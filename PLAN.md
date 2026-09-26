@@ -1,6 +1,6 @@
 # EduFlow AI — Project Plan & Architecture Roadmap
 
-**Tagline:** An autonomous financial agent for education with bounded execution and programmable USDC payments.
+**Tagline:** An autonomous financial agent for education with multi-currency conversion, bounded execution, and programmable USDC payments.
 
 ---
 
@@ -8,24 +8,59 @@
 
 EduFlow AI is an education finance platform that transforms slow, manual student financial assistance into a bounded, intelligent, and auditable system. 
 
+Schools operate worldwide in diverse domestic fiat currencies (USD, EUR, PHP, GBP, CAD, AUD, SGD, INR, NGN), while transparent on-chain assistance pools, smart contract boundaries, and cross-border disbursements leverage **USDC on Circle and Arc infrastructure**.
+
+EduFlow bridges this divide through an integrated **Multi-Currency Conversion & Settlement Engine**:
+- **Tuition & Assistance Denomination:** Schools can bill tuition and students can view aid in their native fiat currency or USDC.
+- **Deterministic Currency Conversion:** Exchange rates are fetched from verified feeds, snapshotted, and locked during evaluation so rate fluctuations never compromise institutional spending caps.
+- **USDC Settlement:** Aid is disbursed autonomously as USDC on-chain, with automated conversion pathways (Circle FX / off-ramp rails) back into local currency for tuition settlement or student expenses.
+
 Traditional education assistance models operate sequentially:
-> Student request $\rightarrow$ Manual review $\rightarrow$ Manual approval $\rightarrow$ Slow bank transfer.
+> Student request $\rightarrow$ Manual review $\rightarrow$ Manual approval $\rightarrow$ Slow cross-border bank transfer.
 
-EduFlow introduces a **bounded autonomous agent loop**:
-> Student request $\rightarrow$ Policy & eligibility evaluation $\rightarrow$ Autonomous approval within strict limits $\rightarrow$ Human escalation for exceptions $\rightarrow$ Programmable USDC disbursement.
+EduFlow introduces a **bounded autonomous agent loop with multi-currency awareness**:
+> Student request (in Local Currency or USDC) $\rightarrow$ Deterministic FX quotation & rate lock $\rightarrow$ Policy evaluation against canonical USDC limits $\rightarrow$ Autonomous approval within strict boundaries $\rightarrow$ Human escalation for exceptions $\rightarrow$ Programmable USDC disbursement & local settlement.
 
-### Non-Negotiable Security Principle
-The Large Language Model (LLM) **never** has direct access to private keys or direct authorization to move funds. All financial actions are strictly governed by a deterministic policy engine and dual-ledger database state before any blockchain transaction can be dispatched.
+### Non-Negotiable Security Principles
+1. **No Direct LLM Fund Control:** The Large Language Model (LLM) **never** has direct access to private keys or direct authorization to move funds. All decisions are evaluated against deterministic PHP rules and dual-ledger database state.
+2. **Fixed-Point Base-Unit Math:** All currency values are stored as integers in minor units (e.g. 6 decimal places for USDC, 2 decimal places for USD/EUR/PHP). Floating-point arithmetic is strictly prohibited for monetary calculations.
+3. **Locked Exchange Rate Snapshots:** Every decision, reservation, and transaction records an immutable snapshot of the exchange rate, rate provider, and timestamp.
 
 ---
 
-## 2. Multi-Part Implementation Roadmap
+## 2. Multi-Currency Architecture
 
 ```mermaid
 graph TD
-    P1[Part 1: Education Foundation & Request Intake] --> P2[Part 2: Deterministic Policy Engine & Human Split]
-    P2 --> P3[Part 3: AI Reasoning & Explainability Agent]
-    P3 --> P4[Part 4: Circle / Arc USDC Settlement Layer]
+    A[Student / School Local Currency<br/>USD, EUR, PHP, GBP, etc.] <-->|Currency Conversion Service<br/>Rates & Rate-Locking| B(Canonical USDC Base Units<br/>6 Decimals)
+    B --> C[Policy Engine<br/>Autonomous Limits & Reserve Checks]
+    C -->|Approved Within Limit| D[USDC Programmable Disbursement<br/>Circle / Arc Wallets]
+    C -->|Exceeds Limit| E[Human Review Escalation<br/>Filament Finance Panel]
+    D -->|Circle FX / Off-Ramp| F[Local Bank Transfer / Tuition Offset]
+```
+
+### Supported Currencies & Precision Matrix
+
+| Currency | Code | Type | Minor Unit Decimals | Multiplier ($1.00$) |
+|---|---|---|---|---|
+| **USD Coin (Settlement)** | `USDC` | Stablecoin | 6 | `1,000,000` |
+| **US Dollar** | `USD` | Fiat | 2 | `100` |
+| **Philippine Peso** | `PHP` | Fiat | 2 | `100` |
+| **Euro** | `EUR` | Fiat | 2 | `100` |
+| **British Pound** | `GBP` | Fiat | 2 | `100` |
+| **Canadian Dollar** | `CAD` | Fiat | 2 | `100` |
+| **Singapore Dollar** | `SGD` | Fiat | 2 | `100` |
+| **Indian Rupee** | `INR` | Fiat | 2 | `100` |
+
+---
+
+## 3. Multi-Part Implementation Roadmap
+
+```mermaid
+graph TD
+    P1[Part 1: Education Foundation & Request Intake<br/>COMPLETED] --> P2[Part 2: Deterministic Policy Engine & Multi-Currency Conversion]
+    P2 --> P3[Part 3: AI Reasoning & Multi-Currency Explainability]
+    P3 --> P4[Part 4: Circle / Arc USDC Settlement & FX Rails]
     P4 --> P5[Part 5: Hackathon Demo & End-to-End Verification]
 
     style P1 fill:#d1fae5,stroke:#059669,stroke-width:2px
@@ -58,69 +93,106 @@ graph TD
 
 ---
 
-### Part 2: Deterministic Policy Engine & Human-in-the-Loop Split (NEXT)
+### Part 2: Deterministic Policy Engine & Multi-Currency Conversion (IN PROGRESS)
 
 #### Objectives
-1. Implement configurable institutional assistance funds and versioned policies.
-2. Build the deterministic `EvaluateAssistancePolicy` action:
+1. **Currency Conversion & Exchange Rate Layer:**
+   - `CurrencyRate` model and repository storing live and fallback exchange rates against USDC.
+   - `CurrencyConverter` service converting between USDC base units and any supported fiat/crypto currency using integer scaling.
+   - Exchange rate quote expiration and locking (`quote_id`, `rate`, `quoted_at`, `expires_at`).
+   - Multi-currency display formatting utility for frontend and Filament panel (e.g. `$100.00 USDC ≈ ₱5,750.00 PHP` or `€92.50 EUR`).
+2. **Institutional Assistance Funds & Policies:**
+   - `AssistanceFund` model with reserve threshold ($5,000 USDC$) and daily budget limits ($1,000 USDC$).
+   - `AssistancePolicyVersion` model with versioned rules for enrollment, GPA, attendance, and semester caps.
+3. **Deterministic `EvaluateAssistancePolicy` Action:**
    - Check enrollment status (`enrolled`).
    - Check academic status (`qualified` or threshold GPA).
    - Check attendance threshold (e.g. $\ge 85\%$).
    - Check outstanding tuition balance ($> 0$).
-   - Check semester disbursement caps per student.
-   - Check fund minimum reserves ($5,000 USDC$) and daily budget limits ($1,000 USDC$).
-3. Implement the **Autonomous Limit vs. Human Review Split**:
-   - Single autonomous limit: **$100.000000 USDC**.
-   - Example ($150 USDC requested):
-     - Automatic approved portion: **$100.000000 USDC**.
-     - Escalated human-review portion: **$50.000000 USDC**.
-     - Status: `partially_approved` or `pending_human_review`.
-4. Create `AgentDecision` and audit records capturing exact evaluation criteria, rule versions, and deterministic rationales.
-5. Provide staff approval/rejection actions in the Filament Finance Panel for the escalated human-review portion.
+   - Check student semester assistance cap.
+   - Check fund minimum reserves and daily budget.
+4. **Autonomous Limit vs. Human Review Split:**
+   - Single autonomous limit: **$100.000000 USDC** (or converted local currency equivalent at locked rate).
+   - Example ($150 USDC requested / ~₱8,625 PHP):
+     - Automatic approved portion: **$100.000000 USDC** (~₱5,750 PHP).
+     - Escalated human-review portion: **$50.000000 USDC** (~₱2,875 PHP).
+     - Status: `partially_approved` with pending escalation.
+5. **Agent Decisions & Dual-Currency Audit Logs:**
+   - `AgentDecision` capturing exact evaluation rules, pass/fail checks, locked exchange rates, and split amounts.
+6. **Filament Staff Actions:**
+   - Staff review and one-click approve/reject actions for the escalated human-review portion in the Finance Panel.
 
 #### Planned Files
+- `app/Enums/CurrencyCode.php`
+- `app/Models/CurrencyRate.php`
+- `app/Services/CurrencyConverter.php`
 - `app/Models/AssistanceFund.php`
 - `app/Models/AssistancePolicyVersion.php`
 - `app/Models/AgentDecision.php`
 - `app/Actions/EvaluateAssistancePolicy.php`
 - `app/Actions/ApproveEscalatedRequest.php`
 - `app/Filament/Resources/AssistanceRequests/Actions/ApproveEscalatedAction.php`
+- `tests/Feature/CurrencyConverterTest.php`
 - `tests/Feature/PolicyEvaluationTest.php`
 
 ---
 
-### Part 3: AI Reasoning & Explainability Layer
-- Integrate LLM agent for natural language justification and request synthesis.
-- Generate conversational explanations for decisions (e.g., answering *"Why was only $100 approved automatically?"*).
-- Enforce strict JSON schema validation on LLM output before passing to backend services.
-- Student conversational assistant for tuition queries and assistance guidelines.
+### Part 3: AI Reasoning & Multi-Currency Explainability Layer
+
+- **LLM Reasoning & Policy Explanation:**
+  - Evaluates qualitative application statements and synthesizes student hardship context.
+  - Explains the exact arithmetic and policy rules in plain language with dual-currency transparency:
+    > *"Your request of ₱8,625 PHP ($150 USDC) was evaluated against Policy v1. Because you meet all academic and attendance criteria, the autonomous financial limit of $100 USDC (₱5,750 PHP) was approved immediately. The remaining $50 USDC (₱2,875 PHP) requires administrative approval to maintain institutional reserve thresholds."*
+- **Strict JSON Schema Enforcement:**
+  - LLM outputs structured JSON validated against strict PHP schema contracts before any downstream processing.
+- **Student Natural Language Querying:**
+  - Interactive "Ask EduFlow" component allowing students to ask questions about tuition balance, currency conversion rates, and financial assistance guidelines.
 
 ---
 
-### Part 4: Circle / Arc USDC Settlement Layer
-- Integration with Circle Developer-Controlled / User-Controlled Wallets.
-- Testnet / Arc smart contract interaction for programmable disbursements.
-- Idempotent transaction submission with blockchain transaction hash recording (`tx_hash`).
-- Webhook handlers for transfer confirmations and failure recovery.
+### Part 4: Circle / Arc USDC Settlement Layer & FX Off-Ramp Rails
+
+- **Circle Wallets Integration:**
+  - School treasury wallet (disbursing fund).
+  - Student recipient wallets (USDC on Arc/testnet).
+- **Programmable Disbursements:**
+  - Automated transfer dispatch for the autonomous $100 USDC portion.
+  - Second conditional transfer dispatch upon human administrator approval for the $50 USDC balance.
+  - Recording on-chain transaction hashes (`tx_hash`) and block explorer links.
+- **Currency Off-Ramp / Tuition Settlement Rails:**
+  - Mock and API integration for Circle Mint / Circle FX / fiat off-ramp.
+  - When funds are earmarked for direct tuition balance reduction, automated conversion from USDC to the school's local ledger currency (e.g. PHP/USD) offsets the student's tuition account with exact ledger reconciliation.
 
 ---
 
 ### Part 5: Hackathon Demo & End-to-End Verification
-- Seeded scenario:
-  1. Student **Juan** signs in with $300 USDC tuition balance.
-  2. Juan requests $150 USDC emergency assistance.
-  3. Policy engine evaluates rules: Juan qualifies, but single autonomous cap is $100 USDC.
-  4. System executes $100 USDC auto-approval and flags $50 USDC for human review.
-  5. Finance officer logs into `/finance` and reviews the pending $50 USDC escalation.
-  6. Audit trail displays full transparency: policy version, rule checks, timestamps, and transactions.
+
+- **Demo Walkthrough (3–5 Minutes):**
+  1. **Student Login:** Juan logs in, seeing a tuition balance displayed in both local currency (e.g., `₱17,250 PHP`) and `300.00 USDC`.
+  2. **Assistance Request:** Juan submits an emergency request for `150.00 USDC` (`₱8,625 PHP`).
+  3. **Autonomous Evaluation:** Policy engine runs instantly:
+     - Verifies enrollment (✓), attendance 95% (✓), academic standing (✓), outstanding balance (✓).
+     - Checks autonomous limit ($100.00 USDC / ₱5,750 PHP).
+  4. **The Split Decision:**
+     - Agent approves `$100.00 USDC` immediately.
+     - Escalates `$50.00 USDC` to human review with exact policy reasons.
+  5. **Disbursement & Conversion:**
+     - Simulates or executes Circle/Arc testnet payment of $100 USDC to Juan's wallet.
+     - Displays live conversion quote and transaction receipt.
+  6. **Admin Review:**
+     - Finance officer logs into `/finance` and views Juan's escalated request with complete AI reasoning and locked exchange rate.
+     - Administrator approves the remaining $50 USDC.
+  7. **Audit & Explanation:**
+     - EduFlow answers: *"Why didn't you send the full $150 USDC initially?"*
+     - Agent explains the institutional threshold and currency conversion breakdown.
 
 ---
 
-## 3. Technology Stack
+## 4. Technology Stack
 
 - **Backend:** Laravel 13, PHP 8.5, SQLite (dev/test) / PostgreSQL (production), Laravel Octane
 - **Frontend:** React 19, Inertia.js v3, Tailwind CSS v4, Radix UI, Lucide Icons
 - **Admin & Operations:** Filament v5, Spatie Permission & Shield, Spatie Activitylog
 - **Testing:** Pest 5, Pest Agent Plugin, PHPUnit
 - **Routing & Types:** Laravel Wayfinder, TypeScript 5.9
-- **Web3 / Payments:** USDC, Circle Wallets / APIs, Arc Testnet
+- **Web3 & Currency:** USDC, Circle Wallets & APIs, Arc Testnet, Multi-Currency Fixed-Point Math
