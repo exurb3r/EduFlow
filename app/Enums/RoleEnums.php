@@ -9,6 +9,8 @@ enum RoleEnums: string
     case SUPER_ADMIN = 'super_admin';
     case ADMIN = 'admin';
     case USER = 'user';
+    case STUDENT = 'student';
+    case FINANCE_OFFICER = 'finance_officer';
 
     public function label(): string
     {
@@ -16,6 +18,8 @@ enum RoleEnums: string
             self::SUPER_ADMIN => 'Super Admin',
             self::ADMIN => 'Admin',
             self::USER => 'User',
+            self::STUDENT => 'Student',
+            self::FINANCE_OFFICER => 'Finance Officer',
         };
     }
 

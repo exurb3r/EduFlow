@@ -19,17 +19,26 @@ use Illuminate\Support\Str;
  * @property int $id
  * @property string $ticket_number
  * @property int $user_id
- * @property AssistanceCategory $category
- * @property AssistancePriority $priority
- * @property AssistanceStatus $status
- * @property string $subject
- * @property string $description
+ * @property int|null $student_id
+ * @property int|null $academic_term_id
+ * @property AssistanceCategory|string $category
+ * @property AssistancePriority|string $priority
+ * @property AssistanceStatus|string $status
+ * @property string|null $type
+ * @property int|string|null $requested_amount
+ * @property string|null $subject
+ * @property string|null $description
+ * @property string|null $reason
+ * @property string|null $submission_key
+ * @property Carbon|null $submitted_at
  * @property string|null $admin_notes
  * @property int|null $assigned_to
  * @property Carbon|null $resolved_at
  * @property Carbon|null $created_at
  * @property Carbon|null $updated_at
  * @property-read User $user
+ * @property-read Student|null $student
+ * @property-read AcademicTerm|null $academicTerm
  * @property-read User|null $assignee
  */
 class AssistanceRequest extends Model
@@ -45,6 +54,8 @@ class AssistanceRequest extends Model
     protected $fillable = [
         'ticket_number',
         'user_id',
+        'student_id',
+        'academic_term_id',
         'category',
         'priority',
         'status',
@@ -53,6 +64,21 @@ class AssistanceRequest extends Model
         'admin_notes',
         'assigned_to',
         'resolved_at',
+        'type',
+        'requested_amount',
+        'reason',
+        'submission_key',
+        'submitted_at',
+    ];
+
+    /**
+     * The model's default values for attributes.
+     *
+     * @var array<string, mixed>
+     */
+    protected $attributes = [
+        'type' => 'emergency',
+        'status' => 'submitted',
     ];
 
     /**
@@ -63,9 +89,12 @@ class AssistanceRequest extends Model
     protected function casts(): array
     {
         return [
+            'student_id' => 'integer',
+            'academic_term_id' => 'integer',
+            'requested_amount' => 'integer',
+            'submitted_at' => 'datetime',
             'category' => AssistanceCategory::class,
             'priority' => AssistancePriority::class,
-            'status' => AssistanceStatus::class,
             'resolved_at' => 'datetime',
         ];
     }
@@ -76,7 +105,41 @@ class AssistanceRequest extends Model
             if (empty($model->ticket_number)) {
                 $model->ticket_number = 'AST-'.strtoupper(Str::random(6));
             }
+            if (empty($model->user_id) && ! empty($model->student_id)) {
+                $student = $model->student ?: Student::find($model->student_id);
+                if ($student) {
+                    $model->user_id = $student->user_id;
+                }
+            }
+            if (empty($model->subject)) {
+                $model->subject = ! empty($model->type) ? ucfirst((string) $model->type).' Assistance' : 'Assistance Request';
+            }
+            if (empty($model->description)) {
+                $model->description = $model->reason ?? '';
+            }
+            if (empty($model->reason)) {
+                $model->reason = $model->description ?? '';
+            }
+            if (empty($model->submitted_at)) {
+                $model->submitted_at = now();
+            }
         });
+    }
+
+    public function getStatusAttribute(mixed $value): mixed
+    {
+        if ($value instanceof AssistanceStatus) {
+            return $value;
+        }
+
+        $enum = AssistanceStatus::tryFrom((string) $value);
+
+        return $enum ?? $value;
+    }
+
+    public function setStatusAttribute(mixed $value): void
+    {
+        $this->attributes['status'] = $value instanceof \BackedEnum ? $value->value : $value;
     }
 
     /**
@@ -85,6 +148,22 @@ class AssistanceRequest extends Model
     public function user(): BelongsTo
     {
         return $this->belongsTo(User::class);
+    }
+
+    /**
+     * @return BelongsTo<Student, $this>
+     */
+    public function student(): BelongsTo
+    {
+        return $this->belongsTo(Student::class);
+    }
+
+    /**
+     * @return BelongsTo<AcademicTerm, $this>
+     */
+    public function academicTerm(): BelongsTo
+    {
+        return $this->belongsTo(AcademicTerm::class);
     }
 
     /**
@@ -102,7 +181,7 @@ class AssistanceRequest extends Model
      */
     public function scopeActive(Builder $query): void
     {
-        $query->whereIn('status', [AssistanceStatus::PENDING, AssistanceStatus::IN_PROGRESS]);
+        $query->whereIn('status', [AssistanceStatus::PENDING->value, AssistanceStatus::IN_PROGRESS->value]);
     }
 
     /**

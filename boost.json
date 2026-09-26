@@ -1,6 +1,7 @@
 {
     "agents": [
-        "opencode"
+        "opencode",
+        "zed"
     ],
     "cloud": false,
     "guidelines": true,
@@ -8,20 +9,13 @@
     "nightwatch": false,
     "packages": [
         "filament/filament",
-        "pestphp/pest-plugin-agent"
+        "pestphp/pest-plugin-agent",
+        "alizharb/filament-activity-log"
     ],
     "sail": false,
     "skills": [
-        "infer-conventions",
-        "fortify-development",
         "laravel-best-practices",
-        "octane-development",
-        "pennant-development",
-        "socialite-development",
-        "wayfinder-development",
         "pest-testing",
-        "inertia-react-development",
-        "tailwindcss-development",
-        "pest-plugin-agent"
+        "tailwindcss-development"
     ]
 }

@@ -16,6 +16,7 @@ use Filament\Panel;
 use Illuminate\Contracts\Auth\MustVerifyEmail;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Relations\HasMany;
+use Illuminate\Database\Eloquent\Relations\HasOne;
 use Illuminate\Foundation\Auth\User as Authenticatable;
 use Illuminate\Notifications\Notifiable;
 use Illuminate\Support\Carbon;
@@ -57,7 +58,17 @@ class User extends Authenticatable implements FilamentUser, HasAppAuthentication
 
     public function canAccessPanel(Panel $panel): bool
     {
-        return $this->hasRole('super_admin');
+        return match ($panel->getId()) {
+            'finance' => $this->hasAnyRole(['admin', 'finance_officer', 'super_admin']),
+            'admin' => $this->hasRole('super_admin'),
+            default => false,
+        };
+    }
+
+    /** @return HasOne<Student, $this> */
+    public function student(): HasOne
+    {
+        return $this->hasOne(Student::class);
     }
 
     public function canImpersonate(): bool
@@ -68,7 +79,9 @@ class User extends Authenticatable implements FilamentUser, HasAppAuthentication
     public function getActivitylogOptions(): LogOptions
     {
         return LogOptions::defaults()
-            ->logAll();
+            ->logOnly(['name', 'email', 'email_verified_at', 'profile_photo_path'])
+            ->logOnlyDirty()
+            ->dontSubmitEmptyLogs();
     }
 
     public function canBeImpersonated(): bool
