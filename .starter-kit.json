@@ -1,8 +1,8 @@
 {
     "docker_enabled": true,
+    "docker_update_strategy": "rolling",
     "docker_registry": "ghcr.io",
     "docker_registry_type": "ghcr",
-    "docker_image_name": "koamishin/koamistarterkit",
-    "configured_at": "2026-01-29T01:00:55+00:00",
-    "docker_hub_author": "koamishin"
+    "docker_image_name": "koamishin/eduflow",
+    "configured_at": "2026-09-26T03:26:07+00:00"
 }
