@@ -62,9 +62,9 @@ show(1, { query: { page: 1 } }) // "/posts/1?page=1"
 ## Wayfinder + Inertia
 
 Use Wayfinder with the `<Form>` component:
-<!-- Wayfinder Form (Vue) -->
-```vue
-<Form v-bind="store.form()"><input name="title" /></Form>
+<!-- Wayfinder Form (React) -->
+```typescript
+<Form {...store.form()}><input name="title" /></Form>
 ```
 
 ## Verification
