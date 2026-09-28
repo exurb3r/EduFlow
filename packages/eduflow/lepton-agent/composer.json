@@ -1,6 +1,6 @@
 {
     "$schema": "https://getcomposer.org/schema.json",
-    "name": "eduflow/lepton-agent",
+    "name": "yukazakiri/lepton-agent",
     "description": "Laravel bridge for Lepton Agents (Circle Agent Stack + Arc). No hardcoded CLI strings in app code.",
     "type": "library",
     "license": "MIT",

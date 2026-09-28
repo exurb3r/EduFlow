@@ -4,7 +4,7 @@
         "Read more about it at https://getcomposer.org/doc/01-basic-usage.md#installing-dependencies",
         "This file is @generated automatically"
     ],
-    "content-hash": "c3e8c23ae3627a163bacb6570804864b",
+    "content-hash": "128c145f4fc9aebc6b8c9dca0bd3539f",
     "packages": [
         {
             "name": "alizharb/filament-activity-log",
@@ -1338,54 +1338,6 @@
                 }
             ],
             "time": "2025-10-31T18:51:33+00:00"
-        },
-        {
-            "name": "eduflow/lepton-agent",
-            "version": "dev-main",
-            "dist": {
-                "type": "path",
-                "url": "packages/eduflow/lepton-agent",
-                "reference": "54725fc9c6e11ef0dd669ff218d4771749358bba"
-            },
-            "require": {
-                "illuminate/contracts": "^13.0",
-                "illuminate/support": "^13.0",
-                "php": "^8.3",
-                "symfony/process": "^7.0|^8.0"
-            },
-            "require-dev": {
-                "orchestra/testbench": "^11.0",
-                "pestphp/pest": "^5.0"
-            },
-            "type": "library",
-            "extra": {
-                "laravel": {
-                    "providers": [
-                        "Eduflow\\Lepton\\LeptonServiceProvider"
-                    ],
-                    "aliases": {
-                        "Lepton": "Eduflow\\Lepton\\Facades\\Lepton"
-                    }
-                }
-            },
-            "autoload": {
-                "psr-4": {
-                    "Eduflow\\Lepton\\": "src/"
-                }
-            },
-            "autoload-dev": {
-                "psr-4": {
-                    "Eduflow\\Lepton\\Tests\\": "tests/"
-                }
-            },
-            "license": [
-                "MIT"
-            ],
-            "description": "Laravel bridge for Lepton Agents (Circle Agent Stack + Arc). No hardcoded CLI strings in app code.",
-            "transport-options": {
-                "symlink": true,
-                "relative": true
-            }
         },
         {
             "name": "egulias/email-validator",
@@ -11417,6 +11369,69 @@
             "time": "2023-04-15T19:07:00+00:00"
         },
         {
+            "name": "yukazakiri/lepton-agent",
+            "version": "dev-main",
+            "dist": {
+                "type": "path",
+                "url": "packages/eduflow/lepton-agent",
+                "reference": "73fd69f9a1e709281b664fe1d6de8c4e8f9489ee"
+            },
+            "require": {
+                "illuminate/contracts": "^13.0",
+                "illuminate/support": "^13.0",
+                "php": "^8.3",
+                "symfony/process": "^7.0|^8.0"
+            },
+            "require-dev": {
+                "orchestra/testbench": "^11.0",
+                "pestphp/pest": "^5.0"
+            },
+            "type": "library",
+            "extra": {
+                "laravel": {
+                    "providers": [
+                        "Eduflow\\Lepton\\LeptonServiceProvider"
+                    ],
+                    "aliases": {
+                        "Lepton": "Eduflow\\Lepton\\Facades\\Lepton"
+                    }
+                }
+            },
+            "autoload": {
+                "psr-4": {
+                    "Eduflow\\Lepton\\": "src/"
+                }
+            },
+            "autoload-dev": {
+                "psr-4": {
+                    "Eduflow\\Lepton\\Tests\\": "tests/"
+                }
+            },
+            "license": [
+                "MIT"
+            ],
+            "authors": [
+                {
+                    "name": "yukazakiri",
+                    "email": "marianolouis18@gmail.com"
+                }
+            ],
+            "description": "Laravel bridge for Lepton Agents (Circle Agent Stack + Arc). No hardcoded CLI strings in app code.",
+            "homepage": "https://github.com/yukazakiri/lepton-agent",
+            "keywords": [
+                "agents",
+                "arc",
+                "circle",
+                "laravel",
+                "usdc",
+                "x402"
+            ],
+            "transport-options": {
+                "symlink": true,
+                "relative": true
+            }
+        },
+        {
             "name": "yukazakiri/shadcthemes-tools",
             "version": "0.1.6",
             "source": {
@@ -17047,7 +17062,7 @@
     "aliases": [],
     "minimum-stability": "stable",
     "stability-flags": {
-        "eduflow/lepton-agent": 20
+        "yukazakiri/lepton-agent": 20
     },
     "prefer-stable": true,
     "prefer-lowest": false,
