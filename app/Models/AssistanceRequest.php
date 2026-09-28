@@ -9,9 +9,11 @@ use App\Enums\AssistancePriority;
 use App\Enums\AssistanceStatus;
 use Database\Factories\AssistanceRequestFactory;
 use Illuminate\Database\Eloquent\Builder;
+use Illuminate\Database\Eloquent\Collection;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
+use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Str;
 
@@ -40,6 +42,7 @@ use Illuminate\Support\Str;
  * @property-read Student|null $student
  * @property-read AcademicTerm|null $academicTerm
  * @property-read User|null $assignee
+ * @property-read Collection<int, AgentDecision> $agentDecisions
  */
 class AssistanceRequest extends Model
 {
@@ -164,6 +167,40 @@ class AssistanceRequest extends Model
     public function academicTerm(): BelongsTo
     {
         return $this->belongsTo(AcademicTerm::class);
+    }
+
+    /**
+     * @return HasMany<AgentDecision, $this>
+     */
+    public function agentDecisions(): HasMany
+    {
+        return $this->hasMany(AgentDecision::class, 'reference_id')
+            ->where('reference_type', static::class);
+    }
+
+    /**
+     * Latest deterministic policy decision recorded for this request, if any.
+     */
+    public function latestAgentDecision(): ?AgentDecision
+    {
+        return $this->agentDecisions()->latest('id')->first();
+    }
+
+    /**
+     * USDC base units still awaiting human approval (requested minus auto-approved).
+     */
+    public function pendingReviewBaseUnits(): int
+    {
+        $requested = (int) ($this->requested_amount ?? 0);
+        $decision = $this->latestAgentDecision();
+
+        if (! $decision || ! $decision->requires_approval) {
+            return 0;
+        }
+
+        $approved = (int) round((float) $decision->approved_amount * 1000000);
+
+        return max(0, $requested - $approved);
     }
 
     /**

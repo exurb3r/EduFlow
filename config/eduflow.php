@@ -3,6 +3,19 @@
 return [
     /*
     |--------------------------------------------------------------------------
+    | Dual-Currency Display
+    |--------------------------------------------------------------------------
+    |
+    | Settlement always happens in USDC base units. Staff-facing screens also
+    | show a local-currency equivalent so a reviewer can see the real value
+    | of what they are authorising. The rate used is the locked quote stored
+    | on the agent decision, never a live rate.
+    |
+    */
+    'display_currency' => env('EDUFLOW_DISPLAY_CURRENCY', 'PHP'),
+
+    /*
+    |--------------------------------------------------------------------------
     | Campus Quick Resources
     |--------------------------------------------------------------------------
     |
