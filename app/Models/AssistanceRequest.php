@@ -104,4 +104,14 @@ class AssistanceRequest extends Model
     {
         $query->whereIn('status', [AssistanceStatus::PENDING, AssistanceStatus::IN_PROGRESS]);
     }
+
+    /**
+     * Scope query to requests that have reached a terminal state.
+     *
+     * @param  Builder<self>  $query
+     */
+    public function scopeResolved(Builder $query): void
+    {
+        $query->whereIn('status', [AssistanceStatus::RESOLVED, AssistanceStatus::CLOSED]);
+    }
 }

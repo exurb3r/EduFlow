@@ -76,7 +76,7 @@ test('student dashboard displays assistance requests and stats', function (): vo
     $response->assertOk();
     $response->assertInertia(fn ($page) => $page
         ->component('dashboard')
-        ->has('requests', 2)
+        ->has('requests.data', 2)
         ->has('categories')
         ->has('priorities')
         ->where('stats.activeRequests', 1)

@@ -30,3 +30,5 @@ yarn-error.log
 **/caddy
 frankenphp
 frankenphp-worker.php
+
+tests/Browser/Screenshots
