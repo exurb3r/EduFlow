@@ -134,9 +134,9 @@ class Dashboard extends BaseDashboard
                 ->title('Ledger and chain differ')
                 ->body(sprintf(
                     'EduFlow ledger %s USDC vs live Arc %s USDC (drift %s USDC). Use "Sync from chain" on the Arc Settlement Network panel to reconcile.',
-                    number_format((float) $chain['ledger_balance'], 2),
-                    number_format((float) $chain['onchain_balance'], 2),
-                    $chain['drift'],
+                    number_format($chain['ledger_balance'], 2),
+                    number_format($chain['onchain_balance'], 2),
+                    number_format($chain['drift'], 2),
                 ))
                 ->warning()
                 ->persistent()

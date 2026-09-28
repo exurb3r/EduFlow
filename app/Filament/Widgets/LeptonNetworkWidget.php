@@ -138,7 +138,7 @@ class LeptonNetworkWidget extends BaseWidget
         }
 
         $balanceStat = Stat::make('On-Chain Treasury', $status['onchain_balance'] !== null
-            ? number_format((float) $status['onchain_balance'], 2).' USDC'
+            ? number_format($status['onchain_balance'], 2).' USDC'
             : 'Unavailable')
             ->description($status['onchain_balance'] !== null
                 ? 'Live via RPC · ledger '.number_format((float) $status['ledger_balance'], 2).' USDC'
