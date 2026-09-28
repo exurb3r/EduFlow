@@ -54,9 +54,29 @@ class Organization extends Model
         return $this->hasMany(Wallet::class);
     }
 
+    /**
+     * The disbursing wallet. Prefers the configured Lepton agent wallet so a
+     * stale placeholder row can never be selected for real settlement.
+     */
     public function primaryWallet(): ?Wallet
     {
-        return $this->wallets()->first();
+        $treasury = config('lepton.arc.treasury');
+
+        if (is_string($treasury) && $treasury !== '') {
+            $configured = $this->wallets()
+                ->where('status', 'active')
+                ->whereRaw('lower(address) = ?', [strtolower($treasury)])
+                ->first();
+
+            if ($configured) {
+                return $configured;
+            }
+        }
+
+        return $this->wallets()
+            ->where('status', 'active')
+            ->orderByDesc('id')
+            ->first();
     }
 
     public function budgets(): HasMany

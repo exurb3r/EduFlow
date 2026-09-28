@@ -28,15 +28,31 @@ class EduFlowFinancialSeeder extends Seeder
             ]
         );
 
-        $wallet = Wallet::firstOrCreate(
-            ['organization_id' => $org->id, 'address' => '0x3a9B97F3dF02B418E97E1C7D6B9c7E67eB3682cA'],
-            [
+        $treasuryAddress = (string) (config('lepton.arc.treasury') ?: '0x3a9B97F3dF02B418E97E1C7D6B9c7E67eB3682cA');
+
+        // Retire placeholder treasury rows so only the real agent wallet remains.
+        $wallet = $org->wallets()->orderBy('id')->first();
+
+        if (! $wallet) {
+            $wallet = Wallet::create([
+                'organization_id' => $org->id,
+                'address' => $treasuryAddress,
                 'provider' => 'circle',
                 'network' => 'arc',
                 'balance' => 25420.00,
                 'status' => 'active',
-            ]
-        );
+            ]);
+        } elseif (strcasecmp($wallet->address, $treasuryAddress) !== 0) {
+            $duplicates = $org->wallets()->whereKeyNot($wallet->id)
+                ->whereRaw('lower(address) = ?', [strtolower($treasuryAddress)])
+                ->pluck('id');
+
+            $wallet->update(['address' => $treasuryAddress]);
+
+            if ($duplicates->isNotEmpty()) {
+                $org->wallets()->whereIn('id', $duplicates)->delete();
+            }
+        }
 
         // Budgets
         $techBudget = Budget::firstOrCreate(

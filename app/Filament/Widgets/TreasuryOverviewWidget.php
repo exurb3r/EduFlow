@@ -4,9 +4,12 @@ declare(strict_types=1);
 
 namespace App\Filament\Widgets;
 
+use App\Enums\TransactionType;
 use App\Models\AgentDecision;
 use App\Models\Invoice;
 use App\Models\Organization;
+use App\Models\Transaction;
+use App\Services\LeptonTreasuryService;
 use App\Services\TreasuryForecastService;
 use Filament\Widgets\StatsOverviewWidget as BaseWidget;
 use Filament\Widgets\StatsOverviewWidget\Stat;
@@ -59,12 +62,39 @@ class TreasuryOverviewWidget extends BaseWidget
             default => 'Critical: Reserve breach expected',
         };
 
+        $chain = app(LeptonTreasuryService::class)->status($wallet);
+
+        // Real settlement history, newest last, so the sparkline is not invented.
+        $history = Transaction::where('wallet_id', $wallet?->id)
+            ->where('type', '!=', TransactionType::TUITION_REVENUE->value)
+            ->orderByDesc('created_at')
+            ->limit(6)
+            ->get(['amount'])
+            ->reverse()
+            ->map(fn (Transaction $t): float => $balance + (float) $t->amount)
+            ->all();
+
+        $balanceStat = Stat::make('Treasury Balance', number_format($balance, 2).' USDC')
+            ->description($chain['live_available']
+                ? 'EduFlow ledger on '.strtoupper($chain['chain'])
+                : 'EduFlow ledger · live chain reads unavailable')
+            ->descriptionIcon('heroicon-m-banknotes')
+            ->color($chain['in_sync'] === false ? 'warning' : 'success');
+
+        if ($chain['live_available']) {
+            $balanceStat->description(sprintf(
+                'Live on-chain %s USDC · %s',
+                number_format((float) $chain['onchain_balance'], 2),
+                $chain['in_sync'] ? 'ledger in sync' : 'drift '.$chain['drift'].' USDC',
+            ));
+        }
+
+        if ($history !== []) {
+            $balanceStat->chart($history);
+        }
+
         return [
-            Stat::make('Treasury Balance', number_format($balance, 2).' USDC')
-                ->description('Circle Wallet on Arc Network')
-                ->descriptionIcon('heroicon-m-banknotes')
-                ->color('success')
-                ->chart([22000, 23500, 24100, 25000, $balance]),
+            $balanceStat,
 
             Stat::make('Minimum Reserve', number_format($reserve, 2).' USDC')
                 ->description($healthDesc)
