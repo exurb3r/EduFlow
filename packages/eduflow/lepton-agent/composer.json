@@ -4,6 +4,14 @@
     "description": "Laravel bridge for Lepton Agents (Circle Agent Stack + Arc). No hardcoded CLI strings in app code.",
     "type": "library",
     "license": "MIT",
+    "homepage": "https://github.com/yukazakiri/lepton-agent",
+    "keywords": ["laravel", "circle", "arc", "usdc", "agents", "x402"],
+    "authors": [
+        {
+            "name": "yukazakiri",
+            "email": "marianolouis18@gmail.com"
+        }
+    ],
     "require": {
         "php": "^8.3",
         "illuminate/contracts": "^13.0",
