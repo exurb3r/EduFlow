@@ -66,7 +66,7 @@ class DashboardController extends Controller
                 'label' => $priority->getLabel(),
             ])->values()->all(),
             'quickResources' => $this->buildQuickResources(),
-            'notifications' => $this->buildNotificationSummary($user),
+            'notifications' => DashboardController::buildNotificationSummary($user),
         ]);
     }
 
@@ -136,7 +136,7 @@ class DashboardController extends Controller
     /**
      * @return array{unreadCount: int, recent: list<array{id: string, title: string, body: string|null, readAt: string|null, createdAt: string}>}
      */
-    private function buildNotificationSummary(User $user): array
+    public static function buildNotificationSummary(User $user): array
     {
         $recent = $user->notifications()
             ->latest()
