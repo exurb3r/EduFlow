@@ -297,6 +297,36 @@ test('primaryWallet ignores inactive wallets', function (): void {
     expect($this->org->primaryWallet())->toBeNull();
 });
 
+test('a stored hash is labelled unverified until proven, never on-chain', function (): void {
+    $tx = Transaction::create([
+        'organization_id' => $this->org->id,
+        'wallet_id' => $this->wallet->id,
+        'type' => TransactionType::VENDOR_PAYMENT,
+        'recipient_address' => '0xvendor',
+        'amount' => 450.00,
+        'status' => TransactionStatus::CONFIRMED,
+        'provider_tx_hash' => '0x'.str_repeat('a', 64),
+        'metadata' => ['gateway' => 'circle-cli', 'is_fake' => false],
+    ]);
+
+    // The database cannot vouch for itself: a hash alone must not read as settled.
+    expect(TransactionsTable::settlementLabel($tx))->toBe('Unverified')
+        ->and(TransactionsTable::settlementTooltip($tx))->toContain('a claim, not proof');
+
+    $tx->update(['metadata' => array_merge($tx->metadata, [
+        'reconciliation' => 'failed',
+        'reconciliation_note' => 'Hash absent from chain.',
+    ])]);
+
+    expect(TransactionsTable::settlementLabel($tx->fresh()))->toBe('Never settled')
+        ->and(TransactionsTable::settlementColor($tx->fresh()))->toBe('danger')
+        ->and(TransactionsTable::isReconciledFailed($tx->fresh()))->toBeTrue();
+
+    $tx->update(['metadata' => array_merge($tx->metadata, ['reconciliation' => 'verified'])]);
+
+    expect(TransactionsTable::isReconciledFailed($tx->fresh()))->toBeFalse();
+});
+
 test('transaction provenance distinguishes on-chain, simulated and ledger-only', function (): void {
     $onchain = Transaction::create([
         'organization_id' => $this->org->id,
@@ -331,8 +361,8 @@ test('transaction provenance distinguishes on-chain, simulated and ledger-only',
         'metadata' => ['simulated_inbound' => true],
     ]);
 
-    expect(TransactionsTable::settlementLabel($onchain))->toBe('On-chain')
-        ->and(TransactionsTable::settlementColor($onchain))->toBe('success')
+    expect(TransactionsTable::settlementLabel($onchain))->toBe('Unverified')
+        ->and(TransactionsTable::settlementColor($onchain))->toBe('info')
         ->and(TransactionsTable::explorerUrl($onchain))->toBe('https://testnet.arcscan.app/tx/0xabc');
 
     expect(TransactionsTable::settlementLabel($simulated))->toBe('Simulated')

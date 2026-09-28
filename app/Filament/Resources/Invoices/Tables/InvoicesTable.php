@@ -4,6 +4,8 @@ declare(strict_types=1);
 
 namespace App\Filament\Resources\Invoices\Tables;
 
+use App\Models\Invoice;
+use App\Services\InvoiceSettlement;
 use Filament\Actions\BulkActionGroup;
 use Filament\Actions\DeleteBulkAction;
 use Filament\Actions\EditAction;
@@ -38,6 +40,44 @@ class InvoicesTable
                 TextColumn::make('due_date')
                     ->label('Due Date')
                     ->date()
+                    ->sortable(),
+                TextColumn::make('settlement_proof')
+                    ->label('Chain Proof')
+                    ->badge()
+                    ->getStateUsing(function (Invoice $record): string {
+                        // A paid status is EduFlow's own claim; only a settled
+                        // transaction backs it. Never assert success on the
+                        // status column alone.
+                        if (! in_array($record->status, ['auto_paid', 'paid'], true)) {
+                            return 'n/a';
+                        }
+
+                        $verdict = InvoiceSettlement::verdictFor($record);
+
+                        return match ($verdict) {
+                            'verified' => 'Verified on Arc',
+                            'unsupported' => 'Receipt invalid',
+                            default => 'Unverified',
+                        };
+                    })
+                    ->color(function (Invoice $record): string {
+                        if (! in_array($record->status, ['auto_paid', 'paid'], true)) {
+                            return 'gray';
+                        }
+
+                        return match (InvoiceSettlement::verdictFor($record)) {
+                            'verified' => 'success',
+                            'unsupported' => 'danger',
+                            default => 'info',
+                        };
+                    })
+                    ->tooltip(function (Invoice $record): string {
+                        if (! in_array($record->status, ['auto_paid', 'paid'], true)) {
+                            return 'Not a settled payment.';
+                        }
+
+                        return InvoiceSettlement::explanationFor($record);
+                    })
                     ->sortable(),
                 TextColumn::make('status')
                     ->badge()
