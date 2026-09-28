@@ -24,10 +24,14 @@ class LeptonTreasuryService
     ) {}
 
     /**
+     * Raw numeric values only. Formatting belongs to the presentation layer;
+     * returning pre-formatted strings here caused `(float) "24,470.00"` to
+     * silently parse as 24.0.
+     *
      * @return array{
      *     chain:string, chain_id:int, block:?int, rpc_host:?string, driver:string,
-     *     live_available:bool, onchain_balance:?string, ledger_balance:string,
-     *     drift:?string, in_sync:?bool, treasury_address:?string,
+     *     live_available:bool, onchain_balance:?float, ledger_balance:float,
+     *     drift:?float, in_sync:?bool, treasury_address:?string,
      *     address_url:?string, is_fake:bool, error:?string
      * }
      */
@@ -47,7 +51,7 @@ class LeptonTreasuryService
             'driver' => $driver,
             'live_available' => false,
             'onchain_balance' => null,
-            'ledger_balance' => number_format($ledger, 2),
+            'ledger_balance' => $ledger,
             'drift' => null,
             'in_sync' => null,
             'treasury_address' => $address,
@@ -81,12 +85,19 @@ class LeptonTreasuryService
         }
 
         // Native Arc USDC is 18 decimals, unlike the 6-decimal Circle USDC.
-        $native = Amounts::toDecimalString((int) hexdec(ltrim($wei, '0x')), 18);
+        // String arithmetic: 20 USDC is 2e19 wei, which overflows a 64-bit int.
+        try {
+            $native = (float) Amounts::fromHexQuantity($wei, 18);
+        } catch (\InvalidArgumentException) {
+            $base['error'] ??= 'Unreadable balance quantity from the RPC endpoint.';
+
+            return $base;
+        }
 
         $base['live_available'] = true;
         $base['onchain_balance'] = $native;
-        $base['drift'] = number_format($ledger - (float) $native, 2);
-        $base['in_sync'] = abs($ledger - (float) $native) < 0.01;
+        $base['drift'] = $ledger - $native;
+        $base['in_sync'] = abs($ledger - $native) < 0.01;
 
         return $base;
     }

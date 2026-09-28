@@ -148,12 +148,14 @@ test('status surfaces ledger drift instead of hiding it', function (): void {
 
     $status = app(LeptonTreasuryService::class)->status($this->wallet);
 
+    // Raw numerics, not pre-formatted strings: (float) "24,470.00" parses as 24.0.
     expect($status['live_available'])->toBeTrue()
-        ->and($status['onchain_balance'])->toBe('5.0')
+        ->and($status['onchain_balance'])->toBe(5.0)
+        ->and($status['ledger_balance'])->toBe(25420.0)
         ->and($status['block'])->toBe((int) hexdec('3d667a7'))
         ->and($status['rpc_host'])->toBe('rpc.testnet.arc-node.thecanteenapp.com')
         ->and($status['in_sync'])->toBeFalse()
-        ->and($status['drift'])->toBe('25,415.00');
+        ->and($status['drift'])->toBe(25415.0);
 });
 
 test('syncBalance writes the live chain figure over the ledger', function (): void {
