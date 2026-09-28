@@ -4,7 +4,7 @@
         "Read more about it at https://getcomposer.org/doc/01-basic-usage.md#installing-dependencies",
         "This file is @generated automatically"
     ],
-    "content-hash": "061557616e55271191fd362047de66ef",
+    "content-hash": "48c27e50e81a780c757935b314e55ae5",
     "packages": [
         {
             "name": "alizharb/filament-activity-log",
@@ -11370,16 +11370,16 @@
         },
         {
             "name": "yukazakiri/lepton-agent",
-            "version": "v1.0.1",
+            "version": "v2.0.0",
             "source": {
                 "type": "git",
                 "url": "https://github.com/yukazakiri/lepton-agent.git",
-                "reference": "a256eb7a327dd99e2fcdaefb6bd789486e9541b5"
+                "reference": "800aefaa18338f06707b4194d89a7c0cc8ef1681"
             },
             "dist": {
                 "type": "zip",
-                "url": "https://api.github.com/repos/yukazakiri/lepton-agent/zipball/a256eb7a327dd99e2fcdaefb6bd789486e9541b5",
-                "reference": "a256eb7a327dd99e2fcdaefb6bd789486e9541b5",
+                "url": "https://api.github.com/repos/yukazakiri/lepton-agent/zipball/800aefaa18338f06707b4194d89a7c0cc8ef1681",
+                "reference": "800aefaa18338f06707b4194d89a7c0cc8ef1681",
                 "shasum": ""
             },
             "require": {
@@ -11396,16 +11396,16 @@
             "extra": {
                 "laravel": {
                     "aliases": {
-                        "Lepton": "Eduflow\\Lepton\\Facades\\Lepton"
+                        "Lepton": "Yukazakiri\\Lepton\\Facades\\Lepton"
                     },
                     "providers": [
-                        "Eduflow\\Lepton\\LeptonServiceProvider"
+                        "Yukazakiri\\Lepton\\LeptonServiceProvider"
                     ]
                 }
             },
             "autoload": {
                 "psr-4": {
-                    "Eduflow\\Lepton\\": "src/"
+                    "Yukazakiri\\Lepton\\": "src/"
                 }
             },
             "notification-url": "https://packagist.org/downloads/",
@@ -11430,9 +11430,9 @@
             ],
             "support": {
                 "issues": "https://github.com/yukazakiri/lepton-agent/issues",
-                "source": "https://github.com/yukazakiri/lepton-agent/tree/v1.0.1"
+                "source": "https://github.com/yukazakiri/lepton-agent/tree/v2.0.0"
             },
-            "time": "2026-09-28T03:11:08+00:00"
+            "time": "2026-09-28T03:20:25+00:00"
         },
         {
             "name": "yukazakiri/shadcthemes-tools",

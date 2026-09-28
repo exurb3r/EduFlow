@@ -8,12 +8,12 @@ use App\Enums\TransactionStatus;
 use App\Enums\TransactionType;
 use App\Models\Transaction;
 use App\Models\Wallet;
-use Eduflow\Lepton\Contracts\ArcNetworkGateway;
-use Eduflow\Lepton\Contracts\WalletGateway;
-use Eduflow\Lepton\Gateways\FakeLeptonGateway;
-use Eduflow\Lepton\Support\Amounts;
 use Illuminate\Support\Str;
 use InvalidArgumentException;
+use Yukazakiri\Lepton\Contracts\ArcNetworkGateway;
+use Yukazakiri\Lepton\Contracts\WalletGateway;
+use Yukazakiri\Lepton\Gateways\FakeLeptonGateway;
+use Yukazakiri\Lepton\Support\Amounts;
 
 class CircleWalletService
 {
