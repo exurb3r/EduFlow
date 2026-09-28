@@ -176,12 +176,13 @@ class AssistanceRequest extends Model
 
     /**
      * Scope query to pending or in-progress requests.
+     * Submitted intake requests count as active until triaged.
      *
      * @param  Builder<self>  $query
      */
     public function scopeActive(Builder $query): void
     {
-        $query->whereIn('status', [AssistanceStatus::PENDING->value, AssistanceStatus::IN_PROGRESS->value]);
+        $query->whereIn('status', [AssistanceStatus::SUBMITTED->value, AssistanceStatus::PENDING->value, AssistanceStatus::IN_PROGRESS->value]);
     }
 
     /**
@@ -191,6 +192,6 @@ class AssistanceRequest extends Model
      */
     public function scopeResolved(Builder $query): void
     {
-        $query->whereIn('status', [AssistanceStatus::RESOLVED, AssistanceStatus::CLOSED]);
+        $query->whereIn('status', [AssistanceStatus::RESOLVED->value, AssistanceStatus::CLOSED->value]);
     }
 }

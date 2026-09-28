@@ -2,6 +2,7 @@
 
 declare(strict_types=1);
 
+use App\Enums\AssistanceStatus;
 use App\Models\AcademicTerm;
 use App\Models\AssistanceRequest;
 use App\Models\Student;
@@ -172,7 +173,7 @@ test('create page supplies a fresh submission key and submission preserves exact
         ->and($request->submission_key)->toBe($key)
         ->and($request->requested_amount)->toBe(150000001)
         ->and($request->type)->toBe('emergency')
-        ->and($request->status)->toBe('submitted')
+        ->and($request->status instanceof AssistanceStatus ? $request->status->value : $request->status)->toBe('submitted')
         ->and($request->reason)->toBe($this->payload['reason'])
         ->and($request->submitted_at->equalTo(now()))->toBeTrue()
         ->and($this->account->fresh()->getAttributes())->toEqual($before)

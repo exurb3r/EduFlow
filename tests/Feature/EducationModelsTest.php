@@ -2,6 +2,7 @@
 
 declare(strict_types=1);
 
+use App\Enums\AssistanceStatus;
 use App\Models\AcademicTerm;
 use App\Models\AssistanceRequest;
 use App\Models\Role;
@@ -113,7 +114,7 @@ test('education defaults apply to models and raw database inserts', function ():
     expect((new Student)->enrollment_status)->toBe('enrolled')
         ->and((new Student)->academic_status)->toBe('qualified')
         ->and((new AssistanceRequest)->type)->toBe('emergency')
-        ->and((new AssistanceRequest)->status)->toBe('submitted');
+        ->and((new AssistanceRequest)->status instanceof AssistanceStatus ? (new AssistanceRequest)->status->value : (new AssistanceRequest)->status)->toBe('submitted');
 
     $studentId = DB::table('students')->insertGetId([
         'user_id' => User::factory()->create()->id,
@@ -132,7 +133,7 @@ test('education defaults apply to models and raw database inserts', function ():
         ->and($student->academic_status)->toBe('qualified')
         ->and($student->attendance_rate)->toBeNull()
         ->and($request->type)->toBe('emergency')
-        ->and($request->status)->toBe('submitted');
+        ->and($request->status instanceof AssistanceStatus ? $request->status->value : $request->status)->toBe('submitted');
 });
 
 test('students enforce unique identity fields', function (string $field): void {
