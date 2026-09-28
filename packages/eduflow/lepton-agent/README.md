@@ -2,6 +2,12 @@
 
 Laravel bridge for Lepton Agents (Circle Agent Stack + Arc). App code never hardcodes `circle` / `arc-canteen` strings.
 
+## Install
+
+```bash
+composer require yukazakiri/lepton-agent
+```
+
 ## Why
 
 `EduFlowAgent` and `CircleWalletService` should depend on contracts:
