@@ -50,7 +50,7 @@
         "spatie/laravel-activitylog": "^4.10",
         "spatie/laravel-permission": "^6.24",
         "spatie/laravel-settings": "^3.7",
-        "yukazakiri/lepton-agent": "@dev",
+        "yukazakiri/lepton-agent": "^1.0",
         "yukazakiri/shadcthemes-tools": "^0.1.6"
     },
     "require-dev": {
@@ -176,15 +176,6 @@
             }
         }
     },
-    "repositories": [
-        {
-            "type": "path",
-            "url": "packages/eduflow/lepton-agent",
-            "options": {
-                "symlink": true
-            }
-        }
-    ],
     "config": {
         "optimize-autoloader": true,
         "preferred-install": "dist",

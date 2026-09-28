@@ -4,7 +4,7 @@
         "Read more about it at https://getcomposer.org/doc/01-basic-usage.md#installing-dependencies",
         "This file is @generated automatically"
     ],
-    "content-hash": "128c145f4fc9aebc6b8c9dca0bd3539f",
+    "content-hash": "061557616e55271191fd362047de66ef",
     "packages": [
         {
             "name": "alizharb/filament-activity-log",
@@ -11370,11 +11370,17 @@
         },
         {
             "name": "yukazakiri/lepton-agent",
-            "version": "dev-main",
+            "version": "v1.0.0",
+            "source": {
+                "type": "git",
+                "url": "https://github.com/yukazakiri/lepton-agent.git",
+                "reference": "040804a36d57dc17e1e26dd68af8b1aef205c766"
+            },
             "dist": {
-                "type": "path",
-                "url": "packages/eduflow/lepton-agent",
-                "reference": "73fd69f9a1e709281b664fe1d6de8c4e8f9489ee"
+                "type": "zip",
+                "url": "https://api.github.com/repos/yukazakiri/lepton-agent/zipball/040804a36d57dc17e1e26dd68af8b1aef205c766",
+                "reference": "040804a36d57dc17e1e26dd68af8b1aef205c766",
+                "shasum": ""
             },
             "require": {
                 "illuminate/contracts": "^13.0",
@@ -11389,12 +11395,12 @@
             "type": "library",
             "extra": {
                 "laravel": {
-                    "providers": [
-                        "Eduflow\\Lepton\\LeptonServiceProvider"
-                    ],
                     "aliases": {
                         "Lepton": "Eduflow\\Lepton\\Facades\\Lepton"
-                    }
+                    },
+                    "providers": [
+                        "Eduflow\\Lepton\\LeptonServiceProvider"
+                    ]
                 }
             },
             "autoload": {
@@ -11402,11 +11408,7 @@
                     "Eduflow\\Lepton\\": "src/"
                 }
             },
-            "autoload-dev": {
-                "psr-4": {
-                    "Eduflow\\Lepton\\Tests\\": "tests/"
-                }
-            },
+            "notification-url": "https://packagist.org/downloads/",
             "license": [
                 "MIT"
             ],
@@ -11419,17 +11421,18 @@
             "description": "Laravel bridge for Lepton Agents (Circle Agent Stack + Arc). No hardcoded CLI strings in app code.",
             "homepage": "https://github.com/yukazakiri/lepton-agent",
             "keywords": [
+                "USDC",
                 "agents",
                 "arc",
                 "circle",
                 "laravel",
-                "usdc",
                 "x402"
             ],
-            "transport-options": {
-                "symlink": true,
-                "relative": true
-            }
+            "support": {
+                "issues": "https://github.com/yukazakiri/lepton-agent/issues",
+                "source": "https://github.com/yukazakiri/lepton-agent/tree/v1.0.0"
+            },
+            "time": "2026-09-28T02:56:59+00:00"
         },
         {
             "name": "yukazakiri/shadcthemes-tools",
@@ -17061,9 +17064,7 @@
     ],
     "aliases": [],
     "minimum-stability": "stable",
-    "stability-flags": {
-        "yukazakiri/lepton-agent": 20
-    },
+    "stability-flags": {},
     "prefer-stable": true,
     "prefer-lowest": false,
     "platform": {
