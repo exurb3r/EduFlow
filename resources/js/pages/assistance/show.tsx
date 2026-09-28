@@ -1,5 +1,7 @@
 import { Head, Link } from '@inertiajs/react';
 import { ArrowLeft } from 'lucide-react';
+import { AskEduFlow } from '@/components/ask-eduflow';
+import { AssistanceAiExplanation } from '@/components/assistance-ai-explanation';
 import {
     AidHeading,
     AidPage,
@@ -12,12 +14,14 @@ import {
     formatUsdc,
 } from '@/lib/financial-aid';
 import { dashboard } from '@/routes/student';
-import type { AssistanceRequest } from '@/types/financial-aid';
+import type { AiExplanation, AssistanceRequest } from '@/types/financial-aid';
 
 export default function ShowAssistance({
     assistanceRequest: request,
+    aiExplanation,
 }: {
     assistanceRequest: AssistanceRequest;
+    aiExplanation?: AiExplanation | null;
 }) {
     return (
         <>
@@ -36,6 +40,12 @@ export default function ShowAssistance({
                 >
                     <RequestStatus status={request.status} />
                 </AidHeading>
+
+                {/* AI Reasoning & Multi-Currency Explanation Section */}
+                {aiExplanation && (
+                    <AssistanceAiExplanation explanation={aiExplanation} />
+                )}
+
                 <section
                     aria-labelledby="request-details"
                     className="overflow-hidden rounded-2xl border bg-card"
@@ -92,7 +102,28 @@ export default function ShowAssistance({
                             {request.reason}
                         </p>
                     </div>
+
+                    {request.admin_notes && (
+                        <div className="space-y-2 border-t bg-muted/20 p-6 sm:p-8">
+                            <h3 className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
+                                Administrative & Dispatch Log
+                            </h3>
+                            <p className="text-xs text-muted-foreground leading-relaxed whitespace-pre-wrap">
+                                {request.admin_notes}
+                            </p>
+                        </div>
+                    )}
                 </section>
+
+                {/* Interactive Ask EduFlow Q&A for this specific request */}
+                <AskEduFlow
+                    suggestedQuestions={[
+                        `Why was request #${request.id} split into autonomous and review portions?`,
+                        'When will the remaining balance be disbursed?',
+                        'How does the locked exchange rate protect my request?',
+                    ]}
+                />
+
                 <PaymentsUnavailable />
             </AidPage>
         </>

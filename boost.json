@@ -14,8 +14,16 @@
     ],
     "sail": false,
     "skills": [
+        "infer-conventions",
+        "fortify-development",
         "laravel-best-practices",
+        "octane-development",
+        "pennant-development",
+        "socialite-development",
+        "wayfinder-development",
         "pest-testing",
-        "tailwindcss-development"
+        "inertia-react-development",
+        "tailwindcss-development",
+        "pest-plugin-agent"
     ]
 }

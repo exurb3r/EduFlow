@@ -1,6 +1,7 @@
 <?php
 
 use App\Enums\SocialLoginProvider;
+use App\Http\Controllers\AskEduFlowController;
 use App\Http\Controllers\AssistanceRequestController;
 use App\Http\Controllers\Auth\SocialAuthController;
 use App\Http\Controllers\NotificationController;
@@ -21,6 +22,7 @@ Route::middleware(['auth', 'verified'])->group(function (): void {
     Route::get('assistance/create', [AssistanceRequestController::class, 'create'])->name('assistance.create');
     Route::post('assistance', [AssistanceRequestController::class, 'storeIntake'])->middleware('throttle:10,1')->name('assistance.store');
     Route::get('assistance/{assistanceRequest}', [AssistanceRequestController::class, 'show'])->name('assistance.show');
+    Route::post('student/ask-eduflow', [AskEduFlowController::class, 'ask'])->middleware('throttle:30,1')->name('student.ask');
     Route::get('notifications', [NotificationController::class, 'index'])->name('notifications.index');
     Route::post('notifications/{id}/read', [NotificationController::class, 'markAsRead'])->name('notifications.mark-as-read');
     Route::post('notifications/read-all', [NotificationController::class, 'markAllAsRead'])->name('notifications.mark-all-read');

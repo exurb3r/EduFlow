@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Agents;
 
+use App\Actions\ApproveEscalatedRequest;
 use App\Actions\EvaluateAssistancePolicy;
 use App\Enums\AgentDecisionType;
 use App\Enums\AssistanceStatus;
@@ -359,6 +360,29 @@ class EduFlowAgent
             return true;
         }
 
+        // If the reference is a student assistance request
+        if ($decision->reference_type === AssistanceRequest::class && $decision->reference_id) {
+            $aid = AssistanceRequest::find($decision->reference_id);
+            if (! $aid) {
+                return false;
+            }
+
+            $fund = AssistanceFund::where('organization_id', $org->id)->first();
+            if (! $fund) {
+                return false;
+            }
+
+            app(ApproveEscalatedRequest::class)->handle(
+                request: $aid,
+                decision: $decision,
+                approver: $approver,
+                fund: $fund,
+                comment: $comment,
+            );
+
+            return true;
+        }
+
         return false;
     }
 
@@ -372,6 +396,15 @@ class EduFlowAgent
         if ($decision->reference_type === Invoice::class && $decision->reference_id) {
             $invoice = Invoice::find($decision->reference_id);
             $invoice?->update(['status' => 'rejected']);
+        }
+
+        if ($decision->reference_type === AssistanceRequest::class && $decision->reference_id) {
+            $aid = AssistanceRequest::find($decision->reference_id);
+            $aid?->update([
+                'status' => AssistanceStatus::CLOSED,
+                'admin_notes' => trim(($aid->admin_notes ?? '')."\nEscalated remainder rejected by {$approver->name}: {$reason}"),
+                'resolved_at' => now(),
+            ]);
         }
 
         $approval->update([

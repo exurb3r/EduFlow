@@ -280,3 +280,116 @@ test('autonomous cycle splits 150 USDC aid into 100 auto plus 50 escalated', fun
         ->and($this->wallet->fresh()->balance)->toBe(25270.00)
         ->and($approval->fresh()->status)->toBe('approved');
 });
+
+test('finance officer can approve student assistance escalation via agent', function (): void {
+    $student = Student::factory()->create([
+        'enrollment_status' => 'enrolled',
+        'academic_status' => 'qualified',
+        'attendance_rate' => 95.00,
+    ]);
+
+    TuitionAccount::factory()->create([
+        'student_id' => $student->id,
+        'academic_term_id' => AcademicTerm::factory()->create()->id,
+        'total_amount' => 300_000000,
+        'paid_amount' => 0,
+    ]);
+
+    $fund = AssistanceFund::create([
+        'organization_id' => $this->org->id,
+        'name' => 'Emergency Assistance Fund',
+        'balance_base_units' => 10000_000000,
+        'reserve_threshold_base_units' => 5000_000000,
+        'daily_budget_base_units' => 1000_000000,
+        'status' => 'active',
+    ]);
+
+    AssistancePolicyVersion::create([
+        'version' => 'v1',
+        'organization_id' => null,
+        'auto_limit_base_units' => 100_000000,
+        'semester_cap_base_units' => 500_000000,
+        'min_attendance_rate' => 85.00,
+        'required_enrollment_status' => 'enrolled',
+        'required_academic_status' => 'qualified',
+        'is_active' => true,
+    ]);
+
+    $aid = AssistanceRequest::factory()->create([
+        'student_id' => $student->id,
+        'user_id' => $student->user_id,
+        'requested_amount' => 150_000000,
+        'status' => AssistanceStatus::SUBMITTED,
+    ]);
+
+    $this->agent->runAutonomousCycle($this->org);
+
+    $decision = AgentDecision::where('reference_id', $aid->id)->first();
+    $approval = Approval::where('agent_decision_id', $decision->id)->first();
+    expect($approval)->not->toBeNull();
+
+    $officer = User::factory()->create(['name' => 'Finance Director']);
+    $success = $this->agent->approveEscalation($approval, $officer, 'Approved remaining 50 USDC');
+
+    expect($success)->toBeTrue()
+        ->and($aid->fresh()->status instanceof AssistanceStatus ? $aid->fresh()->status->value : $aid->fresh()->status)->toBe(AssistanceStatus::RESOLVED->value)
+        ->and($approval->fresh()->status)->toBe('approved')
+        ->and($this->wallet->fresh()->balance)->toBe(25270.00);
+});
+
+test('finance officer can reject student assistance escalation via agent', function (): void {
+    $student = Student::factory()->create([
+        'enrollment_status' => 'enrolled',
+        'academic_status' => 'qualified',
+        'attendance_rate' => 95.00,
+    ]);
+
+    TuitionAccount::factory()->create([
+        'student_id' => $student->id,
+        'academic_term_id' => AcademicTerm::factory()->create()->id,
+        'total_amount' => 300_000000,
+        'paid_amount' => 0,
+    ]);
+
+    AssistanceFund::create([
+        'organization_id' => $this->org->id,
+        'name' => 'Emergency Assistance Fund',
+        'balance_base_units' => 10000_000000,
+        'reserve_threshold_base_units' => 5000_000000,
+        'daily_budget_base_units' => 1000_000000,
+        'status' => 'active',
+    ]);
+
+    AssistancePolicyVersion::create([
+        'version' => 'v1',
+        'organization_id' => null,
+        'auto_limit_base_units' => 100_000000,
+        'semester_cap_base_units' => 500_000000,
+        'min_attendance_rate' => 85.00,
+        'required_enrollment_status' => 'enrolled',
+        'required_academic_status' => 'qualified',
+        'is_active' => true,
+    ]);
+
+    $aid = AssistanceRequest::factory()->create([
+        'student_id' => $student->id,
+        'user_id' => $student->user_id,
+        'requested_amount' => 150_000000,
+        'status' => AssistanceStatus::SUBMITTED,
+    ]);
+
+    $this->agent->runAutonomousCycle($this->org);
+
+    $decision = AgentDecision::where('reference_id', $aid->id)->first();
+    $approval = Approval::where('agent_decision_id', $decision->id)->first();
+    expect($approval)->not->toBeNull();
+
+    $officer = User::factory()->create(['name' => 'Finance Director']);
+    $success = $this->agent->rejectEscalation($approval, $officer, 'Budget allocation exhausted for this category');
+
+    expect($success)->toBeTrue()
+        ->and($aid->fresh()->status instanceof AssistanceStatus ? $aid->fresh()->status->value : $aid->fresh()->status)->toBe(AssistanceStatus::CLOSED->value)
+        ->and($approval->fresh()->status)->toBe('rejected')
+        ->and($decision->fresh()->status)->toBe('rejected')
+        ->and($this->wallet->fresh()->balance)->toBe(25320.00); // 100 auto-paid stands, no additional 50 moved
+});

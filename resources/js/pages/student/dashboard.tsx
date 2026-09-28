@@ -1,11 +1,13 @@
 import { Head, Link } from '@inertiajs/react';
-import { ArrowRight, Plus } from 'lucide-react';
+import { ArrowRight, Plus, Sparkles } from 'lucide-react';
+import { AskEduFlow } from '@/components/ask-eduflow';
 import {
     AidHeading,
     AidPage,
     PaymentsUnavailable,
     RequestStatus,
 } from '@/components/financial-aid';
+import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import {
     formatAidLabel,
@@ -21,6 +23,8 @@ export default function StudentDashboard({
     tuitionAccount,
     requests,
     canRequest,
+    currency,
+    suggestedQuestions,
 }: StudentDashboardProps) {
     return (
         <>
@@ -31,7 +35,7 @@ export default function StudentDashboard({
                     description="Your tuition, your requests, and a clear view of what comes next."
                 >
                     {canRequest && (
-                        <Button asChild className="shrink-0">
+                        <Button asChild className="shrink-0 bg-amber-600 text-white hover:bg-amber-700 dark:bg-amber-600">
                             <Link href={create()}>
                                 <Plus aria-hidden="true" />
                                 Request assistance
@@ -61,14 +65,22 @@ export default function StudentDashboard({
                     </div>
                 </dl>
 
+                {/* Tuition Overview Card with Dual-Currency Display */}
                 <section
                     aria-labelledby="tuition-heading"
                     className="overflow-hidden rounded-2xl border bg-card"
                 >
                     <div className="flex flex-wrap items-center justify-between gap-2 border-b px-6 py-4">
-                        <h2 id="tuition-heading" className="font-medium">
-                            Tuition overview
-                        </h2>
+                        <div className="flex items-center gap-2">
+                            <h2 id="tuition-heading" className="font-medium">
+                                Tuition overview
+                            </h2>
+                            {currency && (
+                                <Badge variant="outline" className="text-[11px] font-normal text-muted-foreground">
+                                    {currency.rate_description}
+                                </Badge>
+                            )}
+                        </div>
                         {tuitionAccount && (
                             <p className="text-sm text-muted-foreground">
                                 {tuitionAccount.term}
@@ -77,7 +89,7 @@ export default function StudentDashboard({
                     </div>
                     {tuitionAccount ? (
                         <dl className="grid md:grid-cols-2">
-                            <div className="flex flex-col justify-center gap-3 bg-emerald-50/70 p-6 sm:p-8 dark:bg-emerald-950/30">
+                            <div className="flex flex-col justify-center gap-2 bg-emerald-50/70 p-6 sm:p-8 dark:bg-emerald-950/30">
                                 <dt className="text-sm text-emerald-900 dark:text-emerald-200">
                                     Remaining balance
                                 </dt>
@@ -86,6 +98,11 @@ export default function StudentDashboard({
                                         tuitionAccount.remaining_amount,
                                     )}
                                 </dd>
+                                {tuitionAccount.remaining_amount_fiat && (
+                                    <p className="text-xs font-medium text-emerald-900/80 dark:text-emerald-200/80">
+                                        ≈ {tuitionAccount.remaining_amount_fiat}
+                                    </p>
+                                )}
                             </div>
                             <div className="grid content-center gap-6 p-6 sm:p-8">
                                 <div className="flex flex-wrap justify-between gap-2">
@@ -96,6 +113,11 @@ export default function StudentDashboard({
                                         {formatUsdc(
                                             tuitionAccount.total_amount,
                                         )}
+                                        {tuitionAccount.total_amount_fiat && (
+                                            <span className="ml-2 text-xs font-normal text-muted-foreground">
+                                                (≈ {tuitionAccount.total_amount_fiat})
+                                            </span>
+                                        )}
                                     </dd>
                                 </div>
                                 <div className="flex flex-wrap justify-between gap-2 border-t pt-5">
@@ -104,6 +126,11 @@ export default function StudentDashboard({
                                     </dt>
                                     <dd className="font-medium break-all tabular-nums">
                                         {formatUsdc(tuitionAccount.paid_amount)}
+                                        {tuitionAccount.paid_amount_fiat && (
+                                            <span className="ml-2 text-xs font-normal text-muted-foreground">
+                                                (≈ {tuitionAccount.paid_amount_fiat})
+                                            </span>
+                                        )}
                                     </dd>
                                 </div>
                             </div>
@@ -121,6 +148,14 @@ export default function StudentDashboard({
                     )}
                 </section>
 
+                {/* Interactive Ask EduFlow AI Component */}
+                <AskEduFlow
+                    suggestedQuestions={suggestedQuestions}
+                    displayCurrency={currency?.display}
+                    rateDescription={currency?.rate_description}
+                />
+
+                {/* Assistance Requests List */}
                 <section
                     aria-labelledby="requests-heading"
                     className="space-y-4"
@@ -161,22 +196,34 @@ export default function StudentDashboard({
                                     className="flex flex-col gap-4 p-5 sm:flex-row sm:items-center sm:justify-between"
                                 >
                                     <div className="min-w-0 space-y-2">
-                                        <Link
-                                            href={show({
-                                                assistanceRequest: request.id,
-                                            })}
-                                            className="inline-flex items-center gap-2 rounded-sm font-medium underline-offset-4 hover:underline focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-ring"
-                                        >
-                                            {formatAidLabel(request.type)}{' '}
-                                            assistance{' '}
-                                            <span className="text-muted-foreground">
-                                                #{request.id}
-                                            </span>
-                                            <ArrowRight
-                                                aria-hidden="true"
-                                                className="size-4"
-                                            />
-                                        </Link>
+                                        <div className="flex flex-wrap items-center gap-2">
+                                            <Link
+                                                href={show({
+                                                    assistanceRequest: request.id,
+                                                })}
+                                                className="inline-flex items-center gap-2 rounded-sm font-medium underline-offset-4 hover:underline focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-ring"
+                                            >
+                                                {formatAidLabel(request.type)}{' '}
+                                                assistance{' '}
+                                                <span className="text-muted-foreground">
+                                                    #{request.id}
+                                                </span>
+                                                <ArrowRight
+                                                    aria-hidden="true"
+                                                    className="size-4"
+                                                />
+                                            </Link>
+
+                                            {request.is_split && (
+                                                <Badge
+                                                    variant="secondary"
+                                                    className="gap-1 border border-amber-400 bg-amber-100/60 text-[10px] text-amber-900 dark:border-amber-800 dark:bg-amber-950/60 dark:text-amber-200"
+                                                >
+                                                    <Sparkles className="size-2.5" />
+                                                    Autonomous Split
+                                                </Badge>
+                                            )}
+                                        </div>
                                         <p className="text-xs text-muted-foreground">
                                             Submitted{' '}
                                             <time
@@ -189,11 +236,18 @@ export default function StudentDashboard({
                                         </p>
                                     </div>
                                     <div className="flex flex-wrap items-center justify-between gap-4 sm:justify-end">
-                                        <span className="text-sm font-medium break-all tabular-nums">
-                                            {formatUsdc(
-                                                request.requested_amount,
+                                        <div className="text-right">
+                                            <span className="text-sm font-medium break-all tabular-nums">
+                                                {formatUsdc(
+                                                    request.requested_amount,
+                                                )}
+                                            </span>
+                                            {request.is_split && (
+                                                <p className="text-[11px] text-muted-foreground">
+                                                    100 USDC auto · remainder pending
+                                                </p>
                                             )}
-                                        </span>
+                                        </div>
                                         <RequestStatus
                                             status={request.status}
                                         />
