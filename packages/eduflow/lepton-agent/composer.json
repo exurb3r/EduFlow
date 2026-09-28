@@ -1,0 +1,39 @@
+{
+    "$schema": "https://getcomposer.org/schema.json",
+    "name": "eduflow/lepton-agent",
+    "description": "Laravel bridge for Lepton Agents (Circle Agent Stack + Arc). No hardcoded CLI strings in app code.",
+    "type": "library",
+    "license": "MIT",
+    "require": {
+        "php": "^8.3",
+        "illuminate/contracts": "^13.0",
+        "illuminate/support": "^13.0",
+        "symfony/process": "^7.0|^8.0"
+    },
+    "require-dev": {
+        "pestphp/pest": "^5.0",
+        "orchestra/testbench": "^11.0"
+    },
+    "autoload": {
+        "psr-4": {
+            "Eduflow\\Lepton\\": "src/"
+        }
+    },
+    "autoload-dev": {
+        "psr-4": {
+            "Eduflow\\Lepton\\Tests\\": "tests/"
+        }
+    },
+    "extra": {
+        "laravel": {
+            "providers": [
+                "Eduflow\\Lepton\\LeptonServiceProvider"
+            ],
+            "aliases": {
+                "Lepton": "Eduflow\\Lepton\\Facades\\Lepton"
+            }
+        }
+    },
+    "minimum-stability": "stable",
+    "prefer-stable": true
+}
