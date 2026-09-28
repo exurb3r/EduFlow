@@ -1,0 +1,249 @@
+@layer components {
+/*
+|--------------------------------------------------------------------------
+| Student Bulletin
+|--------------------------------------------------------------------------
+|
+| Scoped design tokens for the student-facing portal (dashboard and
+| notifications only). The semantic tokens are redefined on a wrapper
+| class rather than on :root, which re-skins every shadcn primitive
+| underneath it — the component set follows without any per-component
+| overrides. Filament, auth and settings keep the neutral default.
+|
+| Direction: warm paper, editorial serif, ink. Cream stock, hairline
+| rules instead of boxes, real colour in a restrained ink-teal and
+| terracotta pair, and the already-imported Antic / Signifier /
+| JetBrains Mono actually wired up instead of silently falling back to
+| system fonts.
+|
+*/
+
+.bulletin {
+    /* Raw palette */
+    --paper: oklch(0.9665 0.0125 85);
+    --paper-raised: oklch(0.9855 0.0075 88);
+    --paper-sunk: oklch(0.9455 0.0155 83);
+    --ink: oklch(0.2450 0.0180 60);
+    --ink-soft: oklch(0.5050 0.0160 70);
+    --ink-faint: oklch(0.6850 0.0130 80);
+    --rule: oklch(0.8680 0.0180 82);
+    --rule-strong: oklch(0.7750 0.0240 80);
+    --ink-teal: oklch(0.4050 0.0560 205);
+    --terracotta: oklch(0.5150 0.1350 43);
+    --terracotta-bright: oklch(0.6100 0.1550 45);
+
+    /* Status hues, muted to sit on paper rather than glow on white */
+    --status-pending: oklch(0.6000 0.1050 72);
+    --status-progress: oklch(0.5000 0.0780 220);
+    --status-resolved: oklch(0.4750 0.0850 152);
+    --status-urgent: oklch(0.4950 0.1700 26);
+
+    /* Semantic remap */
+    --background: var(--paper);
+    --foreground: var(--ink);
+    --card: var(--paper-raised);
+    --card-foreground: var(--ink);
+    --popover: var(--paper-raised);
+    --popover-foreground: var(--ink);
+    --primary: var(--ink-teal);
+    --primary-foreground: oklch(0.9855 0.0075 88);
+    --secondary: var(--paper-sunk);
+    --secondary-foreground: var(--ink);
+    --muted: var(--paper-sunk);
+    --muted-foreground: var(--ink-soft);
+    --accent: oklch(0.9250 0.0240 78);
+    --accent-foreground: var(--ink);
+    --destructive: var(--status-urgent);
+    --destructive-foreground: oklch(0.9855 0.0075 88);
+    --border: var(--rule);
+    --input: var(--rule-strong);
+    --ring: var(--terracotta);
+
+    /*
+    | The app shell paints from the --sidebar* set, not from --background,
+    | so these have to be remapped or the chrome stays on the neutral
+    | default palette. --sidebar is deliberately the SAME value as
+    | --paper: the shell and the content are one continuous sheet, and the
+    | inset variant is delineated by its radius and shadow rather than by
+    | a second background tone.
+    */
+    --sidebar: var(--paper);
+    --sidebar-foreground: var(--ink);
+    --sidebar-primary: var(--ink-teal);
+    --sidebar-primary-foreground: oklch(0.9855 0.0075 88);
+    --sidebar-accent: oklch(0.9150 0.0210 78);
+    --sidebar-accent-foreground: var(--ink);
+    --sidebar-border: var(--rule);
+    --sidebar-ring: var(--terracotta);
+
+    /* Typography — only faces this project actually loads, finally used */
+    --font-sans:
+        'Instrument Sans', ui-sans-serif, system-ui, sans-serif,
+        'Apple Color Emoji', 'Segoe UI Emoji';
+    --font-serif: 'Newsreader', ui-serif, Georgia, Cambria, serif;
+    --font-display: 'Antic', 'Newsreader', ui-serif, Georgia, serif;
+    --font-mono: 'JetBrains Mono', ui-monospace, SFMono-Regular, monospace;
+
+    /* Square corners and almost no elevation: this is printed matter */
+    --radius: 0.25rem;
+    --radius-lg: var(--radius);
+    --radius-md: calc(var(--radius) - 1px);
+    --radius-sm: calc(var(--radius) - 2px);
+    --shadow-2xs: none;
+    --shadow-xs: none;
+    --shadow-sm: 0 1px 2px oklch(0.245 0.018 60 / 0.04);
+    --shadow: 0 1px 3px oklch(0.245 0.018 60 / 0.06);
+    --shadow-md: 0 3px 8px oklch(0.245 0.018 60 / 0.07);
+    --shadow-lg: 0 8px 24px oklch(0.245 0.018 60 / 0.09);
+
+    background-color: var(--background);
+    color: var(--foreground);
+    font-family: var(--font-sans);
+}
+
+/*
+| Dark mode. Not an inversion — the same warm paper stock photographed at
+| night: a deep warm ink ground with cream type. The teal and terracotta
+| are lightened so they hold their contrast against the darker stock.
+*/
+.dark .bulletin {
+    --paper: oklch(0.2320 0.0130 62);
+    --paper-raised: oklch(0.2740 0.0140 64);
+    --paper-sunk: oklch(0.3180 0.0150 66);
+    --ink: oklch(0.9380 0.0135 85);
+    --ink-soft: oklch(0.7250 0.0130 78);
+    --ink-faint: oklch(0.5850 0.0120 76);
+    --rule: oklch(0.3450 0.0140 64);
+    --rule-strong: oklch(0.4550 0.0160 66);
+    --ink-teal: oklch(0.7650 0.0720 195);
+    --terracotta: oklch(0.6950 0.1300 50);
+    --terracotta-bright: oklch(0.7750 0.1400 54);
+
+    --status-pending: oklch(0.7550 0.1150 78);
+    --status-progress: oklch(0.7050 0.0850 220);
+    --status-resolved: oklch(0.7150 0.1100 155);
+    --status-urgent: oklch(0.6850 0.1600 28);
+
+    --primary-foreground: oklch(0.2320 0.0130 62);
+    --destructive-foreground: oklch(0.2320 0.0130 62);
+    --accent: oklch(0.3350 0.0170 66);
+    --accent-foreground: oklch(0.9380 0.0135 85);
+
+    --sidebar: var(--paper);
+    --sidebar-foreground: var(--ink);
+    --sidebar-primary: var(--ink-teal);
+    --sidebar-primary-foreground: oklch(0.2320 0.0130 62);
+    --sidebar-accent: oklch(0.2900 0.0150 64);
+    --sidebar-accent-foreground: var(--ink);
+    --sidebar-border: var(--rule);
+    --sidebar-ring: var(--terracotta);
+
+    --shadow-sm: 0 1px 2px oklch(0 0 0 / 0.3);
+    --shadow: 0 1px 3px oklch(0 0 0 / 0.35);
+    --shadow-md: 0 3px 8px oklch(0 0 0 / 0.4);
+    --shadow-lg: 0 8px 24px oklch(0 0 0 / 0.45);
+}
+
+/* Paper grain. Subtle enough to read as stock, not as noise. */
+.bulletin-grain {
+    position: relative;
+    isolation: isolate;
+}
+
+.bulletin-grain::before {
+    content: '';
+    position: absolute;
+    inset: 0;
+    z-index: -1;
+    pointer-events: none;
+    opacity: 0.5;
+    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='140' height='140'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.85' numOctaves='3' stitchTiles='stitch'/%3E%3CfeColorMatrix type='saturate' values='0'/%3E%3C/filter%3E%3Crect width='140' height='140' filter='url(%23n)' opacity='0.055'/%3E%3C/svg%3E");
+}
+
+/*
+| Small-caps section eyebrow. Antic is a display face, so it earns its
+| place at letter-spaced small sizes where its character reads and
+| vanishes at body size.
+*/
+:where(.bulletin-eyebrow) {
+    font-family: var(--font-display);
+    font-size: 0.6875rem;
+    letter-spacing: 0.16em;
+    text-transform: uppercase;
+    color: var(--ink-faint);
+}
+
+/* Editorial display numerals. Tight, large, and unboxed. */
+:where(.bulletin-figure) {
+    font-family: var(--font-serif);
+    font-weight: 400;
+    line-height: 0.9;
+    letter-spacing: -0.02em;
+    font-variant-numeric: lining-nums tabular-nums;
+    color: var(--ink-teal);
+}
+
+/* Ledger rule: a hairline that reads as a printed divider. */
+:where(.bulletin-rule) {
+    border-bottom: 1px solid var(--rule);
+}
+
+:where(.bulletin-rule-strong) {
+    border-bottom: 1px solid var(--rule-strong);
+}
+
+/*
+| Ticket rows are ledger lines, not cards: no border, no radius, no
+| shadow — just a hairline and a paper lift on hover.
+*/
+:where(.bulletin-row) {
+    border-bottom: 1px solid var(--rule);
+    transition: background-color 150ms ease;
+}
+
+:where(.bulletin-row:last-child) {
+    border-bottom: 0;
+}
+
+:where(.bulletin-row):hover {
+    background-color: var(--paper-raised);
+}
+
+/* Status reads as a small inked rule at the row's leading edge. */
+:where(.bulletin-tab) {
+    width: 2px;
+    align-self: stretch;
+    border-radius: 999px;
+    flex-shrink: 0;
+}
+
+.bulletin-tab-pending {
+    background-color: var(--status-pending);
+}
+
+.bulletin-tab-progress {
+    background-color: var(--status-progress);
+}
+
+.bulletin-tab-resolved {
+    background-color: var(--status-resolved);
+}
+
+.bulletin-tab-closed {
+    background-color: var(--ink-faint);
+}
+
+/* Inset field styling so inputs read as ruled lines, not chrome. */
+:where(.bulletin-field) {
+    background-color: var(--paper-raised);
+    border-color: var(--rule-strong);
+    border-radius: var(--radius);
+    box-shadow: none;
+}
+
+:where(.bulletin-field):focus-visible {
+    border-color: var(--terracotta);
+    box-shadow: 0 0 0 2px oklch(0.515 0.135 43 / 0.18);
+}
+
+}

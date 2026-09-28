@@ -39,6 +39,7 @@ permissions:
 
 env:
   DOCKER_ENABLED: true
+  DOCKER_UPDATE_STRATEGY: rolling  # rolling=auto-build on push, manual=release on explicit trigger
   REGISTRY: ghcr.io
   IMAGE_NAME: ${{ github.repository }}
 
@@ -190,7 +191,7 @@ jobs:
           VERSION: ${{ needs.prepare.outputs.version }}
           TAG: ${{ needs.prepare.outputs.tag }}
           EXTRA_NOTES: ${{ needs.prepare.outputs.extra_notes }}
-          REGISTRY: ${{ env.REGISTRY }}
+          REGISTRY: ghcr.io
           IMAGE_NAME: ${{ github.repository }}
         with:
           script: |

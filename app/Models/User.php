@@ -149,4 +149,12 @@ class User extends Authenticatable implements FilamentUser, HasAppAuthentication
     {
         return $this->hasMany(SocialAccount::class);
     }
+
+    /**
+     * @return HasMany<AssistanceRequest, $this>
+     */
+    public function assistanceRequests(): HasMany
+    {
+        return $this->hasMany(AssistanceRequest::class);
+    }
 }

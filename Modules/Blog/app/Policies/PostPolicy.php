@@ -4,14 +4,14 @@ declare(strict_types=1);
 
 namespace Modules\Blog\Policies;
 
-use Illuminate\Auth\Access\HandlesAuthorization;
 use Illuminate\Foundation\Auth\User as AuthUser;
 use Modules\Blog\Models\Post;
+use Illuminate\Auth\Access\HandlesAuthorization;
 
 class PostPolicy
 {
     use HandlesAuthorization;
-
+    
     public function viewAny(AuthUser $authUser): bool
     {
         return $authUser->can('ViewAny:Post');
@@ -66,4 +66,5 @@ class PostPolicy
     {
         return $authUser->can('Reorder:Post');
     }
+
 }

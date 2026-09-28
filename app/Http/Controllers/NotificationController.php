@@ -5,29 +5,31 @@ namespace App\Http\Controllers;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Notifications\DatabaseNotification;
+use Inertia\Inertia;
+use Inertia\Response;
 
 class NotificationController extends Controller
 {
-    public function index(Request $request): JsonResponse
+    private const PER_PAGE = 20;
+
+    public function index(Request $request): Response
     {
         $notifications = $request->user()
             ->notifications()
             ->latest()
-            ->limit(50)
-            ->get()
-            ->map(fn (DatabaseNotification $databaseNotification): array => [
-                'id' => $databaseNotification->id,
-                'type' => $databaseNotification->type,
-                'data' => $databaseNotification->data,
-                'read_at' => $databaseNotification->read_at?->toISOString(),
-                'created_at' => $databaseNotification->created_at->toISOString(),
+            ->paginate(self::PER_PAGE)
+            ->withQueryString()
+            ->through(fn (DatabaseNotification $notification): array => [
+                'id' => $notification->id,
+                'type' => $notification->type,
+                'data' => $notification->data,
+                'read_at' => $notification->read_at?->toISOString(),
+                'created_at' => $notification->created_at->toISOString(),
             ]);
 
-        $unreadCount = $request->user()->unreadNotifications()->count();
-
-        return response()->json([
+        return Inertia::render('notifications', [
             'notifications' => $notifications,
-            'unread_count' => $unreadCount,
+            'unread_count' => $request->user()->unreadNotifications()->count(),
         ]);
     }
 
