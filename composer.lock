@@ -4,7 +4,7 @@
         "Read more about it at https://getcomposer.org/doc/01-basic-usage.md#installing-dependencies",
         "This file is @generated automatically"
     ],
-    "content-hash": "9b7e35856662f03dc551f8c7d706f47a",
+    "content-hash": "8f35211a425c67cf245135d56447eae4",
     "packages": [
         {
             "name": "alizharb/filament-activity-log",
@@ -11370,16 +11370,16 @@
         },
         {
             "name": "yukazakiri/lepton-agent",
-            "version": "v2.4.0",
+            "version": "v2.5.0",
             "source": {
                 "type": "git",
                 "url": "https://github.com/yukazakiri/lepton-agent.git",
-                "reference": "4686486aa1e0e699361014d59f3549127ad09f35"
+                "reference": "99d616e7ba8e872cee02866a958daf0be2e24801"
             },
             "dist": {
                 "type": "zip",
-                "url": "https://api.github.com/repos/yukazakiri/lepton-agent/zipball/4686486aa1e0e699361014d59f3549127ad09f35",
-                "reference": "4686486aa1e0e699361014d59f3549127ad09f35",
+                "url": "https://api.github.com/repos/yukazakiri/lepton-agent/zipball/99d616e7ba8e872cee02866a958daf0be2e24801",
+                "reference": "99d616e7ba8e872cee02866a958daf0be2e24801",
                 "shasum": ""
             },
             "require": {
@@ -11430,9 +11430,9 @@
             ],
             "support": {
                 "issues": "https://github.com/yukazakiri/lepton-agent/issues",
-                "source": "https://github.com/yukazakiri/lepton-agent/tree/v2.4.0"
+                "source": "https://github.com/yukazakiri/lepton-agent/tree/v2.5.0"
             },
-            "time": "2026-09-28T05:03:11+00:00"
+            "time": "2026-09-29T02:54:11+00:00"
         },
         {
             "name": "yukazakiri/shadcthemes-tools",

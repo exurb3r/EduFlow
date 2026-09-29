@@ -13,6 +13,7 @@ use Symfony\Component\Process\ExecutableFinder;
 use Symfony\Component\Process\Process;
 use Throwable;
 use Yukazakiri\Lepton\Contracts\ArcNetworkGateway;
+use Yukazakiri\Lepton\Contracts\AuthGateway;
 use Yukazakiri\Lepton\Contracts\WalletGateway;
 use Yukazakiri\Lepton\Support\Amounts;
 
@@ -79,34 +80,51 @@ class LeptonDoctor extends Command
     {
         $this->heading('Circle agent session');
 
-        $out = $this->runCli((string) config('lepton.circle.bin', 'circle'), ['wallet', 'status']);
-        $text = $out['output'];
-
-        if ($out['exit'] !== 0) {
-            $this->line('  <fg=red>✗</> could not read Circle status');
-            $this->failures++;
-
-            return;
-        }
-
         $chain = (string) config('lepton.arc.chain', 'ARC-TESTNET');
         $network = str_contains($chain, 'TESTNET') ? 'testnet' : 'mainnet';
 
-        if (! preg_match('/Network:\s*'.$network.'(.*?)Status:\s*(\S+)/s', $text, $m)) {
-            $this->line("  <fg=yellow>?</> no {$network} section in Circle status");
-            $this->detail('Run: circle wallet status');
+        try {
+            $status = app(AuthGateway::class)->authStatus();
+        } catch (Throwable $e) {
+            $this->line('  <fg=red>✗</> could not read Circle status: '.$e->getMessage());
+            $this->detail('Is the Circle CLI installed?  npm install -g @circle-fin/cli');
+            $this->failures++;
 
             return;
         }
 
-        $valid = strtoupper($m[2]) === 'VALID';
+        $this->kv('type', (string) $status['type']);
 
-        $this->line(sprintf('  %s %-14s %s', $valid ? '<fg=green>✓</>' : '<fg=red>✗</>', $network, $m[2]));
+        foreach (['mainnet', 'testnet'] as $name) {
+            $section = $status[$name];
+            $valid = $section['authenticated'] === true;
+            $marker = $valid ? '<fg=green>✓</>' : '<fg=red>✗</>';
 
-        if (! $valid) {
-            $this->failures++;
-            $this->detail("Run: circle wallet login <email> --{$network} --init  (then paste the emailed OTP)");
+            $this->line(sprintf(
+                '  %s %-14s %-30s %s',
+                $marker,
+                $name,
+                $section['email'] ?? 'not signed in',
+                $valid ? 'expires in '.$section['expires_in'] : ''
+            ));
         }
+
+        // Mainnet and testnet authenticate independently, so a valid mainnet
+        // session does not authorise transfers on the configured chain.
+        if (($status[$network]['authenticated'] ?? false) !== true) {
+            $this->line('  <fg=red>✗</> no usable session for '.$chain);
+            $this->failures++;
+            $this->detail('Run: php artisan lepton:login '.$emailHint().'   (add --testnet for testnet)');
+
+            return;
+        }
+
+        $this->line('  <fg=green>✓</> configured chain '.strtoupper($chain).' is authorised');
+    }
+
+    private function emailHint(): string
+    {
+        return '<your-email>';
     }
 
     private function checkConfiguredTreasury(): ?string

@@ -50,7 +50,7 @@
         "spatie/laravel-activitylog": "^4.10",
         "spatie/laravel-permission": "^6.24",
         "spatie/laravel-settings": "^3.7",
-        "yukazakiri/lepton-agent": "^2.4",
+        "yukazakiri/lepton-agent": "^2.5",
         "yukazakiri/shadcthemes-tools": "^0.1.6"
     },
     "require-dev": {
