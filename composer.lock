@@ -4,7 +4,7 @@
         "Read more about it at https://getcomposer.org/doc/01-basic-usage.md#installing-dependencies",
         "This file is @generated automatically"
     ],
-    "content-hash": "8f35211a425c67cf245135d56447eae4",
+    "content-hash": "988bcbdb0710ee180087236304b7737e",
     "packages": [
         {
             "name": "alizharb/filament-activity-log",
@@ -11370,16 +11370,16 @@
         },
         {
             "name": "yukazakiri/lepton-agent",
-            "version": "v2.5.0",
+            "version": "v2.6.0",
             "source": {
                 "type": "git",
                 "url": "https://github.com/yukazakiri/lepton-agent.git",
-                "reference": "99d616e7ba8e872cee02866a958daf0be2e24801"
+                "reference": "a1495e5df56ed0c722a428755901736adb9a004c"
             },
             "dist": {
                 "type": "zip",
-                "url": "https://api.github.com/repos/yukazakiri/lepton-agent/zipball/99d616e7ba8e872cee02866a958daf0be2e24801",
-                "reference": "99d616e7ba8e872cee02866a958daf0be2e24801",
+                "url": "https://api.github.com/repos/yukazakiri/lepton-agent/zipball/a1495e5df56ed0c722a428755901736adb9a004c",
+                "reference": "a1495e5df56ed0c722a428755901736adb9a004c",
                 "shasum": ""
             },
             "require": {
@@ -11390,7 +11390,8 @@
             },
             "require-dev": {
                 "orchestra/testbench": "^11.0",
-                "pestphp/pest": "^5.0"
+                "pestphp/pest": "^5.0",
+                "symfony/yaml": "^7.0|^8.0"
             },
             "type": "library",
             "extra": {
@@ -11430,9 +11431,9 @@
             ],
             "support": {
                 "issues": "https://github.com/yukazakiri/lepton-agent/issues",
-                "source": "https://github.com/yukazakiri/lepton-agent/tree/v2.5.0"
+                "source": "https://github.com/yukazakiri/lepton-agent/tree/v2.6.0"
             },
-            "time": "2026-09-29T02:54:11+00:00"
+            "time": "2026-09-29T04:28:57+00:00"
         },
         {
             "name": "yukazakiri/shadcthemes-tools",

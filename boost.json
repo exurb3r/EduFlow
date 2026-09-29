@@ -10,7 +10,8 @@
     "packages": [
         "filament/filament",
         "pestphp/pest-plugin-agent",
-        "alizharb/filament-activity-log"
+        "alizharb/filament-activity-log",
+        "yukazakiri/lepton-agent"
     ],
     "sail": false,
     "skills": [
@@ -24,6 +25,8 @@
         "pest-testing",
         "inertia-react-development",
         "tailwindcss-development",
+        "lepton-agent-development",
+        "lepton-agent-settlement",
         "pest-plugin-agent"
     ]
 }
