@@ -211,9 +211,47 @@ class EduFlowAgent
             $decision = $out['decision'];
             $explanation = $this->explainer->explain($aidResult, $requestedBase, CurrencyCode::PHP);
 
-            if ($aidResult->decision === AgentDecisionType::AUTO_APPROVE || $aidResult->decision === AgentDecisionType::PARTIAL_APPROVAL) {
-                $recipient = '0xstudent_'.substr(md5((string) ($aidRequest->user_id ?? $aidRequest->student?->user_id ?? 0)), 0, 16);
+            // A payment needs a real destination. The agent must never invent
+            // one: an address the recipient does not control is either rejected
+            // by the Circle CLI or, worse, accepted and irretrievable.
+            $recipient = $aidRequest->student?->payout_address;
 
+            if (in_array($aidResult->decision, [AgentDecisionType::AUTO_APPROVE, AgentDecisionType::PARTIAL_APPROVAL], true)
+                && ($recipient === null || $aidRequest->student?->hasValidPayoutAddress() !== true)) {
+                $decision->update([
+                    'status' => 'escalated',
+                    'decision' => AgentDecisionType::ESCALATE,
+                    'approved_amount' => 0.00,
+                    'requires_approval' => true,
+                    'policy_checked' => 'STUDENT_PAYOUT_ADDRESS_MISSING_V1',
+                    'reasoning_summary' => 'Approved amount withheld: the student has no valid payout address on file. '
+                        .'Record a 0x address for this student before any assistance can be disbursed.',
+                ]);
+
+                Approval::create([
+                    'organization_id' => $org->id,
+                    'agent_decision_id' => $decision->id,
+                    'status' => 'pending',
+                ]);
+
+                $aidRequest->update([
+                    'status' => AssistanceStatus::IN_PROGRESS,
+                    'assigned_to' => null,
+                    'admin_notes' => 'EduFlow AI: no valid payout address on file for this student. '
+                        .'Escalated so Finance can record one before disbursing.',
+                ]);
+
+                $escalatedCount++;
+
+                $processedAssistance[] = [
+                    'ticket' => $aidRequest->ticket_number,
+                    'decision' => AgentDecisionType::ESCALATE->value,
+                ];
+
+                continue;
+            }
+
+            if ($aidResult->decision === AgentDecisionType::AUTO_APPROVE || $aidResult->decision === AgentDecisionType::PARTIAL_APPROVAL) {
                 $tx = $this->circleService->executePayment(
                     wallet: $wallet,
                     recipientAddress: $recipient,

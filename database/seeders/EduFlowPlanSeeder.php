@@ -14,34 +14,39 @@ class EduFlowPlanSeeder extends Seeder
 {
     public function run(): void
     {
-        $org = Organization::firstOrCreate(
+        // Keep these identical to EduFlowFinancialSeeder: whichever runs second
+        // must not leave the organization on a different set of thresholds.
+        $org = Organization::updateOrCreate(
             ['name' => 'Northstar Learning Center'],
             [
                 'type' => 'school',
                 'currency' => 'USDC',
-                'minimum_reserve' => 10000.00,
-                'max_auto_payment' => 1000.00,
-                'max_daily_disbursement' => 5000.00,
-                'human_approval_threshold' => 1000.00,
+                'minimum_reserve' => 20.00,
+                'max_auto_payment' => 50.00,
+                'max_daily_disbursement' => 200.00,
+                'human_approval_threshold' => 50.00,
             ]
         );
 
+        // All amounts are 6-decimal USDC base units, stored as integers.
         AssistanceFund::firstOrCreate(
             ['organization_id' => $org->id],
             [
                 'name' => 'Emergency Assistance Fund',
-                'balance_base_units' => 10000_000000,
-                'reserve_threshold_base_units' => 5000_000000,
-                'daily_budget_base_units' => 1000_000000,
+                'balance_base_units' => 1000_000000,
+                'reserve_threshold_base_units' => 500_000000,
+                'daily_budget_base_units' => 200_000000,
                 'status' => 'active',
             ]
         );
 
+        // A request above the 10 USDC auto-limit is partially approved and the
+        // remainder escalated, which is the split the demo narrates.
         AssistancePolicyVersion::firstOrCreate(
             ['version' => 'v1', 'organization_id' => null],
             [
-                'auto_limit_base_units' => 100_000000,
-                'semester_cap_base_units' => 500_000000,
+                'auto_limit_base_units' => 10_000000,
+                'semester_cap_base_units' => 50_000000,
                 'min_attendance_rate' => 85.00,
                 'required_enrollment_status' => 'enrolled',
                 'required_academic_status' => 'qualified',

@@ -67,11 +67,13 @@ test('qualitative hardship synthesis categorizes student medical hardship', func
 });
 
 test('show assistance page provides rich dual-currency AI explanation when evaluated', function (): void {
+    // Above the 10 USDC auto-limit but under the 50 USDC semester cap, so the
+    // bounded split engages: 10 approved, 5 escalated for advisor review.
     $request = AssistanceRequest::factory()->create([
         'student_id' => $this->student->id,
         'user_id' => $this->user->id,
         'academic_term_id' => $this->term->id,
-        'requested_amount' => 150_000000,
+        'requested_amount' => 15_000000,
         'reason' => 'Emergency medical costs for family clinic stay.',
         'status' => AssistanceStatus::SUBMITTED,
     ]);
@@ -86,9 +88,9 @@ test('show assistance page provides rich dual-currency AI explanation when evalu
         ->has('aiExplanation')
         ->where('aiExplanation.decision', 'partial_approval')
         ->where('aiExplanation.policy_code', 'BOUNDED_EMERGENCY_AID_V1')
-        ->where('aiExplanation.split.requested_usdc', '150.00')
-        ->where('aiExplanation.split.auto_approved_usdc', '100.00')
-        ->where('aiExplanation.split.pending_usdc', '50.00')
+        ->where('aiExplanation.split.requested_usdc', '15.00')
+        ->where('aiExplanation.split.auto_approved_usdc', '10.00')
+        ->where('aiExplanation.split.pending_usdc', '5.00')
         ->where('aiExplanation.hardship_category', 'Emergency Medical & Health Need')
         ->has('aiExplanation.checks', 9)
         ->has('aiExplanation.transactions')

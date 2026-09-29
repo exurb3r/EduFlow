@@ -24,6 +24,25 @@ class StudentFactory extends Factory
             'enrollment_status' => 'enrolled',
             'academic_status' => 'qualified',
             'attendance_rate' => null,
+            // A well-formed destination, so assistance can actually settle.
+            'payout_address' => '0x'.fake()->regexify('[0-9a-f]{40}'),
         ];
+    }
+
+    /**
+     * A student with no payout address, who therefore cannot be disbursed to.
+     */
+    public function withoutPayoutAddress(): static
+    {
+        return $this->state(fn (array $attributes): array => [
+            'payout_address' => null,
+        ]);
+    }
+
+    public function withInvalidPayoutAddress(): static
+    {
+        return $this->state(fn (array $attributes): array => [
+            'payout_address' => '0xnot-a-real-address',
+        ]);
     }
 }

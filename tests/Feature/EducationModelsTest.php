@@ -194,7 +194,10 @@ test('education demo seeder provisions demo data only in allowed environments', 
         ->and($account->total_amount)->toBe(300000000)
         ->and($account->paid_amount)->toBe(0)
         ->and($account->academicTerm->isActive())->toBeTrue()
-        ->and(AssistanceRequest::count())->toBe(0);
+        // One pending request, above the 10 USDC auto-limit so the demo has a
+        // bounded split to narrate.
+        ->and(AssistanceRequest::count())->toBe(1)
+        ->and(AssistanceRequest::sole()->requested_amount)->toBe(15_000000);
 })->with(['local', 'testing']);
 
 test('education demo seeder preserves existing data and passwords on reruns', function (): void {

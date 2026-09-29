@@ -3,6 +3,7 @@
 declare(strict_types=1);
 
 use App\Models\AcademicTerm;
+use App\Models\AssistancePolicyVersion;
 use App\Models\Student;
 use App\Models\TuitionAccount;
 use App\Models\User;
@@ -88,7 +89,10 @@ test('student receives assistance policy guidelines', function (): void {
 
     expect($answer)->toContain('Enrolled')
         ->and($answer)->toContain('attendance')
-        ->and($answer)->toContain('100.00 USDC');
+        // The auto-limit comes from the active policy version, not a constant.
+        ->and($answer)->toContain(
+            number_format(AssistancePolicyVersion::active()->auto_limit_base_units / 1000000, 2).' USDC'
+        );
 });
 
 test('validation rejects empty or overly short questions', function (): void {

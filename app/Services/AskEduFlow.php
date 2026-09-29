@@ -51,8 +51,8 @@ class AskEduFlow
 
         if (str_contains($q, 'assist') || str_contains($q, 'aid') || str_contains($q, 'policy') || str_contains($q, 'guideline') || str_contains($q, 'eligib') || str_contains($q, 'qualif')) {
             $policy = AssistancePolicyVersion::active();
-            $limit = $policy ? number_format($policy->auto_limit_base_units / 1000000, 2) : '100.00';
-            $cap = $policy ? number_format($policy->semester_cap_base_units / 1000000, 2) : '500.00';
+            $limit = $policy ? number_format($policy->auto_limit_base_units / 1000000, 2) : '10.00';
+            $cap = $policy ? number_format($policy->semester_cap_base_units / 1000000, 2) : '50.00';
             $att = $policy ? $policy->min_attendance_rate : 85.00;
 
             return "Assistance guidelines under Policy v1: Enrolled status required, qualified academic standing, ≥{$att}% attendance rate, and an outstanding tuition balance. Auto-limit is {$limit} USDC (instant Arc transfer); larger amounts up to {$cap} USDC per semester are split for human authorization.";

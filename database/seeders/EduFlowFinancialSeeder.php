@@ -16,15 +16,20 @@ class EduFlowFinancialSeeder extends Seeder
 {
     public function run(): void
     {
-        $org = Organization::firstOrCreate(
+        // Scenario figures are sized so the whole demo settles for real on Arc
+        // testnet. The Circle faucet mints exactly 20 USDC per drip and
+        // rate-limits after about five, so a funded agent wallet tops out near
+        // 120 USDC. Every figure below is chosen to fit inside that ceiling
+        // while still exercising each policy branch.
+        $org = Organization::updateOrCreate(
             ['name' => 'Northstar Learning Center'],
             [
                 'type' => 'school',
                 'currency' => 'USDC',
-                'minimum_reserve' => 10000.00,
-                'max_auto_payment' => 1000.00,
-                'max_daily_disbursement' => 5000.00,
-                'human_approval_threshold' => 1000.00,
+                'minimum_reserve' => 20.00,
+                'max_auto_payment' => 50.00,
+                'max_daily_disbursement' => 200.00,
+                'human_approval_threshold' => 50.00,
             ]
         );
 
@@ -39,7 +44,7 @@ class EduFlowFinancialSeeder extends Seeder
                 'address' => $treasuryAddress,
                 'provider' => 'circle',
                 'network' => 'arc',
-                'balance' => 25420.00,
+                'balance' => 120.00,
                 'status' => 'active',
             ]);
         } elseif (strcasecmp($wallet->address, $treasuryAddress) !== 0) {
@@ -59,9 +64,9 @@ class EduFlowFinancialSeeder extends Seeder
             ['organization_id' => $org->id, 'name' => 'Technology & Cloud'],
             [
                 'category' => 'technology',
-                'allocated_amount' => 4000.00,
+                'allocated_amount' => 400.00,
                 'spent_amount' => 0.00,
-                'remaining_amount' => 4000.00,
+                'remaining_amount' => 400.00,
                 'status' => 'active',
             ]
         );
@@ -70,9 +75,9 @@ class EduFlowFinancialSeeder extends Seeder
             ['organization_id' => $org->id, 'name' => 'School Operations'],
             [
                 'category' => 'operations',
-                'allocated_amount' => 10000.00,
+                'allocated_amount' => 1000.00,
                 'spent_amount' => 0.00,
-                'remaining_amount' => 10000.00,
+                'remaining_amount' => 1000.00,
                 'status' => 'active',
             ]
         );
@@ -81,9 +86,9 @@ class EduFlowFinancialSeeder extends Seeder
             ['organization_id' => $org->id, 'name' => 'Student Assistance & Aid'],
             [
                 'category' => 'assistance',
-                'allocated_amount' => 2000.00,
+                'allocated_amount' => 200.00,
                 'spent_amount' => 0.00,
-                'remaining_amount' => 2000.00,
+                'remaining_amount' => 200.00,
                 'status' => 'active',
             ]
         );
@@ -92,9 +97,9 @@ class EduFlowFinancialSeeder extends Seeder
             ['organization_id' => $org->id, 'name' => 'Campus Equipment & Lab'],
             [
                 'category' => 'equipment',
-                'allocated_amount' => 5000.00,
+                'allocated_amount' => 500.00,
                 'spent_amount' => 0.00,
-                'remaining_amount' => 5000.00,
+                'remaining_amount' => 500.00,
                 'status' => 'active',
             ]
         );
@@ -144,14 +149,27 @@ class EduFlowFinancialSeeder extends Seeder
             ]
         );
 
-        // Invoices representing the demo scenarios
+        // Invoices representing the demo scenarios. Amounts are chosen so the
+        // policy engine takes a different branch for each, given a 120 USDC
+        // wallet, a 20 USDC reserve and a 50 USDC autonomous limit. The engine
+        // checks vendor, then budget, then reserve, then the auto limit, so
+        // these amounts are ordered against those gates deliberately.
+        //
+        //   30   -> AUTO_PAY  (verified vendor, under the limit)
+        //   45   -> AUTO_PAY
+        //   60   -> ESCALATE  (unverified vendor, checked first)
+        //   90   -> ESCALATE  (over the 50 limit, wallet can still afford it)
+        //   200  -> HOLD      (would breach the 20 USDC reserve)
+        //   2000 -> REJECT    (the equipment budget only holds 500)
+        //
+        // Only the two auto-pays move money: 75 USDC in total.
         Invoice::firstOrCreate(
-            ['reference' => 'INV-CLOUD-450'],
+            ['reference' => 'INV-CLOUD-45'],
             [
                 'organization_id' => $org->id,
                 'vendor_id' => $cloudVendor->id,
                 'budget_id' => $techBudget->id,
-                'amount' => 450.00,
+                'amount' => 45.00,
                 'due_date' => Carbon::tomorrow(),
                 'category' => 'technology',
                 'status' => 'pending',
@@ -160,12 +178,12 @@ class EduFlowFinancialSeeder extends Seeder
         );
 
         Invoice::firstOrCreate(
-            ['reference' => 'INV-FIBER-300'],
+            ['reference' => 'INV-FIBER-30'],
             [
                 'organization_id' => $org->id,
                 'vendor_id' => $fiberVendor->id,
                 'budget_id' => $opsBudget->id,
-                'amount' => 300.00,
+                'amount' => 30.00,
                 'due_date' => Carbon::now()->addDays(2),
                 'category' => 'operations',
                 'status' => 'pending',
@@ -174,12 +192,26 @@ class EduFlowFinancialSeeder extends Seeder
         );
 
         Invoice::firstOrCreate(
-            ['reference' => 'INV-LAB-2500'],
+            ['reference' => 'INV-UNVERIFIED-60'],
+            [
+                'organization_id' => $org->id,
+                'vendor_id' => $unverifiedVendor->id,
+                'budget_id' => $opsBudget->id,
+                'amount' => 60.00,
+                'due_date' => Carbon::now()->addDays(4),
+                'category' => 'books',
+                'status' => 'pending',
+                'metadata' => ['service' => 'Out-of-Print Literature Anthologies'],
+            ]
+        );
+
+        Invoice::firstOrCreate(
+            ['reference' => 'INV-LAB-90'],
             [
                 'organization_id' => $org->id,
                 'vendor_id' => $labVendor->id,
                 'budget_id' => $equipmentBudget->id,
-                'amount' => 2500.00,
+                'amount' => 90.00,
                 'due_date' => Carbon::now()->addDays(5),
                 'category' => 'equipment',
                 'status' => 'pending',
@@ -188,30 +220,30 @@ class EduFlowFinancialSeeder extends Seeder
         );
 
         Invoice::firstOrCreate(
-            ['reference' => 'INV-HAZARD-20000'],
+            ['reference' => 'INV-SUPPLY-200'],
             [
                 'organization_id' => $org->id,
                 'vendor_id' => $labVendor->id,
                 'budget_id' => $equipmentBudget->id,
-                'amount' => 20000.00,
-                'due_date' => Carbon::now()->addDays(7),
+                'amount' => 200.00,
+                'due_date' => Carbon::now()->addDays(6),
                 'category' => 'equipment',
                 'status' => 'pending',
-                'metadata' => ['service' => 'Full Campus HVAC Replacement'],
+                'metadata' => ['service' => 'Semester Lab Consumables Restock'],
             ]
         );
 
         Invoice::firstOrCreate(
-            ['reference' => 'INV-UNVERIFIED-600'],
+            ['reference' => 'INV-HAZARD-2000'],
             [
                 'organization_id' => $org->id,
-                'vendor_id' => $unverifiedVendor->id,
-                'budget_id' => $opsBudget->id,
-                'amount' => 600.00,
-                'due_date' => Carbon::now()->addDays(4),
-                'category' => 'books',
+                'vendor_id' => $labVendor->id,
+                'budget_id' => $equipmentBudget->id,
+                'amount' => 2000.00,
+                'due_date' => Carbon::now()->addDays(7),
+                'category' => 'equipment',
                 'status' => 'pending',
-                'metadata' => ['service' => 'Out-of-Print Literature Anthologies'],
+                'metadata' => ['service' => 'Full Campus HVAC Replacement'],
             ]
         );
     }
