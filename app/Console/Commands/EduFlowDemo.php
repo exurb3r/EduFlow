@@ -72,7 +72,7 @@ class EduFlowDemo extends Command
             $this->line('Explorer: '.($receipt?->metadata['explorer_url'] ?? $receipt?->provider_tx_hash ?? 'n/a'));
         }
 
-        $this->line($ask->answer("Why didn't you send the full 150 USDC initially?"));
+        $this->line($ask->answer("Why didn't you send the full request initially?"));
 
         return self::SUCCESS;
     }

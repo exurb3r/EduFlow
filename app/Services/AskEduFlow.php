@@ -25,16 +25,23 @@ class AskEduFlow
         $display = CurrencyCode::tryFrom(strtoupper($context['display_currency'] ?? 'PHP')) ?? CurrencyCode::PHP;
         $balanceBase = (int) ($context['tuition_balance_base_units'] ?? 0);
 
-        if (str_contains($q, 'why') && (str_contains($q, '150') || str_contains($q, 'split') || str_contains($q, 'send the full') || str_contains($q, 'not all') || str_contains($q, 'partial'))) {
+        if (str_contains($q, 'why') && (str_contains($q, 'split') || str_contains($q, 'send the full') || str_contains($q, 'not all') || str_contains($q, 'partial') || preg_match('/\b\d+(\.\d+)?\s*usdc\b/', $q) === 1)) {
             $quote = $this->converter->lockQuote($display);
-            $autoFiat = $this->converter->formatDual(100_000000, $display);
-            $pendingFiat = $this->converter->formatDual(50_000000, $display);
 
-            return "Because the autonomous limit is 100 USDC. A 150 USDC request is split into 100 USDC auto-approved ({$autoFiat}) and 50 USDC ({$pendingFiat}) escalated for human review to protect institutional reserves. The rate was locked via provider {$quote['provider']}.";
+            // Describe the rule from the live policy. The exact per-request split
+            // is rendered elsewhere from the recorded decision; restating invented
+            // figures here would contradict it.
+            $autoBase = $this->autoLimitBaseUnits();
+            $auto = number_format($autoBase / 1000000, 2);
+            $autoFiat = $this->converter->formatDual($autoBase, $display);
+
+            return "Because the autonomous assistance limit is {$auto} USDC. Any request above that is split rather than refused: up to {$auto} USDC ({$autoFiat}) is approved immediately, and the remainder is escalated to a human reviewer so a person stays accountable for the larger amount. The exchange rate was locked via provider {$quote['provider']} at evaluation time, so the split cannot change underneath you.";
         }
 
         if (str_contains($q, 'remainder') || str_contains($q, 'escalat') || str_contains($q, 'when') || str_contains($q, 'pending 50') || str_contains($q, 'human review')) {
-            return 'The remaining 50 USDC was escalated to the school Finance Officer. Once reviewed and authorized in the /finance panel, a second Arc USDC transfer will automatically execute to your student wallet.';
+            $pending = number_format($this->autoLimitBaseUnits() / 1000000, 2);
+
+            return "The remaining {$pending} USDC was escalated to the school Finance Officer. Once reviewed and authorized in the /finance panel, a second Arc USDC transfer will automatically execute to your student wallet.";
         }
 
         if (str_contains($q, 'balance') || str_contains($q, 'tuition') || str_contains($q, 'how much do i owe') || str_contains($q, 'pay tuition')) {
@@ -75,7 +82,17 @@ class AskEduFlow
             return 'Tuition ledger holds '.number_format($total / 1000000, 2).' USDC across accounts (base units, integer math).';
         }
 
-        return 'I can explain tuition balance, currency conversion rates, and financial assistance guidelines. Try: "What is my tuition balance?" or "Why didn\'t you send the full 150 USDC?" or "What are assistance guidelines?"';
+        $limit = number_format($this->autoLimitBaseUnits() / 1000000, 2);
+
+        return "I can explain tuition balance, currency conversion rates, and financial assistance guidelines. Try: \"What is my tuition balance?\" or \"Why didn't you send the full {$limit} USDC?\" or \"What are assistance guidelines?\"";
+    }
+
+    /**
+     * The live assistance auto-limit, in base units.
+     */
+    private function autoLimitBaseUnits(): int
+    {
+        return (int) (AssistancePolicyVersion::active()?->auto_limit_base_units ?? 10_000000);
     }
 
     /**
@@ -90,17 +107,20 @@ class AskEduFlow
         $q = strtolower($question);
         $display = CurrencyCode::tryFrom(strtoupper($context['display_currency'] ?? 'PHP')) ?? CurrencyCode::PHP;
 
+        $limit = number_format($this->autoLimitBaseUnits() / 1000000, 2);
+        $pending = number_format(2 * $this->autoLimitBaseUnits() / 1000000, 2);
+
         $topic = 'general';
         $followups = [
             'What is my tuition balance?',
-            'Why was my 150 USDC request split?',
+            'Why was my request split?',
             'What are the assistance guidelines?',
         ];
 
-        if (str_contains($q, '150') || str_contains($q, 'split') || str_contains($q, 'why')) {
+        if (str_contains($q, 'split') || str_contains($q, 'why') || str_contains($q, 'send the full')) {
             $topic = 'split_decision';
             $followups = [
-                'When will the remaining 50 USDC be approved?',
+                "When will the remaining {$pending} USDC be approved?",
                 'How does currency rate locking work?',
                 'What is my current tuition balance?',
             ];
@@ -114,7 +134,7 @@ class AskEduFlow
         } elseif (str_contains($q, 'rate') || str_contains($q, 'convert') || str_contains($q, 'php') || str_contains($q, 'exchange')) {
             $topic = 'currency_conversion';
             $followups = [
-                'Why was my 150 USDC request split?',
+                'Why was my request split?',
                 'What is my tuition balance in PHP?',
                 'Are rates locked during evaluation?',
             ];
@@ -122,7 +142,7 @@ class AskEduFlow
             $topic = 'assistance_policy';
             $followups = [
                 'What is the attendance rate requirement?',
-                'What happens if my request exceeds 100 USDC?',
+                "What happens if my request exceeds {$limit} USDC?",
                 'Can I apply more than once per semester?',
             ];
         }

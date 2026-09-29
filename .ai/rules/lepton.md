@@ -54,3 +54,23 @@ The ledger and the chain are separate numbers. A seeded ledger of 24,470 USDC ag
 119 USDC on-chain balance means every auto-pay will fail for lack of funds, and the
 dashboard will show drift. Seed the ledger to match what the wallet actually holds, or
 keep the large figures off-chain only.
+
+## Each demo run spends real USDC and is not repeatable
+One `eduflow:demo` cycle moves 85 USDC (two auto-paid invoices plus the approved aid
+portion). The faucet will not refill on demand, so plan one run per funding cycle and
+use `LEPTON_DRIVER=fake` for iterating. Note that `migrate:fresh --seed` wipes the ledger
+but **not** the chain, so wiping after a run leaves an unexplained on-chain gap.
+
+## Never invent a payment destination
+A recipient address must come from a real record, never be synthesised from a hash or an
+id. The agent used to build `0xstudent_<md5>`, which was 22 hex characters rather than
+40 and was rejected by Circle. Circle requires `0x` plus exactly 40 hex digits; EIP-55
+checksum casing is *not* required. A malformed or missing address must escalate, never
+fall back to a generated one — a rejected address is recoverable, an accepted one the
+recipient does not control is not.
+
+## Keep user-facing explanations sourced from live policy
+Explanations that restate fixed figures (`AskEduFlow`, dashboard copy, suggested
+questions) drift the moment a threshold changes, and then contradict the decision they
+are describing. Read the active `AssistancePolicyVersion` and the recorded decision, and
+assert in tests that the only USDC figure in a split explanation is the live auto-limit.

@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 use App\Enums\CurrencyCode;
 use App\Models\AcademicTerm;
+use App\Models\AssistancePolicyVersion;
 use App\Models\AssistanceRequest;
 use App\Models\Organization;
 use App\Models\Student;
@@ -52,9 +53,13 @@ test('explainer produces dual-currency text and valid json', function (): void {
 
 test('ask eduflow answers balance and policy questions', function (): void {
     $ask = app(AskEduFlow::class);
+    $limit = number_format(
+        (int) AssistancePolicyVersion::active()?->auto_limit_base_units / 1000000, 2
+    );
 
     expect($ask->answer('What is my tuition balance?', ['tuition_balance_base_units' => 300_000000]))->toContain('USDC')
-        ->and($ask->answer("Why didn't you send the full 150 USDC?"))->toContain('100 USDC')
+        // The split answer quotes the live policy, not a fixed 100 USDC.
+        ->and($ask->answer('Why was my request split?'))->toContain("limit is {$limit} USDC")
         ->and($ask->answer('What are assistance guidelines?'))->toContain('Auto-limit');
 });
 

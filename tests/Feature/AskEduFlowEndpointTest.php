@@ -65,18 +65,40 @@ test('student receives structured answer for tuition balance question', function
         ->and($data['topic'])->toBe('tuition_balance');
 });
 
-test('student receives explanation for 150 split question', function (): void {
+test('student receives an explanation of the split that quotes the live policy', function (): void {
     $response = $this->actingAs($this->user)->postJson(route('student.ask'), [
-        'question' => 'Why was my 150 USDC request split?',
+        'question' => 'Why was my request split?',
     ]);
 
     $response->assertOk()
         ->assertJsonPath('success', true);
 
+    $limit = number_format(AssistancePolicyVersion::active()->auto_limit_base_units / 1000000, 2);
     $answer = $response->json('data.answer');
-    expect($answer)->toContain('100 USDC')
-        ->and($answer)->toContain('50 USDC')
-        ->and($answer)->toContain('reserve');
+
+    // The limit must come from the policy, not a hardcoded figure that could
+    // contradict the decision it is supposed to explain.
+    expect($answer)->toContain("autonomous assistance limit is {$limit} USDC")
+        ->and($answer)->toContain('escalated to a human reviewer')
+        ->and($answer)->toContain('rate was locked');
+});
+
+test('the split explanation never invents request or remainder figures', function (): void {
+    $response = $this->actingAs($this->user)->postJson(route('student.ask'), [
+        'question' => "Why didn't you send the full 999 USDC?",
+    ]);
+
+    $response->assertOk();
+
+    $answer = (string) $response->json('data.answer');
+    $limit = number_format(AssistancePolicyVersion::active()->auto_limit_base_units / 1000000, 2);
+
+    // Only the auto-limit may appear as a USDC figure. Any other value would be a
+    // fabricated request or remainder.
+    preg_match_all('/(\d+(?:\.\d+)?) USDC/', $answer, $matches);
+
+    expect($matches[1])->not->toBeEmpty()
+        ->and(array_values(array_unique($matches[1])))->toBe([$limit]);
 });
 
 test('student receives assistance policy guidelines', function (): void {

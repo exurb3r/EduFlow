@@ -244,7 +244,10 @@ export default function StudentDashboard({
                                             </span>
                                             {request.is_split && (
                                                 <p className="text-[11px] text-muted-foreground">
-                                                    100 USDC auto · remainder pending
+                                                    {formatUsdc(
+                                                        request.auto_approved_amount,
+                                                    )}{" "}
+                                                    auto · remainder pending
                                                 </p>
                                             )}
                                         </div>

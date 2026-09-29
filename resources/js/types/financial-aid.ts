@@ -8,8 +8,10 @@ export type AssistanceRequestSummary = {
     has_decision?: boolean;
     decision?: string | null;
     is_split?: boolean;
-    auto_approved_amount?: string;
-    pending_amount?: string;
+    // Always sent by StudentDashboardController, so the UI can render the real
+    // split rather than a hardcoded figure that could contradict the decision.
+    auto_approved_amount: string;
+    pending_amount: string;
 };
 
 export type AiExplanation = {
