@@ -75,4 +75,13 @@ class Transaction extends Model
     {
         return $this->morphTo();
     }
+
+    /**
+     * Reconciliation proved this receipt's hash is absent from the chain, so
+     * the payment never settled and the row has been marked failed.
+     */
+    public function isReconciledFailed(): bool
+    {
+        return ($this->metadata['reconciliation'] ?? null) === 'failed';
+    }
 }

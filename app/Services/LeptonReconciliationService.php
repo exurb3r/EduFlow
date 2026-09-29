@@ -10,6 +10,7 @@ use Illuminate\Support\Collection;
 use Throwable;
 use Yukazakiri\Lepton\Contracts\ArcNetworkGateway;
 use Yukazakiri\Lepton\Contracts\WalletGateway;
+use Yukazakiri\Lepton\Support\Amounts;
 
 /**
  * Proves whether a recorded transaction actually settled on Arc.
@@ -163,7 +164,7 @@ class LeptonReconciliationService
         return [
             'found' => true,
             'reachable' => true,
-            'block' => is_string($block) ? (int) hexdec(ltrim($block, '0x') ?: '0') : null,
+            'block' => is_string($block) ? (int) Amounts::fromHexQuantity($block, 0) : null,
             'tx' => $tx,
         ];
     }

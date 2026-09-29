@@ -178,7 +178,7 @@ class TransactionsTable
 
     public static function settlementLabel(Transaction $record): string
     {
-        if (self::isReconciledFailed($record)) {
+        if ($record->isReconciledFailed()) {
             return 'Never settled';
         }
 
@@ -195,7 +195,7 @@ class TransactionsTable
 
     public static function settlementColor(Transaction $record): string
     {
-        if (self::isReconciledFailed($record)) {
+        if ($record->isReconciledFailed()) {
             return 'danger';
         }
 
@@ -211,7 +211,7 @@ class TransactionsTable
         $gateway = $record->metadata['gateway'] ?? null;
         $network = $record->metadata['executed_network'] ?? $record->network;
 
-        if (self::isReconciledFailed($record)) {
+        if ($record->isReconciledFailed()) {
             return 'Reconciliation against '.strtoupper((string) $network).' found no transaction at this hash. It was never settled.';
         }
 
@@ -224,11 +224,6 @@ class TransactionsTable
         }
 
         return 'A stored hash is a claim, not proof. Run "Verify against Arc" or php artisan lepton:reconcile to prove settlement on '.strtoupper((string) $network).($gateway !== null ? ' via '.$gateway : '').'.';
-    }
-
-    public static function isReconciledFailed(Transaction $record): bool
-    {
-        return ($record->metadata['reconciliation'] ?? null) === 'failed';
     }
 
     /**

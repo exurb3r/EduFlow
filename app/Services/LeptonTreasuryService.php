@@ -69,7 +69,11 @@ class LeptonTreasuryService
         $base['address_url'] = $this->safe(fn (): ?string => $this->arc->addressExplorerUrl($address));
 
         $block = $this->safe(fn (): ?string => $this->arc->blockNumber());
-        $base['block'] = is_string($block) ? (int) hexdec(ltrim($block, '0x') ?: '0') : null;
+        // hexdec() degrades to float past PHP_INT_MAX, so an (int) cast there
+        // silently corrupts. String arithmetic, like the balance below.
+        $base['block'] = is_string($block)
+            ? (int) Amounts::fromHexQuantity($block, 0)
+            : null;
 
         $rpc = $this->safe(fn (): string => $this->arc->rpcUrl());
         if (is_string($rpc) && $rpc !== '') {

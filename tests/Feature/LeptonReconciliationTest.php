@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 use App\Enums\TransactionStatus;
 use App\Enums\TransactionType;
+use App\Filament\Resources\Transactions\Tables\TransactionsTable;
 use App\Models\Invoice;
 use App\Models\Organization;
 use App\Models\Transaction;
@@ -304,4 +305,62 @@ test('an invoice with no payment at all is unsettled', function (): void {
     $result = settleAgainst(chainKnowing($this->realHash), agentWalletKnowing())->verifyInvoiceSettlement($invoice);
 
     expect($result['settlement_verdict'])->toBe('unsettled');
+});
+
+test('a fabricated receipt is only marked failed once, however often --fix runs', function (): void {
+    $this->app->instance(ArcNetworkGateway::class, chainKnowing($this->realHash));
+    $this->app->instance(WalletGateway::class, agentWalletKnowing());
+
+    $tx = payment($this->org, $this->wallet, $this->fakeHash, ['is_fake' => true]);
+
+    $this->artisan('lepton:reconcile --fix')->assertFailed();
+
+    expect($tx->refresh()->status)->toBe(TransactionStatus::FAILED)
+        ->and($tx->isReconciledFailed())->toBeTrue();
+
+    $firstStamp = $tx->metadata['reconciled_at'];
+
+    // Re-running must not re-stamp or double-report the same row.
+    $this->artisan('lepton:reconcile --fix')->assertFailed();
+
+    expect($tx->refresh()->metadata['reconciled_at'])->toBe($firstStamp);
+});
+
+test('reconcile does not tell you to run --fix when you already did', function (): void {
+    $this->app->instance(ArcNetworkGateway::class, chainKnowing($this->realHash));
+    $this->app->instance(WalletGateway::class, agentWalletKnowing());
+
+    $tx = payment($this->org, $this->wallet, $this->fakeHash, ['is_fake' => true]);
+    $tx->update([
+        'status' => TransactionStatus::FAILED,
+        'metadata' => ['reconciliation' => 'failed', 'reconciled_at' => '2026-01-01T00:00:00+00:00'],
+    ]);
+
+    $this->artisan('lepton:reconcile')
+        ->expectsOutputToContain('already marked failed by an earlier reconciliation')
+        ->assertFailed();
+
+    $this->artisan('lepton:reconcile')
+        ->doesntExpectOutputToContain('php artisan lepton:reconcile --fix')
+        ->assertFailed();
+});
+
+test('reconcile suggests --fix while fabricated rows are still unfixed', function (): void {
+    $this->app->instance(ArcNetworkGateway::class, chainKnowing($this->realHash));
+    $this->app->instance(WalletGateway::class, agentWalletKnowing());
+
+    payment($this->org, $this->wallet, $this->fakeHash, ['is_fake' => true]);
+
+    $this->artisan('lepton:reconcile')
+        ->expectsOutputToContain('php artisan lepton:reconcile --fix')
+        ->doesntExpectOutputToContain('nothing left to fix')
+        ->assertFailed();
+});
+
+test('a reconciled row is badged as never settled in the transactions table', function (): void {
+    $tx = payment($this->org, $this->wallet, $this->fakeHash, ['reconciliation' => 'failed']);
+
+    expect($tx->isReconciledFailed())->toBeTrue()
+        ->and(TransactionsTable::settlementLabel($tx))->toBe('Never settled')
+        ->and(TransactionsTable::settlementColor($tx))->toBe('danger');
 });

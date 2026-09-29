@@ -320,11 +320,11 @@ test('a stored hash is labelled unverified until proven, never on-chain', functi
 
     expect(TransactionsTable::settlementLabel($tx->fresh()))->toBe('Never settled')
         ->and(TransactionsTable::settlementColor($tx->fresh()))->toBe('danger')
-        ->and(TransactionsTable::isReconciledFailed($tx->fresh()))->toBeTrue();
+        ->and($tx->fresh()->isReconciledFailed())->toBeTrue();
 
     $tx->update(['metadata' => array_merge($tx->metadata, ['reconciliation' => 'verified'])]);
 
-    expect(TransactionsTable::isReconciledFailed($tx->fresh()))->toBeFalse();
+    expect($tx->fresh()->isReconciledFailed())->toBeFalse();
 });
 
 test('transaction provenance distinguishes on-chain, simulated and ledger-only', function (): void {

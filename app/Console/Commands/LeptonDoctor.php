@@ -214,7 +214,7 @@ class LeptonDoctor extends Command
 
             $block = $arc->blockNumber();
             $this->kv('block', is_string($block) && $block !== ''
-                ? number_format((int) hexdec(ltrim($block, '0x') ?: '0'))
+                ? number_format((int) Amounts::fromHexQuantity($block, 0))
                 : '<fg=red>unavailable</>');
 
             $rpc = $arc->rpcUrl();

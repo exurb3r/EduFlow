@@ -74,26 +74,37 @@ class LeptonReconcileCommand extends Command
             $report['verified'], $report['fabricated'], $report['unverifiable'], $report['ledger_only']));
         $this->line('  '.str_repeat('─', 72));
 
-        if ($report['fabricated'] > 0) {
+        $fabricated = $report['items']->where('verdict', 'fabricated');
+        $unfixed = $fabricated->reject(
+            fn (array $item): bool => $item['transaction']->isReconciledFailed()
+        );
+        $alreadyFixed = $fabricated->count() - $unfixed->count();
+
+        if ($unfixed->isNotEmpty() && ! $this->option('fix')) {
+            $this->newLine();
             $this->line('  <fg=red>These hashes are absent from the chain. They were never settled.</>');
             $this->line('  <fg=gray>They were most likely produced by a fake-driver run. Fix with:</>');
             $this->line('  <fg=gray>php artisan lepton:reconcile --fix</>');
         }
 
+        if ($alreadyFixed > 0) {
+            $this->line(sprintf(
+                '  <fg=gray>%d already marked failed by an earlier reconciliation.</>',
+                $alreadyFixed
+            ));
+        }
+
         if ($report['unverifiable'] > 0) {
+            $this->newLine();
             $this->line('  <fg=yellow>Some receipts could not be checked. Ensure the Circle agent session is active.</>');
         }
 
-        if ($this->option('fix') && $report['fabricated'] > 0) {
+        if ($this->option('fix') && $unfixed->isNotEmpty()) {
             $fixed = 0;
 
-            foreach ($report['items'] as $item) {
+            foreach ($unfixed as $item) {
                 /** @var Transaction $transaction */
                 $transaction = $item['transaction'];
-
-                if ($item['verdict'] !== 'fabricated') {
-                    continue;
-                }
 
                 $transaction->update([
                     'status' => TransactionStatus::FAILED,
@@ -108,6 +119,8 @@ class LeptonReconcileCommand extends Command
             }
 
             $this->line(sprintf('  <fg=yellow>Marked %d transaction(s) as failed.</>', $fixed));
+        } elseif ($alreadyFixed > 0) {
+            $this->line('  <fg=green>✓</> nothing left to fix.');
         }
 
         $this->newLine();

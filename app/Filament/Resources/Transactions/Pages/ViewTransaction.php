@@ -15,6 +15,7 @@ use Filament\Resources\Pages\ViewRecord;
 use Filament\Schemas\Schema;
 use Throwable;
 use Yukazakiri\Lepton\Contracts\ArcNetworkGateway;
+use Yukazakiri\Lepton\Support\Amounts;
 
 class ViewTransaction extends ViewRecord
 {
@@ -84,7 +85,7 @@ class ViewTransaction extends ViewRecord
                             try {
                                 $block = app(ArcNetworkGateway::class)->blockNumber();
 
-                                return is_string($block) ? number_format((int) hexdec(ltrim($block, '0x') ?: '0')) : 'unavailable';
+                                return is_string($block) ? number_format((int) Amounts::fromHexQuantity($block, 0)) : 'unavailable';
                             } catch (Throwable) {
                                 return 'unavailable';
                             }
