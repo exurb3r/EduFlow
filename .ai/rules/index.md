@@ -5,6 +5,7 @@ Before planning or editing, find the row whose globs match the file's path and r
 | Applies to | Rule file |
 | --- | --- |
 | app/Http/Controllers/** | .ai/rules/controllers.md |
+| app/Services/Lepton*.php, app/Console/Commands/Lepton*.php, app/Console/Commands/EduFlowDemo.php, database/seeders/**/*Lepton*.php, database/seeders/**/*Financial*.php | .ai/rules/lepton.md |
 | resources/css/**/*.css, resources/css/bulletin.css | .ai/rules/css.md |
 | postcss.config.js, composer.json | .ai/rules/general.md |
 | scripts/** | .ai/rules/scripts.md |
