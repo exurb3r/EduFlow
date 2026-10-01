@@ -331,6 +331,61 @@ LEPTON_TREASURY_ADDRESS=0xYourAgentWallet
 
 ---
 
+## The AI layer (optional)
+
+`laravel/ai` is installed. The agents exist, but **none of them are wired into the request
+path yet** — every decision still runs through the deterministic PHP policy engine, and
+that is the point.
+
+```bash
+# Optional: a local model, so the AI layer runs with no paid API key
+ollama serve
+ollama pull llama3.1
+```
+
+```env
+AI_PROVIDER=local
+AI_LOCAL_URL=http://127.0.0.1:11434/v1
+AI_LOCAL_MODEL=llama3.1
+```
+
+Or point it at a hosted provider:
+
+```env
+AI_PROVIDER=anthropic
+ANTHROPIC_API_KEY=sk-...
+```
+
+**EduFlow works with none of this.** Every model call is fail-closed: a missing key, an
+unreachable endpoint, malformed output or a timeout all resolve to "no advisory available",
+and the deterministic engine proceeds alone. A model outage degrades the product; it never
+blocks a payment.
+
+### The three tiers
+
+| Tier | Owner | Can move funds? |
+|---|---|---|
+| **Deterministic** | PHP — limits, reserve, caps, rate locking, auto-vs-escalate | Only after every check passes |
+| **Advisory** | LLM — hardship category, urgency, confidence, narrative, anomaly flags | Never |
+| **Prohibited** | — | Approved amount, policy verdict, recipient selection |
+
+The one-way ratchet: the model may only *tighten* a decision. An `ESCALATE` verdict cannot
+be downgraded by any response.
+
+### How that is enforced, not just promised
+
+- **Allowlist, not a filter.** `AdvisoryEnvelope` is a readonly DTO with no amount, verdict
+  or recipient field. Unknown keys are dropped before it is constructed, so a
+  prompt-injected `"approved_amount": 999999` has nowhere to land. Advisory is namespaced
+  under a metadata `advisory` key and cannot overwrite `approved_amount`.
+- **`DisburseAssistance` is `Approvable`,** and its `needsApproval()` runs the real policy
+  evaluation. `handle()` re-evaluates rather than trusting the earlier verdict, because the
+  model may propose different arguments between the pause and the resume.
+- **27 adversarial tests** cover injected amounts, injected verdicts, malformed output,
+  provider failure and prompt injection. All run offline via the SDK's own fakes.
+
+---
+
 ## How the money moves
 
 ```

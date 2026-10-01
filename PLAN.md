@@ -61,7 +61,7 @@ graph TD
 ```mermaid
 graph TD
     P1[Part 1: Education Foundation & Request Intake<br/>COMPLETED] --> P2[Part 2: Deterministic Policy Engine & Multi-Currency Conversion<br/>COMPLETED]
-    P2 --> P3[Part 3: AI Agent Layer (Laravel AI SDK)<br/>IN PROGRESS]
+    P2 --> P3[Part 3: AI Agent Layer (Laravel AI SDK)<br/>SDK INSTALLED]
     P3 --> P4[Part 4: Circle / Arc USDC Settlement & FX Rails<br/>IN PROGRESS]
     P4 --> P5[Part 5: Hackathon Demo & End-to-End Verification<br/>IN PROGRESS]
 
@@ -144,14 +144,32 @@ graph TD
 
 ### Part 3: AI Agent Layer (Laravel AI SDK)
 
-**Status: deterministic scaffolding shipped, LLM integration pending.**
+**Status: SDK installed; advisory layer and approval seam shipped and tested.**
 
-The Part 3 scaffolding is complete and tested: `DecisionExplainer` produces dual-currency
-explanations, `AskEduFlow` answers student questions, and both are surfaced through
-`AskEduFlow` and `AssistanceAiExplanation` React components. **These are deterministic PHP
-today** — `AskEduFlow` uses `str_contains()` keyword matching and `DecisionExplainer` uses
-template strings. There is no LLM anywhere in the codebase. This part replaces those
-placeholders with real model calls via the official **Laravel AI SDK (`laravel/ai`)**.
+`laravel/ai` v1.0.1 is installed. The four agents, the two tools and the advisory
+boundary exist and are covered by 27 adversarial tests. **The LLM is not yet wired into
+the request path** — `DecisionExplainer` and `AskEduFlow` are still the deterministic
+placeholders described below, and no production code calls an agent. What shipped is the
+part that must be correct before any model is allowed near a decision.
+
+Shipped:
+- `AssistanceAssessor`, `TreasuryAnalyst` — `HasStructuredOutput`, advisory only.
+- `AskEduFlowAgent` — conversational, read-only, no tools.
+- `SettlementOperator` — `Conversational` + `HasTools`, proposes via tool calls.
+- `DisburseAssistance` — `Approvable`; `needsApproval()` **is** the policy engine, and
+  `handle()` re-evaluates rather than trusting the earlier verdict.
+- `RecordHardshipContext` — not approvable, writes advisory only.
+- `AdvisoryEnvelope` / `AdvisorySanitizer` / `AdvisoryGate` — allowlist, fail-closed.
+
+Two findings from reading the SDK rather than assuming it:
+- An agent that pauses a tool must be `Conversational` (or be handed history via
+  `withMessages`), or resuming throws `ApprovalNotResumableException`. `SettlementOperator`
+  uses `RemembersConversations` for exactly this reason.
+- `continue()` and `continueOrStart()` do **not** verify participant ownership. Any route
+  resuming a conversation must call `ConversationStore::conversationBelongsTo()` first.
+
+Remaining: wire `AdvisoryGate` into the assistance evaluation path, swap `AskEduFlow`'s
+keyword matcher for `AskEduFlowAgent`, and connect the approval-resume endpoint.
 
 #### 3.1 Three-Tier Authority Model
 
@@ -294,17 +312,12 @@ data. Required adversarial tests:
 
 #### 3.8 Planned Files
 
-- `app/Ai/Agents/AssistanceAssessor.php` — `make:agent --structured`
-- `app/Ai/Agents/TreasuryAnalyst.php` — `make:agent --structured`
-- `app/Ai/Agents/AskEduFlowAgent.php` — conversational, replaces the keyword matcher
-- `app/Ai/Agents/SettlementOperator.php` — `make:agent`, tool-using
-- `app/Ai/Tools/DisburseAssistance.php` — `Approvable`, the policy seam
-- `app/Ai/Tools/RecordHardshipContext.php` — non-approvable, writes advisory only
-- `app/Ai/Advisory/AdvisoryEnvelope.php` — allowlist DTO
-- `app/Ai/Advisory/AdvisorySanitizer.php` — drops unknown keys
-- `app/Ai/Advisory/AdvisoryGate.php` — fail-closed wrapper, returns `null` on any error
-- `config/ai.php` — provider config
-- `tests/Feature/Ai/AdversarialAgentTest.php` — the five scenarios in 3.7
+All shipped. `tests/Feature/Ai/AdversarialAgentTest.php` covers the five scenarios in
+3.7 and `tests/Feature/Ai/ApprovalRatchetTest.php` covers the approval seam.
+
+Still to build:
+- `app/Http/Controllers/AskEduFlowController.php` — swap the keyword matcher for the agent
+- Approval-resume endpoint, verifying `conversationBelongsTo()` first (3.5.6)
 
 ---
 

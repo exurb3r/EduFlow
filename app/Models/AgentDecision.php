@@ -18,6 +18,7 @@ use Illuminate\Database\Eloquent\Relations\MorphTo;
  * @property string|null $reference_type
  * @property int|null $reference_id
  * @property array<string, mixed> $input_snapshot
+ * @property array<string, mixed>|null $metadata
  * @property string $reasoning_summary
  * @property string $policy_checked
  * @property AgentDecisionType $decision
@@ -38,6 +39,7 @@ class AgentDecision extends Model
         'reference_type',
         'reference_id',
         'input_snapshot',
+        'metadata',
         'reasoning_summary',
         'policy_checked',
         'decision',
@@ -52,6 +54,7 @@ class AgentDecision extends Model
         return [
             'decision' => AgentDecisionType::class,
             'input_snapshot' => 'array',
+            'metadata' => 'array',
             'requested_amount' => 'float',
             'approved_amount' => 'float',
             'requires_approval' => 'boolean',
