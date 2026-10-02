@@ -10,6 +10,7 @@ use App\Models\User;
 use App\Services\InstallationInstitution;
 use App\Services\LeptonTreasuryService;
 use Filament\Facades\Filament;
+use Spatie\LaravelSettings\Models\SettingsProperty;
 use Spatie\Permission\Models\Role;
 
 beforeEach(function (): void {
@@ -96,6 +97,14 @@ test('dashboard remains accessible with ambiguous institution context and no wal
     $this->actingAs($admin)->get(Dashboard::getUrl())
         ->assertSuccessful()
         ->assertSee('EduFlow AI');
+});
+
+test('malformed persisted identity fails closed even when environment ID is configured', function (): void {
+    $school = Organization::factory()->create();
+    config(['eduflow.institution_id' => $school->id]);
+    SettingsProperty::query()->where('group', 'installation')->where('name', 'institution_id')->update(['payload' => 'invalid-json']);
+
+    expect(app(InstallationInstitution::class)->current())->toBeNull();
 });
 
 test('institution resolver keeps no cached model when configuration changes', function (): void {

@@ -488,8 +488,9 @@ progress is tracked immediately after the table. No item is closed solely by cha
 - **OSS-01 source cleanup implemented:** Graphite integration and literal token removed.
   Workflow credential regression tests added. Owner revocation/rotation and historical
   exposure review are still required; this blocker is not fully closed.
-- **OSS-02 seed safety implemented:** Default accounts are limited to local/testing,
-  including direct role-seeder invocation. Production/staging seeding creates no users or
+- **OSS-02 seed safety implemented:** Role seeding creates no users in any environment.
+  Explicit `DemoUsersSeeder` owns local/testing defaults; demo `DatabaseSeeder` invokes it.
+  Production/staging seeding creates no users or
   demo records. `eduflow:bootstrap-admin` creates the first admin through hidden password
   prompts, refuses existing accounts/second superadmins, and records a secret-free audit.
   Existing default accounts are not deleted or reset; operators must remediate them.
@@ -499,15 +500,23 @@ progress is tracked immediately after the table. No item is closed solely by cha
   cannot update stable `latest`. Ad hoc Docker publication disabled. PostgreSQL coverage,
   runtime/image certification and supply-chain attestations remain open.
 - Operator bootstrap/release notes added to README; source archives now retain README
-  and changelog instead of excluding them. No schema migration, dependency
-  change, live payment, full installer or shared-institution tenancy introduced.
-- **OSS-06 selection guard implemented in part:** `InstallationInstitution` requires an
-  explicit `EDUFLOW_INSTITUTION_ID` outside local/testing and exactly one organization;
-  missing/invalid/ambiguous selection fails closed. Dashboard/widgets, wallet doctor and
-  settlement operator factory no longer choose `Organization::first()`. Stateless scoped
-  resolution and negative selection tests added. This is not full resource ownership,
-  second-institution creation prevention, schema backfill or installation onboarding.
-- Next: institution setup/ownership and exact money/reservation foundations.
+  and changelog instead of excluding them. Foundation PR introduced no schema migration,
+  dependency change, live payment or shared-institution tenancy.
+- **OSS-06 selection/setup implemented in part:** `InstallationInstitution` uses persisted
+  installer identity or matching explicit `EDUFLOW_INSTITUTION_ID`, and exactly one
+  organization; missing/invalid/ambiguous context fails closed. Dashboards, wallet doctor
+  and settlement operator factory no longer choose `Organization::first()`.
+- **Installer foundation:** `eduflow:install` initializes institution/settings through a
+  locked DB transaction, without migrating, demo seeding, admin creation or wallet/provider
+  I/O. Identical retry preserves state; explicit adoption required for legacy institution;
+  conflicting identity/metadata refused. Initial registration, impersonation and AI disabled.
+  Settings migration adds persisted installation identity. Eloquent creation of a second
+  institution blocked after setup; raw DB access is outside that guard.
+- Registration GET/POST now respects disabled registration for installed schools; signup
+  still cannot provision staff rights or enrollment. Country validation is code-format
+  only. Native-fiat ledger, complete ownership/backfill, data imports and rail safety remain
+  open; institution currency metadata alone does not convert legacy USDC accounting.
+- Next: school ownership/imports and exact money/reservation foundations.
   O0 still needs credential-owner confirmation, dependency/asset review and named owners.
 
 **Strengths to preserve:** MIT already exists; deterministic policy actions, student
@@ -647,10 +656,11 @@ image. Secrets, databases, uploaded files, debug tools, and development artifact
 not enter an image layer; use an explicit build-context exclusion policy. Public source
 archives must retain README and installation/security documentation.
 
-**Planning-only CLI names:** `eduflow:install` and `eduflow:health` are proposed, not
-existing commands. Installation creates stable roles/settings and institution/admin
-state; health reports dependency readiness without changing balances or broadcasting
-payments. No installation command should call `eduflow:demo`.
+**CLI progress:** `eduflow:install` now initializes institution identity, role-only seeds
+and safe settings after separately applied migrations. `eduflow:bootstrap-admin` creates
+first admin independently. Full workflow/data onboarding is not complete.
+`eduflow:health` remains proposed, not an existing command. Planned health reports readiness
+without changing balances or broadcasting payments. Installer never calls `eduflow:demo`.
 
 ### 7.2 School Onboarding Flow
 

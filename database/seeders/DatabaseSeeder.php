@@ -22,6 +22,7 @@ class DatabaseSeeder extends Seeder
             // organization; the assistance request hangs off the student that
             // EducationDemoSeeder creates.
             $this->call([
+                DemoUsersSeeder::class,
                 EduFlowFinancialSeeder::class,
                 EducationDemoSeeder::class,
                 EduFlowPlanSeeder::class,

@@ -10,6 +10,7 @@ use App\Models\Student;
 use App\Models\TuitionAccount;
 use App\Models\User;
 use Database\Seeders\DatabaseSeeder;
+use Database\Seeders\DemoUsersSeeder;
 use Database\Seeders\RolesAndPermissionsSeeder;
 use Illuminate\Support\Facades\Hash;
 use Spatie\Permission\Models\Permission;
@@ -61,11 +62,11 @@ test('direct role seeding cannot elevate a default-email account outside demo en
         ->and($existing->fresh()->hasRole(RoleEnums::SUPER_ADMIN))->toBeFalse();
 })->with(['production', 'staging']);
 
-test('role seeding preserves local demo accounts and is idempotent', function (string $environment): void {
+test('explicit demo user seeding preserves local accounts and is idempotent', function (string $environment): void {
     app()->instance('env', $environment);
 
-    $this->seed(RolesAndPermissionsSeeder::class);
-    $this->seed(RolesAndPermissionsSeeder::class);
+    $this->seed(DemoUsersSeeder::class);
+    $this->seed(DemoUsersSeeder::class);
 
     $admin = User::where('email', 'admin@admin.com')->sole();
 
@@ -73,3 +74,18 @@ test('role seeding preserves local demo accounts and is idempotent', function (s
         ->and($admin->hasRole(RoleEnums::SUPER_ADMIN))->toBeTrue()
         ->and(Hash::check('password', $admin->password))->toBeTrue();
 })->with(['local', 'testing']);
+
+test('direct role seeding never creates users including in local and testing environments', function (string $environment): void {
+    app()->instance('env', $environment);
+    $this->seed(RolesAndPermissionsSeeder::class);
+
+    expect(User::count())->toBe(0)->and(Role::count())->toBe(count(RoleEnums::cases()));
+})->with(['local', 'testing']);
+
+test('explicit demo user seeding refuses non demo environments before writing', function (string $environment): void {
+    app()->instance('env', $environment);
+
+    expect(fn () => (new DemoUsersSeeder)->run())->toThrow(RuntimeException::class)
+        ->and(User::count())->toBe(0)
+        ->and(Role::count())->toBe(0);
+})->with(['production', 'staging']);
