@@ -5,19 +5,29 @@ declare(strict_types=1);
 namespace App\Ai\Advisory;
 
 use App\Ai\Agents\AssistanceAssessor;
+use App\Services\Ai\AiProviderResolver;
+use App\Settings\AiSettings;
 use Throwable;
 
 /**
  * The only path from the model to application state.
  *
- * Fail-closed by construction: any error, timeout, malformed response or
- * schema violation returns null and logs why. The caller then proceeds with
- * the deterministic policy engine alone. A missing LLM degrades the product,
- * it never loosens a financial control.
+ * Fail-closed by construction, and gated twice over:
+ *
+ *  - the admin switches (`AiSettings`) must both allow advisory calls and
+ *    accept the disclosure, so leaving AI off is the default;
+ *  - then any error, timeout, malformed response or schema violation returns
+ *    null and the caller proceeds with the deterministic engine alone.
+ *
+ * A missing LLM degrades the product, it never loosens a financial control.
  */
 final readonly class AdvisoryGate
 {
-    public function __construct(private AdvisorySanitizer $sanitizer) {}
+    public function __construct(
+        private AdvisorySanitizer $sanitizer,
+        private AiSettings $settings,
+        private AiProviderResolver $providers,
+    ) {}
 
     /**
      * Ask the assessor to characterise a hardship, and return only what
@@ -27,9 +37,23 @@ final readonly class AdvisoryGate
      */
     public function assessHardship(array $context): ?AdvisoryEnvelope
     {
+        if (! $this->settings->mayCallProvider()) {
+            return null;
+        }
+
+        $provider = $this->providers->resolve();
+
+        if ($provider === null) {
+            return null;
+        }
+
         try {
             $response = AssistanceAssessor::make()
-                ->prompt($this->buildPrompt($context));
+                ->prompt(
+                    $this->buildPrompt($context),
+                    provider: $provider,
+                    timeout: $this->settings->timeout_seconds,
+                );
         } catch (Throwable $e) {
             // A provider outage, timeout or missing key must not surface as an
             // exception to the settlement path.
@@ -42,8 +66,8 @@ final readonly class AdvisoryGate
     }
 
     /**
-     * Sanitise arbitrary model output. Exposed separately so adversarial
-     * tests can drive the boundary without a provider.
+     * Sanitise arbitrary model output. Exposed separately so adversarial tests
+     * can drive the boundary without a provider.
      *
      * @param  array<string, mixed>  $payload
      */

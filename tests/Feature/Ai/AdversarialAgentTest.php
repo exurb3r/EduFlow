@@ -38,7 +38,10 @@ function validAdvisory(array $overrides = []): array
 
 beforeEach(function (): void {
     $this->sanitizer = new AdvisorySanitizer;
-    $this->gate = new AdvisoryGate($this->sanitizer);
+    // The gate now also takes the settings switches and the provider resolver,
+    // so building it through the container keeps the test honest about what
+    // production wiring looks like.
+    $this->gate = app(AdvisoryGate::class);
 });
 
 it('discards a model-supplied approved amount instead of applying it', function (): void {

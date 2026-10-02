@@ -53,3 +53,24 @@ Run a mutation before trusting a new invariant: break the guard, confirm the tes
 restore. Two mutations here were silently ineffective because a formatter had moved the
 anchor, so the "test" proved nothing — check that the mutation applied before reading the
 result.
+## Provider keys live in `ai_providers`, encrypted, and never come back to a form
+Endpoints are configured in the admin panel (`Settings → AI Providers`), not only in
+`.env`. `api_key` uses the model's `encrypted` cast, so the column is ciphertext and a
+database dump alone leaks nothing.
+
+The key is stripped in `EditAiProvider::mutateFormDataBeforeFill()`, so panel access is not
+enough to read it out of the DOM, and blank means "keep the stored key" rather than
+"clear it". Do not render `api_key` in a table column, an infolist, or a notification —
+`TextColumn` "masking" still reveals the tail of a secret.
+
+An admin-configured provider takes precedence over `.env`, resolved per request by
+`AiProviderResolver`. Keep that precedence deliberate: it is why a panel change takes effect
+without a deploy, and why `.env` remains the fallback for config-managed deployments.
+
+## Two switches, not one, before any data leaves the app
+`AiSettings::mayCallProvider()` requires `advisory_enabled` **and** `disclosure_accepted`.
+Advisory prompts contain the student's own stated reason, so turning AI on is deliberately
+two separate actions. Never collapse them into a single toggle.
+
+`allow_settlement_proposals` is a third switch and defaults to false. Annotate-only is the
+default because it cannot block a payout.

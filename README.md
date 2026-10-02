@@ -356,6 +356,41 @@ AI_PROVIDER=anthropic
 ANTHROPIC_API_KEY=sk-...
 ```
 
+### Configure it from the admin panel instead
+
+Endpoints and keys can be set in the admin UI instead of `.env`, which is what you want
+when a deployment has several providers or when the key must not sit in a file.
+
+**Settings → AI** holds the switches:
+
+| Switch | Default | Effect |
+|---|---|---|
+| Allow advisory model calls | **off** | Master switch. Nothing leaves the application when off. |
+| Student data may be sent to the provider | **off** | Second, separate acknowledgement. Both must be on. |
+| Let the AI propose disbursements | **off** | Off means annotate-only. See the tiers below. |
+| Timeout | 20s | Kept short on purpose: advisory must never delay a payment. |
+
+**Settings → AI Providers** manages endpoints. Any SDK driver works, including
+**OpenAI-compatible** for Ollama, LM Studio, vLLM, LiteLLM, Together or a corporate
+gateway:
+
+| Field | Notes |
+|---|---|
+| Driver | `openai-compatible` for anything that speaks the OpenAI wire format |
+| Base URL | **Required** for `openai-compatible`; it has no default endpoint |
+| Text model | Used as that provider's default model |
+| Extra headers | Some gateways need e.g. `X-Tenant-Id` |
+| API key | Optional — local endpoints usually need none |
+
+**API keys are encrypted at rest** with `APP_KEY` using Laravel's `encrypted` cast. The
+database column holds ciphertext, so a dump of it leaks nothing on its own. The key is
+also never rendered back into the edit form: it is stripped before the form is filled, so
+panel access is not enough to read a secret out of the DOM. Leaving the field blank keeps
+the stored key; rotating it is therefore an explicit act.
+
+There is also a *Test connection* action, which probes `/models` without sending any student
+data and without costing a completion.
+
 **EduFlow works with none of this.** Every model call is fail-closed: a missing key, an
 unreachable endpoint, malformed output or a timeout all resolve to "no advisory available",
 and the deterministic engine proceeds alone. A model outage degrades the product; it never

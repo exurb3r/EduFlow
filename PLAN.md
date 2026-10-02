@@ -168,6 +168,13 @@ Two findings from reading the SDK rather than assuming it:
 - `continue()` and `continueOrStart()` do **not** verify participant ownership. Any route
   resuming a conversation must call `ConversationStore::conversationBelongsTo()` first.
 
+Also shipped: admin-configured providers. `ai_providers` holds endpoints with an
+encrypted `api_key` cast, managed under `Settings -> AI Providers` (any SDK driver,
+including `openai-compatible` for Ollama, LM Studio, vLLM, LiteLLM or a gateway).
+`AiProviderResolver` resolves an admin provider ahead of `.env`, per request, and
+`AiSettings` gates every call behind two separate switches plus an opt-in for settlement
+proposals. Keys are never rendered back into the edit form.
+
 Remaining: wire `AdvisoryGate` into the assistance evaluation path, swap `AskEduFlow`'s
 keyword matcher for `AskEduFlowAgent`, and connect the approval-resume endpoint.
 
@@ -313,7 +320,9 @@ data. Required adversarial tests:
 #### 3.8 Planned Files
 
 All shipped. `tests/Feature/Ai/AdversarialAgentTest.php` covers the five scenarios in
-3.7 and `tests/Feature/Ai/ApprovalRatchetTest.php` covers the approval seam.
+3.7, `tests/Feature/Ai/ApprovalRatchetTest.php` the approval seam, and
+`tests/Feature/Ai/AiProviderAdminTest.php` plus `tests/Feature/Filament/AiProviderAdminUiTest.php`
+the admin provider configuration and key encryption.
 
 Still to build:
 - `app/Http/Controllers/AskEduFlowController.php` — swap the keyword matcher for the agent

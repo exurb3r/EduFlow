@@ -1,5 +1,6 @@
 <?php
 
+use App\Settings\AiSettings;
 use Spatie\LaravelData\Data;
 use Spatie\LaravelSettings\SettingsCasts\DataCast;
 use Spatie\LaravelSettings\SettingsCasts\DateTimeInterfaceCast;
@@ -14,7 +15,7 @@ return [
      * put them (manually) here.
      */
     'settings' => [
-
+        AiSettings::class,
     ],
 
     /*
