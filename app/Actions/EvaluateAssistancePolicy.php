@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Actions;
 
+use App\Ai\Advisory\AdvisoryGate;
 use App\DTOs\PolicyEvaluationResult;
 use App\Enums\AgentDecisionType;
 use App\Enums\CurrencyCode;
@@ -18,6 +19,7 @@ class EvaluateAssistancePolicy
 {
     public function __construct(
         private readonly CurrencyConverter $converter,
+        private readonly AdvisoryGate $advisoryGate,
     ) {}
 
     /**
@@ -162,6 +164,15 @@ class EvaluateAssistancePolicy
         return ['result' => $result, 'decision' => $decisionModel, 'quote' => $quote];
     }
 
+    /**
+     * Record the deterministic decision first, then attach advisory commentary.
+     *
+     * Order matters and is the whole point of the three-tier model: the row
+     * exists, complete and authoritative, before any model is consulted. The
+     * advisory is written afterwards under a namespaced `advisory` key, so a
+     * provider outage, a timeout or a hostile response cannot delay, alter or
+     * prevent the decision.
+     */
     private function recordDecision(
         AssistanceRequest $request,
         AssistanceFund $fund,
@@ -169,7 +180,7 @@ class EvaluateAssistancePolicy
         PolicyEvaluationResult $result,
         array $quote,
     ): AgentDecision {
-        return AgentDecision::create([
+        $decision = AgentDecision::create([
             'organization_id' => $fund->organization_id,
             'action_type' => 'student_assistance',
             'reference_type' => AssistanceRequest::class,
@@ -190,5 +201,39 @@ class EvaluateAssistancePolicy
             'requires_approval' => $result->requiresHumanApproval,
             'status' => $result->decision === AgentDecisionType::AUTO_APPROVE ? 'pending' : 'escalated',
         ]);
+
+        return $this->attachAdvisory($decision, $request);
+    }
+
+    /**
+     * Best-effort model commentary. Never throws, and never runs in the
+     * synchronous settlement path unless explicitly enabled: AdvisoryGate
+     * returns null whenever the admin switches are off or a provider fails.
+     */
+    private function attachAdvisory(AgentDecision $decision, AssistanceRequest $request): AgentDecision
+    {
+        try {
+            $advisory = $this->advisoryGate->assessHardship([
+                'reason' => (string) ($request->reason ?? ''),
+                'category' => $request->category instanceof \BackedEnum ? $request->category->value : (string) $request->category,
+                'attendance_rate' => (float) ($request->student?->attendance_rate ?? 0),
+                'enrollment_status' => (string) ($request->student?->enrollment_status ?? ''),
+                'academic_status' => (string) ($request->student?->academic_status ?? ''),
+            ]);
+        } catch (\Throwable $e) {
+            report($e);
+
+            return $decision;
+        }
+
+        if ($advisory === null) {
+            return $decision;
+        }
+
+        $decision->update([
+            'metadata' => $advisory->mergeIntoMetadata($decision->metadata ?? []),
+        ]);
+
+        return $decision->refresh();
     }
 }

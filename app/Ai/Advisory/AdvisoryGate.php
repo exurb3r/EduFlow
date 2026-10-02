@@ -90,7 +90,23 @@ final readonly class AdvisoryGate
         if (is_object($response) && method_exists($response, 'toArray')) {
             $array = $response->toArray();
 
-            return is_array($array) ? $array : [];
+            if (is_array($array) && $array !== []) {
+                return $array;
+            }
+
+            // A gateway that ignores `response_format` yields an empty array
+            // even though the text holds the object, so fall through.
+        }
+
+        // Not every gateway honours `response_format: json_schema`. 9Router drops
+        // it and returns the object as text, so the SDK hands back a string
+        // rather than a structured array. Decoding here keeps those providers
+        // working; both paths still end at the sanitizer, which is the actual
+        // boundary.
+        if (is_string($response)) {
+            $decoded = json_decode($response, true);
+
+            return is_array($decoded) ? $decoded : [];
         }
 
         return [];

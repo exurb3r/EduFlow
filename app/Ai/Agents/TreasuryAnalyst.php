@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Ai\Agents;
 
 use Illuminate\Contracts\JsonSchema\JsonSchema;
+use Laravel\Ai\Attributes\Strict;
 use Laravel\Ai\Contracts\Agent;
 use Laravel\Ai\Contracts\HasStructuredOutput;
 use Laravel\Ai\Promptable;
@@ -17,6 +18,7 @@ use Stringable;
  * available or that a transfer succeeded. Balance figures are supplied by the
  * caller from the deterministic ledger, not chosen by the model.
  */
+#[Strict]
 class TreasuryAnalyst implements Agent, HasStructuredOutput
 {
     use Promptable;
@@ -36,6 +38,9 @@ class TreasuryAnalyst implements Agent, HasStructuredOutput
 
         Where you see reserve risk, an approaching spending cap, or a divergence between the
         ledger and the chain, say so plainly and add an anomaly flag.
+        Response format: return a single JSON object and nothing else. No prose, no
+        markdown fences, no preamble. Use exactly these keys: summary, reserve_risk,
+        drift_detected, narrative, anomaly_flags.
         TEXT;
     }
 

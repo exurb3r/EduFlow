@@ -58,6 +58,9 @@ class SettlementOperator implements Agent, Conversational, HasStructuredOutput, 
         were settled, and never choose a wallet address. Amounts are 6-decimal USDC base
         units as integers. Ask for assistance using the DisburseAssistance tool, and use
         RecordHardshipContext only for triage commentary.
+        Response format: return a single JSON object and nothing else. No prose, no
+        markdown fences, no preamble. Use exactly these keys: summary, proposals_made,
+        awaiting_human.
         TEXT;
     }
 

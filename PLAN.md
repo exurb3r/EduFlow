@@ -175,8 +175,20 @@ including `openai-compatible` for Ollama, LM Studio, vLLM, LiteLLM or a gateway)
 `AiSettings` gates every call behind two separate switches plus an opt-in for settlement
 proposals. Keys are never rendered back into the edit form.
 
-Remaining: wire `AdvisoryGate` into the assistance evaluation path, swap `AskEduFlow`'s
-keyword matcher for `AskEduFlowAgent`, and connect the approval-resume endpoint.
+The advisory gate is now wired in. `EvaluateAssistancePolicy::recordDecision()` writes the
+authoritative decision row *first*, then attaches advisory commentary under a namespaced
+`advisory` key, so a provider outage cannot delay or alter the decision. Verified
+end-to-end against a live OpenAI-compatible gateway: with the switches on, advisory is
+recorded; with a bad key, auth fails, the gate returns null, and the cycle still pays out.
+
+Verified live against 9Router, which shaped two design decisions. It ignores
+`response_format: json_schema`, so agents also request the JSON shape in their
+instructions and the gate decodes a string response. And `AiProviderResolver` must return a
+built `Provider` instance rather than the driver name, because a bare name resolves against
+`config/ai.php` and fails with "requires a default text model".
+
+Remaining: swap `AskEduFlow`'s keyword matcher for `AskEduFlowAgent`, and connect the
+approval-resume endpoint with a `conversationBelongsTo()` check.
 
 #### 3.1 Three-Tier Authority Model
 

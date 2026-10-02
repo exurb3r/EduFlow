@@ -391,6 +391,16 @@ the stored key; rotating it is therefore an explicit act.
 There is also a *Test connection* action, which probes `/models` without sending any student
 data and without costing a completion.
 
+> **`migrate:fresh` wipes this.** `ai_providers` is an application table, so
+> `php artisan migrate:fresh --seed` deletes every provider and its key. Use
+> `migrate:refresh` for a demo, or re-enter the key afterwards. The encryption protects a
+> database *dump*; it cannot survive the row being deleted.
+
+> **Not every gateway honours `response_format`.** 9Router accepts the parameter and
+> ignores it, returning the object as text. The agents therefore also ask for the JSON shape
+> in their instructions, and the gate decodes a string response. If a gateway streams SSE
+> regardless of `stream: false`, add an `Accept: application/json` extra header.
+
 **EduFlow works with none of this.** Every model call is fail-closed: a missing key, an
 unreachable endpoint, malformed output or a timeout all resolve to "no advisory available",
 and the deterministic engine proceeds alone. A model outage degrades the product; it never

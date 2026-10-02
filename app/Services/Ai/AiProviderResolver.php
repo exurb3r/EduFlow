@@ -20,10 +20,15 @@ use Throwable;
  *   2. The provider flagged default in the admin panel.
  *   3. `AI_PROVIDER` from .env, for deployments that prefer config.
  *
- * Every lookup is wrapped: this runs inside request handling, and a settings or
+ * An admin-configured provider is returned as a built Provider instance rather
+ * than its driver name. That distinction matters: passing the bare name makes
+ * the SDK resolve `config/ai.php`, which has no default text model, so an
+ * openai-compatible endpoint fails with "requires a default text model". The
+ * instance carries the model, key and headers that were saved in the panel.
+ *
+ * Every lookup is wrapped. This runs inside request handling, and a settings or
  * database problem must surface as "no provider" rather than an exception in
- * the settlement path. Callers treat null as fail-closed and fall back to the
- * deterministic engine.
+ * the settlement path. Callers treat null as fail-closed.
  */
 final class AiProviderResolver
 {
@@ -33,22 +38,34 @@ final class AiProviderResolver
     public function __construct(private readonly AiSettings $settings) {}
 
     /**
-     * The provider spec to hand to `prompt(provider: ...)`, or null.
+     * The provider argument to hand to `prompt(provider: ...)`.
      *
-     * @return array<int, string>|string|null
+     * @return array<int, Provider>|Lab|string|null
      */
-    public function resolve(?string $explicit = null): array|string|null
+    public function resolve(?string $explicit = null): array|Lab|string|null
     {
         $name = $explicit ?? $this->configuredName();
 
-        return $name;
+        if ($name === null) {
+            return null;
+        }
+
+        if ($this->adminProvider()?->providerKey() !== $name) {
+            // Not the admin provider: a plain name resolves against config/ai.php,
+            // which is exactly what a .env deployment wants.
+            return $name;
+        }
+
+        $provider = $this->buildFromSettings($name);
+
+        return $provider instanceof Provider ? [$provider] : null;
     }
 
     /**
-     * Build the provider instance for the admin-configured default.
+     * Build the provider instance for an admin-configured provider.
      *
-     * Used when an agent needs a concrete Provider rather than a name, for
-     * example to implement the SDK's `provider()` method.
+     * Used when an agent needs a concrete Provider, for example to implement
+     * the SDK's own `provider()` method.
      */
     public function buildFromSettings(?string $explicit = null): ?Provider
     {
@@ -62,33 +79,44 @@ final class AiProviderResolver
             return $this->built[$name];
         }
 
+        $config = $this->configFor($name);
+
         try {
-            $provider = Ai::build($this->configFor($name));
+            return $this->built[$name] = Ai::build($config);
         } catch (Throwable $e) {
-            // Ai::build() throws when the name collides with a built-in
-            // provider. Fall back to referring to it by name instead.
+            // Ai::build() refuses a name that collides with a built-in provider.
             report($e);
 
             return null;
         }
-
-        return $this->built[$name] = $provider;
     }
 
     /**
      * Which provider is in force, for display in the admin and diagnostics.
+     *
+     * @return array{source: string, name: ?string, usable: bool, advisory_enabled: bool, provider: ?AiProvider}
      */
     public function describe(): array
     {
-        [$provider, $usable] = AiProvider::active();
+        $provider = $this->adminProvider();
 
         return [
             'source' => $provider !== null ? 'admin' : 'env',
             'name' => $provider?->providerKey() ?? config('ai.default'),
-            'usable' => $provider !== null ? $usable : $this->settings->advisory_enabled,
+            'usable' => $provider !== null ? $provider->isUsable() : $this->settings->advisory_enabled,
             'advisory_enabled' => $this->settings->advisory_enabled,
             'provider' => $provider,
         ];
+    }
+
+    /**
+     * The active admin-configured provider, if there is a usable one.
+     */
+    public function adminProvider(): ?AiProvider
+    {
+        [$provider] = AiProvider::active();
+
+        return $provider;
     }
 
     /**
@@ -96,7 +124,7 @@ final class AiProviderResolver
      */
     private function configuredName(): ?string
     {
-        [$provider] = AiProvider::active();
+        $provider = $this->adminProvider();
 
         if ($provider !== null) {
             return $provider->providerKey();
@@ -110,15 +138,11 @@ final class AiProviderResolver
     /**
      * The config array for a provider name.
      *
-     * For an admin-configured row this comes from the database; otherwise it is
-     * whatever is already in config/ai.php, which keeps .env deployments
-     * working exactly as the SDK intends.
-     *
      * @return array<string, mixed>
      */
     private function configFor(string $name): array
     {
-        [$provider] = AiProvider::active();
+        $provider = $this->adminProvider();
 
         if ($provider !== null && $provider->providerKey() === $name) {
             return $provider->toProviderConfig();

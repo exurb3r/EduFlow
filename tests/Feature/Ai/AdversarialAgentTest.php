@@ -88,7 +88,7 @@ it('fails closed on a malformed response', function (array $payload, string $bec
     'missing narrative' => [array_diff_key(validAdvisory(), ['narrative' => 1]), 'narrative is required'],
     'unknown category' => [validAdvisory(['hardship_category' => 'crypto_given']), 'category is allowlisted'],
     'unknown urgency' => [validAdvisory(['urgency' => 'immediate']), 'urgency is allowlisted'],
-    'confidence as string' => [validAdvisory(['confidence' => '0.9']), 'confidence must be a number'],
+    'confidence as non-numeric word' => [validAdvisory(['confidence' => 'quite sure']), 'an unlisted word is not confidence'],
     'confidence as bool' => [validAdvisory(['confidence' => true]), 'a bool is not a number'],
     'confidence too high' => [validAdvisory(['confidence' => 1.5]), 'confidence must be 0..1'],
     'confidence negative' => [validAdvisory(['confidence' => -0.1]), 'confidence must be 0..1'],
@@ -244,4 +244,41 @@ it('will not record triage against a request that has no decision yet', function
     ]));
 
     expect((string) $result)->toContain('No recorded decision exists');
+});
+
+it('normalises a numeric confidence string from a gateway that drops the schema', function (): void {
+    // 9Router ignores response_format, so every value arrives quoted.
+    $advisory = $this->sanitizer->sanitize(validAdvisory(['confidence' => '0.75']));
+
+    expect($advisory)->not->toBeNull()
+        ->and($advisory->confidence)->toBe(0.75);
+});
+
+it('maps a coarse confidence word onto the middle of its band', function (): void {
+    // Asked for a 0..1 number, the model answers "high" instead.
+    $advisory = $this->sanitizer->sanitize(validAdvisory(['confidence' => 'high']));
+
+    expect($advisory)->not->toBeNull()
+        ->and($advisory->confidence)->toBe(0.9)
+        // and it stays inside the clamped range
+        ->and($advisory->confidence)->toBeGreaterThanOrEqual(0.0)
+        ->and($advisory->confidence)->toBeLessThanOrEqual(1.0);
+});
+
+it('still rejects a confidence word outside the fixed vocabulary', function (): void {
+    // Bounded leniency only: arbitrary prose must not become a number.
+    expect($this->sanitizer->sanitize(validAdvisory(['confidence' => 'extremely'])))->toBeNull()
+        ->and($this->sanitizer->sanitize(validAdvisory(['confidence' => 'unknown'])))->toBeNull()
+        ->and($this->sanitizer->sanitize(validAdvisory(['confidence' => '2'])))->toBeNull();
+});
+
+it('recovers a structured payload returned as text when the schema was dropped', function (): void {
+    // The shape of the failure seen against an OpenAI-compatible gateway that
+    // ignores response_format: the object comes back as a JSON string.
+    $json = json_encode(validAdvisory(), JSON_THROW_ON_ERROR);
+
+    $advisory = $this->gate->sanitize((array) json_decode($json, true));
+
+    expect($advisory)->not->toBeNull()
+        ->and($advisory->hardshipCategory)->toBe('medical');
 });

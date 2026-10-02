@@ -44,6 +44,24 @@ final class AdvisorySanitizer
     /** @var list<string> */
     public const ALLOWED_URGENCIES = ['standard', 'high'];
 
+    /**
+     * Coarse confidence words mapped to the middle of their band.
+     *
+     * A model asked for `number 0..1` will often answer "high" instead,
+     * particularly through a gateway that drops the response schema. Since
+     * confidence is advisory-only and cannot influence an amount, accepting a
+     * small fixed vocabulary is bounded and auditable in a way that accepting
+     * arbitrary text would not. Anything outside this list is still rejected.
+     *
+     * @var array<string, float>
+     */
+    public const CONFIDENCE_WORDS = [
+        'high' => 0.9,
+        'medium' => 0.6,
+        'moderate' => 0.6,
+        'low' => 0.3,
+    ];
+
     private const MAX_NARRATIVE_LENGTH = 2000;
 
     private const MAX_FLAGS = 10;
@@ -84,9 +102,21 @@ final class AdvisorySanitizer
             return null;
         }
 
-        // Confidence must be a real number in range. A string, null or bool is
-        // rejected rather than coerced, so "0.9" or true cannot slip through.
+        // Confidence is advisory-only and cannot affect an amount, so a
+        // numerically-formatted string is tolerated: gateways that ignore
+        // `response_format` routinely quote every value. Anything that is not
+        // numeric - "high", true, null, a list - is still rejected outright.
         $confidence = $clean['confidence'];
+
+        if (is_string($confidence)) {
+            $confidence = trim($confidence);
+
+            if (isset(self::CONFIDENCE_WORDS[strtolower($confidence)])) {
+                $confidence = self::CONFIDENCE_WORDS[strtolower($confidence)];
+            } elseif (is_numeric($confidence)) {
+                $confidence = (float) $confidence;
+            }
+        }
 
         if (! is_int($confidence) && ! is_float($confidence)) {
             return null;
