@@ -4,6 +4,7 @@ use App\Enums\SocialLoginProvider;
 use App\Http\Controllers\AskEduFlowController;
 use App\Http\Controllers\AssistanceRequestController;
 use App\Http\Controllers\Auth\SocialAuthController;
+use App\Http\Controllers\FinanceApprovalController;
 use App\Http\Controllers\NotificationController;
 use App\Http\Controllers\StudentDashboardController;
 use Illuminate\Support\Facades\Route;
@@ -26,6 +27,22 @@ Route::middleware(['auth', 'verified'])->group(function (): void {
     Route::get('notifications', [NotificationController::class, 'index'])->name('notifications.index');
     Route::post('notifications/{id}/read', [NotificationController::class, 'markAsRead'])->name('notifications.mark-as-read');
     Route::post('notifications/read-all', [NotificationController::class, 'markAllAsRead'])->name('notifications.mark-all-read');
+});
+
+/*
+| Human review of paused agent proposals. Authorisation is enforced inside
+| ApprovalResumeGate rather than by middleware, so the route cannot be added
+| without its checks and the role check lives in one place alongside the
+| conversation-ownership check it belongs with.
+*/
+Route::middleware(['auth', 'verified'])->group(function (): void {
+    Route::post('finance/approvals/pending', [FinanceApprovalController::class, 'pending'])
+        ->middleware('throttle:30,1')
+        ->name('finance.approvals.pending');
+
+    Route::post('finance/approvals/resume', [FinanceApprovalController::class, 'resume'])
+        ->middleware('throttle:10,1')
+        ->name('finance.approvals.resume');
 });
 
 Route::middleware('guest')->group(function (): void {

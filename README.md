@@ -471,6 +471,47 @@ The response carries `source: deterministic | assistant`, and the panel shows a 
 model-phrased case, so it is always visible whether a reply came from the ledger or from a
 model reading it.
 
+### Approving a proposal the agent paused on
+
+When `DisburseAssistance` falls outside the autonomous limit, the run *pauses* and waits for a
+person. That decision has an endpoint:
+
+```bash
+# What is this conversation waiting on?
+curl -X POST http://localhost:8000/finance/approvals/pending \
+  -H 'X-CSRF-TOKEN: ...' \
+  -d 'conversation_id=<uuid>'
+
+# Answer it. `decisions` is only ever id => true/false.
+curl -X POST http://localhost:8000/finance/approvals/resume \
+  -H 'X-CSRF-TOKEN: ...' \
+  -d 'conversation_id=<uuid>&decisions[call_abc]=true'
+```
+
+Six checks stand between that `true` and a transfer, in `ApprovalResumeGate`:
+
+| Check | Why the obvious version is wrong |
+|---|---|
+| Role via the Gate | Reading a role name in the gate drifts from the panel |
+| `conversationBelongsTo()` | `continue()` accepts **any** conversation id |
+| Pending-set subset | A stale or foreign tool-call id must not be passed through |
+| Tool allowlist | Only `DisburseAssistance`; `Decision::edit()` is never built |
+| Target from the stored pause | The request id is never read from your payload |
+| `mayProposeSettlements()` | A switch turned off after the pause still refuses |
+
+`decisions` accepts **only** `id => bool`. There is deliberately no field for an amount or a
+recipient, and the `assistance_request_id` is read from the stored pause, so an approval cannot
+be redirected at another student.
+
+A replayed approval finds nothing pending and returns `nothing_pending` without paying twice.
+Any settlement in the response sets `requires_onchain_verification` — a returned hash is a claim
+until `php artisan lepton:reconcile` proves it.
+
+> **Never `app(SettlementOperator::class)`.** Its constructor takes an `Organization`, a fund and
+> a policy version, and Eloquent models take no constructor arguments — so the container hands
+> back **blank, non-existent records**. The agent then refuses with "no active wallet": the right
+> outcome for the wrong reason. Use `SettlementOperatorFactory::makeOrFail()`.
+
 ---
 
 ## How the money moves

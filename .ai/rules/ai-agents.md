@@ -138,3 +138,44 @@ route, because `RemembersConversations::continue()` trusts any id it is handed. 
 forget a check that lives inside the gate. A mismatched id returns null, so the request falls
 back to the deterministic answer and starts a fresh thread rather than leaking the other
 student's conversation.
+
+## The approval-resume gate is the only route from a human to a paused tool call
+`ApprovalResumeGate` holds six checks, each because the obvious implementation is wrong:
+
+- **Role, via the Gate.** `approveSettlementProposals` on `SettlementApprovalPolicy`, not a role
+  name read in the gate. Deliberately narrower than `AssistanceRequestPolicy`: reading requests is
+  not authority to release funds, so a reviewer must be granted it separately.
+- **Conversation ownership.** `RemembersConversations::continue()` trusts any id. Two officers both
+  being allowed to approve does not mean either may answer the other's paused run. Checked inside
+  the gate so a route added later cannot skip it.
+- **Pending-set subset.** Submitted ids must be a subset of what `pendingApprovalsFor()` reports.
+  A stale or foreign id is refused, not passed through.
+- **Tool allowlist.** Only `DisburseAssistance`, and `Decision::edit()` is never constructed. A
+  reviewer authorising the proposal the model made is a different act from rewriting it.
+- **Target provenance.** `assistance_request_id` is read from the *stored* pending approval, never
+  from the request body, so a caller cannot redirect an approval at another student.
+- **Settings gate.** `mayProposeSettlements()` is checked in `resume()`, deliberately *not* in
+  `authorize()`, so listing pending stays available for diagnosis.
+
+`Decision` objects are constructed by the gate, never parsed from input. The payload is only ever
+`id => bool`, so there is no field through which an amount or recipient could be smuggled.
+
+A replay finds nothing pending and returns `nothing_pending` without paying again. The response
+reports settlements read back from the ledger and always sets
+`requires_onchain_verification`: a tx hash is a claim until `lepton:reconcile` proves it.
+
+## Never container-resolve `SettlementOperator`
+Its constructor takes `Organization`, `AssistanceFund` and `AssistancePolicyVersion`. Eloquent
+models take no constructor arguments, so the container instantiates all three as **blank,
+non-existent records** — no error, just wrong ones. The agent then holds an organization whose
+`primaryWallet()` is null and the tool refuses with "The organization has no active wallet": the
+right outcome for the wrong reason, and it behaves differently once a wallet row exists.
+
+Go through `SettlementOperatorFactory::make()` / `makeOrFail()`, which checks `exists` and
+returns null (or throws) naming the actual missing record.
+
+## The AI SDK binds only `ConversationStore`, but implements three interfaces
+`DatabaseConversationStore` also implements `VerifiesConversationOwnership` and
+`ResolvesPendingApprovals`, and neither is bound — resolving them by interface name failed with
+"Target class is not instantiable". `AppServiceProvider::registerAiContracts()` aliases all three
+to the same instance. Anything verifying ownership or reading pending approvals needs these.
