@@ -125,8 +125,18 @@ class AiProvider extends Model
             $config['key'] = $this->api_key;
         }
 
-        if (filled($this->headers)) {
-            $config['headers'] = $this->headers;
+        // Ask for JSON explicitly. Some OpenAI-compatible gateways stream SSE
+        // regardless of `stream: false`, which the SDK cannot parse, and an
+        // Accept header is the reliable way to prevent that. Set as a default so
+        // an operator does not have to discover it.
+        $headers = $this->headers ?? [];
+
+        if (! isset($headers['Accept'])) {
+            $headers = array_merge(['Accept' => 'application/json'], $headers);
+        }
+
+        if ($headers !== []) {
+            $config['headers'] = $headers;
         }
 
         if (filled($this->model)) {

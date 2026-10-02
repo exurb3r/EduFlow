@@ -59,6 +59,21 @@ it('cannot read the stored key without the application key', function (): void {
         ->toThrow(DecryptException::class);
 });
 
+it('asks for JSON by default so a streaming gateway cannot break the response', function (): void {
+    // 9Router streams SSE regardless of `stream: false`, which the SDK cannot
+    // parse. The Accept header must be set even when the operator added none.
+    $config = makeProvider()->toProviderConfig();
+
+    expect($config['headers'])->toHaveKey('Accept')
+        ->and($config['headers']['Accept'])->toBe('application/json');
+});
+
+it('does not override an Accept header the operator set explicitly', function (): void {
+    $config = makeProvider(['headers' => ['Accept' => 'text/plain']])->toProviderConfig();
+
+    expect($config['headers']['Accept'])->toBe('text/plain');
+});
+
 it('builds an openai-compatible provider config with url, key and model', function (): void {
     $config = makeProvider([
         'headers' => ['X-Tenant-Id' => 'acme'],
@@ -67,7 +82,11 @@ it('builds an openai-compatible provider config with url, key and model', functi
     expect($config['driver'])->toBe('openai-compatible')
         ->and($config['url'])->toBe('http://127.0.0.1:11434/v1')
         ->and($config['key'])->toBe('sk-plaintext-should-never-persist')
-        ->and($config['headers'])->toBe(['X-Tenant-Id' => 'acme'])
+        // The Accept default is merged in, and the operator's own header is kept.
+        ->and($config['headers'])->toBe([
+            'Accept' => 'application/json',
+            'X-Tenant-Id' => 'acme',
+        ])
         ->and($config['models']['text']['default'])->toBe('llama3.1');
 });
 
