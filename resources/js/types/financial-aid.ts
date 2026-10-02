@@ -89,6 +89,14 @@ export type AskEduFlowQueryResponse = {
     question: string;
     answer: string;
     topic: string;
+    /**
+     * 'deterministic' means the application computed the answer itself.
+     * 'assistant' means a model rephrased a brief of computed facts; every
+     * figure in it was checked against that brief before it was shown.
+     */
+    source: "deterministic" | "assistant";
+    /** Thread id to send with the next question, or null when there is none. */
+    conversation_id: string | null;
     suggestedFollowups: string[];
     context: {
         display_currency: string;

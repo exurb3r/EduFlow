@@ -17,6 +17,10 @@ class AskEduFlowController extends Controller
     {
         $validated = $request->validate([
             'question' => ['required', 'string', 'min:2', 'max:500'],
+            // Thread continuity. Ownership is *not* checked here: the gate
+            // checks it before continuing, so a mismatched id silently starts
+            // a fresh conversation instead of leaking another student's thread.
+            'conversation_id' => ['nullable', 'uuid'],
         ]);
 
         $user = $request->user();
@@ -36,7 +40,12 @@ class AskEduFlowController extends Controller
             'student_number' => $student?->student_number,
         ];
 
-        $response = $ask->query($validated['question'], $context);
+        $response = $ask->query(
+            $validated['question'],
+            $context,
+            $user,
+            $validated['conversation_id'] ?? null,
+        );
 
         return response()->json([
             'success' => true,

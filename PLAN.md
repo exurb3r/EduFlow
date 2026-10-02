@@ -187,8 +187,22 @@ instructions and the gate decodes a string response. And `AiProviderResolver` mu
 built `Provider` instance rather than the driver name, because a bare name resolves against
 `config/ai.php` and fails with "requires a default text model".
 
-Remaining: swap `AskEduFlow`'s keyword matcher for `AskEduFlowAgent`, and connect the
-approval-resume endpoint with a `conversationBelongsTo()` check.
+`AskEduFlow` is now conversational. The deterministic answer is computed first and is always
+the floor; `StudentBrief` hands the model the facts *and* that explanation, and `QnaGate`
+replaces the text only when `BriefGuard` finds every figure in the response inside the brief.
+Verified live against the configured gateway: it rephrases the split explanation correctly,
+refuses to discuss moving funds, and a fabricated balance falls back to the computed figure.
+`conversationBelongsTo()` is called inside the gate, not at the route, so no caller can skip it.
+
+Replacing the matcher also surfaced a live routing bug. `str_contains($q, 'usd')` matched
+"USDC", so any question quoting an amount was answered about exchange rates, and `'aid'`
+matched inside "paid". `answer()` and `query()` also carried separate keyword chains that had
+drifted apart, so a question could be answered from the policy and labelled `general`; there is
+now one `classify()`.
+
+Remaining: connect the approval-resume endpoint for `SettlementOperator` (the same
+`conversationBelongsTo()` check `QnaGate` now performs), and decide whether to wire
+`TuitionSettlementService` into the settlement path or delete it.
 
 #### 3.1 Three-Tier Authority Model
 

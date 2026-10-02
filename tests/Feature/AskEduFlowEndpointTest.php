@@ -2,12 +2,15 @@
 
 declare(strict_types=1);
 
+use App\Ai\Agents\AskEduFlowAgent;
 use App\Models\AcademicTerm;
 use App\Models\AssistancePolicyVersion;
 use App\Models\Student;
 use App\Models\TuitionAccount;
 use App\Models\User;
+use App\Settings\AiSettings;
 use Database\Seeders\EduFlowPlanSeeder;
+use Laravel\Ai\Ai;
 use Spatie\Permission\Models\Role;
 
 beforeEach(function (): void {
@@ -126,3 +129,109 @@ test('validation rejects empty or overly short questions', function (): void {
         'question' => 'a',
     ])->assertUnprocessable();
 });
+
+/*
+|--------------------------------------------------------------------------
+| Conversational path
+|--------------------------------------------------------------------------
+|
+| The deterministic explanation is the floor, not the ceiling. These assert
+| that a verified model answer replaces it, that an unverified one does not,
+| and that the endpoint threads a conversation without letting one student
+| continue another's.
+|
+*/
+
+test('the endpoint falls back to the deterministic answer when AI is off', function (): void {
+    $response = $this->actingAs($this->user)->postJson(route('student.ask'), [
+        'question' => 'What is my tuition balance?',
+    ]);
+
+    $response->assertOk()
+        ->assertJsonPath('data.source', 'deterministic')
+        ->assertJsonPath('data.conversation_id', null);
+
+    expect($response->json('data.answer'))->toContain('300.00 USDC');
+});
+
+test('the endpoint returns a verified model answer when the switches are on', function (): void {
+    enableAiSwitches();
+
+    Ai::fakeAgent(AskEduFlowAgent::class, [
+        'Your balance is 300.00 USDC at present.',
+    ]);
+
+    $response = $this->actingAs($this->user)->postJson(route('student.ask'), [
+        'question' => 'What is my tuition balance?',
+    ]);
+
+    $response->assertOk()
+        ->assertJsonPath('data.source', 'assistant')
+        ->assertJsonPath('data.answer', 'Your balance is 300.00 USDC at present.');
+
+    expect($response->json('data.conversation_id'))->not->toBeNull();
+});
+
+test('the endpoint discards a model answer that invents a balance', function (): void {
+    enableAiSwitches();
+
+    Ai::fakeAgent(AskEduFlowAgent::class, [
+        'Your balance is 275.00 USDC after the scholarship.',
+    ]);
+
+    $response = $this->actingAs($this->user)->postJson(route('student.ask'), [
+        'question' => 'What is my tuition balance?',
+    ]);
+
+    // The student still gets a truthful answer, computed by the application.
+    $response->assertOk()
+        ->assertJsonPath('data.source', 'deterministic')
+        ->assertJsonPath('data.answer', fn (string $answer): bool => str_contains($answer, '300.00 USDC'));
+});
+
+test('the endpoint will not continue a conversation belonging to another student', function (): void {
+    enableAiSwitches();
+
+    $other = User::factory()->create();
+    $other->assignRole('student');
+    Student::factory()->create(['user_id' => $other->id, 'student_number' => 'STU-2026-0002']);
+
+    Ai::fakeAgent(AskEduFlowAgent::class, ['Your balance is 300.00 USDC.']);
+
+    $stolen = AskEduFlowAgent::make()
+        ->forParticipant($other)
+        ->prompt('What is my tuition balance?')
+        ->conversationId;
+
+    expect($stolen)->not->toBeNull();
+
+    $response = $this->actingAs($this->user)->postJson(route('student.ask'), [
+        'question' => 'What is my tuition balance?',
+        'conversation_id' => $stolen,
+    ]);
+
+    // No answer built on somebody else's thread, and nothing leaked from it.
+    $response->assertOk()
+        ->assertJsonPath('data.source', 'deterministic')
+        ->assertJsonPath('data.conversation_id', null);
+});
+
+test('the endpoint rejects a malformed conversation id at the edge', function (): void {
+    enableAiSwitches();
+
+    $this->actingAs($this->user)->postJson(route('student.ask'), [
+        'question' => 'What is my tuition balance?',
+        'conversation_id' => 'not-a-uuid',
+    ])->assertUnprocessable();
+});
+
+/** Turn on both admin switches. */
+function enableAiSwitches(): void
+{
+    $settings = app(AiSettings::class);
+    $settings->advisory_enabled = true;
+    $settings->disclosure_accepted = true;
+    $settings->save();
+
+    app()->forgetInstance(AiSettings::class);
+}

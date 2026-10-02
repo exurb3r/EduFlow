@@ -429,6 +429,48 @@ be downgraded by any response.
 - **27 adversarial tests** cover injected amounts, injected verdicts, malformed output,
   provider failure and prompt injection. All run offline via the SDK's own fakes.
 
+### Ask EduFlow: conversation with a figure check
+
+The student chat has two answers to every question. The deterministic one comes first and is
+always computed by PHP. A model may then *rephrase* it, and never replaces it.
+
+```
+"What is my tuition balance?"
+        │
+        ▼
+  AskEduFlow::answer()          ← deterministic, live policy, integer math
+        │
+        ▼
+  StudentBrief                  ← those facts + that explanation, assembled by PHP
+        │
+        ▼
+  QnaGate → BriefGuard          ← model answers; every figure checked against the brief
+        │
+    ┌───┴───────────────┐
+    │                   │
+ verified            anything else
+    │                   │
+ assistant          deterministic
+```
+
+`BriefGuard` extracts every numeric token from the model's response and discards the whole
+answer if any of them is absent from the brief. So "Your balance is 275.00 USDC" is refused and
+the student gets the real figure instead. Stripping just the bad number was rejected
+deliberately: an edited answer still reads as authoritative while quietly omitting what the
+student asked about.
+
+> **Compare figures as digit strings, not floats.** PHP 8.5 casts a float array key to `int`, so
+> keying by `(float) 1000.5` stores `1000` — and the guard then *permits* a fabricated `1000.5`
+> because it collides with a permitted `1000`. That was a live bug, now covered by a test.
+
+Threads are real and checked. `QnaGate` calls `conversationBelongsTo()` itself rather than
+trusting the route, because the SDK's `continue()` accepts any conversation id. Send another
+student's id and you get your own deterministic answer and a fresh thread.
+
+The response carries `source: deterministic | assistant`, and the panel shows a badge for the
+model-phrased case, so it is always visible whether a reply came from the ledger or from a
+model reading it.
+
 ---
 
 ## How the money moves

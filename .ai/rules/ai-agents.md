@@ -104,3 +104,37 @@ A gateway may also stream SSE regardless of `stream: false`. Setting an
 Passing the bare name makes the SDK resolve `config/ai.php`, which has no default text
 model, and openai-compatible endpoints fail with "requires a default text model". Return
 the instance.
+
+## A model may rephrase a brief, never supply a figure
+`StudentBrief` is built entirely by PHP from the student's own rows and the live policy, and
+`AskEduFlow::answer()` renders the correct explanation before the agent is consulted. That
+explanation goes *into* the brief, so the model restates policy-derived reasoning instead of
+deriving it. `BriefGuard` then extracts every numeric token from the response and rejects the
+whole answer if any figure is absent from the brief. Failing the entire answer rather than
+stripping the figure is deliberate: a silently edited answer still reads as authoritative while
+quietly omitting what the student asked about.
+
+Compare figures as canonical digit strings, never as floats and never as array keys. PHP 8.5
+casts a float array key to int, so keying by `(float) 1000.5` stores `1000` and the guard then
+*permits* a fabricated `1000.5` because it collides with a permitted `1000`. This was a live
+bug caught by `AskEduFlowMatcherTest`-adjacent coverage; do not reintroduce a numeric key.
+
+## `AskEduFlow` classifies once, not twice
+`answer()` and `query()` used to carry independent keyword chains for the same routing decision
+and they drifted, so a question could be answered from the policy and then labelled `general`.
+`classify()` is now the only router. Adding a keyword means adding it there.
+
+`str_contains` is unsafe for this routing. It matched `usd` inside `USDC`, so any question
+quoting an amount in the currency the system transacts in was answered about exchange rates,
+and it matched `aid` inside `paid`. Use `mentions()` for whole words and `mentionsStem()` for
+truncated stems (`eligib`, `escalat`, `guideline`).
+
+Precedence matters: `attendance` is checked before `currency_conversion`, otherwise "the
+attendance rate requirement" is answered with an FX quote.
+
+## Verify conversation ownership inside the gate
+`QnaGate` calls `ConversationStore::conversationBelongsTo()` itself rather than leaving it to a
+route, because `RemembersConversations::continue()` trusts any id it is handed. A caller cannot
+forget a check that lives inside the gate. A mismatched id returns null, so the request falls
+back to the deterministic answer and starts a fresh thread rather than leaking the other
+student's conversation.
