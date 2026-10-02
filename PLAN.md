@@ -465,7 +465,8 @@ must be labelled separately; neither proves mainnet or local-bank readiness.
 **Review basis:** Repository source and configuration inspected on 2026-10-02. This is
 not a full security audit, live settlement test, or PostgreSQL certification. `.env.example`
 exists but editor privacy rules blocked reading it; its defaults are unverified. Existing
-implementation work is preserved. Every item below remains open until its release test passes.
+implementation work is preserved. Findings below describe the original review; implementation
+progress is tracked immediately after the table. No item is closed solely by changing this document.
 
 | ID | Observed gap and evidence | Required outcome | Gate |
 | --- | --- | --- | --- |
@@ -481,6 +482,33 @@ implementation work is preserved. Every item below remains open until its releas
 | OSS-10 | Dockerfile uses Bun without a frozen lock, frontend PHP from distro packages, `--ignore-platform-reqs`, starter-kit branding, and an amd64-only helper. Entrypoint checks `/var/www/html` while image root is `/app`. No Compose file found. | Clean, reproducible production image and deployment bundle; matching runtime paths, real platform checks, non-root operation, documented services and architecture support. | Before container release |
 | OSS-11 | README is demo-focused; installation docs and `version.json` still identify KoamiStarterKit. Composer hooks enable Blog and run starter-kit setup. `.gitattributes` excludes README from archives. | Product identity and release metadata agree. School installation preserves application code, ships docs, and never invokes scaffold rewriting or demo provisioning. | Before OSS release |
 | OSS-12 | CI tests SQLite through `phpunit.xml`; inspected CI has no PostgreSQL job. Auto-release runs independently of CI and tags prereleases as `latest`. Root PHP constraint/README say 8.3+, but locked Symfony 8.1 dependencies require PHP 8.4.1+. | Test actual production DB, concurrency and upgrades; publish only tested commits; isolate preview/stable channels; document a certified runtime baseline. | Before stable release |
+
+### O0 Implementation Progress
+
+- **OSS-01 source cleanup implemented:** Graphite integration and literal token removed.
+  Workflow credential regression tests added. Owner revocation/rotation and historical
+  exposure review are still required; this blocker is not fully closed.
+- **OSS-02 seed safety implemented:** Default accounts are limited to local/testing,
+  including direct role-seeder invocation. Production/staging seeding creates no users or
+  demo records. `eduflow:bootstrap-admin` creates the first admin through hidden password
+  prompts, refuses existing accounts/second superadmins, and records a secret-free audit.
+  Existing default accounts are not deleted or reset; operators must remediate them.
+- **OSS-12 release guards implemented in part:** CI no longer commits formatter/refactor
+  changes. Preview publication requires successful same-repository push CI and checks out
+  its exact commit. Manual publication requires exact-commit CI; preview/draft releases
+  cannot update stable `latest`. Ad hoc Docker publication disabled. PostgreSQL coverage,
+  runtime/image certification and supply-chain attestations remain open.
+- Operator bootstrap/release notes added to README; source archives now retain README
+  and changelog instead of excluding them. No schema migration, dependency
+  change, live payment, full installer or shared-institution tenancy introduced.
+- **OSS-06 selection guard implemented in part:** `InstallationInstitution` requires an
+  explicit `EDUFLOW_INSTITUTION_ID` outside local/testing and exactly one organization;
+  missing/invalid/ambiguous selection fails closed. Dashboard/widgets, wallet doctor and
+  settlement operator factory no longer choose `Organization::first()`. Stateless scoped
+  resolution and negative selection tests added. This is not full resource ownership,
+  second-institution creation prevention, schema backfill or installation onboarding.
+- Next: institution setup/ownership and exact money/reservation foundations.
+  O0 still needs credential-owner confirmation, dependency/asset review and named owners.
 
 **Strengths to preserve:** MIT already exists; deterministic policy actions, student
 intake, role separation, AI opt-in settings, encrypted provider keys, Lepton contracts,
@@ -966,8 +994,8 @@ satisfies this gate.
 
 ## 11. Next Work and Decisions Requiring Approval
 
-**Next implementation batch:** O0 first, then exact money/institution foundations and the
-no-wallet fulfilment path. Do not start multi-tenant SaaS, generic ERP modules or more AI
+**Next implementation batch:** Finish remaining O0 operator/security checks, then explicit
+institution context, exact money/reservation foundations and the no-wallet fulfilment path. Do not start multi-tenant SaaS, generic ERP modules or more AI
 agents before school installation and financial correctness are demonstrable.
 
 Decisions to confirm before implementation:

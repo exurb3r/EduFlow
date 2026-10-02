@@ -86,7 +86,7 @@ different and specific reason — that is the demo.
 
 | | |
 |---|---|
-| PHP | 8.3+ (this project targets 8.5) with `pdo_sqlite`, `mbstring`, `openssl` |
+| PHP | 8.5 recommended; locked dependencies require at least 8.4.1, with `pdo_sqlite`, `mbstring`, `openssl` |
 | Composer | 2.x |
 | Node.js | 20.18.2+ |
 | Circle CLI | `npm install -g @circle-fin/cli` |
@@ -105,6 +105,10 @@ guessing later.
 ---
 
 ## Setup
+
+**Disposable local demo only:** Commands below include `migrate:fresh`, which deletes
+existing database records. Never use this setup on a school database or an instance
+holding configured providers or payment history.
 
 ```bash
 git clone https://github.com/koamishin/EduFlow.git
@@ -140,6 +144,57 @@ That runs the PHP server, Vite, and the queue worker together. Open the printed 
 | Finance officer | `finance@eduflow.test` | `password` |
 
 Log in as each to see both sides of the approval loop.
+
+### Production-safe role seeding and first administrator
+
+OSS production rollout is still in progress; these commands solve administrator bootstrap,
+not complete school onboarding, financial safety, or payment certification.
+
+On an operator-controlled instance with migrations applied, `APP_ENV=production`, a
+unique existing `APP_KEY`, and reviewed database configuration:
+
+```bash
+php artisan db:seed --force --no-interaction
+php artisan eduflow:bootstrap-admin --name="School Operator" --email="operator@school.example"
+```
+
+Production/staging seed roles and permissions, not demo users or institutions. Bootstrap
+asks for the password and confirmation through hidden prompts; passwords must have at
+least 12 characters, mixed case, a number, and a symbol. It requires an interactive
+terminal, has no password CLI option, leaves email verification pending, and refuses
+existing users or a second superadmin. Verify email and configure staff MFA before opening
+school access. Configure SMTP for verification/reset flows first.
+
+This change does **not** remove accounts created by older seeders. Operators must review
+existing `admin@admin.com` / `user@user.com` accounts, rotate exposed passwords, revoke
+sessions and unnecessary access, and preserve required audit evidence. Do not regenerate
+`APP_KEY`, reset the database, or delete financial records as credential cleanup.
+
+### Single-institution context
+
+Production/staging now require `EDUFLOW_INSTITUTION_ID` to identify the existing
+`organizations.id`. That database must contain exactly one institution. Missing, invalid,
+stale, or ambiguous selection disables treasury actions/operator construction rather
+than choosing the first row. Local/testing retain automatic selection only when exactly
+one institution exists. Restart long-lived workers after changing configuration.
+
+This is a selection guard, not complete tenant isolation or a school installer. It does
+not create institution records or enforce ownership on every existing resource. Do not
+host unrelated schools in one database.
+
+### Release safety
+
+Preview builds publish only after successful same-repository push CI, from its exact
+commit. Preview images use `preview` and version/SHA tags, never stable `latest`.
+Manual releases require successful CI for the dispatched `main` commit, reject existing
+tags, and reject `latest` for drafts/prereleases. Configure required reviewers on the
+GitHub `release` environment before using official publication; an environment name alone
+does not enforce approval. Ad hoc Docker Build Check never publishes an image.
+
+A Graphite token previously embedded in the release workflow has been removed with that
+integration. Its owner must still revoke/rotate the exposed token and review access and
+repository history. Removing source text does not invalidate a credential. These checks
+do not certify the current Docker image or live payment rails for production.
 
 ---
 

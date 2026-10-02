@@ -4,7 +4,7 @@ declare(strict_types=1);
 
 namespace App\Filament\Widgets;
 
-use App\Models\Organization;
+use App\Services\InstallationInstitution;
 use App\Services\LeptonTreasuryService;
 use Filament\Actions\Action;
 use Filament\Notifications\Notification;
@@ -28,7 +28,13 @@ class LeptonNetworkWidget extends BaseWidget
      */
     protected function getHeaderActions(): array
     {
-        $wallet = Organization::first()?->primaryWallet();
+        $institution = app(InstallationInstitution::class)->current();
+
+        if ($institution === null) {
+            return [];
+        }
+
+        $wallet = $institution->primaryWallet();
         $status = app(LeptonTreasuryService::class)->status($wallet);
 
         $needsAdoption = $wallet !== null
@@ -115,8 +121,15 @@ class LeptonNetworkWidget extends BaseWidget
 
     protected function getStats(): array
     {
-        $org = Organization::first();
-        $wallet = $org?->primaryWallet();
+        $org = app(InstallationInstitution::class)->current();
+
+        if ($org === null) {
+            return [Stat::make('Institution', 'Not configured')
+                ->description('Configure EDUFLOW_INSTITUTION_ID for a single institution')
+                ->color('warning')];
+        }
+
+        $wallet = $org->primaryWallet();
         $status = app(LeptonTreasuryService::class)->status($wallet);
 
         $chain = strtoupper($status['chain']);

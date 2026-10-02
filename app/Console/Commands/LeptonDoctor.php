@@ -4,7 +4,7 @@ declare(strict_types=1);
 
 namespace App\Console\Commands;
 
-use App\Models\Organization;
+use App\Services\InstallationInstitution;
 use App\Services\LeptonTreasuryService;
 use Illuminate\Console\Attributes\Description;
 use Illuminate\Console\Attributes\Signature;
@@ -31,6 +31,12 @@ class LeptonDoctor extends Command
 
     public function handle(LeptonTreasuryService $treasury): int
     {
+        if (app(InstallationInstitution::class)->current() === null) {
+            $this->error('Institution context unavailable. Check EDUFLOW_INSTITUTION_ID and single-institution setup.');
+
+            return self::FAILURE;
+        }
+
         $this->newLine();
         $this->line('  Lepton agent wallet doctor');
         $this->line('  '.str_repeat('─', 60));
@@ -132,7 +138,7 @@ class LeptonDoctor extends Command
         $this->heading('Treasury wallet');
 
         $configured = config('lepton.arc.treasury');
-        $wallet = Organization::first()?->primaryWallet();
+        $wallet = app(InstallationInstitution::class)->current()?->primaryWallet();
         $dbAddress = $wallet?->address;
 
         $chain = (string) config('lepton.arc.chain', 'ARC-TESTNET');
@@ -232,7 +238,7 @@ class LeptonDoctor extends Command
     {
         $this->heading('EduFlow ledger parity');
 
-        $status = app(LeptonTreasuryService::class)->status(Organization::first()?->primaryWallet());
+        $status = app(LeptonTreasuryService::class)->status(app(InstallationInstitution::class)->current()?->primaryWallet());
 
         if (! $status['live_available']) {
             $this->line('  <fg=yellow>?</> live balance unreadable, cannot compare');
@@ -314,7 +320,7 @@ class LeptonDoctor extends Command
             $this->kv('.env updated', '<fg=red>not writable</>');
         }
 
-        $wallet = Organization::first()?->primaryWallet();
+        $wallet = app(InstallationInstitution::class)->current()?->primaryWallet();
 
         if ($wallet !== null) {
             $wallet->update(['address' => $agent]);

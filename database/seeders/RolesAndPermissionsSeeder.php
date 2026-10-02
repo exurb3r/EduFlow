@@ -105,6 +105,10 @@ class RolesAndPermissionsSeeder extends Seeder
 
     protected function createDefaultUsers(array $roles): void
     {
+        if (! app()->environment(['local', 'testing'])) {
+            return;
+        }
+
         $admin = User::firstOrCreate(
             ['email' => 'admin@admin.com'],
             [
