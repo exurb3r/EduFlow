@@ -142,7 +142,6 @@ class LeptonDoctor extends Command
         $dbAddress = $wallet?->address;
 
         $chain = (string) config('lepton.arc.chain', 'ARC-TESTNET');
-        $network = str_contains($chain, 'TESTNET') ? 'testnet' : 'mainnet';
 
         $this->kv('env', $configured ?: '<fg=red>not set</>');
         $this->kv('database', $dbAddress ?: '<fg=red>no wallet row</>');
@@ -179,7 +178,7 @@ class LeptonDoctor extends Command
                 $agent = array_values($known)[0];
 
                 if ($this->option('adopt-agent-wallet')) {
-                    $this->adopt($configured, $agent);
+                    $this->adopt($agent);
                 } else {
                     $this->detail('Fix with: php artisan lepton:doctor --adopt-agent-wallet');
                 }
@@ -300,7 +299,7 @@ class LeptonDoctor extends Command
     /**
      * Rewrite LEPTON_TREASURY_ADDRESS and the database treasury in place.
      */
-    private function adopt(string $current, string $agent): void
+    private function adopt(string $agent): void
     {
         $env = base_path('.env');
 

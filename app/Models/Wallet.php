@@ -34,6 +34,7 @@ class Wallet extends Model
         'status',
     ];
 
+    #[\Override]
     protected function casts(): array
     {
         return [

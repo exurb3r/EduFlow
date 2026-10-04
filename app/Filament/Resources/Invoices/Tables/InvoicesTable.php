@@ -34,7 +34,7 @@ class InvoicesTable
                     ->sortable(),
                 TextColumn::make('amount')
                     ->label('Amount')
-                    ->formatStateUsing(fn ($state) => number_format((float) $state, 2).' USDC')
+                    ->formatStateUsing(fn ($state): string => number_format((float) $state, 2).' USDC')
                     ->weight('bold')
                     ->sortable(),
                 TextColumn::make('due_date')

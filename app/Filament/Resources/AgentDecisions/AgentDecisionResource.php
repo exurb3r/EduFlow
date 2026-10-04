@@ -26,11 +26,13 @@ class AgentDecisionResource extends Resource
 
     protected static ?int $navigationSort = 5;
 
+    #[\Override]
     public static function table(Table $table): Table
     {
         return AgentDecisionsTable::configure($table);
     }
 
+    #[\Override]
     public static function getPages(): array
     {
         return [

@@ -50,6 +50,7 @@ class Transaction extends Model
         'executed_at',
     ];
 
+    #[\Override]
     protected function casts(): array
     {
         return [

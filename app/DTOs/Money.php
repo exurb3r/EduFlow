@@ -84,7 +84,7 @@ final readonly class Money implements JsonSerializable
         try {
             return $units->toInt();
         } catch (IntegerOverflowException $exception) {
-            throw new OverflowException('Money exceeds supported signed integer range.', previous: $exception);
+            throw new OverflowException('Money exceeds supported signed integer range.', $exception->getCode(), previous: $exception);
         }
     }
 

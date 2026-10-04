@@ -30,6 +30,7 @@ class Organization extends Model
 {
     use HasFactory;
 
+    #[\Override]
     protected static function booted(): void
     {
         static::creating(fn (Organization $organization) => app(GuardSingleInstitution::class)->handle());
@@ -45,6 +46,7 @@ class Organization extends Model
         'human_approval_threshold',
     ];
 
+    #[\Override]
     protected function casts(): array
     {
         return [

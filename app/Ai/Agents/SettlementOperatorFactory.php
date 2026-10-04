@@ -35,7 +35,7 @@ final class SettlementOperatorFactory
     {
         $institution = app(InstallationInstitution::class)->current();
 
-        if ($institution === null || ($organization !== null && (! $organization->exists || $organization->id !== $institution->id))) {
+        if ($institution === null || ($organization instanceof Organization && (! $organization->exists || $organization->id !== $institution->id))) {
             return null;
         }
 
@@ -44,7 +44,7 @@ final class SettlementOperatorFactory
         $fund = AssistanceFund::where('organization_id', $organization->id)->first();
         $policyVersion = AssistancePolicyVersion::active();
 
-        if ($fund === null || $policyVersion === null) {
+        if ($fund === null || ! $policyVersion instanceof AssistancePolicyVersion) {
             return null;
         }
 
@@ -62,7 +62,7 @@ final class SettlementOperatorFactory
     {
         $operator = self::make($organization);
 
-        if ($operator === null) {
+        if (! $operator instanceof SettlementOperator) {
             throw new \RuntimeException(
                 'SettlementOperator needs a persisted organization, an assistance fund and an active policy version. '
                 .'Check EDUFLOW_INSTITUTION_ID and single-institution setup.'

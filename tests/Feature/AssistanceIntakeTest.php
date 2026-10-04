@@ -12,6 +12,7 @@ use App\Models\User;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Str;
 use Illuminate\Validation\ValidationException;
+use Inertia\Testing\AssertableInertia;
 use Inertia\Testing\AssertableInertia as Assert;
 use Spatie\Activitylog\Models\Activity;
 use Spatie\Permission\Models\Role;
@@ -79,7 +80,7 @@ test('dashboard keeps the generic page for users without a privileged role', fun
     }
 
     $this->actingAs($user)->get(route('dashboard'))
-        ->assertOk()->assertInertia(fn (Assert $page) => $page->component('dashboard'));
+        ->assertOk()->assertInertia(fn (Assert $page): AssertableInertia => $page->component('dashboard'));
     $this->get(route('student.dashboard'))->assertForbidden();
 })->with(['no role' => null, 'ordinary role' => 'user']);
 
@@ -98,7 +99,7 @@ test('student dashboard shows only owned requests and current tuition account', 
     ]))->create();
 
     $this->actingAs($this->student->user)->get(route('student.dashboard'))
-        ->assertOk()->assertInertia(fn (Assert $page) => $page
+        ->assertOk()->assertInertia(fn (Assert $page): AssertableInertia => $page
         ->component('student/dashboard')
         ->where('student.name', $this->student->user->name)
         ->where('student.student_number', $this->student->student_number)
@@ -120,7 +121,7 @@ test('students can view their own request but cannot access another students det
     $other = AssistanceRequest::factory()->create();
 
     $this->actingAs($this->student->user)->get(route('assistance.show', $owned))
-        ->assertOk()->assertInertia(fn (Assert $page) => $page
+        ->assertOk()->assertInertia(fn (Assert $page): AssertableInertia => $page
         ->component('assistance/show')
         ->where('assistanceRequest.id', $owned->id)
         ->where('assistanceRequest.reason', $owned->reason)
@@ -158,11 +159,11 @@ test('creation requires both the student role and a linked student', function (b
 test('create page supplies a fresh submission key and submission preserves exact amounts and tuition', function (): void {
     $this->actingAs($this->student->user);
     $form = $this->get(route('assistance.create'))->assertOk()
-        ->assertInertia(fn (Assert $page) => $page->component('assistance/create')
+        ->assertInertia(fn (Assert $page): AssertableInertia => $page->component('assistance/create')
             ->where('term', $this->term->name)
             ->where('submissionKey', fn (string $key): bool => Str::isUuid($key)));
     $key = $form->inertiaProps('submissionKey');
-    $this->get(route('assistance.create'))->assertInertia(fn (Assert $page) => $page
+    $this->get(route('assistance.create'))->assertInertia(fn (Assert $page): AssertableInertia => $page
         ->where('submissionKey', fn (string $next): bool => Str::isUuid($next) && $next !== $key));
     $before = $this->account->getAttributes();
 
@@ -295,7 +296,7 @@ test('submission requires exactly one current term tuition account', function (s
     $accounts = TuitionAccount::all()->map->getAttributes()->all();
 
     $this->actingAs($this->student->user)->get(route('student.dashboard'))
-        ->assertOk()->assertInertia(fn (Assert $page) => $page
+        ->assertOk()->assertInertia(fn (Assert $page): AssertableInertia => $page
         ->where('canRequest', false)->where('tuitionAccount', null));
     $this->get(route('assistance.create'))->assertRedirect(route('student.dashboard'));
     $this->postJson(route('assistance.store'), $this->payload)

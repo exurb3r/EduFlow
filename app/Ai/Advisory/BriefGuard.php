@@ -32,7 +32,7 @@ final class BriefGuard
 
     public function __construct(?StudentBrief $brief = null)
     {
-        if ($brief !== null) {
+        if ($brief instanceof StudentBrief) {
             $this->allow($brief->toPromptBlock());
         }
     }
@@ -92,18 +92,18 @@ final class BriefGuard
     {
         preg_match_all('/(?<![\d.])(\d{1,3}(?:,\d{3})+(?:\.\d+)?|\d+(?:\.\d+)?)(?![\d.])/', $text, $matches);
 
-        return array_map(self::canonicalise(...), $matches[1]);
+        return array_map($this->canonicalise(...), $matches[1]);
     }
 
     /**
      * Strip thousands separators and trailing fractional zeros.
      */
-    private static function canonicalise(string $figure): string
+    private function canonicalise(string $figure): string
     {
         $figure = str_replace(',', '', $figure);
 
         if (str_contains($figure, '.')) {
-            $figure = rtrim(rtrim($figure, '0'), '.');
+            return rtrim(rtrim($figure, '0'), '.');
         }
 
         return $figure;

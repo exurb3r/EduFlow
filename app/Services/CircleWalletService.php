@@ -123,7 +123,7 @@ class CircleWalletService
                 'description' => $note,
                 'source' => 'student_portal_gateway',
                 'simulated_inbound' => true,
-                'reference' => 'inbound-'.(string) Str::uuid(),
+                'reference' => 'inbound-'.Str::uuid(),
             ],
             'executed_at' => now(),
         ]);

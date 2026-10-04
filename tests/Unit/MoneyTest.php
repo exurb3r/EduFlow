@@ -22,11 +22,11 @@ test('money preserves integer boundaries and rejects out of range decimals', fun
         ->and(Money::fromDecimal($min->decimal(), CurrencyCode::USDC)->minorUnits)->toBe(PHP_INT_MIN)
         ->and($max->decimal())->toBe('9223372036854.775807')
         ->and($min->decimal())->toBe('-9223372036854.775808')
-        ->and(fn () => Money::fromDecimal('9223372036854.775808', CurrencyCode::USDC))->toThrow(OverflowException::class);
+        ->and(fn (): Money => Money::fromDecimal('9223372036854.775808', CurrencyCode::USDC))->toThrow(OverflowException::class);
 });
 
 test('money refuses ambiguous or lossy input', function (string $input): void {
-    expect(fn () => Money::fromDecimal($input, CurrencyCode::USD))->toThrow(InvalidArgumentException::class);
+    expect(fn (): Money => Money::fromDecimal($input, CurrencyCode::USD))->toThrow(InvalidArgumentException::class);
 })->with(['', ' 1.00', '1.00 ', '1,000.00', '1e3', '+1.00', '.50', '1.', '1.001', '--1', 'NaN']);
 
 test('money rounds display separately without losing stored precision', function (): void {
@@ -50,7 +50,7 @@ test('money addition subtraction and serialization remain exact above JavaScript
 });
 
 test('money refuses currency mismatch and arithmetic overflow', function (): void {
-    expect(fn () => (new Money(1, CurrencyCode::USD))->plus(new Money(1, CurrencyCode::PHP)))->toThrow(InvalidArgumentException::class)
-        ->and(fn () => (new Money(PHP_INT_MAX, CurrencyCode::USDC))->plus(new Money(1, CurrencyCode::USDC)))->toThrow(OverflowException::class)
-        ->and(fn () => (new Money(PHP_INT_MIN, CurrencyCode::USDC))->minus(new Money(1, CurrencyCode::USDC)))->toThrow(OverflowException::class);
+    expect(fn (): Money => (new Money(1, CurrencyCode::USD))->plus(new Money(1, CurrencyCode::PHP)))->toThrow(InvalidArgumentException::class)
+        ->and(fn (): Money => (new Money(PHP_INT_MAX, CurrencyCode::USDC))->plus(new Money(1, CurrencyCode::USDC)))->toThrow(OverflowException::class)
+        ->and(fn (): Money => (new Money(PHP_INT_MIN, CurrencyCode::USDC))->minus(new Money(1, CurrencyCode::USDC)))->toThrow(OverflowException::class);
 });

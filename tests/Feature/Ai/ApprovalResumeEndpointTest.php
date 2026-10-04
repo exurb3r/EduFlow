@@ -414,7 +414,7 @@ it('refuses to resume when the operator has no persisted organization', function
     Organization::query()->delete();
 
     expect(SettlementOperatorFactory::make())->toBeNull()
-        ->and(fn () => SettlementOperatorFactory::makeOrFail())
+        ->and(fn (): SettlementOperator => SettlementOperatorFactory::makeOrFail())
         ->toThrow(RuntimeException::class, 'needs a persisted organization');
 });
 

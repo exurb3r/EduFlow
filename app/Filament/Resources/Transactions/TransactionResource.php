@@ -24,11 +24,13 @@ class TransactionResource extends Resource
 
     protected static ?int $navigationSort = 4;
 
+    #[\Override]
     public static function table(Table $table): Table
     {
         return TransactionsTable::configure($table);
     }
 
+    #[\Override]
     public static function getPages(): array
     {
         return [

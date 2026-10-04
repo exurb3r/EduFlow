@@ -35,7 +35,10 @@ export default function StudentDashboard({
                     description="Your tuition, your requests, and a clear view of what comes next."
                 >
                     {canRequest && (
-                        <Button asChild className="shrink-0 bg-amber-600 text-white hover:bg-amber-700 dark:bg-amber-600">
+                        <Button
+                            asChild
+                            className="shrink-0 bg-amber-600 text-white hover:bg-amber-700 dark:bg-amber-600"
+                        >
                             <Link href={create()}>
                                 <Plus aria-hidden="true" />
                                 Request assistance
@@ -76,7 +79,10 @@ export default function StudentDashboard({
                                 Tuition overview
                             </h2>
                             {currency && (
-                                <Badge variant="outline" className="text-[11px] font-normal text-muted-foreground">
+                                <Badge
+                                    variant="outline"
+                                    className="text-[11px] font-normal text-muted-foreground"
+                                >
                                     {currency.rate_description}
                                 </Badge>
                             )}
@@ -115,7 +121,11 @@ export default function StudentDashboard({
                                         )}
                                         {tuitionAccount.total_amount_fiat && (
                                             <span className="ml-2 text-xs font-normal text-muted-foreground">
-                                                (≈ {tuitionAccount.total_amount_fiat})
+                                                (≈{' '}
+                                                {
+                                                    tuitionAccount.total_amount_fiat
+                                                }
+                                                )
                                             </span>
                                         )}
                                     </dd>
@@ -128,7 +138,11 @@ export default function StudentDashboard({
                                         {formatUsdc(tuitionAccount.paid_amount)}
                                         {tuitionAccount.paid_amount_fiat && (
                                             <span className="ml-2 text-xs font-normal text-muted-foreground">
-                                                (≈ {tuitionAccount.paid_amount_fiat})
+                                                (≈{' '}
+                                                {
+                                                    tuitionAccount.paid_amount_fiat
+                                                }
+                                                )
                                             </span>
                                         )}
                                     </dd>
@@ -199,7 +213,8 @@ export default function StudentDashboard({
                                         <div className="flex flex-wrap items-center gap-2">
                                             <Link
                                                 href={show({
-                                                    assistanceRequest: request.id,
+                                                    assistanceRequest:
+                                                        request.id,
                                                 })}
                                                 className="inline-flex items-center gap-2 rounded-sm font-medium underline-offset-4 hover:underline focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-ring"
                                             >
@@ -246,7 +261,7 @@ export default function StudentDashboard({
                                                 <p className="text-[11px] text-muted-foreground">
                                                     {formatUsdc(
                                                         request.auto_approved_amount,
-                                                    )}{" "}
+                                                    )}{' '}
                                                     auto · remainder pending
                                                 </p>
                                             )}

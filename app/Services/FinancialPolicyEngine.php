@@ -135,7 +135,7 @@ class FinancialPolicyEngine
         float $autoAssistanceLimit = 100.00
     ): PolicyEvaluationResult {
         $checks = [
-            'budget_available' => $aidBudget === null || $aidBudget->canAfford($requestedAmount),
+            'budget_available' => ! $aidBudget instanceof Budget || $aidBudget->canAfford($requestedAmount),
             'reserve_protected' => ($wallet->balance - $requestedAmount) >= $org->minimum_reserve,
             'within_auto_aid_limit' => $requestedAmount <= $autoAssistanceLimit,
         ];

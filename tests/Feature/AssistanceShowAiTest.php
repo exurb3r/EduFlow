@@ -13,6 +13,7 @@ use App\Models\User;
 use App\Models\Wallet;
 use App\Services\DecisionExplainer;
 use Database\Seeders\EduFlowPlanSeeder;
+use Inertia\Testing\AssertableInertia;
 use Inertia\Testing\AssertableInertia as Assert;
 use Spatie\Permission\Models\Role;
 
@@ -82,7 +83,7 @@ test('show assistance page provides rich dual-currency AI explanation when evalu
 
     $response = $this->actingAs($this->user)->get(route('assistance.show', $request));
 
-    $response->assertOk()->assertInertia(fn (Assert $page) => $page
+    $response->assertOk()->assertInertia(fn (Assert $page): AssertableInertia => $page
         ->component('assistance/show')
         ->where('assistanceRequest.id', $request->id)
         ->has('aiExplanation')
@@ -108,7 +109,7 @@ test('show assistance page handles un-evaluated request with null aiExplanation 
 
     $response = $this->actingAs($this->user)->get(route('assistance.show', $request));
 
-    $response->assertOk()->assertInertia(fn (Assert $page) => $page
+    $response->assertOk()->assertInertia(fn (Assert $page): AssertableInertia => $page
         ->component('assistance/show')
         ->where('assistanceRequest.id', $request->id)
         ->where('aiExplanation', null)

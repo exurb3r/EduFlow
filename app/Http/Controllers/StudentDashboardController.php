@@ -6,6 +6,7 @@ namespace App\Http\Controllers;
 
 use App\Enums\AgentDecisionType;
 use App\Enums\CurrencyCode;
+use App\Models\AgentDecision;
 use App\Models\AssistanceRequest;
 use App\Services\CurrencyConverter;
 use Illuminate\Http\RedirectResponse;
@@ -56,7 +57,7 @@ class StudentDashboardController extends Controller
             ];
         }
 
-        $requests = $student->assistanceRequests()->with('agentDecisions')->latest('id')->get()->map(function (AssistanceRequest $assistance) {
+        $requests = $student->assistanceRequests()->with('agentDecisions')->latest('id')->get()->map(function (AssistanceRequest $assistance): array {
             $decision = $assistance->latestAgentDecision();
             $pending = $assistance->pendingReviewBaseUnits();
             $requested = (int) ($assistance->requested_amount ?? 0);
@@ -69,7 +70,7 @@ class StudentDashboardController extends Controller
                 'status' => $assistance->status instanceof \BackedEnum ? $assistance->status->value : (string) $assistance->status,
                 'submitted_at' => $assistance->submitted_at?->toIso8601String() ?? $assistance->created_at?->toIso8601String(),
                 'admin_notes' => $assistance->admin_notes,
-                'has_decision' => $decision !== null,
+                'has_decision' => $decision instanceof AgentDecision,
                 'decision' => $decision?->decision->value,
                 'is_split' => $decision?->decision === AgentDecisionType::PARTIAL_APPROVAL,
                 'auto_approved_amount' => (string) $auto,

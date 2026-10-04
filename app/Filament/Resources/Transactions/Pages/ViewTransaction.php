@@ -21,6 +21,7 @@ class ViewTransaction extends ViewRecord
 {
     protected static string $resource = TransactionResource::class;
 
+    #[\Override]
     protected function getHeaderActions(): array
     {
         return [
@@ -34,6 +35,7 @@ class ViewTransaction extends ViewRecord
         ];
     }
 
+    #[\Override]
     public function infolist(Schema $schema): Schema
     {
         return $schema->components([

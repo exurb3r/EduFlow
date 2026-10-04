@@ -16,11 +16,14 @@ class AssistanceRequestPolicy
 
     public function view(User $user, AssistanceRequest $assistanceRequest): bool
     {
-        return $this->viewAny($user)
-            || ($user->hasRole('student') && (
-                $assistanceRequest->student()->where('user_id', $user->getKey())->exists()
-                || $assistanceRequest->user_id === $user->getKey()
-            ));
+        if ($this->viewAny($user)) {
+            return true;
+        }
+
+        return $user->hasRole('student') && (
+            $assistanceRequest->student()->where('user_id', $user->getKey())->exists()
+            || $assistanceRequest->user_id === $user->getKey()
+        );
     }
 
     public function create(User $user): bool

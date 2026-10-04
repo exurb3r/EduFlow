@@ -211,10 +211,8 @@ it('records a human decision on a paused tool call', function (): void {
         Decisions::from(['call_abc' => Decision::reject('Over the autonomous limit.')])
     );
 
-    SettlementOperator::assertPrompted(function (AgentPrompt $prompt): bool {
-        return $prompt->hasApprovalDecisions()
-            && $prompt->approvalDecisions->get('call_abc')?->isApproved() === false;
-    });
+    SettlementOperator::assertPrompted(fn (AgentPrompt $prompt): bool => $prompt->hasApprovalDecisions()
+        && $prompt->approvalDecisions->get('call_abc')?->isApproved() === false);
 });
 
 it('declares a schema so the operator cannot emit an amount as a field', function (): void {

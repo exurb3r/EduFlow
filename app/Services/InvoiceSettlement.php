@@ -20,13 +20,13 @@ use Yukazakiri\Lepton\Contracts\WalletGateway;
  * them exists on Arc. Results are cached briefly because a table render would
  * otherwise make one RPC call per row.
  */
-final class InvoiceSettlement
+final readonly class InvoiceSettlement
 {
     private const CACHE_KEY = 'lepton:invoice-settlement:';
 
     public function __construct(
-        private readonly ArcNetworkGateway $arc,
-        private readonly WalletGateway $wallets,
+        private ArcNetworkGateway $arc,
+        private WalletGateway $wallets,
     ) {}
 
     public static function verdictFor(Invoice $invoice): string

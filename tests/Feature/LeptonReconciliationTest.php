@@ -156,7 +156,7 @@ function payment(Organization $org, Wallet $wallet, ?string $hash, array $metada
         'amount' => 450.00,
         'status' => TransactionStatus::CONFIRMED,
         'provider_tx_hash' => $hash,
-        'reference_type' => $for !== null ? Invoice::class : null,
+        'reference_type' => $for instanceof Invoice ? Invoice::class : null,
         'reference_id' => $for?->id,
         'metadata' => $metadata,
     ]);

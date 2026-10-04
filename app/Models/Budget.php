@@ -36,6 +36,7 @@ class Budget extends Model
         'status',
     ];
 
+    #[\Override]
     protected function casts(): array
     {
         return [

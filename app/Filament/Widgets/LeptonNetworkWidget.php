@@ -119,6 +119,7 @@ class LeptonNetworkWidget extends BaseWidget
         ];
     }
 
+    #[\Override]
     protected function getStats(): array
     {
         $org = app(InstallationInstitution::class)->current();

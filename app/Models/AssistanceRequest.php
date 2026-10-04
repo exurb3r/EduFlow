@@ -89,6 +89,7 @@ class AssistanceRequest extends Model
      *
      * @return array<string, string>
      */
+    #[\Override]
     protected function casts(): array
     {
         return [
@@ -102,6 +103,7 @@ class AssistanceRequest extends Model
         ];
     }
 
+    #[\Override]
     protected static function booted(): void
     {
         static::creating(function (self $model): void {
@@ -115,7 +117,7 @@ class AssistanceRequest extends Model
                 }
             }
             if (empty($model->subject)) {
-                $model->subject = ! empty($model->type) ? ucfirst((string) $model->type).' Assistance' : 'Assistance Request';
+                $model->subject = empty($model->type) ? 'Assistance Request' : ucfirst((string) $model->type).' Assistance';
             }
             if (empty($model->description)) {
                 $model->description = $model->reason ?? '';
@@ -194,7 +196,7 @@ class AssistanceRequest extends Model
         $requested = (int) ($this->requested_amount ?? 0);
         $decision = $this->latestAgentDecision();
 
-        if (! $decision || ! $decision->requires_approval) {
+        if (! $decision instanceof AgentDecision || ! $decision->requires_approval) {
             return 0;
         }
 

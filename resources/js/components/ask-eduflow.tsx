@@ -1,4 +1,4 @@
-import { useRef, useState, useTransition } from "react";
+import { useRef, useState, useTransition } from 'react';
 import {
     ArrowRight,
     Bot,
@@ -8,9 +8,9 @@ import {
     ShieldCheck,
     Sparkles,
     User,
-} from "lucide-react";
-import { Badge } from "@/components/ui/badge";
-import { Button } from "@/components/ui/button";
+} from 'lucide-react';
+import { Badge } from '@/components/ui/badge';
+import { Button } from '@/components/ui/button';
 import {
     Card,
     CardContent,
@@ -18,14 +18,14 @@ import {
     CardFooter,
     CardHeader,
     CardTitle,
-} from "@/components/ui/card";
-import { Input } from "@/components/ui/input";
-import { Spinner } from "@/components/ui/spinner";
-import type { AskEduFlowQueryResponse } from "@/types/financial-aid";
+} from '@/components/ui/card';
+import { Input } from '@/components/ui/input';
+import { Spinner } from '@/components/ui/spinner';
+import type { AskEduFlowQueryResponse } from '@/types/financial-aid';
 
 interface ChatMessage {
     id: string;
-    sender: "user" | "assistant";
+    sender: 'user' | 'assistant';
     text: string;
     topic?: string;
     suggestedFollowups?: string[];
@@ -41,23 +41,23 @@ interface AskEduFlowProps {
 
 export function AskEduFlow({
     suggestedQuestions = [
-        "Why was my 150 USDC request split?",
-        "What is my tuition balance in PHP?",
-        "What are the assistance guidelines?",
-        "How does currency rate locking work?",
+        'Why was my 150 USDC request split?',
+        'What is my tuition balance in PHP?',
+        'What are the assistance guidelines?',
+        'How does currency rate locking work?',
     ],
-    displayCurrency = "PHP",
+    displayCurrency = 'PHP',
     rateDescription,
     className,
 }: AskEduFlowProps) {
-    const [question, setQuestion] = useState("");
+    const [question, setQuestion] = useState('');
     const [isPending, startTransition] = useTransition();
     const [messages, setMessages] = useState<ChatMessage[]>([]);
     const [error, setError] = useState<string | null>(null);
     // Server-side thread, so a follow-up has the earlier turns as context.
     const conversationId = useRef<string | null>(null);
     const [lastSource, setLastSource] = useState<
-        "deterministic" | "assistant" | null
+        'deterministic' | 'assistant' | null
     >(null);
 
     const ask = async (queryText: string) => {
@@ -66,17 +66,17 @@ export function AskEduFlow({
 
         setError(null);
         const userMsg: ChatMessage = {
-            id: "user-" + Date.now(),
-            sender: "user",
+            id: 'user-' + Date.now(),
+            sender: 'user',
             text: trimmed,
             timestamp: new Date().toLocaleTimeString([], {
-                hour: "2-digit",
-                minute: "2-digit",
+                hour: '2-digit',
+                minute: '2-digit',
             }),
         };
 
         setMessages((prev) => [...prev, userMsg]);
-        setQuestion("");
+        setQuestion('');
 
         startTransition(async () => {
             try {
@@ -85,15 +85,15 @@ export function AskEduFlow({
                         document.querySelector(
                             'meta[name="csrf-token"]',
                         ) as HTMLMetaElement
-                    )?.content || "";
+                    )?.content || '';
 
-                const response = await fetch("/student/ask-eduflow", {
-                    method: "POST",
+                const response = await fetch('/student/ask-eduflow', {
+                    method: 'POST',
                     headers: {
-                        "Content-Type": "application/json",
-                        Accept: "application/json",
-                        "X-CSRF-TOKEN": csrfToken,
-                        "X-Requested-With": "XMLHttpRequest",
+                        'Content-Type': 'application/json',
+                        Accept: 'application/json',
+                        'X-CSRF-TOKEN': csrfToken,
+                        'X-Requested-With': 'XMLHttpRequest',
                     },
                     body: JSON.stringify({
                         question: trimmed,
@@ -119,14 +119,14 @@ export function AskEduFlow({
                 setLastSource(result.source);
 
                 const botMsg: ChatMessage = {
-                    id: "bot-" + Date.now(),
-                    sender: "assistant",
+                    id: 'bot-' + Date.now(),
+                    sender: 'assistant',
                     text: result.answer,
                     topic: result.topic,
                     suggestedFollowups: result.suggestedFollowups,
                     timestamp: new Date(result.answered_at).toLocaleTimeString(
                         [],
-                        { hour: "2-digit", minute: "2-digit" },
+                        { hour: '2-digit', minute: '2-digit' },
                     ),
                 };
 
@@ -135,7 +135,7 @@ export function AskEduFlow({
                 const msg =
                     err instanceof Error
                         ? err.message
-                        : "Could not connect to EduFlow AI. Please try again.";
+                        : 'Could not connect to EduFlow AI. Please try again.';
                 setError(msg);
             }
         });
@@ -148,7 +148,7 @@ export function AskEduFlow({
 
     return (
         <Card
-            className={`overflow-hidden border-amber-200/60 bg-gradient-to-b from-card via-card to-amber-50/20 dark:border-amber-950/40 dark:to-amber-950/10 ${className ?? ""}`}
+            className={`overflow-hidden border-amber-200/60 bg-gradient-to-b from-card via-card to-amber-50/20 dark:border-amber-950/40 dark:to-amber-950/10 ${className ?? ''}`}
         >
             <CardHeader className="gap-2 border-b bg-muted/20 pb-4">
                 <div className="flex flex-wrap items-center justify-between gap-2">
@@ -174,7 +174,7 @@ export function AskEduFlow({
                             <Lock className="mr-1 size-3" />
                             Deterministic AI · Zero Direct Fund Control
                         </Badge>
-                        {lastSource === "assistant" && (
+                        {lastSource === 'assistant' && (
                             <Badge
                                 variant="outline"
                                 className="border-emerald-300 bg-emerald-100/50 text-[11px] text-emerald-800 dark:border-emerald-800 dark:bg-emerald-950/50 dark:text-emerald-300"
@@ -223,21 +223,21 @@ export function AskEduFlow({
                             <div
                                 key={m.id}
                                 className={`flex gap-3 text-sm ${
-                                    m.sender === "user"
-                                        ? "justify-end"
-                                        : "justify-start"
+                                    m.sender === 'user'
+                                        ? 'justify-end'
+                                        : 'justify-start'
                                 }`}
                             >
-                                {m.sender === "assistant" && (
+                                {m.sender === 'assistant' && (
                                     <div className="flex size-7 shrink-0 items-center justify-center rounded-full bg-amber-500/10 text-amber-600 dark:bg-amber-500/20 dark:text-amber-400">
                                         <Bot className="size-4" />
                                     </div>
                                 )}
                                 <div
                                     className={`max-w-[85%] rounded-2xl px-4 py-2.5 text-xs leading-relaxed sm:text-sm ${
-                                        m.sender === "user"
-                                            ? "bg-primary text-primary-foreground"
-                                            : "border bg-card text-card-foreground shadow-xs"
+                                        m.sender === 'user'
+                                            ? 'bg-primary text-primary-foreground'
+                                            : 'border bg-card text-card-foreground shadow-xs'
                                     }`}
                                 >
                                     <p className="whitespace-pre-wrap">
@@ -245,9 +245,9 @@ export function AskEduFlow({
                                     </p>
                                     <span
                                         className={`mt-1 block text-[10px] ${
-                                            m.sender === "user"
-                                                ? "text-primary-foreground/70"
-                                                : "text-muted-foreground"
+                                            m.sender === 'user'
+                                                ? 'text-primary-foreground/70'
+                                                : 'text-muted-foreground'
                                         }`}
                                     >
                                         {m.timestamp}
@@ -279,7 +279,7 @@ export function AskEduFlow({
                                             </div>
                                         )}
                                 </div>
-                                {m.sender === "user" && (
+                                {m.sender === 'user' && (
                                     <div className="flex size-7 shrink-0 items-center justify-center rounded-full bg-muted text-muted-foreground">
                                         <User className="size-4" />
                                     </div>

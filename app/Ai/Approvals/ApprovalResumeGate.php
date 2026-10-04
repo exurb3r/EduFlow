@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Ai\Approvals;
 
+use App\Ai\Agents\SettlementOperator;
 use App\Ai\Agents\SettlementOperatorFactory;
 use App\Models\AgentDecision;
 use App\Models\Approval;
@@ -16,7 +17,6 @@ use Illuminate\Auth\Access\AuthorizationException;
 use Laravel\Ai\Approvals\Decision;
 use Laravel\Ai\Approvals\Decisions;
 use Laravel\Ai\Approvals\PendingApproval;
-use Laravel\Ai\Contracts\ConversationStore;
 use Laravel\Ai\Contracts\ResolvesPendingApprovals;
 use Laravel\Ai\Contracts\VerifiesConversationOwnership;
 use Laravel\Ai\Exceptions\ApprovalMismatchException;
@@ -64,7 +64,6 @@ final readonly class ApprovalResumeGate
     public function __construct(
         private AiSettings $settings,
         private AiProviderResolver $providers,
-        private ConversationStore $conversations,
         private VerifiesConversationOwnership $ownership,
         private ResolvesPendingApprovals $pending,
     ) {}
@@ -243,7 +242,7 @@ final readonly class ApprovalResumeGate
         // tool would refuse for the wrong reason. See SettlementOperatorFactory.
         $operator = SettlementOperatorFactory::make();
 
-        if ($operator === null) {
+        if (! $operator instanceof SettlementOperator) {
             throw new AuthorizationException(
                 'The settlement operator is not configured: no organization, assistance fund or active policy version.'
             );

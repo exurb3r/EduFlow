@@ -169,7 +169,7 @@ class EduFlowAgent
         foreach ($pendingAid as $aidRequest) {
             $requestedBase = (int) ($aidRequest->requested_amount ?? 0);
 
-            if (! $fund || ! $policy) {
+            if (! $fund || ! $policy instanceof AssistancePolicyVersion) {
                 $decision = AgentDecision::create([
                     'organization_id' => $org->id,
                     'action_type' => 'student_assistance',

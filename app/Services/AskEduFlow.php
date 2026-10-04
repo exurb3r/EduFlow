@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Services;
 
+use App\Ai\Advisory\QnaAnswer;
 use App\Ai\Advisory\QnaGate;
 use App\Ai\Advisory\StudentBrief;
 use App\Enums\CurrencyCode;
@@ -277,7 +278,7 @@ class AskEduFlow
         ?string $conversationId,
         string $deterministicAnswer,
     ): ?array {
-        if ($participant === null) {
+        if (! $participant instanceof Model) {
             return null;
         }
 
@@ -303,7 +304,7 @@ class AskEduFlow
 
         $answer = $this->qna->answer($question, $brief, $participant, $conversationId);
 
-        if ($answer === null) {
+        if (! $answer instanceof QnaAnswer) {
             return null;
         }
 

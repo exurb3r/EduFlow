@@ -95,7 +95,7 @@ class AssistanceRequestController extends Controller
                 ->where('reference_id', $assistanceRequest->id)
                 ->orderBy('created_at')
                 ->get()
-                ->map(fn (Transaction $t) => [
+                ->map(fn (Transaction $t): array => [
                     'id' => $t->id,
                     'tx_hash' => $t->provider_tx_hash,
                     'amount' => number_format((float) $t->amount, 2).' USDC',
@@ -127,7 +127,7 @@ class AssistanceRequestController extends Controller
                     'pending_usdc' => number_format($pendingBase / 1000000, 2),
                     'pending_fiat' => $converter->formatDual($pendingBase, $displayCurrency),
                 ],
-                'checks' => collect($decision->input_snapshot['checks'] ?? [])->map(fn ($passed, $name) => [
+                'checks' => collect($decision->input_snapshot['checks'] ?? [])->map(fn ($passed, $name): array => [
                     'name' => str_replace('_', ' ', (string) $name),
                     'passed' => (bool) $passed,
                 ])->values()->all(),

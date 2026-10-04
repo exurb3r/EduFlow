@@ -33,7 +33,7 @@ class TransactionsTable
                     ->sortable(),
                 TextColumn::make('amount')
                     ->label('Amount')
-                    ->formatStateUsing(fn ($state) => number_format((float) $state, 2).' USDC')
+                    ->formatStateUsing(fn ($state): string => number_format((float) $state, 2).' USDC')
                     ->weight('bold')
                     ->sortable(),
                 TextColumn::make('status')
@@ -43,7 +43,7 @@ class TransactionsTable
                     ->label('Network')
                     ->badge()
                     ->color('info')
-                    ->formatStateUsing(fn ($state) => strtoupper((string) $state)),
+                    ->formatStateUsing(fn ($state): string => strtoupper((string) $state)),
                 TextColumn::make('settlement')
                     ->label('Settlement')
                     ->badge()

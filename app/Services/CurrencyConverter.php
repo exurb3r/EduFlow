@@ -50,7 +50,7 @@ class CurrencyConverter
 
         $rate = $this->latestRate($fiat);
 
-        return $rate === null ? self::fallbackRates()[$fiat->value] : $rate->units_per_usdc;
+        return $rate instanceof CurrencyRate ? $rate->units_per_usdc : self::fallbackRates()[$fiat->value];
     }
 
     public function usdcToFiat(int $usdcBaseUnits, CurrencyCode $fiat): int
@@ -72,10 +72,10 @@ class CurrencyConverter
     {
         $rate = $this->latestRate($fiat);
         $lockedAt = now();
-        $quotedAt = $rate === null ? $lockedAt : $rate->quoted_at;
+        $quotedAt = $rate instanceof CurrencyRate ? $rate->quoted_at : $lockedAt;
         $expiresAt = $lockedAt->copy()->addSeconds($this->maxRateAgeSeconds());
 
-        if ($rate !== null) {
+        if ($rate instanceof CurrencyRate) {
             $maximumSourceExpiry = $rate->quoted_at->copy()->addSeconds($this->maxRateAgeSeconds());
             $sourceExpiry = $rate->expires_at;
             $expiresAt = $sourceExpiry !== null && $sourceExpiry->lt($maximumSourceExpiry) ? $sourceExpiry : $maximumSourceExpiry;
@@ -85,8 +85,8 @@ class CurrencyConverter
             'quote_id' => (string) Str::uuid(),
             'base' => 'USDC',
             'quote' => $fiat->value,
-            'units_per_usdc' => $fiat === CurrencyCode::USDC ? CurrencyCode::USDC->multiplier() : ($rate === null ? self::fallbackRates()[$fiat->value] : $rate->units_per_usdc),
-            'provider' => $rate === null ? ($fiat === CurrencyCode::USDC ? 'identity' : 'fallback') : $rate->provider,
+            'units_per_usdc' => $fiat === CurrencyCode::USDC ? CurrencyCode::USDC->multiplier() : ($rate instanceof CurrencyRate ? $rate->units_per_usdc : self::fallbackRates()[$fiat->value]),
+            'provider' => $rate instanceof CurrencyRate ? ($rate->provider) : ($fiat === CurrencyCode::USDC ? 'identity' : 'fallback'),
             'quoted_at' => $quotedAt->toIso8601String(),
             'expires_at' => $expiresAt->toIso8601String(),
             'locked_at' => $lockedAt->toIso8601String(),
@@ -143,7 +143,7 @@ class CurrencyConverter
         try {
             return BigInteger::of($amount)->multipliedBy($multiplier)->dividedBy($divisor, RoundingMode::Down)->toInt();
         } catch (IntegerOverflowException $exception) {
-            throw new OverflowException('Converted amount exceeds supported signed integer range.', previous: $exception);
+            throw new OverflowException('Converted amount exceeds supported signed integer range.', $exception->getCode(), previous: $exception);
         }
     }
 

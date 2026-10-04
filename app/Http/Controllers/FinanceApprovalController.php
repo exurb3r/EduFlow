@@ -5,9 +5,11 @@ declare(strict_types=1);
 namespace App\Http\Controllers;
 
 use App\Ai\Approvals\ApprovalResumeGate;
+use App\Ai\Approvals\ApprovalResumeOutcome;
 use Illuminate\Auth\Access\AuthorizationException;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
+use Laravel\Ai\Approvals\PendingApproval;
 use Symfony\Component\HttpKernel\Exception\AccessDeniedHttpException;
 
 /**
@@ -37,7 +39,7 @@ class FinanceApprovalController extends Controller
             'success' => true,
             'data' => [
                 'conversation_id' => $validated['conversation_id'],
-                'pending' => array_map(fn ($approval): array => [
+                'pending' => array_map(fn (PendingApproval $approval): array => [
                     'id' => $approval->id,
                     'tool' => $approval->tool,
                     'arguments' => $approval->arguments,
@@ -62,7 +64,7 @@ class FinanceApprovalController extends Controller
             'decisions.*' => ['required', 'boolean'],
         ]);
 
-        $outcome = $this->guard(fn () => $gate->resume(
+        $outcome = $this->guard(fn (): ApprovalResumeOutcome => $gate->resume(
             $request->user(),
             $validated['conversation_id'],
             $validated['decisions'],

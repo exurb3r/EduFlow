@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Actions;
 
+use App\Ai\Advisory\AdvisoryEnvelope;
 use App\Ai\Advisory\AdvisoryGate;
 use App\DTOs\PolicyEvaluationResult;
 use App\Enums\AgentDecisionType;
@@ -226,7 +227,7 @@ class EvaluateAssistancePolicy
             return $decision;
         }
 
-        if ($advisory === null) {
+        if (! $advisory instanceof AdvisoryEnvelope) {
             return $decision;
         }
 

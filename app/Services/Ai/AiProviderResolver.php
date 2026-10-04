@@ -40,9 +40,9 @@ final class AiProviderResolver
     /**
      * The provider argument to hand to `prompt(provider: ...)`.
      *
-     * @return array<int, Provider>|Lab|string|null
+     * @return array<int, Provider>|string|null
      */
-    public function resolve(?string $explicit = null): array|Lab|string|null
+    public function resolve(?string $explicit = null): array|string|null
     {
         $name = $explicit ?? $this->configuredName();
 
@@ -101,9 +101,9 @@ final class AiProviderResolver
         $provider = $this->adminProvider();
 
         return [
-            'source' => $provider !== null ? 'admin' : 'env',
+            'source' => $provider instanceof AiProvider ? 'admin' : 'env',
             'name' => $provider?->providerKey() ?? config('ai.default'),
-            'usable' => $provider !== null ? $provider->isUsable() : $this->settings->advisory_enabled,
+            'usable' => $provider instanceof AiProvider ? $provider->isUsable() : $this->settings->advisory_enabled,
             'advisory_enabled' => $this->settings->advisory_enabled,
             'provider' => $provider,
         ];
@@ -126,7 +126,7 @@ final class AiProviderResolver
     {
         $provider = $this->adminProvider();
 
-        if ($provider !== null) {
+        if ($provider instanceof AiProvider) {
             return $provider->providerKey();
         }
 
@@ -144,7 +144,7 @@ final class AiProviderResolver
     {
         $provider = $this->adminProvider();
 
-        if ($provider !== null && $provider->providerKey() === $name) {
+        if ($provider instanceof AiProvider && $provider->providerKey() === $name) {
             return $provider->toProviderConfig();
         }
 

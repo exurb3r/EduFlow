@@ -18,6 +18,7 @@ class TreasuryOverviewWidget extends BaseWidget
 {
     protected static ?int $sort = 1;
 
+    #[\Override]
     protected function getStats(): array
     {
         $org = app(InstallationInstitution::class)->current();

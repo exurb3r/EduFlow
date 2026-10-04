@@ -14,6 +14,7 @@ use App\Models\AssistanceFund;
 use App\Models\AssistancePolicyVersion;
 use App\Models\AssistanceRequest;
 use App\Models\Organization;
+use App\Models\Wallet;
 use App\Services\CircleWalletService;
 use Illuminate\Contracts\JsonSchema\JsonSchema;
 use Laravel\Ai\Approvals\Approval;
@@ -84,7 +85,7 @@ class DisburseAssistance implements Approvable, Tool
     {
         $assistanceRequest = $this->resolveRequest($request);
 
-        if ($assistanceRequest === null) {
+        if (! $assistanceRequest instanceof AssistanceRequest) {
             return 'Not disbursed. No assistance request with that id exists.';
         }
 
@@ -110,7 +111,7 @@ class DisburseAssistance implements Approvable, Tool
 
         $wallet = $this->organization->primaryWallet();
 
-        if ($wallet === null) {
+        if (! $wallet instanceof Wallet) {
             return 'Not disbursed. The organization has no active wallet.';
         }
 
@@ -183,7 +184,7 @@ class DisburseAssistance implements Approvable, Tool
     {
         $assistanceRequest = $this->resolveRequest($request);
 
-        if ($assistanceRequest === null) {
+        if (! $assistanceRequest instanceof AssistanceRequest) {
             return null;
         }
 
@@ -207,7 +208,7 @@ class DisburseAssistance implements Approvable, Tool
     {
         $id = $request['assistance_request_id'] ?? null;
 
-        if (! is_int($id) && ! (is_string($id) && ctype_digit($id))) {
+        if (! is_int($id) && (! is_string($id) || ! ctype_digit($id))) {
             return null;
         }
 

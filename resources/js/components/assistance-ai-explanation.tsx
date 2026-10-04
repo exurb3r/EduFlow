@@ -31,7 +31,6 @@ export function AssistanceAiExplanation({
     const isPartial = explanation.decision === 'partial_approval';
     const isApproved = explanation.decision === 'auto_approve';
     const isHeld = explanation.decision === 'hold';
-    const isRejected = explanation.decision === 'reject';
 
     return (
         <Card
@@ -62,7 +61,8 @@ export function AssistanceAiExplanation({
                                 EduFlow AI Reasoning & Policy Evaluation
                             </CardTitle>
                             <CardDescription className="text-xs">
-                                Deterministic evaluation under Policy {explanation.policy_code}
+                                Deterministic evaluation under Policy{' '}
+                                {explanation.policy_code}
                             </CardDescription>
                         </div>
                     </div>
@@ -101,7 +101,10 @@ export function AssistanceAiExplanation({
                         <div className="flex items-center gap-1.5 font-medium text-foreground mb-1">
                             <HelpCircle className="size-3.5 text-amber-600" />
                             <span>Hardship Context Analysis</span>
-                            <Badge variant="secondary" className="ml-2 text-[10px]">
+                            <Badge
+                                variant="secondary"
+                                className="ml-2 text-[10px]"
+                            >
                                 {explanation.hardship_category}
                             </Badge>
                             <Badge
@@ -215,7 +218,8 @@ export function AssistanceAiExplanation({
                     <div className="flex items-center gap-1.5">
                         <Clock className="size-3.5 text-amber-600" />
                         <span>
-                            Locked Rate: {explanation.locked_quote.rate_description}
+                            Locked Rate:{' '}
+                            {explanation.locked_quote.rate_description}
                         </span>
                         <span className="text-muted-foreground/60">
                             (Provider: {explanation.locked_quote.provider})
@@ -259,7 +263,8 @@ export function AssistanceAiExplanation({
                                             </Badge>
                                         </div>
                                         <p className="font-mono text-[11px] text-muted-foreground break-all">
-                                            {tx.tx_hash || 'Simulated On-Chain Batch'}
+                                            {tx.tx_hash ||
+                                                'Simulated On-Chain Batch'}
                                         </p>
                                     </div>
 

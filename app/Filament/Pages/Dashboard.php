@@ -20,11 +20,13 @@ class Dashboard extends BaseDashboard
 {
     protected static string|\BackedEnum|null $navigationIcon = Heroicon::Home;
 
+    #[\Override]
     public function getTitle(): string
     {
         return 'EduFlow AI — Autonomous Financial Operator';
     }
 
+    #[\Override]
     protected function getHeaderActions(): array
     {
         return [

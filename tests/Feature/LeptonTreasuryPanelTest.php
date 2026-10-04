@@ -72,7 +72,7 @@ test('status never throws when the chain is unreachable and explains why', funct
             throw new RuntimeException('offline');
         }
 
-        public function treasuryAddress(): ?string
+        public function treasuryAddress(): string
         {
             return '0x7d41e0AA33A4850E20ECa993dF6F0403d6527C6E';
         }
@@ -124,7 +124,7 @@ test('status surfaces ledger drift instead of hiding it', function (): void {
             return '0x3d667a7';
         }
 
-        public function treasuryAddress(): ?string
+        public function treasuryAddress(): string
         {
             return '0x7d41e0AA33A4850E20ECa993dF6F0403d6527C6E';
         }
@@ -181,7 +181,7 @@ test('syncBalance writes the live chain figure over the ledger', function (): vo
             return '0x1';
         }
 
-        public function treasuryAddress(): ?string
+        public function treasuryAddress(): string
         {
             return '0x7d41e0AA33A4850E20ECa993dF6F0403d6527C6E';
         }

@@ -12,6 +12,7 @@ class ViewAssistanceRequest extends ViewRecord
 {
     protected static string $resource = AssistanceRequestResource::class;
 
+    #[\Override]
     protected function getHeaderActions(): array
     {
         return [

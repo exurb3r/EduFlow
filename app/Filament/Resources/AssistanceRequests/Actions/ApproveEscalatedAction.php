@@ -109,12 +109,9 @@ class ApproveEscalatedAction extends Action
         return implode(PHP_EOL, $lines);
     }
 
-    /**
-     * @return ?Closure(): bool
-     */
     public static function isVisibleUsing(): Closure
     {
-        return fn (AssistanceRequest $record): bool => self::isVisibleFor($record);
+        return self::isVisibleFor(...);
     }
 
     public static function isVisibleFor(AssistanceRequest $record): bool

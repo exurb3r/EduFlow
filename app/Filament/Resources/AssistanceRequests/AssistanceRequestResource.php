@@ -53,6 +53,7 @@ class AssistanceRequestResource extends Resource
         return 'warning';
     }
 
+    #[\Override]
     public static function infolist(Schema $schema): Schema
     {
         return $schema->components([
@@ -79,6 +80,7 @@ class AssistanceRequestResource extends Resource
         ]);
     }
 
+    #[\Override]
     public static function table(Table $table): Table
     {
         return $table
@@ -149,11 +151,13 @@ class AssistanceRequestResource extends Resource
     /**
      * @return Builder<AssistanceRequest>
      */
+    #[\Override]
     public static function getEloquentQuery(): Builder
     {
         return parent::getEloquentQuery()->with(['student.user', 'academicTerm', 'user', 'agentDecisions']);
     }
 
+    #[\Override]
     public static function canCreate(): bool
     {
         return false;
@@ -171,7 +175,7 @@ class AssistanceRequestResource extends Resource
             ->icon('heroicon-o-sparkles')
             ->collapsible()
             ->columnSpanFull()
-            ->hidden(fn (?AssistanceRequest $record): bool => $record?->latestAgentDecision() === null)
+            ->hidden(fn (?AssistanceRequest $record): bool => ! $record?->latestAgentDecision() instanceof AgentDecision)
             ->schema([
                 TextEntry::make('decision_label')
                     ->label('Decision')
@@ -274,6 +278,7 @@ class AssistanceRequestResource extends Resource
         return substr($digits, 0, -6).'.'.substr($digits, -6);
     }
 
+    #[\Override]
     public static function getPages(): array
     {
         return [

@@ -35,6 +35,7 @@ class AssistancePolicyVersion extends Model
         'rules',
     ];
 
+    #[\Override]
     protected function casts(): array
     {
         return [

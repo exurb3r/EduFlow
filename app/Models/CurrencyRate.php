@@ -33,6 +33,7 @@ class CurrencyRate extends Model
         'is_fallback',
     ];
 
+    #[\Override]
     protected function casts(): array
     {
         return [
