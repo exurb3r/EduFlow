@@ -16,6 +16,7 @@ return [
     |
     */
     'display_currency' => env('EDUFLOW_DISPLAY_CURRENCY', 'PHP'),
+    'max_rate_age_seconds' => env('EDUFLOW_MAX_RATE_AGE_SECONDS', 900),
 
     /*
     |--------------------------------------------------------------------------

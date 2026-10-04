@@ -206,6 +206,19 @@ Public registration GET/POST is denied for installed schools until the existing 
 setting is explicitly enabled. Opt-in registration grants no staff role or verified student
 enrollment. Password reset/email verification/MFA still require operator SMTP and access setup.
 
+### Money and rate evidence
+
+Request intake parses plain decimal USDC strings exactly, rejects precision/range errors,
+and preserves six-decimal minor units. The new `Money` DTO formats without floats and
+serializes minor units as strings; currency conversion uses checked arbitrary-precision
+intermediates. Legacy treasury/payment APIs and money columns still need migration.
+
+Rate snapshots preserve source time/expiry and reject future, expired, non-positive and
+old sources. `EDUFLOW_MAX_RATE_AGE_SECONDS` defaults to 900. Static fallback rates remain
+indicative display values. `requireFreshQuote()` requires a non-fallback source with expiry;
+it is not an executable provider offer, fee guarantee, or FX/settlement certification.
+USD source rates may differ from 1:1 USDC parity. No payment adapter is newly enabled.
+
 ### Release safety
 
 Preview builds publish only after successful same-repository push CI, from its exact
