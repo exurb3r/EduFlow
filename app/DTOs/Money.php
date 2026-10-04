@@ -17,6 +17,11 @@ final readonly class Money implements JsonSerializable
 {
     public function __construct(public int $minorUnits, public CurrencyCode $currency) {}
 
+    public function toBaseUnits(): int
+    {
+        return $this->minorUnits;
+    }
+
     public static function fromDecimal(string $amount, CurrencyCode $currency): self
     {
         $decimals = $currency->decimals();
