@@ -3,10 +3,8 @@
 namespace Database\Seeders;
 
 use App\Enums\RoleEnums;
-use App\Models\User;
 use Illuminate\Database\Seeder;
 use Illuminate\Support\Facades\File;
-use Illuminate\Support\Facades\Hash;
 use Spatie\Permission\Models\Permission;
 use Spatie\Permission\Models\Role;
 use Spatie\Permission\PermissionRegistrar;
@@ -36,7 +34,6 @@ class RolesAndPermissionsSeeder extends Seeder
 
         $roles = $this->createRoles();
         $this->assignPermissionsToRoles($roles, $permissions);
-        $this->createDefaultUsers($roles);
     }
 
     protected function discoverPermissionsFromPolicies(): array
@@ -101,32 +98,5 @@ class RolesAndPermissionsSeeder extends Seeder
         $roles[RoleEnums::SUPER_ADMIN->value]->syncPermissions($superAdminPermissions);
         $roles[RoleEnums::ADMIN->value]->syncPermissions($adminPermissions);
         $roles[RoleEnums::USER->value]->syncPermissions($userPermissions);
-    }
-
-    protected function createDefaultUsers(array $roles): void
-    {
-        if (! app()->environment(['local', 'testing'])) {
-            return;
-        }
-
-        $admin = User::firstOrCreate(
-            ['email' => 'admin@admin.com'],
-            [
-                'name' => 'Admin User',
-                'password' => Hash::make('password'),
-                'email_verified_at' => now(),
-            ]
-        );
-        $admin->assignRole($roles[RoleEnums::SUPER_ADMIN->value]);
-
-        $user = User::firstOrCreate(
-            ['email' => 'user@user.com'],
-            [
-                'name' => 'Regular User',
-                'password' => Hash::make('password'),
-                'email_verified_at' => now(),
-            ]
-        );
-        $user->assignRole($roles[RoleEnums::USER->value]);
     }
 }

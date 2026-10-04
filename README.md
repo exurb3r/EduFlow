@@ -145,19 +145,37 @@ That runs the PHP server, Vite, and the queue worker together. Open the printed 
 
 Log in as each to see both sides of the approval loop.
 
-### Production-safe role seeding and first administrator
+### School identity setup and first administrator
 
-OSS production rollout is still in progress; these commands solve administrator bootstrap,
-not complete school onboarding, financial safety, or payment certification.
+OSS production rollout is still in progress. These commands initialize school identity,
+conservative settings and administrator access—not native-fiat accounting, a complete aid
+workflow, production financial safety or payment certification.
 
-On an operator-controlled instance with migrations applied, `APP_ENV=production`, a
-unique existing `APP_KEY`, and reviewed database configuration:
+On an operator-controlled instance with reviewed database configuration,
+`APP_ENV=production`, `APP_DEBUG=false`, and a valid unique existing `APP_KEY`:
 
 ```bash
-php artisan db:seed --force --no-interaction
+php artisan migrate --force --no-interaction
+php artisan eduflow:install --institution="Pilot School" --country=PH --timezone=Asia/Manila --currency=PHP --no-interaction
 php artisan eduflow:bootstrap-admin --name="School Operator" --email="operator@school.example"
 ```
 
+Migrations are a separate operator task. Installer never migrates, resets data, seeds demo
+records, generates keys, creates wallets or calls external providers. It creates roles,
+one institution with zero autonomous thresholds, persisted country/locale/timezone/currency,
+and disables public registration, impersonation and AI. Country is validated as a two-letter
+code format; jurisdiction eligibility is not certified. English is the current supported locale.
+School currency metadata does not convert legacy USDC tuition or payment records.
+
+Repeat identical setup is a no-op: credentials, settings, budgets and policies survive.
+Changed identity/metadata is refused rather than overwritten. An existing institution
+requires explicit `--adopt-institution` with its actual numeric ID and matching name/currency;
+review its existing financial data before adoption. Adoption preserves monetary limits,
+policies and balances; it is not cleanup of an existing demo or authorization of live payments.
+Missing keys, unsafe debug mode, locked unsafe defaults or ambiguous institutions fail setup.
+
+`RolesAndPermissionsSeeder` now creates no users in any environment. Default local demo
+accounts live in `DemoUsersSeeder`, invoked only by local/testing demo `DatabaseSeeder`.
 Production/staging seed roles and permissions, not demo users or institutions. Bootstrap
 asks for the password and confirmation through hidden prompts; passwords must have at
 least 12 characters, mixed case, a number, and a symbol. It requires an interactive
@@ -172,15 +190,21 @@ sessions and unnecessary access, and preserve required audit evidence. Do not re
 
 ### Single-institution context
 
-Production/staging now require `EDUFLOW_INSTITUTION_ID` to identify the existing
-`organizations.id`. That database must contain exactly one institution. Missing, invalid,
-stale, or ambiguous selection disables treasury actions/operator construction rather
-than choosing the first row. Local/testing retain automatic selection only when exactly
-one institution exists. Restart long-lived workers after changing configuration.
+Installer persists `organizations.id` as school identity in installation settings.
+Production/staging use that identity without requiring `.env` edits. Legacy instances may
+still configure `EDUFLOW_INSTITUTION_ID`; when both exist, they must agree. Database must
+contain exactly one institution. Missing, corrupt, stale or ambiguous context disables
+treasury actions/operator construction instead of choosing the first row. Local/testing
+retain automatic selection only before setup and when exactly one institution exists.
 
-This is a selection guard, not complete tenant isolation or a school installer. It does
-not create institution records or enforce ownership on every existing resource. Do not
-host unrelated schools in one database.
+After setup, Eloquent refuses creation of another institution. Raw database access can
+bypass that model guard, but ambiguous data still disables selection. Restart long-lived
+workers after setup/configuration changes. This is not complete tenant isolation or
+ownership enforcement for every existing resource; do not host unrelated schools in one DB.
+
+Public registration GET/POST is denied for installed schools until the existing registration
+setting is explicitly enabled. Opt-in registration grants no staff role or verified student
+enrollment. Password reset/email verification/MFA still require operator SMTP and access setup.
 
 ### Release safety
 
