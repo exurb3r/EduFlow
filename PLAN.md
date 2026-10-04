@@ -516,7 +516,18 @@ progress is tracked immediately after the table. No item is closed solely by cha
   still cannot provision staff rights or enrollment. Country validation is code-format
   only. Native-fiat ledger, complete ownership/backfill, data imports and rail safety remain
   open; institution currency metadata alone does not convert legacy USDC accounting.
-- Next: school ownership/imports and exact money/reservation foundations.
+- **OSS-03 exact-money foundation implemented in part:** Readonly `Money` DTO parses
+  plain decimal strings with currency precision/range checks, performs checked arithmetic,
+  formats without floats and serializes minor units as strings. Intake uses it and rejects
+  invalid amount limits even when called outside a Form Request. Converter uses existing
+  Brick Math for overflow-safe integer intermediates. Legacy decision/treasury/payment
+  float APIs and two-decimal DB columns remain open; no money schema cutover yet.
+- **OSS-07 rate snapshots hardened in part:** Future/expired/over-age/non-positive sources
+  excluded, source timestamps/expiry preserved, display rates marked indicative. USD can
+  use an actual source rate instead of forced parity. `requireFreshQuote()` rejects fallback
+  or unbounded rates; all external-currency snapshots remain indicative, not provider offers
+  or executable FX. No live feed/off-ramp or settlement path is certified by this change.
+- Next: school ownership/imports and exact decision/reservation/payment foundations.
   O0 still needs credential-owner confirmation, dependency/asset review and named owners.
 
 **Strengths to preserve:** MIT already exists; deterministic policy actions, student

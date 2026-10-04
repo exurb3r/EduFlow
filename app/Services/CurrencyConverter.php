@@ -4,134 +4,151 @@ declare(strict_types=1);
 
 namespace App\Services;
 
+use App\DTOs\Money;
 use App\Enums\CurrencyCode;
 use App\Models\CurrencyRate;
+use Brick\Math\BigInteger;
+use Brick\Math\Exception\IntegerOverflowException;
+use Brick\Math\RoundingMode;
 use Illuminate\Support\Str;
+use InvalidArgumentException;
+use OverflowException;
+use RuntimeException;
 
 class CurrencyConverter
 {
-    /**
-     * Fallback units of fiat minor units per 1 USDC.
-     *
-     * @return array<string,int>
-     */
+    /** @return array<string, int> */
     public static function fallbackRates(): array
     {
-        return [
-            'USD' => 100,
-            'PHP' => 5750,
-            'EUR' => 92,
-            'GBP' => 79,
-            'CAD' => 136,
-            'SGD' => 134,
-            'INR' => 8300,
-        ];
+        return ['USD' => 100, 'PHP' => 5750, 'EUR' => 92, 'GBP' => 79, 'CAD' => 136, 'SGD' => 134, 'INR' => 8300];
     }
 
     public function latestRate(CurrencyCode $fiat): ?CurrencyRate
     {
-        if ($fiat === CurrencyCode::USDC || $fiat === CurrencyCode::USD) {
+        if ($fiat === CurrencyCode::USDC) {
             return null;
         }
 
-        return CurrencyRate::query()
-            ->where('base_code', 'USDC')
-            ->where('quote_code', $fiat->value)
-            ->where(function ($query): void {
-                $query->whereNull('expires_at')->orWhere('expires_at', '>', now());
-            })
-            ->orderByDesc('quoted_at')
-            ->first();
+        /** @var CurrencyRate|null $rate */
+        $rate = CurrencyRate::query()
+            ->where('base_code', 'USDC')->where('quote_code', $fiat->value)
+            ->where('units_per_usdc', '>', 0)
+            ->where('quoted_at', '<=', now())
+            ->where('quoted_at', '>', now()->subSeconds($this->maxRateAgeSeconds()))
+            ->where(fn ($query) => $query->whereNull('expires_at')->orWhere('expires_at', '>', now()))
+            ->orderByDesc('quoted_at')->orderByDesc('id')->first();
+
+        return $rate;
     }
 
+    /** Indicative display conversion only; not a guarantee of an executable exchange. */
     public function unitsPerUsdc(CurrencyCode $fiat): int
     {
         if ($fiat === CurrencyCode::USDC) {
-            return 1000000;
-        }
-
-        if ($fiat === CurrencyCode::USD) {
-            return 100;
+            return CurrencyCode::USDC->multiplier();
         }
 
         $rate = $this->latestRate($fiat);
 
-        if ($rate) {
-            return $rate->units_per_usdc;
-        }
-
-        return self::fallbackRates()[$fiat->value] ?? 100;
+        return $rate === null ? self::fallbackRates()[$fiat->value] : $rate->units_per_usdc;
     }
 
-    /**
-     * Convert USDC base units (6 decimals) to fiat minor units (2 decimals) using integer math.
-     */
     public function usdcToFiat(int $usdcBaseUnits, CurrencyCode $fiat): int
     {
-        if ($fiat === CurrencyCode::USDC) {
-            return $usdcBaseUnits;
-        }
-
-        return intdiv($usdcBaseUnits * $this->unitsPerUsdc($fiat), 1000000);
+        return $this->convert($usdcBaseUnits, $this->unitsPerUsdc($fiat), CurrencyCode::USDC->multiplier());
     }
 
-    /**
-     * Convert fiat minor units to USDC base units using integer math.
-     */
     public function fiatToUsdc(int $fiatMinorUnits, CurrencyCode $fiat): int
     {
-        if ($fiat === CurrencyCode::USDC) {
-            return $fiatMinorUnits;
-        }
-
-        $units = $this->unitsPerUsdc($fiat);
-
-        if ($units <= 0) {
-            return 0;
-        }
-
-        return intdiv($fiatMinorUnits * 1000000, $units);
+        return $this->convert($fiatMinorUnits, CurrencyCode::USDC->multiplier(), $this->unitsPerUsdc($fiat));
     }
 
     /**
-     * Create an immutable locked quote snapshot for audit trail.
+     * Snapshots an indicative rate without extending its source validity.
      *
-     * @return array{quote_id:string, base:string, quote:string, units_per_usdc:int, provider:string, quoted_at:string, expires_at:string}
+     * @return array{quote_id: string, base: string, quote: string, units_per_usdc: int, provider: string, quoted_at: string, expires_at: string, locked_at: string, source_rate_id: ?int, indicative: bool}
      */
     public function lockQuote(CurrencyCode $fiat): array
     {
         $rate = $this->latestRate($fiat);
-        $units = $this->unitsPerUsdc($fiat);
-        $quotedAt = now();
-        $expiresAt = $quotedAt->copy()->addMinutes(15);
+        $lockedAt = now();
+        $quotedAt = $rate === null ? $lockedAt : $rate->quoted_at;
+        $expiresAt = $lockedAt->copy()->addSeconds($this->maxRateAgeSeconds());
+
+        if ($rate !== null) {
+            $maximumSourceExpiry = $rate->quoted_at->copy()->addSeconds($this->maxRateAgeSeconds());
+            $sourceExpiry = $rate->expires_at;
+            $expiresAt = $sourceExpiry !== null && $sourceExpiry->lt($maximumSourceExpiry) ? $sourceExpiry : $maximumSourceExpiry;
+        }
 
         return [
             'quote_id' => (string) Str::uuid(),
             'base' => 'USDC',
             'quote' => $fiat->value,
-            'units_per_usdc' => $units,
-            'provider' => $rate?->provider ?? 'fallback',
+            'units_per_usdc' => $fiat === CurrencyCode::USDC ? CurrencyCode::USDC->multiplier() : ($rate === null ? self::fallbackRates()[$fiat->value] : $rate->units_per_usdc),
+            'provider' => $rate === null ? ($fiat === CurrencyCode::USDC ? 'identity' : 'fallback') : $rate->provider,
             'quoted_at' => $quotedAt->toIso8601String(),
             'expires_at' => $expiresAt->toIso8601String(),
+            'locked_at' => $lockedAt->toIso8601String(),
+            'source_rate_id' => $rate?->id,
+            'indicative' => $fiat !== CurrencyCode::USDC,
         ];
+    }
+
+    /**
+     * Non-fallback fresh evidence for a future reviewed FX adapter, not an executable offer.
+     *
+     * @return array<string, mixed>
+     */
+    public function requireFreshQuote(CurrencyCode $fiat): array
+    {
+        $quote = $this->lockQuote($fiat);
+
+        if ($fiat === CurrencyCode::USDC) {
+            return $quote;
+        }
+
+        $rate = $quote['source_rate_id'] === null ? null : CurrencyRate::query()->find($quote['source_rate_id']);
+
+        if (! $rate instanceof CurrencyRate || $rate->is_fallback || $rate->expires_at === null || $rate->isExpired()
+            || trim($rate->provider) === '' || $rate->provider === 'fallback') {
+            throw new RuntimeException('A fresh non-fallback currency rate with source expiry is required.');
+        }
+
+        return $quote;
     }
 
     public function formatDual(int $usdcBaseUnits, CurrencyCode $fiat): string
     {
-        $usdc = number_format($usdcBaseUnits / 1000000, 2).' USDC';
+        $usdc = (new Money($usdcBaseUnits, CurrencyCode::USDC))->format(2).' USDC';
 
         if ($fiat === CurrencyCode::USDC) {
             return $usdc;
         }
 
-        $fiatMinor = $this->usdcToFiat($usdcBaseUnits, $fiat);
-        $fiatFormatted = number_format($fiatMinor / 100, 2).' '.$fiat->value;
-
-        return $usdc.' ≈ '.$fiat->symbol().$fiatFormatted;
+        return $usdc.' ≈ '.$fiat->symbol().(new Money($this->usdcToFiat($usdcBaseUnits, $fiat), $fiat))->format().' '.$fiat->value;
     }
 
     public function formatUsdc(int $baseUnits): string
     {
-        return number_format($baseUnits / 1000000, 6).' USDC';
+        return (new Money($baseUnits, CurrencyCode::USDC))->format().' USDC';
+    }
+
+    private function convert(int $amount, int $multiplier, int $divisor): int
+    {
+        if ($multiplier <= 0 || $divisor <= 0) {
+            throw new InvalidArgumentException('Currency rate must be positive.');
+        }
+
+        try {
+            return BigInteger::of($amount)->multipliedBy($multiplier)->dividedBy($divisor, RoundingMode::Down)->toInt();
+        } catch (IntegerOverflowException $exception) {
+            throw new OverflowException('Converted amount exceeds supported signed integer range.', previous: $exception);
+        }
+    }
+
+    private function maxRateAgeSeconds(): int
+    {
+        return max(1, (int) config('eduflow.max_rate_age_seconds', 900));
     }
 }

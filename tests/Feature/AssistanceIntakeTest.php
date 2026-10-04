@@ -2,6 +2,7 @@
 
 declare(strict_types=1);
 
+use App\Actions\SubmitAssistanceRequest;
 use App\Enums\AssistanceStatus;
 use App\Models\AcademicTerm;
 use App\Models\AssistanceRequest;
@@ -10,6 +11,7 @@ use App\Models\TuitionAccount;
 use App\Models\User;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Str;
+use Illuminate\Validation\ValidationException;
 use Inertia\Testing\AssertableInertia as Assert;
 use Spatie\Activitylog\Models\Activity;
 use Spatie\Permission\Models\Role;
@@ -228,6 +230,14 @@ test('valid amount boundaries are converted exactly', function (string $amount, 
     ['150.1', 150100000],
     ['1000000.000000', 1000000000000],
 ]);
+
+test('direct intake action refuses malformed precision overflow and invalid limits before writes', function (string $amount): void {
+    expect(fn () => app(SubmitAssistanceRequest::class)->handle($this->student->user, [
+        ...$this->payload, 'requested_amount' => $amount,
+    ]))->toThrow(ValidationException::class)
+        ->and(AssistanceRequest::count())->toBe(0)
+        ->and(Activity::where('event', 'submitted')->count())->toBe(0);
+})->with(['1e6', '1.0000001', '9223372036854.775808', '1000000.000001', '0', '-0.000001']);
 
 test('server controlled fields are prohibited', function (string $field, mixed $value): void {
     $this->actingAs($this->student->user)->postJson(route('assistance.store'), [

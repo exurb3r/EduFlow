@@ -4,19 +4,30 @@ declare(strict_types=1);
 
 namespace App\Actions;
 
+use App\DTOs\Money;
+use App\Enums\CurrencyCode;
 use App\Models\AssistanceRequest;
 use App\Models\Student;
 use App\Models\User;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Validation\ValidationException;
+use InvalidArgumentException;
+use OverflowException;
 
 class SubmitAssistanceRequest
 {
     /** @param array{submission_key: string, type: string, requested_amount: string, reason: string} $data */
     public function handle(User $user, array $data): AssistanceRequest
     {
-        [$whole, $fraction] = array_pad(explode('.', $data['requested_amount'], 2), 2, '');
-        $amount = ((int) $whole * 1000000) + (int) str_pad($fraction, 6, '0');
+        try {
+            $amount = Money::fromDecimal($data['requested_amount'], CurrencyCode::USDC)->minorUnits;
+        } catch (InvalidArgumentException|OverflowException) {
+            throw ValidationException::withMessages(['requested_amount' => 'Enter a supported USDC decimal amount with at most six decimal places.']);
+        }
+
+        if ($amount <= 0 || $amount > 1_000_000_000000) {
+            throw ValidationException::withMessages(['requested_amount' => 'Requested amount must be positive and no more than 1,000,000 USDC.']);
+        }
 
         return DB::transaction(function () use ($user, $data, $amount): AssistanceRequest {
             $student = Student::query()->where('user_id', $user->id)->lockForUpdate()->firstOrFail();
