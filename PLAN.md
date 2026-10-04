@@ -1033,3 +1033,99 @@ Decisions to confirm before implementation:
 **Plan outcome:** Distribute a usable school-owned application, not a wallet-dependent
 demo. Keep one maintained codebase, make school differences configuration, publish honest
 capability limits, and certify financial rails independently from the OSS core.
+
+---
+
+## 12. Autonomous Institution Financial Agent & Payment Gateway Architecture
+
+### 12.1 From Student-Only Triage to Institution Financial Manager
+
+Current EduFlow core triggers actions when a student submits an assistance request. To serve as an autonomous financial operating system for a registered institution, the agent must govern the school's total cash flow: inbound collection (tuition, fees, endowments), liquidity defense (reserves, payroll buffers), outbound payables (vendors, utilities, staff stipends), and continuous ledger reconciliation.
+
+```
+                                  [ INBOUND RAILS ]
+                  Fiat Cards / ACH / Bank VAN / Arc USDC (Lepton)
+                                         │
+                                         ▼
+                     [ INBOUND PAYMENT GATEWAY & MATCHER ]
+               Matches: Student Bills │ Lab Fees │ Dorms │ Endowments
+                                         │
+                                         ▼
+┌───────────────────────────────────────────────────────────────────────────────────┐
+│                        EDUFLOW CORE FINANCIAL AGENT                               │
+│                                                                                   │
+│  1. Inbound Gateway: Multi-rail intake & zero-touch receivable reconciliation    │
+│  2. Liquidity Defense: Minimum reserve + payroll & debt buffer protection         │
+│  3. Department Envelopes: Dynamic budget caps (IT, Facilities, Scholarships)      │
+│  4. Accounts Payable: Vendor invoices, utilities, stipends, emergency aid        │
+│  5. Policy Engine: Limits, velocity caps, maker-checker authorization             │
+│  6. Dispatcher: Scheduled payment batches via Circle USDC or local bank rails     │
+└───────────────────────────────────────────────────────────────────────────────────┘
+                                         │
+                                         ▼
+                                 [ OUTBOUND RAILS ]
+             Vendor AP │ Software Subs │ Utilities │ Stipends │ Student Aid
+```
+
+### 12.2 Inbound Payment Gateway & Autonomous Matching
+
+The institution collects tuition, dorm fees, lab fees, application fees, and donor contributions. The agent serves as the self-hosted payment gateway for these receivables:
+
+1. **Receivable Invoices Schema (`receivable_invoices`):**
+   - Tracks `organization_id`, `payer_type`/`payer_id` (polymorphic: `Student`, `Donor`, `Vendor`), `reference`, `type` (`tuition`, `dorm`, `lab_fee`, `application_fee`, `endowment`), `amount_base_units`, `currency`, `due_date`, `status` (`open`, `partial`, `paid`, `void`), `deposit_address` (dedicated per-bill crypto address), `virtual_account_number` (dedicated bank VAN).
+2. **Multi-Rail Intake Listeners:**
+   - **Fiat Rails:** Webhook endpoints for Stripe, ACH, cards, and national QR schemes; captures payments with reference tags.
+   - **On-Chain Rails:** Background polling of Arc RPC (`eth_getLogs`) via Lepton for ERC-20 `Transfer` events matching dedicated deposit addresses or treasury transaction memos.
+3. **Autonomous 3-Stage Reconciliation Engine:**
+   - **Stage 1 (Exact Reference Match):** Match transaction metadata reference with `receivable_invoices.reference`. Settles immediately upon confirmation.
+   - **Stage 2 (Dedicated Account Identifier):** Match dedicated per-student crypto deposit address or virtual account number. Maps 1-to-1 to student receivables.
+   - **Stage 3 (Fuzzy Bank Narrative Fallback):** Match student number + exact amount in unstructured bank memo.
+   - **Fail-Closed Unmatched Ledger:** Transactions without definitive match are marked `reconcile_inbound` escalation. Funds are escrowed in unallocated ledger; agent notifies the bursar with suggested matches rather than guessing.
+
+### 12.3 Outbound Disbursements & Accounts Payable (Beyond Students)
+
+School finance manages operational overhead beyond student hardship:
+- **Payable Categories:**
+  - `vendor_invoice`: Lab supplies, textbook publishers, construction contractors.
+  - `software_subscription`: AWS, Google Workspace, LMS licenses.
+  - `utilities_facilities`: Power, water, HVAC maintenance.
+  - `faculty_stipend`: Research grants, conference travel claims.
+  - `student_emergency`: Existing student hardship assistance pipeline.
+- **Maker-Checker Segregation (Four-Eyes Principle):**
+  - **Maker (Department Staff / AP Clerk):** Enters invoice or reimbursement claim.
+  - **Evaluator (Agent Policy Engine):** Checks vendor verification, budget envelope sufficiency, single-payment auto limits (`max_auto_payment`), and daily velocity caps (`max_daily_disbursement`).
+  - **Checker (Bursar / CFO):** If policy marks `ESCALATE` (amount exceeds threshold, vendor address unverified, or reserve close to floor), release requires cryptographic passkey authorization in the Filament Approval Center.
+- **Disbursement Batching:**
+  - Rather than executing individual transactions immediately, the agent compiles approved payables into scheduled daily/weekly `DisbursementBatch` runs, optimizing transaction fees and bulk bank processing.
+
+### 12.4 Autonomous Treasury & Liquidity Management
+
+The agent protects institutional solvency before allowing any discretionary payout:
+- **Runway & Minimum Reserve Defense:**
+  - Extends `TreasuryForecastService` to model a hard reserve floor: `minimum_reserve + monthly_payroll_buffer`.
+  - Simulates 30-day scheduled obligations against cash inflows.
+  - **Health Trigger:** If projected balance dips below the reserve floor within 30 days, health transitions to `CRITICAL`. The agent automatically freezes non-essential automated payouts, prioritizes payroll and utilities, and surfaces an emergency liquidity alert to the CFO.
+- **Dynamic Departmental Budget Envelopes:**
+  - Department accounts (IT, Athletics, Science, Scholarships) carry allocated minor-unit caps in `budgets`.
+  - Payouts are rejected or escalated when departmental envelope is exhausted.
+  - End-of-term automated sweeping moves unspent departmental balances back to master treasury reserves.
+- **Multi-Currency & FX Treasury Balancing:**
+  - Institutions holding both local fiat (for domestic payroll) and digital assets / USDC (for international vendors or cross-border endowments) are monitored for exposure drift.
+  - The agent generates rebalancing advisories when reserve ratios breach policy targets.
+
+### 12.5 Financial Agent Run Loop (Cron / Octane Worker)
+
+The institution financial agent executes a scheduled continuous run cycle (`eduflow:financial-cycle`):
+1. **Reconcile:** Ingest incoming bank webhooks and Arc blockchain event receipts. Match to receivable invoices and student tuition accounts.
+2. **Forecast:** Run 30-day liquidity simulation. Compute reserve floor and health status (`SAFE`, `WARNING`, `CRITICAL`).
+3. **Prioritize Outbound:** Sort pending obligations into priority queues (P1: Payroll/Utilities -> P2: Early-discount vendor bills -> P3: Due vendor invoices -> P4: Student aid -> P5: Discretionary reimbursements).
+4. **Evaluate Policies:** Evaluate each pending payable against budget envelopes, velocity caps, and vendor verification.
+5. **Dispatch:** Execute `AUTO_APPROVE` payments; stage `ESCALATE` payments into the CFO Approval Center with complete deterministic reasoning.
+6. **Audit & Anomaly Detection:** Run best-effort advisory agent to detect vendor bank account changes, duplicate invoices, or unusual transaction velocity jumps. Post structured audit summary to activity log.
+
+### 12.6 CFO & Bursar Command Center (Filament UI)
+
+1. **Treasury Overview & Runway Gauge:** Real-time visibility into days of runway, projected cash buffer, and inflow/outflow velocity.
+2. **Receivable Invoice Resource:** Invoicing portal with self-service payment links for students and donors.
+3. **Maker-Checker Approval Center:** Single queue for high-value vendor disbursements, travel reimbursements, and escalated student aid.
+4. **Budget Envelope Management:** Real-time visual progress of departmental spend against authorized term allocations.
