@@ -5,8 +5,8 @@ declare(strict_types=1);
 namespace App\Filament\Pages;
 
 use App\Agents\EduFlowAgent;
-use App\Models\Organization;
 use App\Services\CircleWalletService;
+use App\Services\InstallationInstitution;
 use App\Services\LeptonTreasuryService;
 use Filament\Actions\Action;
 use Filament\Forms\Components\TextInput;
@@ -43,7 +43,7 @@ class Dashboard extends BaseDashboard
                         ->required(),
                 ])
                 ->action(function (CircleWalletService $walletService, array $data): void {
-                    $wallet = Organization::first()?->primaryWallet();
+                    $wallet = app(InstallationInstitution::class)->current()?->primaryWallet();
 
                     if (! $wallet) {
                         Notification::make()->title('Organization wallet not found')->danger()->send();
@@ -74,10 +74,10 @@ class Dashboard extends BaseDashboard
                 ->modalHeading('Execute Autonomous Financial Cycle')
                 ->modalDescription('EduFlow AI will observe pending invoices, forecast 30-day liquidity, evaluate deterministic policies, disburse approved USDC through the Lepton agent wallet on Arc, and escalate high-value payments to the Approval Center.')
                 ->action(function (EduFlowAgent $agent): void {
-                    $org = Organization::first();
+                    $org = app(InstallationInstitution::class)->current();
 
                     if (! $org) {
-                        Notification::make()->title('No organization found. Please run seeder.')->danger()->send();
+                        Notification::make()->title('Institution context unavailable. Check installation configuration.')->danger()->send();
 
                         return;
                     }
@@ -117,7 +117,7 @@ class Dashboard extends BaseDashboard
      */
     private function reportChainDrift(): void
     {
-        $wallet = Organization::first()?->primaryWallet();
+        $wallet = app(InstallationInstitution::class)->current()?->primaryWallet();
 
         if (! $wallet) {
             return;

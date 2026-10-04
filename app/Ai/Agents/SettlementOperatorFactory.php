@@ -7,6 +7,7 @@ namespace App\Ai\Agents;
 use App\Models\AssistanceFund;
 use App\Models\AssistancePolicyVersion;
 use App\Models\Organization;
+use App\Services\InstallationInstitution;
 
 /**
  * Builds a `SettlementOperator` bound to real records.
@@ -32,11 +33,13 @@ final class SettlementOperatorFactory
      */
     public static function make(?Organization $organization = null): ?SettlementOperator
     {
-        $organization ??= Organization::first();
+        $institution = app(InstallationInstitution::class)->current();
 
-        if (! $organization?->exists) {
+        if ($institution === null || ($organization !== null && (! $organization->exists || $organization->id !== $institution->id))) {
             return null;
         }
+
+        $organization = $institution;
 
         $fund = AssistanceFund::where('organization_id', $organization->id)->first();
         $policyVersion = AssistancePolicyVersion::active();
@@ -62,7 +65,7 @@ final class SettlementOperatorFactory
         if ($operator === null) {
             throw new \RuntimeException(
                 'SettlementOperator needs a persisted organization, an assistance fund and an active policy version. '
-                .'Run `php artisan db:seed` or `eduflow:demo` first.'
+                .'Check EDUFLOW_INSTITUTION_ID and single-institution setup.'
             );
         }
 

@@ -1,6 +1,9 @@
 <?php
 
 return [
+    // Required outside local/testing; never choose an institution by row order.
+    'institution_id' => env('EDUFLOW_INSTITUTION_ID'),
+
     /*
     |--------------------------------------------------------------------------
     | Dual-Currency Display

@@ -465,7 +465,8 @@ must be labelled separately; neither proves mainnet or local-bank readiness.
 **Review basis:** Repository source and configuration inspected on 2026-10-02. This is
 not a full security audit, live settlement test, or PostgreSQL certification. `.env.example`
 exists but editor privacy rules blocked reading it; its defaults are unverified. Existing
-implementation work is preserved. Every item below remains open until its release test passes.
+implementation work is preserved. Findings below describe the original review; implementation
+progress is tracked immediately after the table. No item is closed solely by changing this document.
 
 | ID | Observed gap and evidence | Required outcome | Gate |
 | --- | --- | --- | --- |
@@ -481,6 +482,42 @@ implementation work is preserved. Every item below remains open until its releas
 | OSS-10 | Dockerfile uses Bun without a frozen lock, frontend PHP from distro packages, `--ignore-platform-reqs`, starter-kit branding, and an amd64-only helper. Entrypoint checks `/var/www/html` while image root is `/app`. No Compose file found. | Clean, reproducible production image and deployment bundle; matching runtime paths, real platform checks, non-root operation, documented services and architecture support. | Before container release |
 | OSS-11 | README is demo-focused; installation docs and `version.json` still identify KoamiStarterKit. Composer hooks enable Blog and run starter-kit setup. `.gitattributes` excludes README from archives. | Product identity and release metadata agree. School installation preserves application code, ships docs, and never invokes scaffold rewriting or demo provisioning. | Before OSS release |
 | OSS-12 | CI tests SQLite through `phpunit.xml`; inspected CI has no PostgreSQL job. Auto-release runs independently of CI and tags prereleases as `latest`. Root PHP constraint/README say 8.3+, but locked Symfony 8.1 dependencies require PHP 8.4.1+. | Test actual production DB, concurrency and upgrades; publish only tested commits; isolate preview/stable channels; document a certified runtime baseline. | Before stable release |
+
+### O0 Implementation Progress
+
+- **OSS-01 source cleanup implemented:** Graphite integration and literal token removed.
+  Workflow credential regression tests added. Owner revocation/rotation and historical
+  exposure review are still required; this blocker is not fully closed.
+- **OSS-02 seed safety implemented:** Role seeding creates no users in any environment.
+  Explicit `DemoUsersSeeder` owns local/testing defaults; demo `DatabaseSeeder` invokes it.
+  Production/staging seeding creates no users or
+  demo records. `eduflow:bootstrap-admin` creates the first admin through hidden password
+  prompts, refuses existing accounts/second superadmins, and records a secret-free audit.
+  Existing default accounts are not deleted or reset; operators must remediate them.
+- **OSS-12 release guards implemented in part:** CI no longer commits formatter/refactor
+  changes. Preview publication requires successful same-repository push CI and checks out
+  its exact commit. Manual publication requires exact-commit CI; preview/draft releases
+  cannot update stable `latest`. Ad hoc Docker publication disabled. PostgreSQL coverage,
+  runtime/image certification and supply-chain attestations remain open.
+- Operator bootstrap/release notes added to README; source archives now retain README
+  and changelog instead of excluding them. Foundation PR introduced no schema migration,
+  dependency change, live payment or shared-institution tenancy.
+- **OSS-06 selection/setup implemented in part:** `InstallationInstitution` uses persisted
+  installer identity or matching explicit `EDUFLOW_INSTITUTION_ID`, and exactly one
+  organization; missing/invalid/ambiguous context fails closed. Dashboards, wallet doctor
+  and settlement operator factory no longer choose `Organization::first()`.
+- **Installer foundation:** `eduflow:install` initializes institution/settings through a
+  locked DB transaction, without migrating, demo seeding, admin creation or wallet/provider
+  I/O. Identical retry preserves state; explicit adoption required for legacy institution;
+  conflicting identity/metadata refused. Initial registration, impersonation and AI disabled.
+  Settings migration adds persisted installation identity. Eloquent creation of a second
+  institution blocked after setup; raw DB access is outside that guard.
+- Registration GET/POST now respects disabled registration for installed schools; signup
+  still cannot provision staff rights or enrollment. Country validation is code-format
+  only. Native-fiat ledger, complete ownership/backfill, data imports and rail safety remain
+  open; institution currency metadata alone does not convert legacy USDC accounting.
+- Next: school ownership/imports and exact money/reservation foundations.
+  O0 still needs credential-owner confirmation, dependency/asset review and named owners.
 
 **Strengths to preserve:** MIT already exists; deterministic policy actions, student
 intake, role separation, AI opt-in settings, encrypted provider keys, Lepton contracts,
@@ -619,10 +656,11 @@ image. Secrets, databases, uploaded files, debug tools, and development artifact
 not enter an image layer; use an explicit build-context exclusion policy. Public source
 archives must retain README and installation/security documentation.
 
-**Planning-only CLI names:** `eduflow:install` and `eduflow:health` are proposed, not
-existing commands. Installation creates stable roles/settings and institution/admin
-state; health reports dependency readiness without changing balances or broadcasting
-payments. No installation command should call `eduflow:demo`.
+**CLI progress:** `eduflow:install` now initializes institution identity, role-only seeds
+and safe settings after separately applied migrations. `eduflow:bootstrap-admin` creates
+first admin independently. Full workflow/data onboarding is not complete.
+`eduflow:health` remains proposed, not an existing command. Planned health reports readiness
+without changing balances or broadcasting payments. Installer never calls `eduflow:demo`.
 
 ### 7.2 School Onboarding Flow
 
@@ -966,8 +1004,8 @@ satisfies this gate.
 
 ## 11. Next Work and Decisions Requiring Approval
 
-**Next implementation batch:** O0 first, then exact money/institution foundations and the
-no-wallet fulfilment path. Do not start multi-tenant SaaS, generic ERP modules or more AI
+**Next implementation batch:** Finish remaining O0 operator/security checks, then explicit
+institution context, exact money/reservation foundations and the no-wallet fulfilment path. Do not start multi-tenant SaaS, generic ERP modules or more AI
 agents before school installation and financial correctness are demonstrable.
 
 Decisions to confirm before implementation:

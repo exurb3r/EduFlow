@@ -7,8 +7,8 @@ namespace App\Filament\Widgets;
 use App\Enums\TransactionType;
 use App\Models\AgentDecision;
 use App\Models\Invoice;
-use App\Models\Organization;
 use App\Models\Transaction;
+use App\Services\InstallationInstitution;
 use App\Services\LeptonTreasuryService;
 use App\Services\TreasuryForecastService;
 use Filament\Widgets\StatsOverviewWidget as BaseWidget;
@@ -20,11 +20,11 @@ class TreasuryOverviewWidget extends BaseWidget
 
     protected function getStats(): array
     {
-        $org = Organization::first();
+        $org = app(InstallationInstitution::class)->current();
         if (! $org) {
             return [
                 Stat::make('EduFlow AI', 'Initializing...')
-                    ->description('Run database seeder to load Northstar Academy')
+                    ->description('Configure EDUFLOW_INSTITUTION_ID for a single institution')
                     ->color('gray'),
             ];
         }

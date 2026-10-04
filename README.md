@@ -86,7 +86,7 @@ different and specific reason — that is the demo.
 
 | | |
 |---|---|
-| PHP | 8.3+ (this project targets 8.5) with `pdo_sqlite`, `mbstring`, `openssl` |
+| PHP | 8.5 recommended; locked dependencies require at least 8.4.1, with `pdo_sqlite`, `mbstring`, `openssl` |
 | Composer | 2.x |
 | Node.js | 20.18.2+ |
 | Circle CLI | `npm install -g @circle-fin/cli` |
@@ -105,6 +105,10 @@ guessing later.
 ---
 
 ## Setup
+
+**Disposable local demo only:** Commands below include `migrate:fresh`, which deletes
+existing database records. Never use this setup on a school database or an instance
+holding configured providers or payment history.
 
 ```bash
 git clone https://github.com/koamishin/EduFlow.git
@@ -140,6 +144,81 @@ That runs the PHP server, Vite, and the queue worker together. Open the printed 
 | Finance officer | `finance@eduflow.test` | `password` |
 
 Log in as each to see both sides of the approval loop.
+
+### School identity setup and first administrator
+
+OSS production rollout is still in progress. These commands initialize school identity,
+conservative settings and administrator access—not native-fiat accounting, a complete aid
+workflow, production financial safety or payment certification.
+
+On an operator-controlled instance with reviewed database configuration,
+`APP_ENV=production`, `APP_DEBUG=false`, and a valid unique existing `APP_KEY`:
+
+```bash
+php artisan migrate --force --no-interaction
+php artisan eduflow:install --institution="Pilot School" --country=PH --timezone=Asia/Manila --currency=PHP --no-interaction
+php artisan eduflow:bootstrap-admin --name="School Operator" --email="operator@school.example"
+```
+
+Migrations are a separate operator task. Installer never migrates, resets data, seeds demo
+records, generates keys, creates wallets or calls external providers. It creates roles,
+one institution with zero autonomous thresholds, persisted country/locale/timezone/currency,
+and disables public registration, impersonation and AI. Country is validated as a two-letter
+code format; jurisdiction eligibility is not certified. English is the current supported locale.
+School currency metadata does not convert legacy USDC tuition or payment records.
+
+Repeat identical setup is a no-op: credentials, settings, budgets and policies survive.
+Changed identity/metadata is refused rather than overwritten. An existing institution
+requires explicit `--adopt-institution` with its actual numeric ID and matching name/currency;
+review its existing financial data before adoption. Adoption preserves monetary limits,
+policies and balances; it is not cleanup of an existing demo or authorization of live payments.
+Missing keys, unsafe debug mode, locked unsafe defaults or ambiguous institutions fail setup.
+
+`RolesAndPermissionsSeeder` now creates no users in any environment. Default local demo
+accounts live in `DemoUsersSeeder`, invoked only by local/testing demo `DatabaseSeeder`.
+Production/staging seed roles and permissions, not demo users or institutions. Bootstrap
+asks for the password and confirmation through hidden prompts; passwords must have at
+least 12 characters, mixed case, a number, and a symbol. It requires an interactive
+terminal, has no password CLI option, leaves email verification pending, and refuses
+existing users or a second superadmin. Verify email and configure staff MFA before opening
+school access. Configure SMTP for verification/reset flows first.
+
+This change does **not** remove accounts created by older seeders. Operators must review
+existing `admin@admin.com` / `user@user.com` accounts, rotate exposed passwords, revoke
+sessions and unnecessary access, and preserve required audit evidence. Do not regenerate
+`APP_KEY`, reset the database, or delete financial records as credential cleanup.
+
+### Single-institution context
+
+Installer persists `organizations.id` as school identity in installation settings.
+Production/staging use that identity without requiring `.env` edits. Legacy instances may
+still configure `EDUFLOW_INSTITUTION_ID`; when both exist, they must agree. Database must
+contain exactly one institution. Missing, corrupt, stale or ambiguous context disables
+treasury actions/operator construction instead of choosing the first row. Local/testing
+retain automatic selection only before setup and when exactly one institution exists.
+
+After setup, Eloquent refuses creation of another institution. Raw database access can
+bypass that model guard, but ambiguous data still disables selection. Restart long-lived
+workers after setup/configuration changes. This is not complete tenant isolation or
+ownership enforcement for every existing resource; do not host unrelated schools in one DB.
+
+Public registration GET/POST is denied for installed schools until the existing registration
+setting is explicitly enabled. Opt-in registration grants no staff role or verified student
+enrollment. Password reset/email verification/MFA still require operator SMTP and access setup.
+
+### Release safety
+
+Preview builds publish only after successful same-repository push CI, from its exact
+commit. Preview images use `preview` and version/SHA tags, never stable `latest`.
+Manual releases require successful CI for the dispatched `main` commit, reject existing
+tags, and reject `latest` for drafts/prereleases. Configure required reviewers on the
+GitHub `release` environment before using official publication; an environment name alone
+does not enforce approval. Ad hoc Docker Build Check never publishes an image.
+
+A Graphite token previously embedded in the release workflow has been removed with that
+integration. Its owner must still revoke/rotate the exposed token and review access and
+repository history. Removing source text does not invalidate a credential. These checks
+do not certify the current Docker image or live payment rails for production.
 
 ---
 
