@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Actions;
 
 use App\Ai\Advisory\AdvisoryGate;
+use App\DTOs\Money;
 use App\DTOs\PolicyEvaluationResult;
 use App\Enums\AgentDecisionType;
 use App\Enums\CurrencyCode;
@@ -58,12 +59,21 @@ class EvaluateAssistancePolicy
                 ->sum('requested_amount');
         }
 
-        $todaySpentBase = (int) AgentDecision::query()
+        $todayDecisions = AgentDecision::query()
             ->where('organization_id', $fund->organization_id)
             ->where('action_type', 'student_assistance')
             ->where('created_at', '>=', Carbon::today())
             ->whereIn('status', ['executed', 'pending'])
-            ->sum('approved_amount') * 1000000;
+            ->get(['approved_amount', 'input_snapshot']);
+
+        $todaySpentBase = 0;
+        foreach ($todayDecisions as $decisionRow) {
+            if (isset($decisionRow->input_snapshot['approved_base_units'])) {
+                $todaySpentBase += (int) $decisionRow->input_snapshot['approved_base_units'];
+            } elseif ($decisionRow->approved_amount !== null && (string) $decisionRow->approved_amount !== '') {
+                $todaySpentBase += Money::fromDecimal((string) $decisionRow->approved_amount, CurrencyCode::USDC)->toBaseUnits();
+            }
+        }
 
         $checks = [
             'enrolled' => $enrollment === $policy->required_enrollment_status,
@@ -180,6 +190,10 @@ class EvaluateAssistancePolicy
         PolicyEvaluationResult $result,
         array $quote,
     ): AgentDecision {
+        $approvedBaseUnits = $result->approvedAmount > 0
+            ? Money::fromDecimal((string) $result->approvedAmount, CurrencyCode::USDC)->toBaseUnits()
+            : 0;
+
         $decision = AgentDecision::create([
             'organization_id' => $fund->organization_id,
             'action_type' => 'student_assistance',
@@ -188,6 +202,7 @@ class EvaluateAssistancePolicy
             'input_snapshot' => [
                 'ticket' => $request->ticket_number,
                 'requested_base_units' => (int) ($request->requested_amount ?? 0),
+                'approved_base_units' => $approvedBaseUnits,
                 'fund_id' => $fund->id,
                 'policy_version' => $policy->version,
                 'locked_quote' => $quote,

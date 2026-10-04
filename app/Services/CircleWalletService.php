@@ -36,31 +36,70 @@ class CircleWalletService
         ?int $referenceId = null,
         array $metadata = []
     ): Transaction {
-        if ($amount <= 0) {
-            throw new InvalidArgumentException("Payment amount must be positive, got {$amount}.");
-        }
+        $decimals = (int) config('lepton.usdc_decimals', 6);
+        $baseUnits = Amounts::fromDecimalString(number_format($amount, $decimals, '.', ''), $decimals);
 
-        if ($wallet->balance < $amount) {
-            throw new InvalidArgumentException("Insufficient wallet balance ({$wallet->balance} USDC) for payment of {$amount} USDC.");
+        return $this->executePaymentBaseUnits(
+            wallet: $wallet,
+            recipientAddress: $recipientAddress,
+            baseUnits: $baseUnits,
+            type: $type,
+            referenceType: $referenceType,
+            referenceId: $referenceId,
+            metadata: $metadata,
+        );
+    }
+
+    /**
+     * Execute a payment in exact base units without float conversion.
+     *
+     * @param  array<string, mixed>  $metadata
+     */
+    public function executePaymentBaseUnits(
+        Wallet $wallet,
+        string $recipientAddress,
+        int $baseUnits,
+        TransactionType $type,
+        ?string $referenceType = null,
+        ?int $referenceId = null,
+        array $metadata = []
+    ): Transaction {
+        if ($baseUnits <= 0) {
+            throw new InvalidArgumentException("Payment base units must be positive, got {$baseUnits}.");
         }
 
         $decimals = (int) config('lepton.usdc_decimals', 6);
-        $baseUnits = Amounts::fromDecimalString(number_format($amount, $decimals, '.', ''), $decimals);
+        $amountFloat = (float) Amounts::toDecimalString($baseUnits, $decimals);
+        $walletBalanceBaseUnits = Amounts::fromDecimalString(number_format((float) $wallet->balance, $decimals, '.', ''), $decimals);
+
+        if ($walletBalanceBaseUnits < $baseUnits) {
+            throw new InvalidArgumentException("Insufficient wallet balance ({$wallet->balance} USDC) for payment of {$amountFloat} USDC.");
+        }
 
         $chain = $this->resolveChain($wallet);
         $rpcUrl = $this->resolveRpcUrl();
 
         $this->ensureFakeFunds($wallet, $baseUnits);
 
+        $idempotencyKey = $metadata['idempotency_key']
+            ?? (isset($metadata['ticket']) ? 'eduflow_ticket_'.preg_replace('/[^a-zA-Z0-9_-]/', '', (string) $metadata['ticket']) : null);
+
+        $transferOptions = array_filter([
+            'chain' => $chain,
+            'rpcUrl' => $rpcUrl,
+            'idempotencyKey' => $idempotencyKey,
+        ]);
+
         $result = $this->wallets->transfer(
             $wallet->address,
             $recipientAddress,
             $baseUnits,
-            array_filter(['chain' => $chain, 'rpcUrl' => $rpcUrl])
+            $transferOptions,
         );
 
-        // Deduct from wallet balance
-        $wallet->balance -= $amount;
+        // Deduct from wallet balance safely
+        $newBalanceBaseUnits = max(0, $walletBalanceBaseUnits - $baseUnits);
+        $wallet->balance = (float) Amounts::toDecimalString($newBalanceBaseUnits, $decimals);
         $wallet->save();
 
         // Record on-chain transaction
@@ -69,7 +108,7 @@ class CircleWalletService
             'wallet_id' => $wallet->id,
             'type' => $type,
             'recipient_address' => $recipientAddress,
-            'amount' => $amount,
+            'amount' => $amountFloat,
             'currency' => 'USDC',
             'status' => TransactionStatus::CONFIRMED,
             'provider_tx_hash' => $result->txHash,
