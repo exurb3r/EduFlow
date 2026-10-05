@@ -79,24 +79,24 @@ export default function Notifications({
         <>
             <Head title="Notifications" />
 
-            <div className="bulletin bulletin-grain min-h-full w-full">
-                <div className="mx-auto flex w-full max-w-3xl flex-col px-5 py-10 sm:px-8 sm:py-14">
-                    <header className="flex flex-col gap-5 border-b border-[var(--rule-strong)] pb-8 sm:flex-row sm:items-end sm:justify-between">
+            <div className="bulletin clay-ambient min-h-full w-full">
+                <div className="mx-auto flex w-full max-w-3xl flex-col gap-6 px-4 py-6 sm:px-6 sm:py-10 lg:px-8 lg:py-12">
+                    <header className="flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between">
                         <div>
                             <p className="bulletin-eyebrow flex items-center gap-2">
                                 <Bell className="size-3.5" />
                                 EduFlow
                             </p>
-                            <h1 className="mt-3 font-serif text-4xl leading-none font-normal tracking-tight sm:text-5xl">
+                            <h1 className="clay-h1 mt-2">
                                 Notifications
                             </h1>
                             {unread_count > 0 && (
-                                <p className="mt-3 text-sm text-muted-foreground">
-                                    <span className="font-mono text-[var(--terracotta)]">
+                                <p className="clay-body mt-2">
+                                    <span className="clay-meta font-semibold text-[var(--clay-primary-bright)]">
                                         {unread_count}
                                     </span>{' '}
                                     unread of{' '}
-                                    <span className="font-mono">{total}</span>
+                                    <span className="clay-meta">{total}</span>
                                 </p>
                             )}
                         </div>
@@ -104,7 +104,7 @@ export default function Notifications({
                         {unread_count > 0 && (
                             <Button
                                 onClick={handleMarkAllRead}
-                                className="h-9 gap-2 rounded-[var(--radius)] bg-[var(--terracotta)] px-4 text-xs text-white hover:bg-[var(--terracotta-bright)]"
+                                className="clay-focus h-11 gap-2 rounded-full bg-[var(--clay-primary)] px-5 text-xs font-semibold text-[var(--clay-primary-foreground)] shadow-[var(--shadow-cta)] hover:bg-[var(--clay-primary-bright)] sm:h-10"
                             >
                                 <Check className="size-3.5" />
                                 Mark all as read
@@ -113,106 +113,115 @@ export default function Notifications({
                     </header>
 
                     {data.length === 0 ? (
-                        <div className="flex flex-col items-start gap-4 py-16">
-                            <Inbox className="size-6 text-[var(--rule-strong)]" />
-                            <div>
-                                <p className="font-serif text-2xl text-foreground">
+                        <div
+                            className="clay-card clay-rise flex flex-col items-center gap-4 px-6 py-12 text-center sm:items-start sm:text-left"
+                            style={{ '--stagger': 0 } as React.CSSProperties}
+                        >
+                            <span className="clay-inset flex size-12 items-center justify-center rounded-full">
+                                <Inbox className="size-5 text-[var(--clay-text-muted)]" />
+                            </span>
+                            <div>                                    <p className="clay-h2">
                                     Nothing here yet.
                                 </p>
-                                <p className="mt-1.5 max-w-sm text-sm text-muted-foreground">
+                                <p className="clay-body mx-auto mt-1.5 max-w-sm sm:mx-0">
                                     When staff reply to one of your tickets you
                                     will find it on this page.
                                 </p>
                             </div>
                             <Button
                                 variant="outline"
-                                className="h-9 rounded-[var(--radius)] px-4 text-xs"
+                                className="clay-focus h-10 rounded-full border-[var(--clay-border)] bg-transparent px-5 text-xs font-semibold shadow-none"
                                 asChild
                             >
-                                <Link href={dashboard()}>
-                                    Back to dashboard
-                                </Link>
+                                <Link href={dashboard()}>Back to dashboard</Link>
                             </Button>
                         </div>
                     ) : (
-                        <ul className="border-b border-[var(--rule)]">
-                            {data.map((notification) => (
+                        <ul className="flex flex-col gap-3">
+                            {data.map((notification, index) => (
                                 <li
                                     key={notification.id}
-                                    className="bulletin-row flex items-start gap-4 py-4"
+                                    className="clay-card clay-rise p-4 sm:p-5"
+                                    style={
+                                        {
+                                            '--stagger': Math.min(index, 8),
+                                        } as React.CSSProperties
+                                    }
                                 >
-                                    <span
-                                        className={`mt-2 size-1.5 shrink-0 rounded-full ${
-                                            notification.read_at
-                                                ? 'bg-[var(--rule-strong)]'
-                                                : 'bg-[var(--terracotta)]'
-                                        }`}
-                                    />
-
-                                    <div className="min-w-0 flex-1">
-                                        <p
-                                            className={`text-sm ${
+                                    <div className="flex items-start gap-3">
+                                        <span
+                                            className={`mt-2 size-2 shrink-0 rounded-full ${
                                                 notification.read_at
-                                                    ? 'text-muted-foreground'
-                                                    : 'font-medium text-foreground'
+                                                    ? 'bg-[var(--clay-border)]'
+                                                    : 'clay-ping bg-[var(--clay-primary)] shadow-[0_0_0_3px_var(--clay-primary-soft)]'
                                             }`}
-                                        >
-                                            {title(notification)}
-                                        </p>
-                                        {body(notification) && (
-                                            <p className="mt-0.5 text-sm leading-relaxed text-muted-foreground">
-                                                {body(notification)}
-                                            </p>
-                                        )}
-                                        <time className="mt-1.5 block font-mono text-[11px] text-[var(--ink-faint)]">
-                                            {new Date(
-                                                notification.created_at,
-                                            ).toLocaleString()}
-                                        </time>
-                                    </div>
+                                        />
 
-                                    {!notification.read_at && (
-                                        <Button
-                                            variant="ghost"
-                                            size="sm"
-                                            className="h-7 shrink-0 px-2 text-xs"
-                                            onClick={() =>
-                                                handleMarkAsRead(
-                                                    notification.id,
-                                                )
-                                            }
-                                        >
-                                            Mark read
-                                        </Button>
-                                    )}
+                                        <div className="min-w-0 flex-1">
+                                            <p
+                                                className={`text-sm ${
+                                                    notification.read_at
+                                                        ? 'text-[var(--clay-text-muted)]'
+                                                        : 'font-semibold text-[var(--clay-ink)]'
+                                                }`}
+                                            >
+                                                {title(notification)}
+                                            </p>
+                                            {body(notification) && (
+                                                <p className="mt-0.5 text-sm leading-relaxed text-[var(--clay-text-muted)]">
+                                                    {body(notification)}
+                                                </p>
+                                            )}
+                                            <time className="clay-meta mt-1.5 block">
+                                                {new Date(
+                                                    notification.created_at,
+                                                ).toLocaleString()}
+                                            </time>
+                                        </div>
+
+                                        {!notification.read_at && (
+                                            <Button
+                                                variant="ghost"
+                                                size="sm"
+                                                className="clay-focus h-8 shrink-0 rounded-full px-3 text-xs font-semibold"
+                                                onClick={() =>
+                                                    handleMarkAsRead(
+                                                        notification.id,
+                                                    )
+                                                }
+                                            >
+                                                Mark read
+                                            </Button>
+                                        )}
+                                    </div>
                                 </li>
                             ))}
                         </ul>
                     )}
 
                     {last_page > 1 && (
-                        <div className="flex items-center justify-between pt-6 text-xs text-muted-foreground">
-                            <span className="font-mono">
+                        <div className="flex flex-wrap items-center justify-between gap-3 text-xs text-[var(--clay-text-muted)]">
+                            <span className="clay-meta">
                                 {from ?? 0}–{to ?? 0} / {total}
                             </span>
                             <div className="flex items-center gap-2">
                                 <Button
                                     variant="outline"
                                     size="sm"
-                                    className="h-8 rounded-[var(--radius)] text-xs"
+                                    className="clay-focus h-9 rounded-full border-[var(--clay-border)] bg-transparent text-xs font-semibold shadow-none"
                                     disabled={current_page <= 1}
                                     onClick={() => goToPage(current_page - 1)}
                                 >
                                     <ChevronLeft className="size-3.5" />
                                     Previous
                                 </Button>
-                                <span className="font-mono">
+                                <span className="clay-meta">
                                     {current_page}/{last_page}
                                 </span>
                                 <Button
                                     variant="outline"
                                     size="sm"
-                                    className="h-8 rounded-[var(--radius)] text-xs"
+                                    className="clay-focus h-9 rounded-full border-[var(--clay-border)] bg-transparent text-xs font-semibold shadow-none"
                                     disabled={current_page >= last_page}
                                     onClick={() => goToPage(current_page + 1)}
                                 >
@@ -224,11 +233,11 @@ export default function Notifications({
                     )}
 
                     {data.length > 0 && (
-                        <div className="pt-8">
+                        <div>
                             <Button variant="ghost" size="sm" asChild>
                                 <Link
                                     href={dashboard()}
-                                    className="text-xs text-[var(--ink-teal)]"
+                                    className="clay-focus rounded-full text-xs font-semibold text-[var(--clay-primary-bright)]"
                                 >
                                     Back to dashboard
                                 </Link>

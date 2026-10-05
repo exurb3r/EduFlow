@@ -1,7 +1,6 @@
-import { Head, Link, router, useForm, usePage } from '@inertiajs/react';
+import { Head, router, useForm, usePage } from '@inertiajs/react';
 import {
     ArrowUpRight,
-    Bell,
     BookOpen,
     Calendar,
     Clock,
@@ -15,6 +14,7 @@ import {
     Plus,
     Search,
     Send,
+    X,
 } from 'lucide-react';
 import { useEffect, useRef, useState } from 'react';
 import { toast } from 'sonner';
@@ -41,18 +41,20 @@ import {
     SelectValue,
 } from '@/components/ui/select';
 import { Textarea } from '@/components/ui/textarea';
-import { dashboard } from '@/routes';
 import {
-    index as notificationsIndex,
-    markAllRead,
-} from '@/routes/notifications';
+    Tooltip,
+    TooltipContent,
+    TooltipProvider,
+    TooltipTrigger,
+} from '@/components/ui/tooltip';
+import { dashboard } from '@/routes';
+
 import type {
     AssistancePriorityType,
     AssistanceRequestItem,
     AssistanceStatusFilter,
     AssistanceStatusType,
     Auth,
-    DashboardNotificationSummary,
     DashboardStats,
     OptionItem,
     Paginated,
@@ -91,27 +93,41 @@ function formatDuration(minutes: number): string {
 function statusTabClass(status: AssistanceStatusType): string {
     switch (status) {
         case 'pending':
-            return 'bulletin-tab-pending';
+            return 'clay-tab-pending';
         case 'in_progress':
-            return 'bulletin-tab-progress';
+            return 'clay-tab-progress';
         case 'resolved':
-            return 'bulletin-tab-resolved';
+            return 'clay-tab-resolved';
         case 'closed':
         default:
-            return 'bulletin-tab-closed';
+            return 'clay-tab-closed';
     }
 }
 
 function priorityClass(priority: AssistancePriorityType): string {
     if (priority === 'urgent') {
-        return 'text-[var(--status-urgent)] border-[var(--status-urgent)]/30';
+        return 'bg-[var(--status-urgent)]/10 text-[var(--status-urgent)]';
     }
 
     if (priority === 'high') {
-        return 'text-[var(--status-pending)] border-[var(--status-pending)]/35';
+        return 'bg-[var(--status-pending)]/10 text-[var(--status-pending)]';
     }
 
-    return 'text-muted-foreground border-border';
+    return 'bg-[var(--clay-surface-soft)] text-[var(--clay-text-muted)]';
+}
+
+function statusPillClass(status: AssistanceStatusType): string {
+    switch (status) {
+        case 'resolved':
+            return 'bg-[var(--status-resolved)]/10 text-[var(--status-resolved)]';
+        case 'in_progress':
+            return 'bg-[var(--status-progress)]/10 text-[var(--status-progress)]';
+        case 'closed':
+            return 'bg-[var(--clay-surface-soft)] text-[var(--clay-text-muted)]';
+        case 'pending':
+        default:
+            return 'bg-[var(--status-pending)]/10 text-[var(--status-pending)]';
+    }
 }
 
 interface DashboardProps {
@@ -124,7 +140,6 @@ interface DashboardProps {
     categories: OptionItem[];
     priorities: OptionItem[];
     quickResources: QuickResource[];
-    notifications: DashboardNotificationSummary;
 }
 
 export default function Dashboard({
@@ -145,7 +160,6 @@ export default function Dashboard({
         { value: 'urgent', label: 'Urgent' },
     ],
     quickResources = [],
-    notifications,
 }: DashboardProps) {
     const { auth } = usePage<{ auth: Auth }>().props;
 
@@ -153,6 +167,7 @@ export default function Dashboard({
     const [selectedRequest, setSelectedRequest] =
         useState<AssistanceRequestItem | null>(null);
     const [search, setSearch] = useState(filters.search);
+    const [isFilteringRequests, setIsFilteringRequests] = useState(false);
     const searchTimeout = useRef<ReturnType<typeof setTimeout> | null>(null);
 
     const form = useForm({
@@ -191,6 +206,8 @@ export default function Dashboard({
                 preserveState: true,
                 preserveScroll: true,
                 replace: true,
+                onStart: () => setIsFilteringRequests(true),
+                onFinish: () => setIsFilteringRequests(false),
             },
         );
     };
@@ -241,23 +258,6 @@ export default function Dashboard({
         });
     };
 
-    const handleMarkAllRead = () => {
-        router.post(
-            markAllRead.url(),
-            {},
-            {
-                preserveScroll: true,
-                onSuccess: () => {
-                    toast.success('All notifications marked as read.');
-                    router.reload({ only: ['notifications'] });
-                },
-                onError: () => {
-                    toast.error('Could not mark notifications as read.');
-                },
-            },
-        );
-    };
-
     const copyTicketNumber = (ticket: string) => {
         navigator.clipboard.writeText(ticket);
         toast.info(`Copied #${ticket} to clipboard`);
@@ -272,225 +272,219 @@ export default function Dashboard({
         <>
             <Head title="Student Dashboard" />
 
-            <div className="bulletin bulletin-grain min-h-full w-full">
-                <div className="mx-auto flex w-full max-w-6xl flex-col px-5 py-10 sm:px-8 sm:py-14">
-                    {/* Masthead */}
-                    <header className="border-b border-[var(--rule-strong)] pb-8">
-                        <div className="flex flex-col gap-8 lg:flex-row lg:items-end lg:justify-between">
+            <TooltipProvider delayDuration={200}>
+            <div className="bulletin clay-ambient min-h-full w-full">
+                {/* 8pt grid: 4 / 8 / 12 / 16 / 24 / 32 / 48 / 64 */}
+                <div className="mx-auto flex w-full max-w-6xl flex-col gap-8 px-4 py-6 sm:gap-10 sm:px-6 sm:py-10 lg:px-8 lg:py-12">
+                    {/* -- Header: identity + primary action -- */}
+                    <header className="flex flex-col gap-6">
+                        <div className="flex flex-col gap-5 lg:flex-row lg:items-end lg:justify-between">
                             <div className="min-w-0">
                                 <p className="bulletin-eyebrow">
                                     EduFlow &middot; Northstar Learning Center
                                 </p>
-                                <h1 className="mt-4 font-serif text-4xl leading-[1.05] font-normal tracking-tight text-foreground sm:text-6xl">
-                                    Welcome back,
-                                    <br />
-                                    <span className="text-[var(--ink-teal)] italic">
-                                        {firstName}.
+                                <h1 className="clay-h1 mt-2">
+                                    Welcome back,{' '}
+                                    <span className="text-[var(--clay-primary-bright)]">
+                                        {firstName}
                                     </span>
                                 </h1>
-                                <p className="mt-5 max-w-md text-sm leading-relaxed text-muted-foreground">
+                                <p className="clay-body mt-1.5 max-w-md">
                                     Your desk for coursework, campus records,
                                     and anything the administration can answer.
                                 </p>
                             </div>
 
-                            <div className="flex shrink-0 flex-col items-start gap-5 lg:items-end">
+                            <div className="flex shrink-0 flex-col gap-2 lg:items-end">
                                 <Button
                                     onClick={() => setIsAskModalOpen(true)}
-                                    className="h-11 gap-2 rounded-[var(--radius)] bg-[var(--terracotta)] px-6 font-medium text-white shadow-[var(--shadow-md)] transition-transform hover:bg-[var(--terracotta-bright)] active:scale-[0.98]"
+                                    className="clay-focus h-12 w-full gap-2 rounded-full bg-[var(--clay-primary)] px-7 text-sm font-semibold text-[var(--clay-primary-foreground)] shadow-[var(--shadow-cta)] transition-all hover:-translate-y-0.5 hover:bg-[var(--clay-primary-bright)] hover:shadow-[var(--shadow-lg)] active:translate-y-0 active:scale-[0.98] sm:h-11 sm:w-auto"
                                 >
                                     <LifeBuoy className="size-4" />
                                     Ask Assistance
                                 </Button>
-                                <p className="font-mono text-[11px] text-[var(--ink-faint)]">
+                                <p className="clay-meta text-center lg:text-right">
                                     {stats.totalRequests} ticket
                                     {stats.totalRequests === 1 ? '' : 's'} on
                                     file
                                 </p>
                             </div>
                         </div>
+
+                        {/* -- Stat tiles: hierarchy level 1 -- */}
+                        <dl className="grid grid-cols-3 gap-3 sm:gap-4">
+                            <div className="clay-card p-4 sm:p-6">
+                                <dt className="bulletin-eyebrow">Active</dt>
+                                <dd className="mt-2 sm:mt-3">
+                                    <span className="bulletin-figure block text-[28px] sm:text-4xl lg:text-5xl">
+                                        {stats.activeRequests}
+                                    </span>
+                                    <span className="mt-1 hidden text-xs text-[var(--clay-text-muted)] sm:block">
+                                        awaiting staff
+                                    </span>
+                                </dd>
+                            </div>
+                            <div className="clay-card p-4 sm:p-6">
+                                <dt className="bulletin-eyebrow">Resolved</dt>
+                                <dd className="mt-2 sm:mt-3">
+                                    <span className="bulletin-figure block text-[28px] text-[var(--status-resolved)] sm:text-4xl lg:text-5xl">
+                                        {stats.resolvedRequests}
+                                    </span>
+                                    <span className="mt-1 hidden text-xs text-[var(--clay-text-muted)] sm:block">
+                                        all time
+                                    </span>
+                                </dd>
+                            </div>
+                            <div className="clay-card p-4 sm:p-6">
+                                <dt className="bulletin-eyebrow">
+                                    Median time
+                                </dt>
+                                <dd className="mt-2 sm:mt-3">
+                                    <span className="bulletin-figure block text-[28px] text-[var(--clay-accent)] sm:text-4xl lg:text-5xl">
+                                        {stats.medianResolutionMinutes === null
+                                            ? '—'
+                                            : formatDuration(
+                                                  stats.medianResolutionMinutes,
+                                              )}
+                                    </span>
+                                    <span className="mt-1 hidden text-xs text-[var(--clay-text-muted)] sm:block">
+                                        {stats.medianResolutionMinutes === null
+                                            ? 'no data yet'
+                                            : 'to answer'}
+                                    </span>
+                                </dd>
+                            </div>
+                        </dl>
                     </header>
 
-                    {/* Ledger of figures */}
-                    <dl className="grid divide-y divide-[var(--rule)] border-b border-[var(--rule-strong)] sm:grid-cols-3 sm:divide-y-0 sm:divide-x">
-                        <div className="py-6 sm:px-6 sm:py-7 sm:first:pl-0">
-                            <dt className="bulletin-eyebrow">Active</dt>
-                            <dd className="mt-2 flex items-baseline gap-3">
-                                <span className="bulletin-figure text-5xl">
-                                    {stats.activeRequests}
-                                </span>
-                                <span className="text-xs text-muted-foreground">
-                                    awaiting staff
-                                </span>
-                            </dd>
-                        </div>
-                        <div className="py-6 sm:px-6 sm:py-7">
-                            <dt className="bulletin-eyebrow">Resolved</dt>
-                            <dd className="mt-2 flex items-baseline gap-3">
-                                <span className="bulletin-figure text-5xl text-[var(--status-resolved)]">
-                                    {stats.resolvedRequests}
-                                </span>
-                                <span className="text-xs text-muted-foreground">
-                                    all time
-                                </span>
-                            </dd>
-                        </div>
-                        <div className="py-6 sm:px-6 sm:py-7 sm:last:pr-0">
-                            <dt className="bulletin-eyebrow">
-                                Median turnaround
-                            </dt>
-                            <dd className="mt-2 flex items-baseline gap-3">
-                                <span className="bulletin-figure text-5xl text-[var(--terracotta)]">
-                                    {stats.medianResolutionMinutes === null
-                                        ? '—'
-                                        : formatDuration(
-                                              stats.medianResolutionMinutes,
-                                          )}
-                                </span>
-                                <span className="text-xs text-muted-foreground">
-                                    {stats.medianResolutionMinutes === null
-                                        ? 'no data yet'
-                                        : 'to answer'}
-                                </span>
-                            </dd>
-                        </div>
-                    </dl>
+                    {/* -- Assistance requests -- */}
+                    <section className="flex flex-col gap-4">
+                        <div className="flex flex-col gap-4">
+                            <div className="flex flex-wrap items-end justify-between gap-x-4 gap-y-2">
+                                <div>
+                                    <h2 className="bulletin-eyebrow">
+                                        Assistance requests
+                                    </h2>
+                                    <p className="clay-body mt-1">
+                                        {isFiltering
+                                            ? 'Filtered view of your tickets.'
+                                            : 'Every ticket you have raised, newest first.'}
+                                    </p>
+                                </div>
 
-                    {/* Notifications */}
-                    <section className="py-8">
-                        <div className="flex items-baseline justify-between gap-4">
-                            <h2 className="bulletin-eyebrow flex items-center gap-2">
-                                <Bell className="size-3.5" />
-                                Notifications
-                                {notifications.unreadCount > 0 && (
-                                    <span className="rounded-full bg-[var(--terracotta)] px-1.5 py-0.5 text-[10px] font-semibold text-white">
-                                        {notifications.unreadCount}
-                                    </span>
-                                )}
-                            </h2>
-
-                            <div className="flex items-center gap-4">
-                                {notifications.unreadCount > 0 && (
+                                {isFiltering && (
                                     <button
                                         type="button"
-                                        onClick={handleMarkAllRead}
-                                        className="text-xs text-muted-foreground underline-offset-4 transition-colors hover:text-foreground hover:underline"
+                                        onClick={() => {
+                                            setSearch('');
+                                            router.get(
+                                                dashboard.url(),
+                                                {},
+                                                {
+                                                    only: [
+                                                        'requests',
+                                                        'filters',
+                                                    ],
+                                                    preserveState: true,
+                                                    preserveScroll: true,
+                                                    replace: true,
+                                                },
+                                            );
+                                        }}
+                                        className="clay-ghost clay-focus"
                                     >
-                                        Mark all read
+                                        <X className="size-3" />
+                                        Clear filters
                                     </button>
                                 )}
-                                <Link
-                                    href={notificationsIndex()}
-                                    className="text-xs text-[var(--ink-teal)] underline-offset-4 hover:underline"
-                                >
-                                    All notifications
-                                </Link>
                             </div>
-                        </div>
 
-                        {notifications.recent.length === 0 ? (
-                            <p className="mt-4 border-t border-[var(--rule)] py-4 text-sm text-muted-foreground italic">
-                                Nothing new. We will tell you here when a member
-                                of staff replies.
-                            </p>
-                        ) : (
-                            <ul className="mt-4">
-                                {notifications.recent.map((notification) => (
-                                    <li
-                                        key={notification.id}
-                                        className="bulletin-row flex items-baseline gap-4 py-3"
+                            <div className="relative">
+                                <Search
+                                    className={`pointer-events-none absolute left-4 top-1/2 size-4 -translate-y-1/2 transition-colors ${
+                                        search
+                                            ? 'text-[var(--clay-primary-bright)]'
+                                            : 'text-[var(--clay-text-faint)]'
+                                    }`}
+                                />
+                                <Input
+                                    placeholder="Search subject or ticket no."
+                                    value={search}
+                                    onChange={(e) => setSearch(e.target.value)}
+                                    className="clay-field clay-focus h-12 w-full rounded-full pl-11 text-sm shadow-none sm:h-10"
+                                />
+                                {search && (
+                                    <button
+                                        type="button"
+                                        aria-label="Clear search"
+                                        onClick={() => setSearch('')}
+                                        className="clay-focus absolute right-3 top-1/2 flex size-6 -translate-y-1/2 items-center justify-center rounded-full bg-[var(--clay-surface-hi)] text-[var(--clay-text-muted)] transition-colors hover:text-[var(--clay-text)]"
                                     >
-                                        <span
-                                            className={`mt-1.5 size-1.5 shrink-0 rounded-full ${
-                                                notification.readAt
-                                                    ? 'bg-[var(--rule-strong)]'
-                                                    : 'bg-[var(--terracotta)]'
-                                            }`}
-                                        />
-                                        <p className="min-w-0 flex-1 truncate text-sm text-foreground">
-                                            {notification.title}
-                                        </p>
-                                        <time className="shrink-0 font-mono text-[11px] text-muted-foreground">
-                                            {notification.createdAt}
-                                        </time>
-                                    </li>
-                                ))}
-                            </ul>
-                        )}
-                    </section>
-
-                    {/* Assistance requests */}
-                    <section className="pb-10">
-                        <div className="flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between">
-                            <div>
-                                <h2 className="bulletin-eyebrow">
-                                    Assistance requests
-                                </h2>
-                                <p className="mt-1.5 text-sm text-muted-foreground">
-                                    {isFiltering
-                                        ? 'Filtered view of your tickets.'
-                                        : 'Every ticket you have raised, newest first.'}
-                                </p>
+                                        <X className="size-3.5" />
+                                    </button>
+                                )}
                             </div>
 
-                            <div className="flex flex-wrap items-center gap-3">
-                                <div className="relative">
-                                    <Search className="pointer-events-none absolute left-3 top-1/2 size-3.5 -translate-y-1/2 text-muted-foreground" />
-                                    <Input
-                                        placeholder="Subject or ticket no."
-                                        value={search}
-                                        onChange={(e) =>
-                                            setSearch(e.target.value)
-                                        }
-                                        className="bulletin-field h-9 w-56 pl-8 text-xs"
-                                    />
-                                </div>
+                            <div
+                                className="-mx-1 flex gap-2 overflow-x-auto px-1 pb-1"
+                                role="tablist"
+                                aria-label="Filter tickets by status"
+                            >
+                                {statusTabs.map((tab) => {
+                                    const count =
+                                        tab.value === 'all'
+                                            ? stats.totalRequests
+                                            : tab.value === 'active'
+                                              ? stats.activeRequests
+                                              : stats.resolvedRequests;
+                                    const isActive =
+                                        filters.status === tab.value;
 
-                                <div className="flex items-center gap-1">
-                                    {statusTabs.map((tab) => {
-                                        const count =
-                                            tab.value === 'all'
-                                                ? stats.totalRequests
-                                                : tab.value === 'active'
-                                                  ? stats.activeRequests
-                                                  : stats.resolvedRequests;
-
-                                        return (
-                                            <button
-                                                key={tab.value}
-                                                type="button"
-                                                onClick={() =>
-                                                    handleStatusChange(
-                                                        tab.value,
-                                                    )
+                                    return (
+                                        <button
+                                            key={tab.value}
+                                            type="button"
+                                            role="tab"
+                                            aria-selected={isActive}
+                                            data-active={isActive}
+                                            onClick={() =>
+                                                handleStatusChange(tab.value)
+                                            }
+                                            className="clay-chip clay-focus shrink-0"
+                                        >
+                                            {tab.label}
+                                            <span
+                                                className={
+                                                    isActive
+                                                        ? 'opacity-70'
+                                                        : 'opacity-60'
                                                 }
-                                                className={`rounded-[var(--radius)] px-2.5 py-1.5 font-mono text-[11px] uppercase tracking-wider transition-colors ${
-                                                    filters.status === tab.value
-                                                        ? 'bg-[var(--ink-teal)] text-white'
-                                                        : 'text-muted-foreground hover:bg-accent hover:text-foreground'
-                                                }`}
                                             >
-                                                {tab.label}
-                                                <span className="ml-1.5 opacity-60">
-                                                    {count}
-                                                </span>
-                                            </button>
-                                        );
-                                    })}
-                                </div>
+                                                {count}
+                                            </span>
+                                        </button>
+                                    );
+                                })}
                             </div>
                         </div>
 
                         {requests.data.length === 0 ? (
-                            <div className="mt-6 flex flex-col items-start gap-4 border-t border-[var(--rule-strong)] py-12">
-                                <Inbox className="size-6 text-[var(--rule-strong)]" />
+                            <div
+                                className="clay-card clay-rise flex flex-col items-center gap-4 px-6 py-12 text-center sm:items-start sm:text-left"
+                                style={
+                                    { '--stagger': 1 } as React.CSSProperties
+                                }
+                            >
+                                <span className="clay-inset flex size-12 items-center justify-center rounded-full">
+                                    <Inbox className="size-5 text-[var(--clay-text-muted)]" />
+                                </span>
                                 <div>
-                                    <p className="font-serif text-2xl text-foreground">
+                                    <p className="text-lg font-semibold text-[var(--clay-ink)]">
                                         {isFiltering
                                             ? 'Nothing matches.'
                                             : 'No requests yet.'}
                                     </p>
-                                    <p className="mt-1.5 max-w-sm text-sm text-muted-foreground">
+                                    <p className="clay-body mx-auto mt-1.5 max-w-sm sm:mx-0">
                                         {isFiltering
                                             ? 'Try a different search, or clear the filter to see everything.'
                                             : 'When you need guidance with coursework, records, or campus systems, raise a ticket and staff will pick it up.'}
@@ -499,7 +493,7 @@ export default function Dashboard({
                                 {isFiltering ? (
                                     <Button
                                         variant="outline"
-                                        className="h-9 rounded-[var(--radius)] px-4 text-xs"
+                                        className="clay-focus h-10 rounded-full border-[var(--clay-border)] bg-transparent px-5 text-xs font-semibold shadow-none"
                                         onClick={() => {
                                             setSearch('');
                                             router.get(
@@ -522,7 +516,7 @@ export default function Dashboard({
                                 ) : (
                                     <Button
                                         onClick={() => setIsAskModalOpen(true)}
-                                        className="h-9 gap-2 rounded-[var(--radius)] bg-[var(--terracotta)] px-4 text-xs text-white hover:bg-[var(--terracotta-bright)]"
+                                        className="clay-focus h-10 gap-2 rounded-full bg-[var(--clay-primary)] px-5 text-xs font-semibold text-[var(--clay-primary-foreground)] shadow-[var(--shadow-cta)] hover:bg-[var(--clay-primary-bright)]"
                                     >
                                         <Plus className="size-3.5" />
                                         Raise a ticket
@@ -531,88 +525,119 @@ export default function Dashboard({
                             </div>
                         ) : (
                             <>
-                                <ul className="mt-6 border-t border-[var(--rule-strong)]">
-                                    {requests.data.map((req) => (
+                                <ul
+                                    className="flex flex-col gap-3"
+                                    data-loading={isFilteringRequests}
+                                    aria-busy={isFilteringRequests}
+                                >
+                                    {requests.data.map((req, index) => (
                                         <li key={req.id}>
                                             <button
                                                 type="button"
                                                 onClick={() =>
                                                     setSelectedRequest(req)
                                                 }
-                                                className="bulletin-row group flex w-full items-center gap-4 py-4 text-left"
+                                                style={
+                                                    {
+                                                        '--stagger': Math.min(
+                                                            index,
+                                                            8,
+                                                        ),
+                                                    } as React.CSSProperties
+                                                }
+                                                className="clay-card clay-press clay-rise flex w-full items-center gap-3 p-4 text-left sm:gap-4 sm:p-5"
                                             >
                                                 <span
-                                                    className={`bulletin-tab ${statusTabClass(req.status)} hidden sm:block`}
+                                                    className={`clay-tab ${statusTabClass(req.status)}`}
                                                 />
 
                                                 <div className="min-w-0 flex-1">
-                                                    <div className="flex flex-wrap items-center gap-x-2.5 gap-y-1">
-                                                        <span className="font-mono text-[11px] text-muted-foreground">
-                                                            #{req.ticket_number}
+                                                    <div className="flex flex-wrap items-center gap-x-2 gap-y-1">
+                                                        <span className="clay-meta">
+                                                            #
+                                                            {
+                                                                req.ticket_number
+                                                            }
                                                         </span>
-                                                        <span className="text-[11px] text-[var(--rule-strong)]">
-                                                            /
+                                                        <span className="clay-meta hidden sm:inline">
+                                                            ·
                                                         </span>
-                                                        <span className="text-[11px] text-muted-foreground">
-                                                            {req.category_label}
+                                                        <span className="clay-meta hidden text-[var(--clay-text-muted)] sm:inline">
+                                                            {
+                                                                req.category_label
+                                                            }
                                                         </span>
                                                         <Badge
                                                             variant="outline"
-                                                            className={`h-4 rounded-[2px] px-1.5 font-mono text-[10px] font-medium uppercase tracking-wider ${priorityClass(req.priority)}`}
+                                                            className={`rounded-full border-0 px-2 py-0 text-[10px] font-semibold uppercase tracking-wider ${priorityClass(req.priority)}`}
                                                         >
                                                             {req.priority_label}
                                                         </Badge>
                                                     </div>
 
-                                                    <p className="mt-1 truncate font-serif text-lg leading-snug text-foreground">
+                                                    <p className="clay-title mt-1 truncate text-base sm:text-lg">
                                                         {req.subject}
                                                     </p>
 
                                                     {req.admin_notes && (
                                                         <p className="mt-1 truncate text-xs text-[var(--status-resolved)]">
-                                                            <span className="font-medium">
+                                                            <span className="font-semibold">
                                                                 Reply:
                                                             </span>{' '}
                                                             {req.admin_notes}
                                                         </p>
                                                     )}
+
+                                                    <div className="mt-2 flex items-center gap-2 sm:hidden">
+                                                        <span
+                                                            className={`rounded-full px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wider ${statusPillClass(req.status)}`}
+                                                        >
+                                                            {req.status_label}
+                                                        </span>
+                                                        <span className="clay-meta">
+                                                            {req.created_at}
+                                                        </span>
+                                                    </div>
                                                 </div>
 
-                                                <div className="hidden shrink-0 text-right sm:block">
-                                                    <p className="font-mono text-[11px] text-muted-foreground">
-                                                        {req.created_at}
-                                                    </p>
-                                                    <p
-                                                        className={`mt-1 text-[11px] ${
-                                                            req.status ===
-                                                            'resolved'
-                                                                ? 'text-[var(--status-resolved)]'
-                                                                : req.status ===
-                                                                    'in_progress'
-                                                                  ? 'text-[var(--status-progress)]'
-                                                                  : 'text-[var(--status-pending)]'
-                                                        }`}
-                                                    >
-                                                        {req.status_label}
-                                                    </p>
-                                                </div>
+                                                <Tooltip>
+                                                    <TooltipTrigger asChild>
+                                                        <span className="hidden shrink-0 text-right sm:block">
+                                                            <p className="clay-meta">
+                                                                {
+                                                                    req.created_at
+                                                                }
+                                                            </p>
+                                                            <p
+                                                                className={`clay-meta mt-1 font-semibold ${statusPillClass(req.status)}`}
+                                                            >
+                                                                {
+                                                                    req.status_label
+                                                                }
+                                                            </p>
+                                                        </span>
+                                                    </TooltipTrigger>
+                                                    <TooltipContent className="clay-tooltip">
+                                                        Raised {req.created_at}
+                                                    </TooltipContent>
+                                                </Tooltip>
 
-                                                <ArrowUpRight className="size-4 shrink-0 text-[var(--rule-strong)] transition-all group-hover:-translate-y-0.5 group-hover:translate-x-0.5 group-hover:text-[var(--terracotta)]" />
+                                                <ArrowUpRight className="size-4 shrink-0 text-[var(--clay-border)] transition-all duration-200 group-hover:text-[var(--clay-primary-bright)]" />
                                             </button>
                                         </li>
                                     ))}
                                 </ul>
 
                                 {hasPages && (
-                                    <div className="flex items-center justify-between pt-5 text-xs text-muted-foreground">
-                                        <span className="font-mono">
+                                    <div className="flex flex-wrap items-center justify-between gap-3 pt-1 text-xs text-[var(--clay-text-muted)]">
+                                        <span className="clay-meta">
                                             {from ?? 0}–{to ?? 0} / {total}
                                         </span>
                                         <div className="flex items-center gap-2">
                                             <Button
                                                 variant="outline"
                                                 size="sm"
-                                                className="h-8 rounded-[var(--radius)] text-xs"
+                                                className="clay-focus h-9 rounded-full border-[var(--clay-border)] bg-transparent text-xs font-semibold shadow-none"
                                                 disabled={current_page <= 1}
                                                 onClick={() =>
                                                     reloadRequests({
@@ -622,13 +647,13 @@ export default function Dashboard({
                                             >
                                                 Previous
                                             </Button>
-                                            <span className="font-mono">
+                                            <span className="clay-meta">
                                                 {current_page}/{last_page}
                                             </span>
                                             <Button
                                                 variant="outline"
                                                 size="sm"
-                                                className="h-8 rounded-[var(--radius)] text-xs"
+                                                className="clay-focus h-9 rounded-full border-[var(--clay-border)] bg-transparent text-xs font-semibold shadow-none"
                                                 disabled={
                                                     current_page >= last_page
                                                 }
@@ -647,42 +672,56 @@ export default function Dashboard({
                         )}
                     </section>
 
-                    {/* Quick resources */}
+                    {/* -- Quick resources -- */}
                     {quickResources.length > 0 && (
-                        <section className="border-t border-[var(--rule-strong)] py-8">
+                        <section className="flex flex-col gap-4">
                             <h2 className="bulletin-eyebrow">
                                 Campus resources
                             </h2>
-                            <ul className="mt-4 grid gap-x-8 sm:grid-cols-2">
-                                {quickResources.map((resource) => {
+                            <ul className="grid gap-3 sm:grid-cols-2 sm:gap-4">
+                                {quickResources.map((resource, index) => {
                                     const Icon =
                                         resourceIcons[resource.icon] ?? Link2;
 
                                     return (
                                         <li
                                             key={resource.title}
-                                            className="bulletin-row flex items-start gap-3 py-3.5"
+                                            className="clay-card clay-rise p-4 sm:p-5"
+                                            style={
+                                                {
+                                                    '--stagger': Math.min(
+                                                        index,
+                                                        8,
+                                                    ),
+                                                } as React.CSSProperties
+                                            }
                                         >
-                                            <Icon className="mt-0.5 size-4 shrink-0 text-[var(--ink-teal)]" />
-                                            <div className="min-w-0 flex-1">
-                                                {resource.url ? (
-                                                    <a
-                                                        href={resource.url}
-                                                        target="_blank"
-                                                        rel="noreferrer noopener"
-                                                        className="group inline-flex items-center gap-1.5 text-sm font-medium text-foreground"
-                                                    >
-                                                        {resource.title}
-                                                        <ExternalLink className="size-3 text-muted-foreground transition-colors group-hover:text-[var(--terracotta)]" />
-                                                    </a>
-                                                ) : (
-                                                    <span className="text-sm text-muted-foreground">
-                                                        {resource.title}
-                                                    </span>
-                                                )}
-                                                <p className="mt-0.5 text-xs text-muted-foreground">
-                                                    {resource.description}
-                                                </p>
+                                            <div className="flex items-start gap-3">
+                                                <span className="clay-icon-chip size-9 shrink-0">
+                                                    <Icon className="size-4" />
+                                                </span>
+                                                <div className="min-w-0 flex-1">
+                                                    {resource.url ? (
+                                                        <a
+                                                            href={resource.url}
+                                                            target="_blank"
+                                                            rel="noreferrer noopener"
+                                                            className="clay-focus group inline-flex items-center gap-1.5 rounded-sm text-sm font-semibold text-[var(--clay-ink)] transition-colors hover:text-[var(--clay-primary-bright)]"
+                                                        >
+                                                            {resource.title}
+                                                            <ExternalLink className="size-3 text-[var(--clay-text-faint)] transition-all duration-200 group-hover:-translate-y-0.5 group-hover:translate-x-0.5 group-hover:text-[var(--clay-primary-bright)]" />
+                                                        </a>
+                                                    ) : (
+                                                        <span className="text-sm font-semibold text-[var(--clay-ink)]">
+                                                            {resource.title}
+                                                        </span>
+                                                    )}
+                                                    <p className="mt-0.5 text-xs leading-relaxed text-[var(--clay-text-muted)]">
+                                                        {
+                                                            resource.description
+                                                        }
+                                                    </p>
+                                                </div>
                                             </div>
                                         </li>
                                     );
@@ -692,17 +731,20 @@ export default function Dashboard({
                     )}
                 </div>
             </div>
+            </TooltipProvider>
 
-            {/* Ask Assistance */}
+            {/* -- Ask Assistance dialog -- */}
             <Dialog open={isAskModalOpen} onOpenChange={setIsAskModalOpen}>
-                <DialogContent className="bulletin sm:max-w-lg">
+                <DialogContent className="bulletin clay-card border-[var(--clay-border)] sm:max-w-lg">
                     <form onSubmit={handleSubmitAssistance}>
                         <DialogHeader>
-                            <DialogTitle className="flex items-center gap-2 font-serif text-2xl font-normal">
-                                <LifeBuoy className="size-5 text-[var(--ink-teal)]" />
+                            <DialogTitle className="flex items-center gap-3 text-xl font-bold text-[var(--clay-ink)]">
+                                <span className="clay-icon-chip size-9 shrink-0">
+                                    <LifeBuoy className="size-4" />
+                                </span>
                                 Ask Assistance
                             </DialogTitle>
-                            <DialogDescription className="text-xs">
+                            <DialogDescription className="text-xs leading-relaxed">
                                 Goes straight to the administration and academic
                                 advisors. You will get a ticket number back
                                 immediately.
@@ -710,7 +752,7 @@ export default function Dashboard({
                         </DialogHeader>
 
                         <div className="grid gap-4 py-4">
-                            <div className="grid grid-cols-2 gap-3">
+                            <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
                                 <div className="space-y-1.5">
                                     <Label
                                         htmlFor="category"
@@ -726,11 +768,11 @@ export default function Dashboard({
                                     >
                                         <SelectTrigger
                                             id="category"
-                                            className="bulletin-field w-full"
+                                            className="clay-field clay-focus w-full rounded-xl shadow-none"
                                         >
                                             <SelectValue placeholder="Select topic" />
                                         </SelectTrigger>
-                                        <SelectContent className="bulletin">
+                                        <SelectContent className="bulletin rounded-xl border-[var(--clay-border)] shadow-[var(--shadow-lg)]">
                                             {categories.map((c) => (
                                                 <SelectItem
                                                     key={c.value}
@@ -761,11 +803,11 @@ export default function Dashboard({
                                     >
                                         <SelectTrigger
                                             id="priority"
-                                            className="bulletin-field w-full"
+                                            className="clay-field clay-focus w-full rounded-xl shadow-none"
                                         >
                                             <SelectValue placeholder="Select priority" />
                                         </SelectTrigger>
-                                        <SelectContent className="bulletin">
+                                        <SelectContent className="bulletin rounded-xl border-[var(--clay-border)] shadow-[var(--shadow-lg)]">
                                             {priorities.map((p) => (
                                                 <SelectItem
                                                     key={p.value}
@@ -796,7 +838,7 @@ export default function Dashboard({
                                     onChange={(e) =>
                                         form.setData('subject', e.target.value)
                                     }
-                                    className="bulletin-field"
+                                    className="clay-field clay-focus shadow-none"
                                     required
                                     maxLength={255}
                                 />
@@ -821,10 +863,10 @@ export default function Dashboard({
                                             e.target.value,
                                         )
                                     }
-                                    className="bulletin-field"
+                                    className="clay-field clay-focus shadow-none"
                                     required
                                 />
-                                <p className="text-[11px] text-muted-foreground">
+                                <p className="clay-meta mt-3">
                                     Include course codes and steps to reproduce
                                     the problem.
                                 </p>
@@ -836,7 +878,7 @@ export default function Dashboard({
                             <Button
                                 type="button"
                                 variant="outline"
-                                className="rounded-[var(--radius)]"
+                                className="clay-focus rounded-full border-[var(--clay-border)] bg-transparent font-semibold shadow-none"
                                 onClick={() => setIsAskModalOpen(false)}
                                 disabled={form.processing}
                             >
@@ -845,7 +887,8 @@ export default function Dashboard({
                             <Button
                                 type="submit"
                                 disabled={form.processing}
-                                className="gap-2 rounded-[var(--radius)] bg-[var(--terracotta)] text-white hover:bg-[var(--terracotta-bright)]"
+                                data-loading={form.processing}
+                                className="clay-focus gap-2 rounded-full bg-[var(--clay-primary)] font-semibold text-[var(--clay-primary-foreground)] shadow-[var(--shadow-cta)] hover:bg-[var(--clay-primary-bright)]"
                             >
                                 <Send className="size-4" />
                                 {form.processing
@@ -857,62 +900,68 @@ export default function Dashboard({
                 </DialogContent>
             </Dialog>
 
-            {/* Ticket detail */}
+            {/* -- Ticket detail dialog -- */}
             <Dialog
                 open={!!selectedRequest}
                 onOpenChange={(open) => !open && setSelectedRequest(null)}
             >
                 {selectedRequest && (
-                    <DialogContent className="bulletin sm:max-w-lg">
+                    <DialogContent className="bulletin clay-card border-[var(--clay-border)] sm:max-w-lg">
                         <DialogHeader>
                             <div className="flex items-center justify-between gap-3 pr-4">
-                                <span className="font-mono text-xs text-muted-foreground">
+                                <span className="clay-meta">
                                     #{selectedRequest.ticket_number}
                                 </span>
-                                <button
-                                    type="button"
-                                    onClick={() =>
-                                        copyTicketNumber(
-                                            selectedRequest.ticket_number,
-                                        )
-                                    }
-                                    className="text-muted-foreground transition-colors hover:text-foreground"
-                                    title="Copy ticket number"
-                                >
-                                    <Copy className="size-3.5" />
-                                </button>
+                                <Tooltip>
+                                    <TooltipTrigger asChild>
+                                        <button
+                                            type="button"
+                                            onClick={() =>
+                                                copyTicketNumber(
+                                                    selectedRequest.ticket_number,
+                                                )
+                                            }
+                                            className="clay-icon-chip clay-focus size-8 text-[var(--clay-text-muted)]"
+                                        >
+                                            <Copy className="size-3.5" />
+                                        </button>
+                                    </TooltipTrigger>
+                                    <TooltipContent className="clay-tooltip">
+                                        Copy ticket number
+                                    </TooltipContent>
+                                </Tooltip>
                             </div>
-                            <DialogTitle className="font-serif text-2xl font-normal leading-snug">
+                            <DialogTitle className="text-xl font-bold leading-snug text-[var(--clay-ink)]">
                                 {selectedRequest.subject}
                             </DialogTitle>
                             <DialogDescription className="flex flex-wrap items-center gap-2 text-xs">
                                 <span>{selectedRequest.category_label}</span>
-                                <span className="text-[var(--rule-strong)]">
+                                <span className="text-[var(--clay-border)]">
                                     /
                                 </span>
                                 <span>{selectedRequest.status_label}</span>
-                                <span className="text-[var(--rule-strong)]">
+                                <span className="text-[var(--clay-border)]">
                                     /
                                 </span>
-                                <span className="font-mono">
+                                <span className="clay-meta">
                                     {selectedRequest.created_at}
                                 </span>
                             </DialogDescription>
                         </DialogHeader>
 
                         <div className="space-y-4 py-2 text-sm">
-                            <div className="border-l-2 border-[var(--rule-strong)] pl-3.5">
+                            <div className="clay-inset p-4">
                                 <p className="bulletin-eyebrow mb-1.5">
                                     Your message
                                 </p>
-                                <p className="whitespace-pre-wrap text-sm leading-relaxed text-foreground">
+                                <p className="whitespace-pre-wrap text-sm leading-relaxed text-[var(--clay-text)]">
                                     {selectedRequest.description}
                                 </p>
                             </div>
 
                             {selectedRequest.admin_notes ? (
-                                <div className="border-l-2 border-[var(--status-resolved)] pl-3.5">
-                                    <p className="bulletin-eyebrow mb-1.5 text-[var(--status-resolved)]">
+                                <div className="rounded-[var(--radius-sm)] bg-[var(--clay-primary-soft)] p-4">
+                                    <p className="bulletin-eyebrow mb-1.5 text-[var(--clay-primary-bright)]">
                                         Official reply
                                         {selectedRequest.assigned_to_name && (
                                             <span className="ml-2 normal-case tracking-normal">
@@ -922,18 +971,18 @@ export default function Dashboard({
                                             </span>
                                         )}
                                     </p>
-                                    <p className="whitespace-pre-wrap text-sm leading-relaxed text-foreground">
+                                    <p className="whitespace-pre-wrap text-sm leading-relaxed text-[var(--clay-text)]">
                                         {selectedRequest.admin_notes}
                                     </p>
                                     {selectedRequest.resolved_at && (
-                                        <p className="mt-2 font-mono text-[11px] text-muted-foreground">
+                                        <p className="clay-meta mt-2">
                                             resolved{' '}
                                             {selectedRequest.resolved_at}
                                         </p>
                                     )}
                                 </div>
                             ) : (
-                                <p className="flex items-start gap-2 border-l-2 border-[var(--status-pending)] pl-3.5 text-sm text-muted-foreground">
+                                <p className="clay-inset flex items-start gap-2 p-4 text-sm text-[var(--clay-text-muted)]">
                                     <Clock className="mt-0.5 size-3.5 shrink-0 text-[var(--status-pending)]" />
                                     In the queue. A staff member will post a
                                     reply here.
@@ -944,7 +993,7 @@ export default function Dashboard({
                         <DialogFooter>
                             <Button
                                 variant="outline"
-                                className="rounded-[var(--radius)]"
+                                className="clay-focus rounded-full border-[var(--clay-border)] bg-transparent font-semibold shadow-none"
                                 onClick={() => setSelectedRequest(null)}
                             >
                                 Close

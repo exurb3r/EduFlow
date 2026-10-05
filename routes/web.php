@@ -6,6 +6,9 @@ use App\Http\Controllers\AssistanceRequestController;
 use App\Http\Controllers\Auth\SocialAuthController;
 use App\Http\Controllers\FinanceApprovalController;
 use App\Http\Controllers\NotificationController;
+use App\Http\Controllers\StudentAssistanceController;
+use App\Http\Controllers\StudentPaymentsController;
+use App\Http\Controllers\StudentWalletController;
 use App\Http\Controllers\StudentDashboardController;
 use Illuminate\Support\Facades\Route;
 use Inertia\Inertia;
@@ -27,6 +30,10 @@ Route::middleware(['auth', 'verified'])->group(function (): void {
     Route::get('notifications', [NotificationController::class, 'index'])->name('notifications.index');
     Route::post('notifications/{id}/read', [NotificationController::class, 'markAsRead'])->name('notifications.mark-as-read');
     Route::post('notifications/read-all', [NotificationController::class, 'markAllAsRead'])->name('notifications.mark-all-read');
+    Route::get('financial-assistance', [StudentAssistanceController::class, 'index'])->name('financial-assistance.index');
+    Route::post('financial-assistance', [StudentAssistanceController::class, 'store'])->name('financial-assistance.store');
+    Route::get('payments', [StudentPaymentsController::class, 'index'])->name('payments.index');
+    Route::patch('wallet', [StudentWalletController::class, 'update'])->name('wallet.update');
 });
 
 /*

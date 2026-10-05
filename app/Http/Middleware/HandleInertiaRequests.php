@@ -4,6 +4,7 @@ namespace App\Http\Middleware;
 
 use App\Enums\SocialLoginProvider;
 use App\Features\FeatureRegistry;
+use App\Http\Controllers\DashboardController;
 use App\Settings\ApplicationFeaturesSettings;
 use App\Settings\SocialLoginSettings;
 use Illuminate\Http\Request;
@@ -62,6 +63,9 @@ class HandleInertiaRequests extends Middleware
                 'user' => $request->user(),
                 'impersonating' => app('impersonate')->isImpersonating(),
             ],
+            'notificationSummary' => $user !== null
+                ? DashboardController::buildNotificationSummary($user)
+                : null,
             'sidebarOpen' => ! $request->hasCookie('sidebar_state') || $request->cookie('sidebar_state') === 'true',
             'authLayout' => app(ApplicationFeaturesSettings::class)->auth_layout,
             'settingsFeatures' => $settingsFeatures,
