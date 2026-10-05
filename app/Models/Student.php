@@ -5,11 +5,26 @@ declare(strict_types=1);
 namespace App\Models;
 
 use Database\Factories\StudentFactory;
+use Illuminate\Database\Eloquent\Collection;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 
+/**
+ * @property int $id
+ * @property int $user_id
+ * @property string $student_number
+ * @property string $program
+ * @property int $year_level
+ * @property string $enrollment_status
+ * @property string $academic_status
+ * @property string|null $attendance_rate
+ * @property string|null $payout_address
+ * @property-read User $user
+ * @property-read Collection<int, TuitionAccount> $tuitionAccounts
+ * @property-read Collection<int, AssistanceRequest> $assistanceRequests
+ */
 class Student extends Model
 {
     /** @use HasFactory<StudentFactory> */

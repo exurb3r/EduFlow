@@ -53,8 +53,7 @@ class ApproveEscalatedRequest
 
         $student = $request->student;
         $hasPayoutAddress = $student?->hasValidPayoutAddress() === true;
-        $tuitionAccount = $student?->tuitionAccounts()->where('status', 'active')->first()
-            ?? $student?->tuitionAccounts()->first();
+        $tuitionAccount = $student?->tuitionAccounts()->first();
         $hasTuitionBalance = $tuitionAccount && $tuitionAccount->remainingAmount() > 0;
 
         $settleViaTuition = ($forceTuitionOffset || (! $hasPayoutAddress && $request->category === AssistanceCategory::FINANCIAL))
@@ -64,7 +63,7 @@ class ApproveEscalatedRequest
             throw new InvalidArgumentException('Student does not have a valid payout address on file. Cannot disburse funds.');
         }
 
-        if ($settleViaTuition && $tuitionAccount !== null) {
+        if ($settleViaTuition) {
             $quote = $decision->input_snapshot['locked_quote'] ?? [];
             $tx = $this->tuitionService->settleToTuition(
                 request: $request,
@@ -74,7 +73,7 @@ class ApproveEscalatedRequest
                 quote: $quote,
             );
 
-            $noteMessage = "Escalated {$remainingFloat} USDC applied to tuition ledger ({$tuitionAccount->account_number}) by {$approver->name}.";
+            $noteMessage = "Escalated {$remainingFloat} USDC applied to tuition ledger (#{$tuitionAccount->id}) by {$approver->name}.";
         } else {
             $recipient = $this->resolveRecipient($request);
             $tx = $this->walletService->executePaymentBaseUnits(
