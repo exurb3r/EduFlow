@@ -15,6 +15,7 @@ class AgentActivityFeedWidget extends BaseWidget
 
     protected int|string|array $columnSpan = 'full';
 
+    #[\Override]
     public function table(Table $table): Table
     {
         return $table
@@ -35,11 +36,11 @@ class AgentActivityFeedWidget extends BaseWidget
                     ->badge(),
                 TextColumn::make('requested_amount')
                     ->label('Requested')
-                    ->formatStateUsing(fn ($state) => number_format((float) $state, 2).' USDC')
+                    ->formatStateUsing(fn ($state): string => number_format((float) $state, 2).' USDC')
                     ->weight('bold'),
                 TextColumn::make('approved_amount')
                     ->label('Approved')
-                    ->formatStateUsing(fn ($state) => number_format((float) $state, 2).' USDC'),
+                    ->formatStateUsing(fn ($state): string => number_format((float) $state, 2).' USDC'),
                 TextColumn::make('policy_checked')
                     ->label('Policy Checked')
                     ->badge()

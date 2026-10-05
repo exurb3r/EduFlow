@@ -50,6 +50,7 @@ class Transaction extends Model
         'executed_at',
     ];
 
+    #[\Override]
     protected function casts(): array
     {
         return [
@@ -74,5 +75,14 @@ class Transaction extends Model
     public function reference(): MorphTo
     {
         return $this->morphTo();
+    }
+
+    /**
+     * Reconciliation proved this receipt's hash is absent from the chain, so
+     * the payment never settled and the row has been marked failed.
+     */
+    public function isReconciledFailed(): bool
+    {
+        return ($this->metadata['reconciliation'] ?? null) === 'failed';
     }
 }

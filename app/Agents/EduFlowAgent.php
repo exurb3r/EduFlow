@@ -4,17 +4,23 @@ declare(strict_types=1);
 
 namespace App\Agents;
 
+use App\Actions\ApproveEscalatedRequest;
+use App\Actions\EvaluateAssistancePolicy;
 use App\Enums\AgentDecisionType;
 use App\Enums\AssistanceStatus;
+use App\Enums\CurrencyCode;
 use App\Enums\TransactionType;
 use App\Models\AgentDecision;
 use App\Models\Approval;
+use App\Models\AssistanceFund;
+use App\Models\AssistancePolicyVersion;
 use App\Models\AssistanceRequest;
 use App\Models\Budget;
 use App\Models\Invoice;
 use App\Models\Organization;
 use App\Models\User;
 use App\Services\CircleWalletService;
+use App\Services\DecisionExplainer;
 use App\Services\FinancialPolicyEngine;
 use App\Services\TreasuryForecastService;
 use InvalidArgumentException;
@@ -25,6 +31,8 @@ class EduFlowAgent
         protected FinancialPolicyEngine $policyEngine,
         protected TreasuryForecastService $forecastService,
         protected CircleWalletService $circleService,
+        protected EvaluateAssistancePolicy $assistancePolicy,
+        protected DecisionExplainer $explainer,
     ) {}
 
     /**
@@ -144,40 +152,106 @@ class EduFlowAgent
         }
 
         // 3. OBSERVE & EVALUATE STUDENT ASSISTANCE
+        // Deterministic integer policy with locked FX quote (PLAN Part 2):
+        // request -> quote lock -> canonical USDC evaluation -> disburse or escalate.
         $aidBudget = Budget::where('organization_id', $org->id)
             ->where('category', 'assistance')
             ->first();
 
-        $pendingAid = AssistanceRequest::where('status', AssistanceStatus::PENDING)->get();
+        $fund = AssistanceFund::where('organization_id', $org->id)->first();
+        $policy = AssistancePolicyVersion::active($org->id);
+
+        $pendingAid = AssistanceRequest::whereIn('status', [
+            AssistanceStatus::SUBMITTED->value,
+            AssistanceStatus::PENDING->value,
+        ])->with(['student.tuitionAccounts', 'user'])->get();
 
         foreach ($pendingAid as $aidRequest) {
-            // Standard student emergency assistance is budgeted at 100 USDC auto-allowance
-            $requestedAmt = 100.00;
-            $aidResult = $this->policyEngine->evaluateStudentAssistance($requestedAmt, $org, $wallet, $aidBudget);
+            $requestedBase = (int) ($aidRequest->requested_amount ?? 0);
 
-            $decision = AgentDecision::create([
-                'organization_id' => $org->id,
-                'action_type' => 'student_assistance',
-                'reference_type' => AssistanceRequest::class,
-                'reference_id' => $aidRequest->id,
-                'input_snapshot' => [
-                    'student_name' => $aidRequest->user->name,
+            if (! $fund || ! $policy instanceof AssistancePolicyVersion) {
+                $decision = AgentDecision::create([
+                    'organization_id' => $org->id,
+                    'action_type' => 'student_assistance',
+                    'reference_type' => AssistanceRequest::class,
+                    'reference_id' => $aidRequest->id,
+                    'input_snapshot' => [
+                        'ticket' => $aidRequest->ticket_number,
+                        'requested_base_units' => $requestedBase,
+                        'wallet_balance' => $wallet->balance,
+                    ],
+                    'reasoning_summary' => 'Assistance fund or policy version is not configured. Escalated for setup.',
+                    'policy_checked' => 'AID_SETUP_REQUIRED_V1',
+                    'decision' => AgentDecisionType::ESCALATE,
+                    'requested_amount' => round($requestedBase / 1000000, 2),
+                    'approved_amount' => 0.00,
+                    'requires_approval' => true,
+                    'status' => 'escalated',
+                ]);
+
+                Approval::create([
+                    'organization_id' => $org->id,
+                    'agent_decision_id' => $decision->id,
+                    'status' => 'pending',
+                ]);
+
+                $aidRequest->update(['admin_notes' => 'EduFlow AI: assistance fund or policy missing. Escalated for setup.']);
+                $escalatedCount++;
+
+                $processedAssistance[] = [
                     'ticket' => $aidRequest->ticket_number,
-                    'subject' => $aidRequest->subject,
-                    'wallet_balance' => $wallet->balance,
-                ],
-                'reasoning_summary' => $aidResult->reasoning,
-                'policy_checked' => $aidResult->policyCode,
-                'decision' => $aidResult->decision,
-                'requested_amount' => $requestedAmt,
-                'approved_amount' => $aidResult->approvedAmount,
-                'requires_approval' => $aidResult->requiresHumanApproval,
-                'status' => 'pending',
-            ]);
+                    'decision' => AgentDecisionType::ESCALATE->value,
+                ];
+
+                continue;
+            }
+
+            $out = $this->assistancePolicy->handle($aidRequest, $fund, $policy, CurrencyCode::PHP);
+            $aidResult = $out['result'];
+            $decision = $out['decision'];
+            $explanation = $this->explainer->explain($aidResult, $requestedBase, CurrencyCode::PHP);
+
+            // A payment needs a real destination. The agent must never invent
+            // one: an address the recipient does not control is either rejected
+            // by the Circle CLI or, worse, accepted and irretrievable.
+            $recipient = $aidRequest->student?->payout_address;
+
+            if (in_array($aidResult->decision, [AgentDecisionType::AUTO_APPROVE, AgentDecisionType::PARTIAL_APPROVAL], true)
+                && ($recipient === null || $aidRequest->student?->hasValidPayoutAddress() !== true)) {
+                $decision->update([
+                    'status' => 'escalated',
+                    'decision' => AgentDecisionType::ESCALATE,
+                    'approved_amount' => 0.00,
+                    'requires_approval' => true,
+                    'policy_checked' => 'STUDENT_PAYOUT_ADDRESS_MISSING_V1',
+                    'reasoning_summary' => 'Approved amount withheld: the student has no valid payout address on file. '
+                        .'Record a 0x address for this student before any assistance can be disbursed.',
+                ]);
+
+                Approval::create([
+                    'organization_id' => $org->id,
+                    'agent_decision_id' => $decision->id,
+                    'status' => 'pending',
+                ]);
+
+                $aidRequest->update([
+                    'status' => AssistanceStatus::IN_PROGRESS,
+                    'assigned_to' => null,
+                    'admin_notes' => 'EduFlow AI: no valid payout address on file for this student. '
+                        .'Escalated so Finance can record one before disbursing.',
+                ]);
+
+                $escalatedCount++;
+
+                $processedAssistance[] = [
+                    'ticket' => $aidRequest->ticket_number,
+                    'decision' => AgentDecisionType::ESCALATE->value,
+                ];
+
+                continue;
+            }
 
             if ($aidResult->decision === AgentDecisionType::AUTO_APPROVE || $aidResult->decision === AgentDecisionType::PARTIAL_APPROVAL) {
-                $recipient = '0xstudent_'.substr(md5((string) $aidRequest->user_id), 0, 16);
-
                 $tx = $this->circleService->executePayment(
                     wallet: $wallet,
                     recipientAddress: $recipient,
@@ -185,20 +259,42 @@ class EduFlowAgent
                     type: TransactionType::STUDENT_ASSISTANCE,
                     referenceType: AssistanceRequest::class,
                     referenceId: $aidRequest->id,
-                    metadata: ['ticket' => $aidRequest->ticket_number]
+                    metadata: [
+                        'ticket' => $aidRequest->ticket_number,
+                        'policy' => $aidResult->policyCode,
+                        'quote_id' => $out['quote']['quote_id'] ?? null,
+                    ]
                 );
+
+                $fund->recordDisbursement((int) round($aidResult->approvedAmount * 1000000));
 
                 if ($aidBudget) {
                     $aidBudget->recordExpense($aidResult->approvedAmount);
                 }
 
-                $aidRequest->update([
-                    'status' => AssistanceStatus::RESOLVED,
-                    'admin_notes' => "EduFlow AI: {$aidResult->reasoning}. Disbursed {$aidResult->approvedAmount} USDC on Arc. Tx: {$tx->provider_tx_hash}",
-                    'resolved_at' => now(),
-                ]);
+                if ($aidResult->decision === AgentDecisionType::PARTIAL_APPROVAL) {
+                    Approval::create([
+                        'organization_id' => $org->id,
+                        'agent_decision_id' => $decision->id,
+                        'status' => 'pending',
+                    ]);
 
-                $decision->update(['status' => 'executed']);
+                    $aidRequest->update([
+                        'status' => AssistanceStatus::IN_PROGRESS,
+                        'admin_notes' => "EduFlow AI: {$explanation} Auto-disbursed {$aidResult->approvedAmount} USDC on Arc. Tx: {$tx->provider_tx_hash}",
+                    ]);
+
+                    $escalatedCount++;
+                } else {
+                    $aidRequest->update([
+                        'status' => AssistanceStatus::RESOLVED,
+                        'admin_notes' => "EduFlow AI: {$aidResult->reasoning}. Disbursed {$aidResult->approvedAmount} USDC on Arc. Tx: {$tx->provider_tx_hash}",
+                        'resolved_at' => now(),
+                    ]);
+
+                    $decision->update(['status' => 'executed']);
+                }
+
                 $totalDisbursed += $aidResult->approvedAmount;
                 $autoPaidCount++;
             } elseif ($aidResult->decision === AgentDecisionType::HOLD) {
@@ -207,6 +303,27 @@ class EduFlowAgent
                 ]);
                 $decision->update(['status' => 'held']);
                 $heldCount++;
+            } elseif ($aidResult->decision === AgentDecisionType::REJECT) {
+                $aidRequest->update([
+                    'status' => AssistanceStatus::CLOSED,
+                    'admin_notes' => "EduFlow AI: {$explanation}",
+                    'resolved_at' => now(),
+                ]);
+                $decision->update(['status' => 'rejected']);
+                $rejectedCount++;
+            } else {
+                Approval::create([
+                    'organization_id' => $org->id,
+                    'agent_decision_id' => $decision->id,
+                    'status' => 'pending',
+                ]);
+
+                $aidRequest->update([
+                    'status' => AssistanceStatus::IN_PROGRESS,
+                    'admin_notes' => "EduFlow AI: {$explanation}",
+                ]);
+
+                $escalatedCount++;
             }
 
             $processedAssistance[] = [
@@ -281,6 +398,29 @@ class EduFlowAgent
             return true;
         }
 
+        // If the reference is a student assistance request
+        if ($decision->reference_type === AssistanceRequest::class && $decision->reference_id) {
+            $aid = AssistanceRequest::find($decision->reference_id);
+            if (! $aid) {
+                return false;
+            }
+
+            $fund = AssistanceFund::where('organization_id', $org->id)->first();
+            if (! $fund) {
+                return false;
+            }
+
+            app(ApproveEscalatedRequest::class)->handle(
+                request: $aid,
+                decision: $decision,
+                approver: $approver,
+                fund: $fund,
+                comment: $comment,
+            );
+
+            return true;
+        }
+
         return false;
     }
 
@@ -294,6 +434,15 @@ class EduFlowAgent
         if ($decision->reference_type === Invoice::class && $decision->reference_id) {
             $invoice = Invoice::find($decision->reference_id);
             $invoice?->update(['status' => 'rejected']);
+        }
+
+        if ($decision->reference_type === AssistanceRequest::class && $decision->reference_id) {
+            $aid = AssistanceRequest::find($decision->reference_id);
+            $aid?->update([
+                'status' => AssistanceStatus::CLOSED,
+                'admin_notes' => trim(($aid->admin_notes ?? '')."\nEscalated remainder rejected by {$approver->name}: {$reason}"),
+                'resolved_at' => now(),
+            ]);
         }
 
         $approval->update([

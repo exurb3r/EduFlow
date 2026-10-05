@@ -1,426 +1,711 @@
 <div align="center">
-  <a href="https://github.com/koamishin/KoamiStarterKit">
-    <!-- Replace with actual logo URL if available, or keep using the text/emoji representation -->
-    <img src="public/koamishin-logo.svg" alt="Logo" width="300" height="auto">
-  </a>
 
-  <h1 align="center">Koamishin Starterkit</h1>
+# EduFlow
 
-  <p align="center">
-    <strong>The Opinionated Laravel Starter Kit for Modern Artisans</strong>
-  </p>
+**Autonomous school finance on Circle Agent Wallets + Arc**
 
-  <p align="center">
-    <a href="https://laravel.com"><img src="https://img.shields.io/badge/Laravel-13-FF2D20?style=for-the-badge&logo=laravel" alt="Laravel 13" /></a>
-    <a href="https://vuejs.org"><img src="https://img.shields.io/badge/Vue.js-3-4FC08D?style=for-the-badge&logo=vue.js" alt="Vue 3" /></a>
-    <a href="https://inertiajs.com"><img src="https://img.shields.io/badge/Inertia-v2-9553E9?style=for-the-badge&logo=inertia" alt="Inertia v2" /></a>
-    <a href="https://tailwindcss.com"><img src="https://img.shields.io/badge/Tailwind_CSS-4-38B2AC?style=for-the-badge&logo=tailwind-css" alt="Tailwind 4" /></a>
-    <a href="https://ui.shadcn.com"><img src="https://img.shields.io/badge/Shadcn-Vue-000000?style=for-the-badge&logo=shadcnui" alt="Shadcn Vue" /></a>
-  </p>
+An agent that pays vendors and students in USDC — and stops at a human when policy says it should.
+
 </div>
 
-<br/>
+---
 
-## 🚀 Why This Exists?
+## What this is
 
-I've tried different starter kits—including the official Laravel starter kits. They're great, no doubt about it. But every time I started a new project, I found myself doing the same ritual over and over:
+EduFlow runs a school's money on [Circle Agent Stack](https://developers.circle.com/agent-stack) and the [Arc](https://docs.arc.io) network. Every cycle it reads invoices and student aid requests, evaluates them against a deterministic policy engine, and either:
 
-- Setting up authentication and user management
-- Installing and configuring Filament for the admin panel
-- Wiring up roles and permissions
-- Adding activity logs, notifications, impersonation
-- Setting up development dependencies, linters, and CI/CD
+- **pays immediately** in USDC over Arc,
+- **escalates** to a finance officer, or
+- **holds** to protect the school's reserve.
 
-It wasn't a huge deal, but it added up. Hours lost on configuration instead of building actual features.
+The point of the demo isn't the AI. It's that an autonomous system moving real money is
+built so that **every decision is reproducible, every amount is integer-exact, and a
+stored transaction hash is treated as a claim rather than proof.**
 
-**So I built Koamishin Starterkit for myself.** One command, zero friction, and I'm straight into shipping features instead of fighting config files.
+### The five rules this codebase actually enforces
 
-> **Note**: This starter kit is configured for **specific applications** rather than SaaS products. I don't primarily build SaaS applications, so the architecture and features reflect that use case. If I start working on SaaS-based projects in the future, I'll update this to support those needs.
+1. **The LLM never moves money.** Policy decisions live in plain PHP
+   (`FinancialPolicyEngine`, `EvaluateAssistancePolicy`). The model explains decisions;
+   it never makes them.
+2. **Money is integer base units.** USDC is 6 decimals, so `45.00` is `45_000000`. No
+   floats anywhere near a balance.
+3. **A tx hash is not proof.** `lepton:reconcile` re-derives settlement from the chain.
+   Fabricated receipts get marked failed.
+4. **No hardcoded CLI.** All Circle/Arc access goes through
+   [`yukazakiri/lepton-agent`](https://github.com/yukazakiri/lepton-agent) gateways.
+5. **Testnet fixtures match what the faucet can fund.** The demo settles in real USDC.
 
 ---
 
-## 🎯 Who Is This For?
+## Table of contents
 
-This starter kit is for developers who:
-
-- Want to skip the initial setup phase and get straight to building features
-- Work on custom applications rather than multi-tenant SaaS products
-- Appreciate having authentication, admin panels, and user management ready out of the box
-- Prefer a curated, opinionated setup over making endless configuration decisions
-
-Use it as-is, fork it, or cherry-pick the parts you like—whatever gets you coding faster.
-
-## ✨ Features
-
-**Battery-included, but not bloated.** Everything you need to ship.
-
-- **🔐 Complete Authentication**: Powered by **Fortify**. Login, Registration, 2FA, Email Verification, Passkeys, and Profile Management ready to go.
-- **🔑 Social Login**: Login with **GitHub**, **Google**, or **Facebook** via Laravel Socialite. Configure credentials through the admin panel (stored in DB or `.env`).
-- **📦 Modular Architecture**: Built on **nwidart/laravel-modules** — extend with self-contained modules that register their own routes, Filament resources, and Inertia pages.
-- **👥 Roles & Permissions**: Built-in **Spatie Permissions**. Manage **Admins** (Filament access) and **Users** (Inertia access) out of the box.
-- **⚙️ System Settings**: Powerful settings management with **spatie/laravel-settings**. Configure application details, features, social login, and security through a beautiful Filament interface.
-- **🎨 Auth Layout Switcher**: Choose between 3 beautiful authentication layouts (Simple, Card, Split) directly from the admin settings panel.
-- **⌨️ User Activity Logs** Included with Activity Logs filament plugin to monitor user activities on the application
-- **🕵️‍♂️ User Impersonation**: Admins can easily impersonate users to troubleshoot issues, with a visible banner and quick "Leave" action.
-- **🔔 Database Notifications**: Built-in notification system with a bell icon in the sidebar header. Shows unread count, dropdown list, and mark as read functionality.
-- **🎛️ Admin Panel**: Pre-configured **Filament** admin dashboard with User Management.
-- **🎨 40+ UI Components**: Beautiful, accessible components from **Shadcn Vue**, plus dark mode and multiple themes (Default, Rose, Ocean, Sage Garden, Claude).
-- **🛠️ Type-Safe Routing**: **Wayfinder** ensures your frontend knows your backend routes. No more broken links.
-- **⚡ High Performance**: **Laravel Octane** + **Inertia.js v2** + **Vite** for instant page loads.
-- **🚢 Production Ready**: **Docker** support, **GitHub Actions** CI/CD, and strict code quality tools (Pint, PHPStan, Rector) pre-configured.
+- [What you'll see](#what-youll-see)
+- [Requirements](#requirements)
+- [Setup](#setup)
+- [Authenticate your agent wallet](#authenticate-your-agent-wallet)
+- [Fund the wallet](#fund-the-wallet)
+- [Run the demo](#run-the-demo)
+- [The seeded scenarios](#the-seeded-scenarios)
+- [Using the app](#using-the-app)
+- [Verify it really settled](#verify-it-really-settled)
+- [Commands](#commands)
+- [Configuration](#configuration)
+- [How the money moves](#how-the-money-moves)
+- [Testing](#testing)
+- [Troubleshooting](#troubleshooting)
+- [Project layout](#project-layout)
 
 ---
 
-## 🏁 Getting Started
+## What you'll see
 
-### Prerequisites
+A full cycle looks like this:
 
-- PHP 8.2+
-- Composer
-- Node.js & NPM/Bun
+```
+$ php artisan eduflow:demo
 
-### Installation
+Cycle: auto-paid 3, escalated 2, held 1, disbursed 85 USDC.
 
-You can create a new project using Composer:
+  Invoice  30.00 USDC   AUTO_APPROVE      VENDOR_AUTO_PAYMENT_V1
+  Invoice  45.00 USDC   AUTO_APPROVE      VENDOR_AUTO_PAYMENT_V1
+  Invoice  60.00 USDC   ESCALATE          VENDOR_COMPLIANCE_V1
+  Invoice  90.00 USDC   ESCALATE          HIGH_VALUE_DISBURSEMENT_V1
+  Invoice 200.00 USDC   HOLD              TREASURY_RESERVE_SAFETY_V1
+  Invoice 2000.00 USDC  REJECT            BUDGET_EXHAUSTION_V1
 
-```bash
-composer create-project koamishin/koamistarterkit my-app
-cd my-app
+  Aid     15.00 USDC   PARTIAL_APPROVAL  BOUNDED_EMERGENCY_AID_V1
+    10.00 USDC approved instantly, 5.00 USDC escalated for advisor review.
 ```
 
-Or use laravel new command:
+Two invoices and part of an aid request pay for real. The rest are stopped, each for a
+different and specific reason — that is the demo.
+
+---
+
+## Requirements
+
+| | |
+|---|---|
+| PHP | 8.5 recommended; locked dependencies require at least 8.4.1, with `pdo_sqlite`, `mbstring`, `openssl` |
+| Composer | 2.x |
+| Node.js | 20.18.2+ |
+| Circle CLI | `npm install -g @circle-fin/cli` |
+| arc-canteen | `uv tool install arc-canteen && arc-canteen login` — gives you an Arc testnet RPC endpoint |
+
+Check the toolchain before anything else:
 
 ```bash
-laravel new my-app --using=koamishin/koamistarterkit
+php artisan lepton:doctor
 ```
 
-### ⚙️ Setup & Configuration
+It verifies the binaries, your Circle session, your treasury address, chain reads and
+ledger parity, and tells you which of those are broken. Run it first; it saves a lot of
+guessing later.
 
-Once installed, personalize the starter kit with your own project details using our setup wizard:
+---
+
+## Setup
+
+**Disposable local demo only:** Commands below include `migrate:fresh`, which deletes
+existing database records. Never use this setup on a school database or an instance
+holding configured providers or payment history.
 
 ```bash
-php artisan setup:starter-kit
+git clone https://github.com/koamishin/EduFlow.git
+cd EduFlow
+
+composer install
+npm install
+
+cp .env.example .env
+php artisan key:generate
+
+touch database/database.sqlite
+php artisan migrate:fresh --seed
 ```
 
-This interactive tool will:
+`migrate:fresh --seed` gives you the organization, the wallets, the budgets, the policy
+versions, six invoices, two vendors' worth of vendor records, and one pending student
+aid request. It is the whole demo.
 
-- 🎨 **Personalize** `composer.json` with your author and package details.
-- 🐳 **Configure Docker** settings (Docker Hub vs GHCR).
-- 🤖 **Update GitHub Actions** workflows to use your repository and registry.
-
-> **Fresh install?** `composer create-project` runs the wizard once with safe
-> defaults so it never blocks. Re-run `php artisan setup:starter-kit`
-> afterwards to personalize — it's safe to re-run anytime.
-
-Every question also has a CLI flag for unattended/scripted setups:
-
-```bash
-php artisan setup:starter-kit \
-  --github=my-org \
-  --name=my-app \
-  --author="Jane Doe" \
-  --email=jane@example.com \
-  --docker \
-  --registry=ghcr \
-  --strategy=rolling \
-  --install \
-  --create-repo \
-  --push \
-  --force
-```
-
-The wizard can also **create the GitHub repository for you** — via the `gh`
-CLI when you're signed in (`gh auth login`), or a personal access token
-(`--github-token`, or `GH_TOKEN`/`GITHUB_TOKEN` env). Otherwise it prints a
-one-click manual fallback link. `--push` uploads the initial commit.
-
-Run `php artisan setup:starter-kit --help` for all options.
-
-### Development
-
-Start the development server with one simple command:
+Start the app:
 
 ```bash
 composer run dev
 ```
 
-This runs both the Laravel server and the Vite development server concurrently.
+That runs the PHP server, Vite, and the queue worker together. Open the printed URL.
 
----
+### Demo accounts
 
-## 📦 What's Inside?
+| Role | Email | Password |
+|---|---|---|
+| Student | `juan@eduflow.test` | `password` |
+| Finance officer | `finance@eduflow.test` | `password` |
 
-### UI Components (Shadcn)
+Log in as each to see both sides of the approval loop.
 
-This starter kit includes a comprehensive suite of UI components to jumpstart your development:
+### School identity setup and first administrator
 
-<details>
-<summary><strong>Click to view all included components</strong></summary>
+OSS production rollout is still in progress. These commands initialize school identity,
+conservative settings and administrator access—not native-fiat accounting, a complete aid
+workflow, production financial safety or payment certification.
 
-- **Form Elements**: Input, Select, Checkbox, Radio, Switch, Slider, Textarea, Form, Combobox
-- **Feedback**: Alert, Badge, Progress, Skeleton, Sonner (Toast), Spinner, Tooltip
-- **Overlay**: Dialog, Drawer, Sheet, Popover, Hover Card, Context Menu, Dropdown Menu
-- **Layout**: Card, Aspect Ratio, Resizable, Scroll Area, Separator
-- **Navigation**: Sidebar, Navigation Menu, Breadcrumb, Tabs, Menubar, Pagination, Stepper
-- **Data Display**: Table, Avatar, Accordion, Collapsible, Carousel, Calendar
-- **Charts**: Extensive charting library support
-
-</details>
-
----
-
-## 🔔 Using Notifications
-
-This starter kit includes a database notification system integrated into the sidebar header. Users can view and manage their notifications from the bell icon.
-
-### Sending Notifications
-
-Send notifications to users using Laravel's notification system:
-
-```php
-use App\Models\User;
-use App\Notifications\YourNotification;
-
-$user->notify(new YourNotification());
-```
-
-### Creating Notifications
-
-Create a new notification class:
+On an operator-controlled instance with reviewed database configuration,
+`APP_ENV=production`, `APP_DEBUG=false`, and a valid unique existing `APP_KEY`:
 
 ```bash
-php artisan make:notification YourNotification
+php artisan migrate --force --no-interaction
+php artisan eduflow:install --institution="Pilot School" --country=PH --timezone=Asia/Manila --currency=PHP --no-interaction
+php artisan eduflow:bootstrap-admin --name="School Operator" --email="operator@school.example"
 ```
 
-In your notification class, define the database channel:
+Migrations are a separate operator task. Installer never migrates, resets data, seeds demo
+records, generates keys, creates wallets or calls external providers. It creates roles,
+one institution with zero autonomous thresholds, persisted country/locale/timezone/currency,
+and disables public registration, impersonation and AI. Country is validated as a two-letter
+code format; jurisdiction eligibility is not certified. English is the current supported locale.
+School currency metadata does not convert legacy USDC tuition or payment records.
+
+Repeat identical setup is a no-op: credentials, settings, budgets and policies survive.
+Changed identity/metadata is refused rather than overwritten. An existing institution
+requires explicit `--adopt-institution` with its actual numeric ID and matching name/currency;
+review its existing financial data before adoption. Adoption preserves monetary limits,
+policies and balances; it is not cleanup of an existing demo or authorization of live payments.
+Missing keys, unsafe debug mode, locked unsafe defaults or ambiguous institutions fail setup.
+
+`RolesAndPermissionsSeeder` now creates no users in any environment. Default local demo
+accounts live in `DemoUsersSeeder`, invoked only by local/testing demo `DatabaseSeeder`.
+Production/staging seed roles and permissions, not demo users or institutions. Bootstrap
+asks for the password and confirmation through hidden prompts; passwords must have at
+least 12 characters, mixed case, a number, and a symbol. It requires an interactive
+terminal, has no password CLI option, leaves email verification pending, and refuses
+existing users or a second superadmin. Verify email and configure staff MFA before opening
+school access. Configure SMTP for verification/reset flows first.
+
+This change does **not** remove accounts created by older seeders. Operators must review
+existing `admin@admin.com` / `user@user.com` accounts, rotate exposed passwords, revoke
+sessions and unnecessary access, and preserve required audit evidence. Do not regenerate
+`APP_KEY`, reset the database, or delete financial records as credential cleanup.
+
+### Single-institution context
+
+Installer persists `organizations.id` as school identity in installation settings.
+Production/staging use that identity without requiring `.env` edits. Legacy instances may
+still configure `EDUFLOW_INSTITUTION_ID`; when both exist, they must agree. Database must
+contain exactly one institution. Missing, corrupt, stale or ambiguous context disables
+treasury actions/operator construction instead of choosing the first row. Local/testing
+retain automatic selection only before setup and when exactly one institution exists.
+
+After setup, Eloquent refuses creation of another institution. Raw database access can
+bypass that model guard, but ambiguous data still disables selection. Restart long-lived
+workers after setup/configuration changes. This is not complete tenant isolation or
+ownership enforcement for every existing resource; do not host unrelated schools in one DB.
+
+Public registration GET/POST is denied for installed schools until the existing registration
+setting is explicitly enabled. Opt-in registration grants no staff role or verified student
+enrollment. Password reset/email verification/MFA still require operator SMTP and access setup.
+
+### Money and rate evidence
+
+Request intake parses plain decimal USDC strings exactly, rejects precision/range errors,
+and preserves six-decimal minor units. The new `Money` DTO formats without floats and
+serializes minor units as strings; currency conversion uses checked arbitrary-precision
+intermediates. Legacy treasury/payment APIs and money columns still need migration.
+
+Rate snapshots preserve source time/expiry and reject future, expired, non-positive and
+old sources. `EDUFLOW_MAX_RATE_AGE_SECONDS` defaults to 900. Static fallback rates remain
+indicative display values. `requireFreshQuote()` requires a non-fallback source with expiry;
+it is not an executable provider offer, fee guarantee, or FX/settlement certification.
+USD source rates may differ from 1:1 USDC parity. No payment adapter is newly enabled.
+
+### Release safety
+
+Preview builds publish only after successful same-repository push CI, from its exact
+commit. Preview images use `preview` and version/SHA tags, never stable `latest`.
+Manual releases require successful CI for the dispatched `main` commit, reject existing
+tags, and reject `latest` for drafts/prereleases. Configure required reviewers on the
+GitHub `release` environment before using official publication; an environment name alone
+does not enforce approval. Ad hoc Docker Build Check never publishes an image.
+
+A Graphite token previously embedded in the release workflow has been removed with that
+integration. Its owner must still revoke/rotate the exposed token and review access and
+repository history. Removing source text does not invalidate a credential. These checks
+do not certify the current Docker image or live payment rails for production.
+
+---
+
+## Authenticate your agent wallet
+
+Circle agent wallets authenticate with an **email one-time password**. Sessions last
+seven days.
+
+```bash
+# Check current state first — this never fails and never prompts
+php artisan lepton:login --status
+
+# Step 1: send the OTP, get a request ID (expires in 10 minutes, one-shot)
+php artisan lepton:login you@example.com
+
+# Step 2: paste the code from the email
+php artisan lepton:login --request=<request-id> --otp=B1X-123456
+```
+
+> **Mainnet and testnet authenticate independently.** A valid mainnet session does not
+> authorise an ARC-TESTNET transfer. If testnet transfers fail, check the *testnet* row
+> in `lepton:login --status`.
+
+The package stores no credentials. The Circle CLI owns the session; EduFlow only reads it.
+
+---
+
+## Fund the wallet
+
+```bash
+circle wallet fund --address <your-agent-wallet> --chain ARC-TESTNET
+```
+
+**This mints exactly 20 USDC per call and ignores `--amount`.** It also rate-limits
+after roughly five calls:
+
+```
+Error: Faucet drip failed (429): API rate limit error
+```
+
+So a realistically funded wallet holds about **100–120 USDC**. That ceiling is why the
+demo scenarios are the size they are — see [The seeded scenarios](#the-seeded-scenarios).
+
+Once funded, point EduFlow at that wallet and sync the ledger:
+
+```bash
+# LEPTON_TREASURY_ADDRESS=0xYourAgentWallet   in .env
+php artisan lepton:doctor        # confirms env, database and Circle all agree
+php artisan lepton:reconcile     # proves existing receipts against the chain
+```
+
+Use **Sync from chain** on the dashboard to overwrite the ledger balance with the real
+figure. Do this before the demo, or the dashboard will show drift and auto-pays will
+fail for lack of funds.
+
+> **USDC is the gas token on Arc.** A wallet needs USDC to send anything at all,
+> including a zero-value transfer. "My balance reads zero" is sometimes really "no gas".
+
+---
+
+## Run the demo
+
+```bash
+php artisan lepton:doctor      # is it wired up?
+php artisan eduflow:demo       # run one full autonomous cycle
+php artisan lepton:reconcile   # prove every receipt on-chain
+```
+
+`eduflow:demo` moves **85 USDC** of real testnet USDC (30 + 45 + the 10 USDC aid
+portion). It is not a simulation under the `circle` driver, and it is not repeatable
+without re-funding — see [Funding](#fund-the-wallet).
+
+To watch it without touching a chain, use the fake driver:
+
+```env
+LEPTON_DRIVER=fake
+```
+
+Everything then runs in memory. `is_fake` is set on every receipt and the UI badges them
+**Simulated**, so you can never mistake a fake run for settlement.
+
+---
+
+## The seeded scenarios
+
+Given a 120 USDC wallet, a 20 USDC reserve and a 50 USDC autonomous limit. The policy
+engine checks **vendor → budget → reserve → auto limit**, so each amount is placed
+against those gates deliberately.
+
+| Invoice | Amount | Decision | Why |
+|---|---:|---|---|
+| `INV-FIBER-30` | 30 | **auto-pay** | verified vendor, under the limit |
+| `INV-CLOUD-45` | 45 | **auto-pay** | verified vendor, under the limit |
+| `INV-UNVERIFIED-60` | 60 | **escalate** | vendor not verified, checked first |
+| `INV-LAB-90` | 90 | **escalate** | over the 50 limit, wallet can still afford it |
+| `INV-SUPPLY-200` | 200 | **hold** | would breach the 20 USDC reserve |
+| `INV-HAZARD-2000` | 2000 | **reject** | equipment budget only holds 500 |
+
+Plus one student aid request at **15 USDC** against a **10 USDC** auto-limit, which
+produces the bounded split: 10 approved instantly, 5 escalated for advisor review.
+
+Only the two auto-pays and the approved aid portion move money: **85 USDC**. Everything
+else is a decision, not a payment. `tests/Feature/DemoScenarioScaleTest.php` fails if
+these ever stop fitting the faucet ceiling or stop covering all four reachable
+decisions.
+
+---
+
+## Using the app
+
+**Student side** (Inertia + shadcn/ui) — log in as `juan@eduflow.test`:
+
+- Submit an assistance request and watch the split explained in plain language.
+- Ask the policy questions directly: *"Why didn't you send the full 15 USDC?"*,
+  *"What are the assistance guidelines?"*, *"What's the current rate?"*
+
+**Staff side** (Filament) — log in as `finance@eduflow.test` at `/admin`:
+
+- **Dashboard** — live chain state, ledger drift, treasury balance.
+- **Approval Center** — approve or reject escalated decisions.
+- **Invoices** — settlement status and an explorer link for each.
+- **Transactions** — a **Chain Proof** column; run *Verify against Arc* on any row.
+- **Agent Decisions** — the recorded input snapshot and reasoning for every call.
+
+---
+
+## Verify it really settled
+
+This is the part that matters. A hash in your database is a claim.
+
+```bash
+php artisan lepton:reconcile
+```
+
+```
+  ✓  #7    vendor_payment      45.00  verified     0xcecac1d9520c4815
+  ✗  #3    student_assistance 100.00  fabricated   0x59cbf4983d0e6ff1
+
+  1 verified · 1 fabricated · 0 unverifiable · 0 ledger-only
+```
+
+Forged or fake-driver receipts come back **fabricated**. Mark them failed with:
+
+```bash
+php artisan lepton:reconcile --fix
+```
+
+This is idempotent — it only touches rows not already reconciled, and it will not tell
+you to re-run a flag you already passed.
+
+To check one hash yourself:
 
 ```php
-public function via(object $notifiable): array
-{
-    return ['database'];
-}
-
-public function toArray(object $notifiable): array
-{
-    return [
-        'title' => 'Notification Title',
-        'message' => 'Your notification message here',
-        'action_url' => '/optional-action-url',
-    ];
-}
+app(Yukazakiri\Lepton\Contracts\ArcNetworkGateway::class)
+    ->rpc('eth_getTransactionByHash', [$hash]);
 ```
 
 ---
 
-## ⚙️ System Settings
+## Commands
 
-This starter kit includes a comprehensive settings management system powered by **spatie/laravel-settings** with a beautiful Filament interface.
-
-### Settings Sections
-
-The settings are organized into logical sections accessible from the admin panel at `/admin/settings`:
-
-<details>
-<summary><strong>Application Details</strong></summary>
-
-Configure your application's identity and display settings:
-
-- **Site Information**: Name, description, logo URL, favicon URL
-- **Date & Time**: Timezone, date format, time format
-- **Contact**: Contact email, support URL
-
-</details>
-
-<details>
-<summary><strong>Application Features</strong></summary>
-
-Toggle application features on or off:
-
-- **Authentication Features**: User registration, email verification, 2FA, password reset
-- **User Management**: User impersonation, default role for new users
-- **System Features**: Activity logging, notifications
-- **Auth Layout**: Choose between Simple, Card, or Split layout for authentication pages
-
-</details>
-
-<details>
-<summary><strong>Application Security</strong></summary>
-
-Configure security policies:
-
-- **Password Policy**: Minimum length, require uppercase/lowercase/numbers/symbols
-- **Session Settings**: Session lifetime, single session per user
-- **Login Protection**: Rate limiting attempts, lockout duration
-
-</details>
-
-<details>
-<summary><strong>Social Login</strong></summary>
-
-Configure OAuth providers for social authentication:
-
-- **GitHub**: Enable/disable, client ID, client secret, redirect URI
-- **Google**: Enable/disable, client ID, client secret, redirect URI
-- **Facebook**: Enable/disable, client ID, client secret, redirect URI
-
-Each provider shows whether it's using environment variables or database-stored credentials.
-
-</details>
-
-### Auth Layout Switcher
-
-Choose from three beautiful authentication layouts directly from the settings panel:
-
-| Layout     | Description                                  |
-| ---------- | -------------------------------------------- |
-| **Simple** | Clean, centered layout with minimal styling  |
-| **Card**   | Form wrapped in a card component with shadow |
-| **Split**  | Side-by-side layout with branding panel      |
-
-The layout selection is instant and applies to all authentication pages (login, register, password reset).
-
-### Social Login
-
-Social login is managed through the **Social Login** settings page in the admin panel (`/admin/settings`). Supports GitHub, Google, and Facebook.
-
-#### Configuration
-
-Credentials can be set in two ways, with `.env` taking precedence:
-
-1. **Environment variables** (recommended for production):
-```env
-GITHUB_CLIENT_ID=your-id
-GITHUB_CLIENT_SECRET=your-secret
-GOOGLE_CLIENT_ID=your-id
-GOOGLE_CLIENT_SECRET=your-secret
-FACEBOOK_CLIENT_ID=your-id
-FACEBOOK_CLIENT_SECRET=your-secret
-```
-
-2. **Database settings** (via the Filament admin panel) — stored in the `social_login` settings group. Falls back to these when `.env` values are empty.
-
-#### Linking Behavior
-
-| Scenario | Behavior |
+| Command | What it does |
 |---|---|
-| New provider ID | Creates a new user and social account. Email is auto-verified. |
-| Existing social account | Logs in the linked user, updates profile data. |
-| Matching verified email | Auto-links the social account to the existing verified user. |
-| Matching unverified email | Returns 409 — user must verify their email first. |
-| Disabled provider | Redirects to login with an error message. |
-
-#### Code
-
-```php
-use App\Enums\SocialLoginProvider;
-use App\Settings\SocialLoginSettings;
-
-$settings = app(SocialLoginSettings::class);
-
-// Check if a provider is enabled
-if ($settings->isProviderEnabled(SocialLoginProvider::Github)) {
-    // Show GitHub login button
-}
-
-// Resolve credentials (env wins over stored settings)
-$creds = $settings->resolveCredentials(SocialLoginProvider::Google);
-```
+| `php artisan lepton:doctor` | **Run this first.** Verifies binaries, session, treasury, chain, ledger |
+| `php artisan lepton:login --status` | Circle session state per network |
+| `php artisan lepton:login <email>` | Send the OTP, print the request ID |
+| `php artisan lepton:login --request=<id> --otp=<code>` | Complete login |
+| `php artisan lepton:reconcile` | Prove every receipt against the chain |
+| `php artisan lepton:reconcile --fix` | Mark fabricated receipts as failed |
+| `php artisan eduflow:demo` | Run one full autonomous cycle |
+| `php artisan lepton:status --address=0x…` | Chain, block, balance, limits |
+| `php artisan lepton:transfer 0x… --amount=1.00 --from=0x…` | Single transfer (`--estimate` to dry-run) |
 
 ---
 
-### Passkeys (WebAuthn)
-
-Passkey authentication is available on both the **admin panel** (Filament) and the **frontend** (Inertia login page). Users can register passkeys from their profile settings.
-
-Passkeys are device-bound ("phone-as-passkey" style) and use the browser's native WebAuthn API. Login with a passkey requires only biometrics or device PIN — no password needed.
-
-#### Frontend Usage
-
-The passkey sign-in button appears automatically on the login page when the feature is enabled. Users can manage passkeys from their security settings.
-
-#### Configuration
+## Configuration
 
 ```env
-# Config is handled via the admin Application Features settings page
-# and the config/passkeys.php file
+# circle = real Circle CLI + arc-canteen, fake = in-memory ledger
+LEPTON_DRIVER=circle
+LEPTON_CHAIN=ARC-TESTNET
+LEPTON_CHAIN_ID=5042002
+
+# A Circle *agent* wallet. A local arc-canteen wallet cannot be signed for.
+LEPTON_TREASURY_ADDRESS=0xYourAgentWallet
 ```
+
+`LEPTON_DRIVER` defaults to `fake` under `APP_ENV=testing`.
 
 ---
 
-### Accessing Settings in Code
+## The AI layer (optional)
 
-```php
-use App\Settings\ApplicationFeaturesSettings;
-
-// Get settings instance
-$settings = app(ApplicationFeaturesSettings::class);
-
-// Access individual settings
-if ($settings->registration_enabled) {
-    // Allow registration
-}
-
-// Update settings
-$settings->auth_layout = 'card';
-$settings->save();
-```
-
----
-
-## 📦 Modular Architecture (nwidart/laravel-modules)
-
-This starter kit supports a modular architecture via **nwidart/laravel-modules**. Modules live in the `Modules/` directory and are self-contained units with their own models, controllers, routes, Filament resources, frontend pages, and tests.
-
-### Included Module: Blog
-
-A fully-functional blog module is included as a reference implementation. It demonstrates:
-
-- **Filament Resource** — CRUD for blog posts in the admin panel
-- **Inertia Page** — Public blog post listing at `/blog`
-- **Module Routes** — Registered automatically when the module is enabled
-- **Module Tests** — Feature, unit, and Filament tests packaged with the module
-
-### Creating a New Module
+`laravel/ai` is installed. The agents exist, but **none of them are wired into the request
+path yet** — every decision still runs through the deterministic PHP policy engine, and
+that is the point.
 
 ```bash
-php artisan module:make MyModule
+# Optional: a local model, so the AI layer runs with no paid API key
+ollama serve
+ollama pull llama3.1
 ```
 
-This scaffolds a new module in `Modules/MyModule/` with providers, routing, and configuration files. The module's Inertia pages are auto-discovered (place them in `resources/js/pages/`) and Filament resources are registered via a plugin class:
-
-```php
-class MyModulePlugin implements Plugin
-{
-    public function register(Panel $panel): void
-    {
-        $panel->discoverResources(
-            in: __DIR__.'/Filament/Resources',
-            for: 'Modules\\MyModule\\Filament\\Resources',
-        );
-    }
-}
+```env
+AI_PROVIDER=local
+AI_LOCAL_URL=http://127.0.0.1:11434/v1
+AI_LOCAL_MODEL=llama3.1
 ```
 
-Modules are enabled/disabled in `modules_statuses.json` and via `php artisan module:enable` / `php artisan module:disable`.
+Or point it at a hosted provider:
+
+```env
+AI_PROVIDER=anthropic
+ANTHROPIC_API_KEY=sk-...
+```
+
+### Configure it from the admin panel instead
+
+Endpoints and keys can be set in the admin UI instead of `.env`, which is what you want
+when a deployment has several providers or when the key must not sit in a file.
+
+**Settings → AI** holds the switches:
+
+| Switch | Default | Effect |
+|---|---|---|
+| Allow advisory model calls | **off** | Master switch. Nothing leaves the application when off. |
+| Student data may be sent to the provider | **off** | Second, separate acknowledgement. Both must be on. |
+| Let the AI propose disbursements | **off** | Off means annotate-only. See the tiers below. |
+| Timeout | 20s | Kept short on purpose: advisory must never delay a payment. |
+
+**Settings → AI Providers** manages endpoints. Any SDK driver works, including
+**OpenAI-compatible** for Ollama, LM Studio, vLLM, LiteLLM, Together or a corporate
+gateway:
+
+| Field | Notes |
+|---|---|
+| Driver | `openai-compatible` for anything that speaks the OpenAI wire format |
+| Base URL | **Required** for `openai-compatible`; it has no default endpoint |
+| Text model | Used as that provider's default model |
+| Extra headers | Some gateways need e.g. `X-Tenant-Id` |
+| API key | Optional — local endpoints usually need none |
+
+**API keys are encrypted at rest** with `APP_KEY` using Laravel's `encrypted` cast. The
+database column holds ciphertext, so a dump of it leaks nothing on its own. The key is
+also never rendered back into the edit form: it is stripped before the form is filled, so
+panel access is not enough to read a secret out of the DOM. Leaving the field blank keeps
+the stored key; rotating it is therefore an explicit act.
+
+There is also a *Test connection* action, which probes `/models` without sending any student
+data and without costing a completion.
+
+> **`migrate:fresh` wipes this.** `ai_providers` is an application table, so
+> `php artisan migrate:fresh --seed` deletes every provider and its key. Use
+> `migrate:refresh` for a demo, or re-enter the key afterwards. The encryption protects a
+> database *dump*; it cannot survive the row being deleted.
+
+> **Not every gateway honours `response_format`.** 9Router accepts the parameter and
+> ignores it, returning the object as text. The agents therefore also ask for the JSON shape
+> in their instructions, and the gate decodes a string response. If a gateway streams SSE
+> regardless of `stream: false`, add an `Accept: application/json` extra header.
+
+**EduFlow works with none of this.** Every model call is fail-closed: a missing key, an
+unreachable endpoint, malformed output or a timeout all resolve to "no advisory available",
+and the deterministic engine proceeds alone. A model outage degrades the product; it never
+blocks a payment.
+
+### The three tiers
+
+| Tier | Owner | Can move funds? |
+|---|---|---|
+| **Deterministic** | PHP — limits, reserve, caps, rate locking, auto-vs-escalate | Only after every check passes |
+| **Advisory** | LLM — hardship category, urgency, confidence, narrative, anomaly flags | Never |
+| **Prohibited** | — | Approved amount, policy verdict, recipient selection |
+
+The one-way ratchet: the model may only *tighten* a decision. An `ESCALATE` verdict cannot
+be downgraded by any response.
+
+### How that is enforced, not just promised
+
+- **Allowlist, not a filter.** `AdvisoryEnvelope` is a readonly DTO with no amount, verdict
+  or recipient field. Unknown keys are dropped before it is constructed, so a
+  prompt-injected `"approved_amount": 999999` has nowhere to land. Advisory is namespaced
+  under a metadata `advisory` key and cannot overwrite `approved_amount`.
+- **`DisburseAssistance` is `Approvable`,** and its `needsApproval()` runs the real policy
+  evaluation. `handle()` re-evaluates rather than trusting the earlier verdict, because the
+  model may propose different arguments between the pause and the resume.
+- **27 adversarial tests** cover injected amounts, injected verdicts, malformed output,
+  provider failure and prompt injection. All run offline via the SDK's own fakes.
+
+### Ask EduFlow: conversation with a figure check
+
+The student chat has two answers to every question. The deterministic one comes first and is
+always computed by PHP. A model may then *rephrase* it, and never replaces it.
+
+```
+"What is my tuition balance?"
+        │
+        ▼
+  AskEduFlow::answer()          ← deterministic, live policy, integer math
+        │
+        ▼
+  StudentBrief                  ← those facts + that explanation, assembled by PHP
+        │
+        ▼
+  QnaGate → BriefGuard          ← model answers; every figure checked against the brief
+        │
+    ┌───┴───────────────┐
+    │                   │
+ verified            anything else
+    │                   │
+ assistant          deterministic
+```
+
+`BriefGuard` extracts every numeric token from the model's response and discards the whole
+answer if any of them is absent from the brief. So "Your balance is 275.00 USDC" is refused and
+the student gets the real figure instead. Stripping just the bad number was rejected
+deliberately: an edited answer still reads as authoritative while quietly omitting what the
+student asked about.
+
+> **Compare figures as digit strings, not floats.** PHP 8.5 casts a float array key to `int`, so
+> keying by `(float) 1000.5` stores `1000` — and the guard then *permits* a fabricated `1000.5`
+> because it collides with a permitted `1000`. That was a live bug, now covered by a test.
+
+Threads are real and checked. `QnaGate` calls `conversationBelongsTo()` itself rather than
+trusting the route, because the SDK's `continue()` accepts any conversation id. Send another
+student's id and you get your own deterministic answer and a fresh thread.
+
+The response carries `source: deterministic | assistant`, and the panel shows a badge for the
+model-phrased case, so it is always visible whether a reply came from the ledger or from a
+model reading it.
+
+### Approving a proposal the agent paused on
+
+When `DisburseAssistance` falls outside the autonomous limit, the run *pauses* and waits for a
+person. That decision has an endpoint:
+
+```bash
+# What is this conversation waiting on?
+curl -X POST http://localhost:8000/finance/approvals/pending \
+  -H 'X-CSRF-TOKEN: ...' \
+  -d 'conversation_id=<uuid>'
+
+# Answer it. `decisions` is only ever id => true/false.
+curl -X POST http://localhost:8000/finance/approvals/resume \
+  -H 'X-CSRF-TOKEN: ...' \
+  -d 'conversation_id=<uuid>&decisions[call_abc]=true'
+```
+
+Six checks stand between that `true` and a transfer, in `ApprovalResumeGate`:
+
+| Check | Why the obvious version is wrong |
+|---|---|
+| Role via the Gate | Reading a role name in the gate drifts from the panel |
+| `conversationBelongsTo()` | `continue()` accepts **any** conversation id |
+| Pending-set subset | A stale or foreign tool-call id must not be passed through |
+| Tool allowlist | Only `DisburseAssistance`; `Decision::edit()` is never built |
+| Target from the stored pause | The request id is never read from your payload |
+| `mayProposeSettlements()` | A switch turned off after the pause still refuses |
+
+`decisions` accepts **only** `id => bool`. There is deliberately no field for an amount or a
+recipient, and the `assistance_request_id` is read from the stored pause, so an approval cannot
+be redirected at another student.
+
+A replayed approval finds nothing pending and returns `nothing_pending` without paying twice.
+Any settlement in the response sets `requires_onchain_verification` — a returned hash is a claim
+until `php artisan lepton:reconcile` proves it.
+
+> **Never `app(SettlementOperator::class)`.** Its constructor takes an `Organization`, a fund and
+> a policy version, and Eloquent models take no constructor arguments — so the container hands
+> back **blank, non-existent records**. The agent then refuses with "no active wallet": the right
+> outcome for the wrong reason. Use `SettlementOperatorFactory::makeOrFail()`.
 
 ---
 
-## 🤝 Contributing
+## How the money moves
 
-This is a community-friendly project. If you find a bug or have an idea for an improvement, please feel free to open an issue or submit a pull request.
+```
+Invoices + Aid requests
+        │
+        ▼
+  EduFlowAgent::runAutonomousCycle()
+        │
+        ▼
+  FinancialPolicyEngine / EvaluateAssistancePolicy     ← deterministic PHP
+        │  auto_approve │ escalate │ hold │ reject
+        ▼
+  CircleWalletService  →  WalletGateway  →  circle wallet transfer
+        │
+        ▼
+  Transaction row (status + hash)                      ← a claim
+        │
+        ▼
+  lepton:reconcile  →  eth_getTransactionByHash        ← the proof
+```
 
-1.  Fork the Project
-2.  Create your Feature Branch (`git checkout -b feature/AmazingFeature`)
-3.  Commit your Changes (`git commit -m 'Add some AmazingFeature'`)
-4.  Push to the Branch (`git push origin feature/AmazingFeature`)
-5.  Open a Pull Request
+Amounts cross the boundary as integers. `Amounts::fromDecimalString('45.00')` gives
+`45_000000`; nothing is ever parsed as a float.
+
+> **Never `hexdec()` a chain quantity.** Arc native USDC is 18 decimals, so 20 USDC is
+> 2e19 wei — past `PHP_INT_MAX`. `hexdec()` returns a float there and an `(int)` cast
+> silently wraps. Use `Amounts::fromHexQuantity()`. A guard test fails if `hexdec(` is
+> reintroduced into a chain-reading file.
 
 ---
 
-## 📄 License
+## Testing
 
-Distributed under the MIT License. See `LICENSE` for more information.
+```bash
+php artisan test                              # 374 tests
+php artisan test --compact --filter=Reconcile
+```
 
-<div align="center">
-  <p>Built with ❤️ by Koamishin</p>
-</div>
+The fake driver needs no network, no credentials and no cost, so the whole suite runs
+offline. Tests that assert on receipts construct a chain stub that knows about exactly
+one hash, so fabricated receipts cannot pass unnoticed.
+
+---
+
+## Troubleshooting
+
+**`no agent session is active`** — the address is not a Circle agent wallet, or you are
+not logged in for that network. Check `php artisan lepton:login --status` and
+`circle wallet list --type agent --chain ARC-TESTNET`.
+
+**Transfers fail on testnet but the wallet looks funded** — you are authenticated for
+mainnet only. Mainnet and testnet are independent sessions.
+
+**`method 'trace_block' not allowed by the proxy`** — the Arc RPC proxy is allowlisted
+by design. That method is not exposed; it is not a bug in your setup.
+
+**`Faucet drip failed (429)`** — you hit the per-user faucet cap. Wait, or use a second
+agent wallet. There is no way around the ~120 USDC ceiling.
+
+**Auto-pays fail with "asset amount owned by the wallet is insufficient"** — the ledger
+claims a balance the chain does not hold. Use **Sync from chain**, and check
+`lepton:doctor` for drift.
+
+**A balance reads as 0** — you are probably pointed at an `arc-canteen` local wallet
+rather than your Circle agent wallet, or you are querying a chain you are not
+authenticated for.
+
+**`eduflow:demo` is not repeatable** — each run spends 85 USDC. Re-fund, or use
+`LEPTON_DRIVER=fake`.
+
+---
+
+## Project layout
+
+```
+app/
+  Agents/EduFlowAgent.php            the autonomous cycle
+  Policies/                          invoice + assistance policy (deterministic)
+  Actions/                           policy evaluation, escalation approval
+  Services/
+    FinancialPolicyEngine.php        every vendor-payment decision
+    CircleWalletService.php          the only path to a real transfer
+    LeptonReconciliationService.php  proves settlement on-chain
+    LeptonTreasuryService.php        live chain reads vs the ledger
+  Console/Commands/
+    EduFlowDemo.php                  the end-to-end demo
+    LeptonDoctor.php                 the "is it working" check
+database/seeders/
+  EduFlowFinancialSeeder.php         org, wallets, budgets, the six invoices
+  EduFlowPlanSeeder.php              thresholds, assistance fund, aid policy
+  EducationDemoSeeder.php           students, tuition, one pending aid request
+```
+
+---
+
+## Built on
+
+- [Laravel 13](https://laravel.com) · [Inertia v3](https://inertiajs.com) · [Vue 3](https://vuejs.org) · [Tailwind 4](https://tailwindcss.com) · shadcn/ui
+- [Filament 5](https://filamentphp.com) for staff panels
+- [yukazakiri/lepton-agent](https://github.com/yukazakiri/lepton-agent) for Circle + Arc
+- [Circle Agent Stack](https://developers.circle.com/agent-stack) · [Arc](https://docs.arc.io) · [x402](https://developers.circle.com/agent-stack/agent-wallets/wallet-operations/pay-for-service)
+
+Built for the [Lepton Agents Hackathon](https://arc-node.thecanteenapp.com/).

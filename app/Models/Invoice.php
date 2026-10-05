@@ -41,6 +41,7 @@ class Invoice extends Model
         'metadata',
     ];
 
+    #[\Override]
     protected function casts(): array
     {
         return [

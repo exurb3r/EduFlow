@@ -72,7 +72,7 @@ class AssistanceRequestsTable
                     ->label('Take Ticket')
                     ->icon('heroicon-o-arrow-path')
                     ->color('info')
-                    ->visible(fn (AssistanceRequest $record): bool => $record->status === AssistanceStatus::PENDING)
+                    ->visible(fn (AssistanceRequest $record): bool => $record->status === AssistanceStatus::PENDING || $record->status === AssistanceStatus::PENDING->value)
                     ->requiresConfirmation()
                     ->action(function (AssistanceRequest $record): void {
                         $record->update([
@@ -84,7 +84,7 @@ class AssistanceRequestsTable
                     ->label('Resolve')
                     ->icon('heroicon-o-check-circle')
                     ->color('success')
-                    ->visible(fn (AssistanceRequest $record): bool => $record->status !== AssistanceStatus::RESOLVED)
+                    ->visible(fn (AssistanceRequest $record): bool => $record->status !== AssistanceStatus::RESOLVED && $record->status !== AssistanceStatus::RESOLVED->value)
                     ->schema([
                         Textarea::make('admin_notes')
                             ->label('Resolution Notes & Response')

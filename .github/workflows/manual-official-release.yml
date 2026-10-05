@@ -4,668 +4,198 @@ on:
   workflow_dispatch:
     inputs:
       version:
-        description: 'Version to release (e.g. 1.33.1 or v1.33.1)'
+        description: 'New version, such as 1.0.0 or 1.0.0-preview.1'
         required: true
         type: string
       publish_latest:
-        description: 'Also push Docker :latest tag'
+        description: 'Update stable latest image (never for drafts or prereleases)'
         required: true
-        default: true
+        default: false
         type: boolean
       draft:
-        description: 'Create the GitHub release as a draft'
-        required: true
-        default: false
-        type: boolean
-      prerelease:
-        description: 'Mark the GitHub release as a pre-release'
-        required: true
-        default: false
-        type: boolean
-      extra_notes:
-        description: 'Extra release notes (optional)'
-        required: false
-        type: string
-      fail_if_tag_exists:
-        description: 'Fail if the Git tag already exists'
+        description: 'Create a draft release without updating stable aliases'
         required: true
         default: true
         type: boolean
+      prerelease:
+        description: 'Mark as preview; keep true until school release gates pass'
+        required: true
+        default: true
+        type: boolean
+      extra_notes:
+        description: 'Release limitations and operator notes'
+        required: false
+        type: string
 
 permissions:
-  contents: write
-  packages: write
-  pull-requests: read
+  contents: read
+  actions: read
 
-env:
-  DOCKER_ENABLED: true
-  DOCKER_UPDATE_STRATEGY: rolling  # rolling=auto-build on push, manual=release on explicit trigger
-  REGISTRY: ghcr.io
-  IMAGE_NAME: ${{ github.repository }}
+concurrency:
+  group: eduflow-official-release
+  cancel-in-progress: false
 
 jobs:
   prepare:
+    if: github.ref == 'refs/heads/main'
     runs-on: ubuntu-latest
     outputs:
-      version: ${{ steps.prepare.outputs.version }}
-      tag: ${{ steps.prepare.outputs.tag }}
-      publish_latest: ${{ steps.prepare.outputs.publish_latest }}
-      draft: ${{ steps.prepare.outputs.draft }}
-      prerelease: ${{ steps.prepare.outputs.prerelease }}
-      extra_notes: ${{ steps.prepare.outputs.extra_notes }}
-
+      version: ${{ steps.validate.outputs.version }}
+      tag: ${{ steps.validate.outputs.tag }}
+      commit: ${{ steps.validate.outputs.commit }}
+      image: ${{ steps.validate.outputs.image }}
+      publish_latest: ${{ steps.validate.outputs.publish_latest }}
+      ci_url: ${{ steps.validate.outputs.ci_url }}
     steps:
-      - name: Checkout repository
+      - name: Validate release inputs and exact-commit CI
+        id: validate
+        uses: actions/github-script@v7
+        env:
+          INPUT_VERSION: ${{ inputs.version }}
+          PUBLISH_LATEST: ${{ inputs.publish_latest }}
+          IS_DRAFT: ${{ inputs.draft }}
+          IS_PRERELEASE: ${{ inputs.prerelease }}
+        with:
+          script: |
+            if (context.ref !== 'refs/heads/main') {
+              throw new Error('Official releases must originate from main.');
+            }
+            const version = process.env.INPUT_VERSION.replace(/^v/, '');
+            if (!/^\d+\.\d+\.\d+(?:-[0-9A-Za-z]+(?:\.[0-9A-Za-z]+)*)?$/.test(version)) {
+              throw new Error('Version must be a semantic version without build metadata.');
+            }
+            const prerelease = process.env.IS_PRERELEASE === 'true';
+            const draft = process.env.IS_DRAFT === 'true';
+            if (version.includes('-') && !prerelease) {
+              throw new Error('A preview version must be marked as a prerelease.');
+            }
+            if (process.env.PUBLISH_LATEST === 'true' && (prerelease || draft)) {
+              throw new Error('Drafts and prereleases cannot update stable latest.');
+            }
+            const branch = await github.rest.repos.getBranch({ ...context.repo, branch: 'main' });
+            if (branch.data.commit.sha !== context.sha) {
+              throw new Error('Main changed after dispatch; release the new tested commit instead.');
+            }
+            const runs = await github.rest.actions.listWorkflowRuns({
+              ...context.repo,
+              workflow_id: 'ci.yml',
+              head_sha: context.sha,
+              branch: 'main',
+              event: 'push',
+              per_page: 100,
+            });
+            const run = runs.data.workflow_runs.find((candidate) =>
+              candidate.head_sha === context.sha && candidate.event === 'push' &&
+              candidate.head_repository.full_name === `${context.repo.owner}/${context.repo.repo}`
+            );
+            if (!run || run.status !== 'completed' || run.conclusion !== 'success') {
+              throw new Error('Latest push CI for this exact commit must pass before release.');
+            }
+            const tag = `v${version}`;
+            try {
+              await github.rest.git.getRef({ ...context.repo, ref: `tags/${tag}` });
+              throw new Error('Release tag already exists; immutable versions cannot be overwritten.');
+            } catch (error) {
+              if (error.status !== 404) throw error;
+            }
+            core.setOutput('version', version);
+            core.setOutput('tag', tag);
+            core.setOutput('commit', context.sha);
+            core.setOutput('image', `ghcr.io/${context.repo.owner}/${context.repo.repo}`.toLowerCase());
+            core.setOutput('publish_latest', process.env.PUBLISH_LATEST);
+            core.setOutput('ci_url', run.html_url);
+
+  publish:
+    needs: prepare
+    runs-on: ubuntu-latest
+    environment: release
+    permissions:
+      contents: write
+      packages: write
+    steps:
+      - name: Checkout tested commit
         uses: actions/checkout@v4
         with:
-          fetch-depth: 0
-
-      - name: Validate inputs and resolve tag
-        id: prepare
-        shell: bash
-        run: |
-          set -euo pipefail
-
-          if [ "${{ github.ref_name }}" != "main" ]; then
-            echo "This workflow must be run from main (current: ${{ github.ref_name }})."
-            exit 1
-          fi
-
-          git fetch --tags --force
-
-          INPUT_VERSION="${{ inputs.version }}"
-          INPUT_VERSION="${INPUT_VERSION#v}"
-
-          if ! [[ "$INPUT_VERSION" =~ ^[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
-            echo "Invalid version '$INPUT_VERSION'. Expected semver like 1.33.1 or v1.33.1."
-            exit 1
-          fi
-
-          TAG="v$INPUT_VERSION"
-
-          if git rev-parse "$TAG" >/dev/null 2>&1; then
-            if [ "${{ inputs.fail_if_tag_exists }}" = "true" ]; then
-              echo "Git tag $TAG already exists. Choose a new version, or re-run with fail_if_tag_exists=false."
-              exit 1
-            fi
-
-            echo "Git tag $TAG already exists; continuing (tag will not be recreated)."
-          fi
-
-          echo "Resolved version: $INPUT_VERSION"
-          echo "Resolved tag: $TAG"
-
-          echo "version=$INPUT_VERSION" >> "$GITHUB_OUTPUT"
-          echo "tag=$TAG" >> "$GITHUB_OUTPUT"
-          echo "publish_latest=${{ inputs.publish_latest }}" >> "$GITHUB_OUTPUT"
-          echo "draft=${{ inputs.draft }}" >> "$GITHUB_OUTPUT"
-          echo "prerelease=${{ inputs.prerelease }}" >> "$GITHUB_OUTPUT"
-          {
-            echo 'extra_notes<<EOF'
-            echo "${{ inputs.extra_notes }}"
-            echo 'EOF'
-          } >> "$GITHUB_OUTPUT"
-
-  build-and-push:
-    runs-on: ubuntu-latest
-    needs: prepare
-    if: needs.prepare.result == 'success'
-
-    steps:
-      - name: Check if Docker is enabled
-        id: check_docker
-        run: |
-          if [ "${{ env.DOCKER_ENABLED }}" != "true" ]; then
-            echo "Docker CI/CD is disabled. Skipping Docker build."
-            echo "skip=true" >> "$GITHUB_OUTPUT"
-          else
-            echo "skip=false" >> "$GITHUB_OUTPUT"
-          fi
-
-      - name: Checkout repository
-        if: steps.check_docker.outputs.skip != 'true'
-        uses: actions/checkout@v4
+          ref: ${{ needs.prepare.outputs.commit }}
+          persist-credentials: false
 
       - name: Set up Docker Buildx
-        if: steps.check_docker.outputs.skip != 'true'
         uses: docker/setup-buildx-action@v3
 
       - name: Log in to GitHub Container Registry
-        if: steps.check_docker.outputs.skip != 'true'
         uses: docker/login-action@v3
         with:
-          registry: ${{ env.REGISTRY }}
+          registry: ghcr.io
           username: ${{ github.actor }}
           password: ${{ secrets.GITHUB_TOKEN }}
 
-      - name: Extract metadata
-        if: steps.check_docker.outputs.skip != 'true'
-        id: meta
-        uses: docker/metadata-action@v5
-        with:
-          images: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}
-          tags: |
-            type=semver,pattern={{version}},value=${{ needs.prepare.outputs.tag }}
-            type=semver,pattern={{major}}.{{minor}},value=${{ needs.prepare.outputs.tag }}
-            type=semver,pattern={{major}},value=${{ needs.prepare.outputs.tag }}
-            type=raw,value=latest,enable=${{ needs.prepare.outputs.publish_latest == 'true' }}
-            type=sha,prefix=sha-,format=short
-          labels: |
-            org.opencontainers.image.version=${{ needs.prepare.outputs.version }}
-            org.opencontainers.image.revision=${{ github.sha }}
-            org.opencontainers.image.created=${{ github.event.head_commit.timestamp }}
-            org.opencontainers.image.title=${{ github.event.repository.name }}
-            org.opencontainers.image.description=Production Docker image for this Laravel application
-            org.opencontainers.image.vendor=${{ github.repository_owner }}
+      - name: Resolve versioned image tags
+        id: tags
+        env:
+          IMAGE: ${{ needs.prepare.outputs.image }}
+          VERSION: ${{ needs.prepare.outputs.version }}
+          PUBLISH_LATEST: ${{ needs.prepare.outputs.publish_latest }}
+        run: |
+          python3 - <<'PY'
+          import json, os
+          tags = [os.environ['IMAGE'] + ':' + os.environ['VERSION']]
+          if os.environ['PUBLISH_LATEST'] == 'true':
+              tags.append(os.environ['IMAGE'] + ':latest')
+          with open(os.environ['GITHUB_OUTPUT'], 'a') as output:
+              output.write('tags=' + ','.join(tags) + '\n')
+          PY
 
-      - name: Build and push Docker image
-        if: steps.check_docker.outputs.skip != 'true'
+      - name: Build tested release image
         uses: docker/build-push-action@v5
         with:
           context: .
           file: ./docker/Dockerfile
           push: true
-          tags: ${{ steps.meta.outputs.tags }}
-          labels: ${{ steps.meta.outputs.labels }}
           platforms: linux/amd64
-          build-args: |
-            APP_NAME=laravel
-            APP_ENV=production
-            APP_DEBUG=false
-            APP_URL=https://koamistarterkit.yukazaki.com
+          tags: ${{ steps.tags.outputs.tags }}
+          labels: |
+            org.opencontainers.image.title=EduFlow
+            org.opencontainers.image.revision=${{ needs.prepare.outputs.commit }}
+            org.opencontainers.image.version=${{ needs.prepare.outputs.version }}
+            org.opencontainers.image.licenses=MIT
 
-  create-release:
-    runs-on: ubuntu-latest
-    needs: [prepare, build-and-push]
-    if: needs.build-and-push.result == 'success' || needs.build-and-push.result == 'skipped'
-
-    steps:
-      - name: Checkout repository
-        uses: actions/checkout@v4
-        with:
-          fetch-depth: 0
-
-      - name: Generate release notes (PRs + commits)
-        uses: actions/github-script@v7
+      - name: Write release metadata
         env:
           VERSION: ${{ needs.prepare.outputs.version }}
-          TAG: ${{ needs.prepare.outputs.tag }}
-          EXTRA_NOTES: ${{ needs.prepare.outputs.extra_notes }}
-          REGISTRY: ghcr.io
-          IMAGE_NAME: ${{ github.repository }}
-        with:
-          script: |
-            const fs = require('fs');
-
-            const owner = context.repo.owner;
-            const repo = context.repo.repo;
-            const tag = process.env.TAG;
-            const version = process.env.VERSION;
-            const extraNotes = (process.env.EXTRA_NOTES || '').trim();
-            const registry = process.env.REGISTRY;
-            const imageName = process.env.IMAGE_NAME;
-
-            const isStableTag = (value) => /^v\d+\.\d+\.\d+$/.test(value || '');
-            const firstLine = (value) => (value || '').split('\n')[0].trim();
-
-            const releases = await github.paginate(github.rest.repos.listReleases, {
-              owner,
-              repo,
-              per_page: 100,
-            });
-
-            const officialReleases = releases
-              .filter((r) => !r.draft && !r.prerelease)
-              .filter((r) => isStableTag(r.tag_name))
-              .filter((r) => r.tag_name !== tag)
-              .sort((a, b) => new Date(b.published_at || b.created_at) - new Date(a.published_at || a.created_at));
-
-            const baseTag = officialReleases[0]?.tag_name || null;
-
-            let commits = [];
-            if (baseTag) {
-              const compare = await github.rest.repos.compareCommits({
-                owner,
-                repo,
-                base: baseTag,
-                head: context.sha,
-              });
-              commits = compare.data.commits || [];
-            } else {
-              const list = await github.rest.repos.listCommits({
-                owner,
-                repo,
-                sha: context.sha,
-                per_page: 100,
-              });
-              commits = list.data || [];
-            }
-
-            const skippedBySha = new Set();
-            const prByNumber = new Map();
-            const commitWithAssociatedPr = new Set();
-
-            for (const commit of commits) {
-              const sha = commit.sha;
-              const subject = firstLine(commit.commit?.message);
-
-              const authorLogin = commit.author?.login || '';
-              const committerLogin = commit.committer?.login || '';
-              const committerName = commit.commit?.committer?.name || '';
-
-              const isGithubActions =
-                authorLogin === 'github-actions[bot]' ||
-                committerLogin === 'github-actions[bot]' ||
-                committerName === 'github-actions[bot]';
-
-              const isVersionBump = /^chore: update version to\s+/i.test(subject);
-              const hasSkipCi = /\[skip ci\]/i.test(subject);
-
-              if (isGithubActions || isVersionBump || hasSkipCi) {
-                skippedBySha.add(sha);
-                continue;
-              }
-
-              try {
-                const associated = await github.rest.repos.listPullRequestsAssociatedWithCommit({
-                  owner,
-                  repo,
-                  commit_sha: sha,
-                  mediaType: {
-                    previews: ['groot'],
-                  },
-                });
-
-                const mergedPr = (associated.data || []).find((pr) => pr.merged_at);
-                if (mergedPr) {
-                  prByNumber.set(mergedPr.number, mergedPr);
-                  commitWithAssociatedPr.add(sha);
-                }
-              } catch {
-                // Ignore: commits may have no associated PRs.
-              }
-            }
-
-            const categories = {
-              '💥 Breaking Changes': [],
-              '✨ Features': [],
-              '🐛 Fixes': [],
-              '♻️ Refactors': [],
-              '📚 Documentation': [],
-              '🔧 Chores': [],
-              '📦 Other': [],
-            };
-
-            const categoryForPr = (pr) => {
-              const labels = (pr.labels || []).map((l) => (typeof l === 'string' ? l : l.name)).filter(Boolean);
-              const normalized = labels.map((l) => String(l).toLowerCase());
-
-              const has = (needle) => normalized.some((l) => l === needle || l.includes(needle));
-
-              if (has('breaking') || has('major')) {
-                return '💥 Breaking Changes';
-              }
-              if (has('feature') || has('enhancement') || has('feat')) {
-                return '✨ Features';
-              }
-              if (has('fix') || has('bug') || has('bugfix') || has('hotfix')) {
-                return '🐛 Fixes';
-              }
-              if (has('refactor')) {
-                return '♻️ Refactors';
-              }
-              if (has('docs') || has('documentation')) {
-                return '📚 Documentation';
-              }
-              if (has('chore') || has('ci') || has('build')) {
-                return '🔧 Chores';
-              }
-
-              return '📦 Other';
-            };
-
-            const prs = Array.from(prByNumber.values()).sort((a, b) => a.number - b.number);
-            for (const pr of prs) {
-              categories[categoryForPr(pr)].push(pr);
-            }
-
-            const nonPrCommits = commits
-              .filter((c) => !skippedBySha.has(c.sha))
-              .filter((c) => !commitWithAssociatedPr.has(c.sha))
-              .map((c) => ({
-                sha: c.sha,
-                subject: firstLine(c.commit?.message),
-              }));
-
-            const compareUrl = baseTag
-              ? `${context.serverUrl}/${owner}/${repo}/compare/${baseTag}...${tag}`
-              : null;
-
-            const lines = [];
-            lines.push(`# Koamishin Starterkit ${tag} (Official Release)`);
-            lines.push('');
-            lines.push('✅ **Channel:** Official');
-            lines.push(`📦 **Version:** ${version}`);
-            lines.push('');
-            lines.push('---');
-            lines.push('');
-
-            lines.push('## What\'s Changed');
-            lines.push('');
-
-            const prLine = (item) => {
-              if (item._isCommit) {
-                return `- ${item.title} (${item.sha.slice(0, 7)})`;
-              }
-              const login = item.user?.login ? `@${item.user.login}` : '@unknown';
-              return `- ${item.title} (#${item.number}) (${login})`;
-            };
-
-            // Categorize non-PR commits by conventional commit prefix
-            if (nonPrCommits.length) {
-              const commitToCategory = [
-                ['breaking', '💥 Breaking Changes'],
-                ['feat', '✨ Features'],
-                ['feature', '✨ Features'],
-                ['fix', '🐛 Fixes'],
-                ['bugfix', '🐛 Fixes'],
-                ['hotfix', '🐛 Fixes'],
-                ['refactor', '♻️ Refactors'],
-                ['perf', '♻️ Refactors'],
-                ['docs', '📚 Documentation'],
-                ['documentation', '📚 Documentation'],
-                ['chore', '🔧 Chores'],
-                ['ci', '🔧 Chores'],
-                ['build', '🔧 Chores'],
-                ['test', '🔧 Chores'],
-                ['style', '🔧 Chores'],
-              ];
-
-              for (const c of nonPrCommits) {
-                const subject = c.subject;
-                const match = subject.match(/^(\w+)(?:\([^)]*\))?(!?):\s*/);
-                const prefix = match ? match[1].toLowerCase() : '';
-                const hasBang = match ? match[2] === '!' : false;
-                let categoryKey = '📦 Other';
-                if (hasBang) {
-                  categoryKey = '💥 Breaking Changes';
-                } else {
-                  const entry = commitToCategory.find(([p]) => p === prefix);
-                  if (entry) categoryKey = entry[1];
-                }
-
-                categories[categoryKey].push({
-                  _isCommit: true,
-                  title: subject,
-                  sha: c.sha,
-                });
-              }
-            }
-
-            const categoryOrder = Object.keys(categories);
-            let anyItems = false;
-            for (const key of categoryOrder) {
-              const prGroup = categories[key];
-              if (!prGroup.length) {
-                continue;
-              }
-
-              anyItems = true;
-              lines.push(`### ${key}`);
-              for (const pr of prGroup) {
-                lines.push(prLine(pr));
-              }
-              lines.push('');
-            }
-
-            if (!anyItems) {
-              lines.push('_(No changes detected in this range)_');
-              lines.push('');
-            }
-
-            // Extra notes
-            if (extraNotes) {
-              lines.push('### 📝 Additional Notes');
-              lines.push('');
-              lines.push(extraNotes);
-              lines.push('');
-            }
-
-            lines.push('## References');
-            lines.push('');
-            lines.push('### 🐳 Docker');
-            lines.push('');
-            lines.push(`Pull the official release image from the container registry:`);
-            lines.push('');
-            lines.push('```sh');
-            lines.push(`docker pull ${registry}/${imageName}:${version}`);
-            lines.push('```');
-            lines.push('');
-            lines.push(`Or run it directly:`);
-            lines.push('');
-            lines.push('```sh');
-            lines.push(`docker run -p 8000:8000 ${registry}/${imageName}:${version}`);
-            lines.push('```');
-            lines.push('');
-            lines.push('### 🔗 Links');
-            lines.push('');
-            if (compareUrl) {
-              lines.push(`- **🔎 Compare Changes:** ${compareUrl}`);
-            }
-            lines.push(`- **📦 Version:** ${version}`);
-            lines.push(`- **🏷️ Tag:** ${tag}`);
-            lines.push(`- **🔨 Build Pipeline:** ${context.serverUrl}/${owner}/${repo}/actions/runs/${context.runId}`);
-            lines.push(`- **📄 Release:** ${context.serverUrl}/${owner}/${repo}/releases/tag/${tag}`);
-            lines.push('');
-
-            lines.push('---');
-            lines.push(`🤖 *Manual release triggered by ${context.actor}*`);
-
-            fs.writeFileSync('RELEASE_NOTES.md', lines.join('\n'));
-
-            // Create version.json for release artifacts
-            const versionJson = {
-              version: version,
-              image: `${registry}/${imageName}:${version}`,
-              commit: context.sha,
-              branch: context.ref.replace('refs/heads/', ''),
-              timestamp: new Date().toISOString(),
-              build_url: `${context.serverUrl}/${owner}/${repo}/actions/runs/${context.runId}`,
-              release_type: "official"
-            };
-            fs.writeFileSync('version.json', JSON.stringify(versionJson, null, 2));
-
-      - name: Create Git tag (idempotent)
-        shell: bash
+          TESTED_SHA: ${{ needs.prepare.outputs.commit }}
+          CI_URL: ${{ needs.prepare.outputs.ci_url }}
+          IMAGE: ${{ needs.prepare.outputs.image }}
+          EXTRA_NOTES: ${{ inputs.extra_notes }}
+          IS_PRERELEASE: ${{ inputs.prerelease }}
         run: |
-          set -euo pipefail
+          python3 - <<'PY'
+          import json, os
+          from pathlib import Path
+          metadata = {
+              'version': os.environ['VERSION'],
+              'commit': os.environ['TESTED_SHA'],
+              'image': os.environ['IMAGE'] + ':' + os.environ['VERSION'],
+              'ci_url': os.environ['CI_URL'],
+              'release_type': 'preview' if os.environ['IS_PRERELEASE'] == 'true' else 'official',
+          }
+          Path('version.json').write_text(json.dumps(metadata, indent=2) + '\n')
+          Path('RELEASE_NOTES.md').write_text(
+              '# EduFlow ' + os.environ['VERSION'] + '\n\n'
+              'Tested commit: `' + os.environ['TESTED_SHA'] + '`\n\n'
+              'CI evidence: ' + os.environ['CI_URL'] + '\n\n'
+              'Image: `' + metadata['image'] + '`\n\n'
+              + os.environ.get('EXTRA_NOTES', '') + '\n'
+          )
+          PY
 
-          TAG="${{ needs.prepare.outputs.tag }}"
-
-          git config --local user.email "action@github.com"
-          git config --local user.name "GitHub Action"
-
-          if git rev-parse "$TAG" >/dev/null 2>&1; then
-            echo "Tag $TAG already exists; skipping creation."
-            exit 0
-          fi
-
-          git tag -a "$TAG" -m "Release $TAG"
-          git push origin "$TAG"
-
-      - name: Create GitHub Release
+      - name: Publish versioned release
         uses: softprops/action-gh-release@v2
         with:
           tag_name: ${{ needs.prepare.outputs.tag }}
-          name: Koamishin Starterkit ${{ needs.prepare.outputs.tag }}
+          target_commitish: ${{ needs.prepare.outputs.commit }}
+          name: EduFlow ${{ needs.prepare.outputs.version }}
           body_path: RELEASE_NOTES.md
-          draft: ${{ needs.prepare.outputs.draft == 'true' }}
-          prerelease: ${{ needs.prepare.outputs.prerelease == 'true' }}
-          files: |
-            version.json
-          generate_release_notes: false
-
-  update-version:
-    runs-on: ubuntu-latest
-    needs: [prepare, build-and-push, create-release]
-    if: always() && (needs.build-and-push.result == 'success' || needs.build-and-push.result == 'skipped') && (needs.create-release.result == 'success' || needs.create-release.result == 'skipped')
-
-    steps:
-      - name: Checkout repository
-        uses: actions/checkout@v4
-        with:
-          fetch-depth: 0
-
-      - name: Update version.json and composer.json
-        shell: bash
-        run: |
-          set -euo pipefail
-
-          VERSION="${{ needs.prepare.outputs.version }}"
-          TAG="${{ needs.prepare.outputs.tag }}"
-
-          PREVIOUS_VERSION="1.0.0"
-          if [ -f "version.json" ]; then
-            PREVIOUS_VERSION=$(jq -r '.version // "1.0.0"' version.json 2>/dev/null || echo "1.0.0")
-          fi
-
-          # Pull latest changes to avoid conflicts
-          git pull origin ${GITHUB_REF_NAME}
-
-          # Update version.json
-          cat > version.json << EOF
-          {
-            "version": "${VERSION}",
-            "image": "${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:${TAG}",
-            "commit": "${{ github.sha }}",
-            "branch": "${{ github.ref_name }}",
-            "timestamp": "$(date -u +%Y-%m-%dT%H:%M:%SZ)",
-            "build_url": "${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}",
-            "release_type": "official",
-            "changelog": {
-              "current": "Version ${VERSION} - manual release",
-              "previous": "${PREVIOUS_VERSION}"
-            },
-            "metadata": {
-              "author": "${{ github.actor }}",
-              "workflow": "${{ github.workflow }}",
-              "repository": "${{ github.repository }}"
-            }
-          }
-          EOF
-
-          # Update composer.json version
-          jq --arg v "${VERSION}" '.version = $v' composer.json > composer.json.tmp
-          mv composer.json.tmp composer.json
-
-          git config --local user.email "action@github.com"
-          git config --local user.name "GitHub Action"
-          git add version.json composer.json
-          git diff --staged --quiet || (git commit -m "chore: update version to ${VERSION} [skip ci]" && git push)
-
-  notify:
-    runs-on: ubuntu-latest
-    needs: [prepare, build-and-push, create-release, update-version]
-    if: always()
-    env:
-      DISCORD_WEBHOOK_URL: ${{ secrets.DISCORD_WEBHOOK_URL }}
-
-    steps:
-      - name: Checkout repository
-        uses: actions/checkout@v4
-        with:
-          fetch-depth: 50
-
-      - name: Send Discord notification
-        if: ${{ env.DISCORD_WEBHOOK_URL != '' }}
-        env:
-          BUILD_RESULT: ${{ needs.build-and-push.result }}
-          RELEASE_RESULT: ${{ needs.create-release.result }}
-          VERSION_RESULT: ${{ needs.update-version.result }}
-        shell: bash
-        run: |
-          set -euo pipefail
-
-          if [ -z "$DISCORD_WEBHOOK_URL" ]; then
-            echo "No Discord webhook configured; skipping notification"
-            exit 0
-          fi
-
-          status_icon() {
-            case "$1" in
-              success) echo "✅" ;;
-              skipped) echo "⏭️" ;;
-              cancelled) echo "⚪" ;;
-              *) echo "❌" ;;
-            esac
-          }
-
-          BUILD_ICON=$(status_icon "$BUILD_RESULT")
-          RELEASE_ICON=$(status_icon "$RELEASE_RESULT")
-          VERSION_ICON=$(status_icon "$VERSION_RESULT")
-
-          if [ "$BUILD_RESULT" = "success" ]; then
-            COLOR=5763719
-            SUMMARY="Build succeeded"
-          else
-            COLOR=15548997
-            SUMMARY="Build failed"
-          fi
-
-          RECENT_CHANGES=$(git log -5 --pretty=format:"- %s (%an)" HEAD 2>/dev/null || true)
-          if [ -z "${RECENT_CHANGES:-}" ]; then
-            RECENT_CHANGES="(No additional commits detected)"
-          fi
-
-          CONTRIBUTORS=$(git log -20 --pretty=format:"%an" HEAD 2>/dev/null | awk '!seen[$0]++' | head -n 10 | paste -sd ', ' - 2>/dev/null || true)
-          if [ -z "${CONTRIBUTORS:-}" ]; then
-            CONTRIBUTORS="${{ github.actor }}"
-          fi
-
-          RELEASE_URL="${{ github.server_url }}/${{ github.repository }}/releases/tag/${{ needs.prepare.outputs.tag }}"
-
-          PAYLOAD=$(jq -n \
-            --arg summary "$SUMMARY" \
-            --arg build "$BUILD_ICON Build: $BUILD_RESULT" \
-            --arg release "$RELEASE_ICON Release: $RELEASE_RESULT" \
-            --arg version "$VERSION_ICON Version File: $VERSION_RESULT" \
-            --arg versionLabel "${{ needs.prepare.outputs.version }}" \
-            --arg tag "${{ needs.prepare.outputs.tag }}" \
-            --arg branch "${{ github.ref_name }}" \
-            --arg actor "${{ github.actor }}" \
-            --arg buildUrl "${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}" \
-            --arg docker "${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:${{ needs.prepare.outputs.version }}" \
-            --arg releaseUrl "$RELEASE_URL" \
-            --arg changes "$RECENT_CHANGES" \
-            --arg contributors "$CONTRIBUTORS" \
-            --argjson color "$COLOR" \
-            '{
-              "username": "Koamishin Release Bot",
-              "embeds": [
-                {
-                  "title": "Official Release • \($summary)",
-                  "color": $color,
-                  "description": "**Version:** \($versionLabel)\n**Tag:** \($tag)",
-                  "fields": [
-                    { "name": "Pipeline", "value": $buildUrl, "inline": false },
-                    { "name": "Docker Image", "value": $docker, "inline": false },
-                    { "name": "Build Stage", "value": $build, "inline": true },
-                    { "name": "Release Stage", "value": $release, "inline": true },
-                    { "name": "Version File", "value": $version, "inline": true },
-                    { "name": "Branch", "value": $branch, "inline": true },
-                    { "name": "Actor", "value": $actor, "inline": true },
-                    { "name": "Latest Changes", "value": $changes, "inline": false },
-                    { "name": "Contributors", "value": $contributors, "inline": false }
-                  ],
-                  "footer": {
-                    "text": "Release details - \($releaseUrl)"
-                  },
-                  "timestamp": "'"$(date -u +%Y-%m-%dT%H:%M:%SZ)"'"
-                }
-              ]
-            }')
-
-          curl -X POST \
-            "$DISCORD_WEBHOOK_URL" \
-            -H 'Content-Type: application/json' \
-            -d "$PAYLOAD"
+          draft: ${{ inputs.draft }}
+          prerelease: ${{ inputs.prerelease }}
+          make_latest: ${{ !inputs.draft && !inputs.prerelease }}
+          files: version.json

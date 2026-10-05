@@ -5,74 +5,74 @@ declare(strict_types=1);
 namespace App\Policies;
 
 use App\Models\AssistanceRequest;
-use Illuminate\Auth\Access\HandlesAuthorization;
-use Illuminate\Foundation\Auth\User as AuthUser;
+use App\Models\User;
 
 class AssistanceRequestPolicy
 {
-    use HandlesAuthorization;
-
-    public function before(AuthUser $authUser, string $ability): ?bool
+    public function viewAny(User $user): bool
     {
-        if ($authUser->hasRole('super_admin')) {
+        return $user->hasAnyRole(['admin', 'finance_officer', 'super_admin']);
+    }
+
+    public function view(User $user, AssistanceRequest $assistanceRequest): bool
+    {
+        if ($this->viewAny($user)) {
             return true;
         }
 
-        return null;
+        return $user->hasRole('student') && (
+            $assistanceRequest->student()->where('user_id', $user->getKey())->exists()
+            || $assistanceRequest->user_id === $user->getKey()
+        );
     }
 
-    public function viewAny(AuthUser $authUser): bool
+    public function create(User $user): bool
     {
-        return $authUser->can('ViewAny:AssistanceRequest');
+        return $user->hasRole('student') && $user->student()->exists();
     }
 
-    public function view(AuthUser $authUser, AssistanceRequest $assistanceRequest): bool
+    public function update(User $user, AssistanceRequest $assistanceRequest): bool
     {
-        return $authUser->can('View:AssistanceRequest');
+        return false;
     }
 
-    public function create(AuthUser $authUser): bool
+    public function delete(User $user, AssistanceRequest $assistanceRequest): bool
     {
-        return $authUser->can('Create:AssistanceRequest');
+        return false;
     }
 
-    public function update(AuthUser $authUser, AssistanceRequest $assistanceRequest): bool
+    public function deleteAny(User $user): bool
     {
-        return $authUser->can('Update:AssistanceRequest');
+        return false;
     }
 
-    public function delete(AuthUser $authUser, AssistanceRequest $assistanceRequest): bool
+    public function restore(User $user, AssistanceRequest $assistanceRequest): bool
     {
-        return $authUser->can('Delete:AssistanceRequest');
+        return false;
     }
 
-    public function restore(AuthUser $authUser, AssistanceRequest $assistanceRequest): bool
+    public function restoreAny(User $user): bool
     {
-        return $authUser->can('Restore:AssistanceRequest');
+        return false;
     }
 
-    public function forceDelete(AuthUser $authUser, AssistanceRequest $assistanceRequest): bool
+    public function forceDelete(User $user, AssistanceRequest $assistanceRequest): bool
     {
-        return $authUser->can('ForceDelete:AssistanceRequest');
+        return false;
     }
 
-    public function forceDeleteAny(AuthUser $authUser): bool
+    public function forceDeleteAny(User $user): bool
     {
-        return $authUser->can('ForceDeleteAny:AssistanceRequest');
+        return false;
     }
 
-    public function restoreAny(AuthUser $authUser): bool
+    public function replicate(User $user, AssistanceRequest $assistanceRequest): bool
     {
-        return $authUser->can('RestoreAny:AssistanceRequest');
+        return false;
     }
 
-    public function replicate(AuthUser $authUser, AssistanceRequest $assistanceRequest): bool
+    public function reorder(User $user): bool
     {
-        return $authUser->can('Replicate:AssistanceRequest');
-    }
-
-    public function reorder(AuthUser $authUser): bool
-    {
-        return $authUser->can('Reorder:AssistanceRequest');
+        return false;
     }
 }

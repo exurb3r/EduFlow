@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Models;
 
+use App\Actions\GuardSingleInstitution;
 use Illuminate\Database\Eloquent\Collection;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
@@ -29,6 +30,12 @@ class Organization extends Model
 {
     use HasFactory;
 
+    #[\Override]
+    protected static function booted(): void
+    {
+        static::creating(fn (Organization $organization) => app(GuardSingleInstitution::class)->handle());
+    }
+
     protected $fillable = [
         'name',
         'type',
@@ -39,6 +46,7 @@ class Organization extends Model
         'human_approval_threshold',
     ];
 
+    #[\Override]
     protected function casts(): array
     {
         return [
@@ -54,9 +62,29 @@ class Organization extends Model
         return $this->hasMany(Wallet::class);
     }
 
+    /**
+     * The disbursing wallet. Prefers the configured Lepton agent wallet so a
+     * stale placeholder row can never be selected for real settlement.
+     */
     public function primaryWallet(): ?Wallet
     {
-        return $this->wallets()->first();
+        $treasury = config('lepton.arc.treasury');
+
+        if (is_string($treasury) && $treasury !== '') {
+            $configured = $this->wallets()
+                ->where('status', 'active')
+                ->whereRaw('lower(address) = ?', [strtolower($treasury)])
+                ->first();
+
+            if ($configured) {
+                return $configured;
+            }
+        }
+
+        return $this->wallets()
+            ->where('status', 'active')
+            ->orderByDesc('id')
+            ->first();
     }
 
     public function budgets(): HasMany

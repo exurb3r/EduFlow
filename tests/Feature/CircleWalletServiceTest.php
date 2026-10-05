@@ -60,6 +60,20 @@ test('receiving revenue increments balance and logs confirmation', function (): 
         ->and($tx->status)->toBe(TransactionStatus::CONFIRMED);
 });
 
+test('executes payment with exact base units and decrements balance', function (): void {
+    $tx = $this->circleService->executePaymentBaseUnits(
+        wallet: $this->wallet,
+        recipientAddress: '0xrecipient456',
+        baseUnits: 250_000000,
+        type: TransactionType::STUDENT_ASSISTANCE,
+        metadata: ['ticket' => 'REQ-TEST-001']
+    );
+
+    expect($this->wallet->fresh()->balance)->toBe(1250.00)
+        ->and($tx->status)->toBe(TransactionStatus::CONFIRMED)
+        ->and($tx->metadata['amount_base_units'])->toBe(250_000000);
+});
+
 test('throws exception when wallet balance is insufficient', function (): void {
     expect(fn () => $this->circleService->executePayment(
         wallet: $this->wallet,

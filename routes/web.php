@@ -1,14 +1,15 @@
 <?php
 
 use App\Enums\SocialLoginProvider;
+use App\Http\Controllers\AskEduFlowController;
 use App\Http\Controllers\AssistanceRequestController;
 use App\Http\Controllers\Auth\SocialAuthController;
-use App\Http\Controllers\DashboardController;
-use App\Http\Controllers\ImpersonateController;
+use App\Http\Controllers\FinanceApprovalController;
 use App\Http\Controllers\NotificationController;
 use App\Http\Controllers\StudentAssistanceController;
 use App\Http\Controllers\StudentPaymentsController;
 use App\Http\Controllers\StudentWalletController;
+use App\Http\Controllers\StudentDashboardController;
 use Illuminate\Support\Facades\Route;
 use Inertia\Inertia;
 use Laravel\Fortify\Features;
@@ -17,9 +18,15 @@ Route::get('/', fn () => Inertia::render('welcome', [
     'canRegister' => Features::enabled(Features::registration()),
 ]))->name('home');
 
+Route::get('dashboard', [StudentDashboardController::class, 'index'])->middleware(['auth', 'verified'])->name('dashboard');
+
 Route::middleware(['auth', 'verified'])->group(function (): void {
-    Route::get('dashboard', [DashboardController::class, 'index'])->name('dashboard');
+    Route::get('student/dashboard', [StudentDashboardController::class, 'show'])->name('student.dashboard');
     Route::post('assistance-requests', [AssistanceRequestController::class, 'store'])->name('assistance-requests.store');
+    Route::get('assistance/create', [AssistanceRequestController::class, 'create'])->name('assistance.create');
+    Route::post('assistance', [AssistanceRequestController::class, 'storeIntake'])->middleware('throttle:10,1')->name('assistance.store');
+    Route::get('assistance/{assistanceRequest}', [AssistanceRequestController::class, 'show'])->name('assistance.show');
+    Route::post('student/ask-eduflow', [AskEduFlowController::class, 'ask'])->middleware('throttle:30,1')->name('student.ask');
     Route::get('notifications', [NotificationController::class, 'index'])->name('notifications.index');
     Route::post('notifications/{id}/read', [NotificationController::class, 'markAsRead'])->name('notifications.mark-as-read');
     Route::post('notifications/read-all', [NotificationController::class, 'markAllAsRead'])->name('notifications.mark-all-read');
@@ -29,21 +36,32 @@ Route::middleware(['auth', 'verified'])->group(function (): void {
     Route::patch('wallet', [StudentWalletController::class, 'update'])->name('wallet.update');
 });
 
-Route::middleware('web')->group(function (): void {
-    /** @phpstan-ignore-next-line */
-    Route::impersonate();
-    Route::get('impersonate/take-redirect', [ImpersonateController::class, 'takeRedirect'])->name('impersonate.take-redirect');
-    Route::get('impersonate/leave-redirect', [ImpersonateController::class, 'leaveRedirect'])->name('impersonate.leave-redirect');
+/*
+| Human review of paused agent proposals. Authorisation is enforced inside
+| ApprovalResumeGate rather than by middleware, so the route cannot be added
+| without its checks and the role check lives in one place alongside the
+| conversation-ownership check it belongs with.
+*/
+Route::middleware(['auth', 'verified'])->group(function (): void {
+    Route::post('finance/approvals/pending', [FinanceApprovalController::class, 'pending'])
+        ->middleware('throttle:30,1')
+        ->name('finance.approvals.pending');
+
+    Route::post('finance/approvals/resume', [FinanceApprovalController::class, 'resume'])
+        ->middleware('throttle:10,1')
+        ->name('finance.approvals.resume');
 });
 
-$socialProviders = implode('|', SocialLoginProvider::values());
+Route::middleware('guest')->group(function (): void {
+    Route::get('auth/{provider}/redirect', [SocialAuthController::class, 'redirect'])
+        ->whereIn('provider', SocialLoginProvider::values())
+        ->name('auth.social.redirect');
 
-Route::get('auth/{provider}/redirect', [SocialAuthController::class, 'redirect'])
-    ->where('provider', $socialProviders)
-    ->name('auth.social.redirect');
+    Route::get('auth/{provider}/callback', [SocialAuthController::class, 'callback'])
+        ->whereIn('provider', SocialLoginProvider::values())
+        ->name('auth.social.callback');
+});
 
-Route::get('auth/{provider}/callback', [SocialAuthController::class, 'callback'])
-    ->where('provider', $socialProviders)
-    ->name('auth.social.callback');
+Route::impersonate();
 
 require __DIR__.'/settings.php';

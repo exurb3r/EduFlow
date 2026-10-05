@@ -1,10 +1,328 @@
 parameters:
 	ignoreErrors:
 		-
+			rawMessage: Access to an undefined property App\Models\AssistanceFund::$organization.
+			identifier: property.notFound
+			count: 1
+			path: app/Actions/ApproveEscalatedRequest.php
+
+		-
+			rawMessage: 'Call to an undefined static method App\Models\Approval::updateOrCreate().'
+			identifier: staticMethod.notFound
+			count: 1
+			path: app/Actions/ApproveEscalatedRequest.php
+
+		-
+			rawMessage: 'Call to an undefined static method App\Models\AgentDecision::create().'
+			identifier: staticMethod.notFound
+			count: 1
+			path: app/Actions/EvaluateAssistancePolicy.php
+
+		-
+			rawMessage: Using nullsafe property access "?->academic_status" on left side of ?? is unnecessary. Use -> instead.
+			identifier: nullsafe.neverNull
+			count: 2
+			path: app/Actions/EvaluateAssistancePolicy.php
+
+		-
+			rawMessage: Using nullsafe property access "?->attendance_rate" on left side of ?? is unnecessary. Use -> instead.
+			identifier: nullsafe.neverNull
+			count: 1
+			path: app/Actions/EvaluateAssistancePolicy.php
+
+		-
+			rawMessage: Using nullsafe property access "?->enrollment_status" on left side of ?? is unnecessary. Use -> instead.
+			identifier: nullsafe.neverNull
+			count: 2
+			path: app/Actions/EvaluateAssistancePolicy.php
+
+		-
 			rawMessage: 'Call to an undefined static method App\Models\User::create().'
 			identifier: staticMethod.notFound
 			count: 1
 			path: app/Actions/Fortify/CreateNewUser.php
+
+		-
+			rawMessage: 'Call to an undefined static method Spatie\Permission\Models\Role::firstOrCreate().'
+			identifier: staticMethod.notFound
+			count: 1
+			path: app/Actions/Fortify/CreateNewUser.php
+
+		-
+			rawMessage: 'Cannot call method assistanceRequests() on stdClass.'
+			identifier: method.nonObject
+			count: 2
+			path: app/Actions/SubmitAssistanceRequest.php
+
+		-
+			rawMessage: 'Cannot call method tuitionAccounts() on stdClass.'
+			identifier: method.nonObject
+			count: 1
+			path: app/Actions/SubmitAssistanceRequest.php
+
+		-
+			rawMessage: 'Call to an undefined static method App\Models\AgentDecision::create().'
+			identifier: staticMethod.notFound
+			count: 2
+			path: app/Agents/EduFlowAgent.php
+
+		-
+			rawMessage: 'Call to an undefined static method App\Models\Approval::create().'
+			identifier: staticMethod.notFound
+			count: 5
+			path: app/Agents/EduFlowAgent.php
+
+		-
+			rawMessage: 'Call to an undefined static method App\Models\AssistanceFund::where().'
+			identifier: staticMethod.notFound
+			count: 2
+			path: app/Agents/EduFlowAgent.php
+
+		-
+			rawMessage: 'Call to an undefined static method App\Models\AssistanceRequest::find().'
+			identifier: staticMethod.notFound
+			count: 2
+			path: app/Agents/EduFlowAgent.php
+
+		-
+			rawMessage: 'Call to an undefined static method App\Models\AssistanceRequest::whereIn().'
+			identifier: staticMethod.notFound
+			count: 1
+			path: app/Agents/EduFlowAgent.php
+
+		-
+			rawMessage: 'Call to an undefined static method App\Models\Budget::where().'
+			identifier: staticMethod.notFound
+			count: 1
+			path: app/Agents/EduFlowAgent.php
+
+		-
+			rawMessage: 'Call to an undefined static method App\Models\Invoice::find().'
+			identifier: staticMethod.notFound
+			count: 2
+			path: app/Agents/EduFlowAgent.php
+
+		-
+			rawMessage: 'Call to an undefined static method App\Models\Invoice::where().'
+			identifier: staticMethod.notFound
+			count: 1
+			path: app/Agents/EduFlowAgent.php
+
+		-
+			rawMessage: Using nullsafe method call on non-nullable type mixed. Use -> instead.
+			identifier: nullsafe.neverNull
+			count: 1
+			path: app/Agents/EduFlowAgent.php
+
+		-
+			rawMessage: 'Call to an undefined method Laravel\Ai\Contracts\ConversationStore::conversationBelongsTo().'
+			identifier: method.notFound
+			count: 1
+			path: app/Ai/Advisory/QnaGate.php
+
+		-
+			rawMessage: Expression on left side of ?? is not nullable.
+			identifier: nullCoalesce.expr
+			count: 1
+			path: app/Ai/Advisory/StudentBrief.php
+
+		-
+			rawMessage: Using nullsafe property access "?->approved_amount" on left side of ?? is unnecessary. Use -> instead.
+			identifier: nullsafe.neverNull
+			count: 1
+			path: app/Ai/Advisory/StudentBrief.php
+
+		-
+			rawMessage: Using nullsafe property access "?->auto_limit_base_units" on left side of ?? is unnecessary. Use -> instead.
+			identifier: nullsafe.neverNull
+			count: 1
+			path: app/Ai/Advisory/StudentBrief.php
+
+		-
+			rawMessage: Using nullsafe property access "?->min_attendance_rate" on left side of ?? is unnecessary. Use -> instead.
+			identifier: nullsafe.neverNull
+			count: 1
+			path: app/Ai/Advisory/StudentBrief.php
+
+		-
+			rawMessage: Using nullsafe property access "?->semester_cap_base_units" on left side of ?? is unnecessary. Use -> instead.
+			identifier: nullsafe.neverNull
+			count: 1
+			path: app/Ai/Advisory/StudentBrief.php
+
+		-
+			rawMessage: 'Call to an undefined static method App\Models\AssistanceFund::where().'
+			identifier: staticMethod.notFound
+			count: 1
+			path: app/Ai/Agents/SettlementOperatorFactory.php
+
+		-
+			rawMessage: 'Call to an undefined static method App\Models\Approval::updateOrCreate().'
+			identifier: staticMethod.notFound
+			count: 1
+			path: app/Ai/Approvals/ApprovalResumeGate.php
+
+		-
+			rawMessage: 'Parameter #1 $callback of method Illuminate\Support\Collection<int,stdClass>::map() expects callable(stdClass, int): array{tool_call_id: string, summary: non-falsy-string}, Closure(App\Models\Transaction): array{tool_call_id: string, summary: non-falsy-string} given.'
+			identifier: argument.type
+			count: 1
+			path: app/Ai/Approvals/ApprovalResumeGate.php
+
+		-
+			rawMessage: 'Call to an undefined method Illuminate\Database\Eloquent\Model::recordExpense().'
+			identifier: method.notFound
+			count: 1
+			path: app/Ai/Tools/DisburseAssistance.php
+
+		-
+			rawMessage: 'Call to an undefined static method App\Models\AssistanceRequest::find().'
+			identifier: staticMethod.notFound
+			count: 1
+			path: app/Ai/Tools/DisburseAssistance.php
+
+		-
+			rawMessage: 'Method App\Ai\Tools\DisburseAssistance::evaluate() never returns array{result: App\DTOs\PolicyEvaluationResult, decision: App\Models\AgentDecision, quote: array<string, mixed>, fund: App\Models\AssistanceFund} so it can be removed from the return type.'
+			identifier: return.unusedType
+			count: 1
+			path: app/Ai/Tools/DisburseAssistance.php
+
+		-
+			rawMessage: 'Method App\Ai\Tools\DisburseAssistance::evaluate() should return array{result: App\DTOs\PolicyEvaluationResult, decision: App\Models\AgentDecision, quote: array<string, mixed>, fund: App\Models\AssistanceFund}|null but returns array{result: App\DTOs\PolicyEvaluationResult, decision: App\Models\AgentDecision, quote: array<string, mixed>}.'
+			identifier: return.type
+			count: 1
+			path: app/Ai/Tools/DisburseAssistance.php
+
+		-
+			rawMessage: 'Call to an undefined static method App\Models\AgentDecision::where().'
+			identifier: staticMethod.notFound
+			count: 1
+			path: app/Ai/Tools/RecordHardshipContext.php
+
+		-
+			rawMessage: 'Call to an undefined static method App\Models\AgentDecision::where().'
+			identifier: staticMethod.notFound
+			count: 1
+			path: app/Console/Commands/EduFlowDemo.php
+
+		-
+			rawMessage: 'Call to an undefined static method App\Models\Organization::where().'
+			identifier: staticMethod.notFound
+			count: 1
+			path: app/Console/Commands/EduFlowDemo.php
+
+		-
+			rawMessage: 'Call to an undefined static method App\Models\Transaction::where().'
+			identifier: staticMethod.notFound
+			count: 1
+			path: app/Console/Commands/EduFlowDemo.php
+
+		-
+			rawMessage: Using nullsafe property access "?->provider_tx_hash" on left side of ?? is unnecessary. Use -> instead.
+			identifier: nullsafe.neverNull
+			count: 1
+			path: app/Console/Commands/EduFlowDemo.php
+
+		-
+			rawMessage: 'Call to function is_string() with string will always evaluate to true.'
+			identifier: function.alreadyNarrowedType
+			count: 1
+			path: app/Console/Commands/LeptonDoctor.php
+
+		-
+			rawMessage: 'Method App\Console\Commands\LeptonDoctor::emailHint() is unused.'
+			identifier: method.unused
+			count: 1
+			path: app/Console/Commands/LeptonDoctor.php
+
+		-
+			rawMessage: 'Offset ''authenticated'' on array{authenticated: bool, email: string|null, status: string|null, expires_in: string|null} on left side of ?? always exists and is not nullable.'
+			identifier: nullCoalesce.offset
+			count: 1
+			path: app/Console/Commands/LeptonDoctor.php
+
+		-
+			rawMessage: 'Undefined variable: $emailHint'
+			identifier: variable.undefined
+			count: 1
+			path: app/Console/Commands/LeptonDoctor.php
+
+		-
+			rawMessage: Instanceof between App\Enums\TransactionType and App\Enums\TransactionType will always evaluate to true.
+			identifier: instanceof.alwaysTrue
+			count: 1
+			path: app/Console/Commands/LeptonReconcileCommand.php
+
+		-
+			rawMessage: 'Method App\Enums\AgentDecisionType::getColor() never returns array<string> so it can be removed from the return type.'
+			identifier: return.unusedType
+			count: 1
+			path: app/Enums/AgentDecisionType.php
+
+		-
+			rawMessage: 'Method App\Enums\AgentDecisionType::getColor() never returns null so it can be removed from the return type.'
+			identifier: return.unusedType
+			count: 1
+			path: app/Enums/AgentDecisionType.php
+
+		-
+			rawMessage: 'Method App\Enums\AssistanceCategory::getColor() never returns array<string> so it can be removed from the return type.'
+			identifier: return.unusedType
+			count: 1
+			path: app/Enums/AssistanceCategory.php
+
+		-
+			rawMessage: 'Method App\Enums\AssistanceCategory::getColor() never returns null so it can be removed from the return type.'
+			identifier: return.unusedType
+			count: 1
+			path: app/Enums/AssistanceCategory.php
+
+		-
+			rawMessage: 'Method App\Enums\AssistancePriority::getColor() never returns array<string> so it can be removed from the return type.'
+			identifier: return.unusedType
+			count: 1
+			path: app/Enums/AssistancePriority.php
+
+		-
+			rawMessage: 'Method App\Enums\AssistancePriority::getColor() never returns null so it can be removed from the return type.'
+			identifier: return.unusedType
+			count: 1
+			path: app/Enums/AssistancePriority.php
+
+		-
+			rawMessage: 'Method App\Enums\AssistanceStatus::getColor() never returns array<string> so it can be removed from the return type.'
+			identifier: return.unusedType
+			count: 1
+			path: app/Enums/AssistanceStatus.php
+
+		-
+			rawMessage: 'Method App\Enums\AssistanceStatus::getColor() never returns null so it can be removed from the return type.'
+			identifier: return.unusedType
+			count: 1
+			path: app/Enums/AssistanceStatus.php
+
+		-
+			rawMessage: 'Method App\Enums\TransactionStatus::getColor() never returns array<string> so it can be removed from the return type.'
+			identifier: return.unusedType
+			count: 1
+			path: app/Enums/TransactionStatus.php
+
+		-
+			rawMessage: 'Method App\Enums\TransactionStatus::getColor() never returns null so it can be removed from the return type.'
+			identifier: return.unusedType
+			count: 1
+			path: app/Enums/TransactionStatus.php
+
+		-
+			rawMessage: 'Method App\Enums\TransactionType::getColor() never returns array<string> so it can be removed from the return type.'
+			identifier: return.unusedType
+			count: 1
+			path: app/Enums/TransactionType.php
+
+		-
+			rawMessage: 'Method App\Enums\TransactionType::getColor() never returns null so it can be removed from the return type.'
+			identifier: return.unusedType
+			count: 1
+			path: app/Enums/TransactionType.php
 
 		-
 			rawMessage: Access to an undefined property Illuminate\Support\Fluent::$default.
@@ -55,10 +373,166 @@ parameters:
 			path: app/Filament/Clusters/Settings/Pages/ApplicationFeaturesSettingsPage.php
 
 		-
+			rawMessage: 'Call to an undefined static method App\Models\Approval::where().'
+			identifier: staticMethod.notFound
+			count: 1
+			path: app/Filament/Pages/ApprovalCenter.php
+
+		-
+			rawMessage: 'Parameter #2 $approver of method App\Agents\EduFlowAgent::approveEscalation() expects App\Models\User, Illuminate\Contracts\Auth\Authenticatable|null given.'
+			identifier: argument.type
+			count: 1
+			path: app/Filament/Pages/ApprovalCenter.php
+
+		-
+			rawMessage: 'Parameter #2 $approver of method App\Agents\EduFlowAgent::rejectEscalation() expects App\Models\User, Illuminate\Contracts\Auth\Authenticatable|null given.'
+			identifier: argument.type
+			count: 1
+			path: app/Filament/Pages/ApprovalCenter.php
+
+		-
+			rawMessage: Using nullsafe property access on non-nullable type App\Models\AgentDecision. Use -> instead.
+			identifier: nullsafe.neverNull
+			count: 1
+			path: app/Filament/Pages/ApprovalCenter.php
+
+		-
+			rawMessage: 'Call to an undefined static method App\Models\Approval::where().'
+			identifier: staticMethod.notFound
+			count: 1
+			path: app/Filament/Resources/AssistanceRequests/Actions/ApproveEscalatedAction.php
+
+		-
+			rawMessage: 'Call to an undefined static method App\Models\AssistanceFund::where().'
+			identifier: staticMethod.notFound
+			count: 1
+			path: app/Filament/Resources/AssistanceRequests/Actions/ApproveEscalatedAction.php
+
+		-
+			rawMessage: 'Method App\Filament\Resources\AssistanceRequests\Actions\ApproveEscalatedAction::schemaFor() has invalid return type Filament\Forms\Components\Component.'
+			identifier: class.notFound
+			count: 1
+			path: app/Filament/Resources/AssistanceRequests/Actions/ApproveEscalatedAction.php
+
+		-
+			rawMessage: 'Method App\Filament\Resources\AssistanceRequests\Actions\ApproveEscalatedAction::schemaFor() should return array<int, Filament\Forms\Components\Component> but returns array<int, Filament\Forms\Components\Placeholder|Filament\Forms\Components\Textarea>.'
+			identifier: return.type
+			count: 1
+			path: app/Filament/Resources/AssistanceRequests/Actions/ApproveEscalatedAction.php
+
+		-
+			rawMessage: 'Parameter $approver of method App\Actions\ApproveEscalatedRequest::handle() expects App\Models\User, Illuminate\Contracts\Auth\Authenticatable|null given.'
+			identifier: argument.type
+			count: 1
+			path: app/Filament/Resources/AssistanceRequests/Actions/ApproveEscalatedAction.php
+
+		-
+			rawMessage: 'Call to an undefined static method App\Models\AssistanceRequest::whereIn().'
+			identifier: staticMethod.notFound
+			count: 1
+			path: app/Filament/Resources/AssistanceRequests/AssistanceRequestResource.php
+
+		-
+			rawMessage: 'Method App\Filament\Resources\AssistanceRequests\AssistanceRequestResource::getEloquentQuery() should return Illuminate\Database\Eloquent\Builder<App\Models\AssistanceRequest> but returns Illuminate\Database\Eloquent\Builder<Illuminate\Database\Eloquent\Model>.'
+			identifier: return.type
+			count: 1
+			path: app/Filament/Resources/AssistanceRequests/AssistanceRequestResource.php
+
+		-
+			rawMessage: Using nullsafe property access "?->policy_checked" on left side of ?? is unnecessary. Use -> instead.
+			identifier: nullsafe.neverNull
+			count: 1
+			path: app/Filament/Resources/AssistanceRequests/AssistanceRequestResource.php
+
+		-
+			rawMessage: Using nullsafe property access "?->reasoning_summary" on left side of ?? is unnecessary. Use -> instead.
+			identifier: nullsafe.neverNull
+			count: 1
+			path: app/Filament/Resources/AssistanceRequests/AssistanceRequestResource.php
+
+		-
 			rawMessage: Access to an undefined property Illuminate\Support\Fluent::$name.
 			identifier: property.notFound
 			count: 4
 			path: app/Filament/Resources/FeatureFlag/FeatureFlagResource.php
+
+		-
+			rawMessage: Access to an undefined property Illuminate\Database\Eloquent\Model::$network.
+			identifier: property.notFound
+			count: 1
+			path: app/Filament/Resources/Transactions/Pages/ViewTransaction.php
+
+		-
+			rawMessage: Access to an undefined property Illuminate\Database\Eloquent\Model::$provider_tx_hash.
+			identifier: property.notFound
+			count: 1
+			path: app/Filament/Resources/Transactions/Pages/ViewTransaction.php
+
+		-
+			rawMessage: 'Call to function is_string() with string will always evaluate to true.'
+			identifier: function.alreadyNarrowedType
+			count: 1
+			path: app/Filament/Resources/Transactions/Pages/ViewTransaction.php
+
+		-
+			rawMessage: 'Call to static method make() on an unknown class Filament\Infolists\Components\Section.'
+			identifier: class.notFound
+			count: 3
+			path: app/Filament/Resources/Transactions/Pages/ViewTransaction.php
+
+		-
+			rawMessage: 'Parameter #1 $label of method Filament\Infolists\Components\Entry::label() expects Closure|Illuminate\Contracts\Support\Htmlable|string|null, false given.'
+			identifier: argument.type
+			count: 1
+			path: app/Filament/Resources/Transactions/Pages/ViewTransaction.php
+
+		-
+			rawMessage: 'Parameter #1 $record of static method App\Filament\Resources\Transactions\Tables\TransactionsTable::explorerUrl() expects App\Models\Transaction, Illuminate\Database\Eloquent\Model given.'
+			identifier: argument.type
+			count: 2
+			path: app/Filament/Resources/Transactions/Pages/ViewTransaction.php
+
+		-
+			rawMessage: 'Call to an undefined static method App\Models\AgentDecision::where().'
+			identifier: staticMethod.notFound
+			count: 2
+			path: app/Filament/Widgets/TreasuryOverviewWidget.php
+
+		-
+			rawMessage: 'Call to an undefined static method App\Models\Invoice::where().'
+			identifier: staticMethod.notFound
+			count: 2
+			path: app/Filament/Widgets/TreasuryOverviewWidget.php
+
+		-
+			rawMessage: 'Call to an undefined static method App\Models\Transaction::where().'
+			identifier: staticMethod.notFound
+			count: 1
+			path: app/Filament/Widgets/TreasuryOverviewWidget.php
+
+		-
+			rawMessage: 'Parameter #2 $context of method App\Services\AskEduFlow::query() expects array{tuition_balance_base_units?: int, display_currency?: string, student_name?: string}, array{tuition_balance_base_units: mixed, display_currency: string, student_name: mixed, student_number: mixed} given.'
+			identifier: argument.type
+			count: 1
+			path: app/Http/Controllers/AskEduFlowController.php
+
+		-
+			rawMessage: 'Call to an undefined static method App\Models\Transaction::where().'
+			identifier: staticMethod.notFound
+			count: 1
+			path: app/Http/Controllers/AssistanceRequestController.php
+
+		-
+			rawMessage: Instanceof between App\Enums\TransactionStatus and BackedEnum will always evaluate to true.
+			identifier: instanceof.alwaysTrue
+			count: 1
+			path: app/Http/Controllers/AssistanceRequestController.php
+
+		-
+			rawMessage: Using nullsafe property access "?->name" on left side of ?? is unnecessary. Use -> instead.
+			identifier: nullsafe.neverNull
+			count: 1
+			path: app/Http/Controllers/AssistanceRequestController.php
 
 		-
 			rawMessage: Access to an undefined property App\Models\SocialAccount::$user.
@@ -83,6 +557,66 @@ parameters:
 			identifier: property.notFound
 			count: 1
 			path: app/Http/Controllers/Auth/SocialAuthController.php
+
+		-
+			rawMessage: 'Call to an undefined static method Spatie\Permission\Models\Role::firstOrCreate().'
+			identifier: staticMethod.notFound
+			count: 1
+			path: app/Http/Controllers/Auth/SocialAuthController.php
+
+		-
+			rawMessage: Access to an undefined property Illuminate\Notifications\DatabaseNotification::$created_at.
+			identifier: property.notFound
+			count: 1
+			path: app/Http/Controllers/DashboardController.php
+
+		-
+			rawMessage: Access to an undefined property Illuminate\Notifications\DatabaseNotification::$id.
+			identifier: property.notFound
+			count: 1
+			path: app/Http/Controllers/DashboardController.php
+
+		-
+			rawMessage: Access to an undefined property Illuminate\Notifications\DatabaseNotification::$read_at.
+			identifier: property.notFound
+			count: 1
+			path: app/Http/Controllers/DashboardController.php
+
+		-
+			rawMessage: Access to an undefined property Illuminate\Notifications\DatabaseNotification::$type.
+			identifier: property.notFound
+			count: 1
+			path: app/Http/Controllers/DashboardController.php
+
+		-
+			rawMessage: 'Call to an undefined method Illuminate\Database\Eloquent\Relations\HasMany<App\Models\AssistanceRequest, App\Models\User>::active().'
+			identifier: method.notFound
+			count: 1
+			path: app/Http/Controllers/DashboardController.php
+
+		-
+			rawMessage: 'Call to an undefined method Illuminate\Database\Eloquent\Relations\HasMany<App\Models\AssistanceRequest, App\Models\User>::resolved().'
+			identifier: method.notFound
+			count: 1
+			path: app/Http/Controllers/DashboardController.php
+
+		-
+			rawMessage: 'Parameter #1 $callback of method Illuminate\Support\Collection<int,stdClass>::map() contains unresolvable type.'
+			identifier: argument.unresolvableType
+			count: 1
+			path: app/Http/Controllers/DashboardController.php
+
+		-
+			rawMessage: 'Parameter #1 $callback of method Illuminate\Support\Collection<int,stdClass>::map() expects callable(stdClass, int): array{id: mixed, title: string, body: string|null, readAt: mixed, createdAt: mixed}, Closure(Illuminate\Notifications\DatabaseNotification): array{id: mixed, title: string, body: string|null, readAt: mixed, createdAt: mixed} given.'
+			identifier: argument.type
+			count: 1
+			path: app/Http/Controllers/DashboardController.php
+
+		-
+			rawMessage: 'Parameter #1 $callback of method Illuminate\Support\Collection<int,stdClass>::map() expects callable(stdClass, int): int, Closure(App\Models\AssistanceRequest): int given.'
+			identifier: argument.type
+			count: 1
+			path: app/Http/Controllers/DashboardController.php
 
 		-
 			rawMessage: Access to an undefined property Illuminate\Notifications\DatabaseNotification::$created_at.
@@ -121,16 +655,748 @@ parameters:
 			path: app/Http/Controllers/Settings/SecurityController.php
 
 		-
+			rawMessage: 'Strict comparison using !== between non-empty-array<string, string> and array{} will always evaluate to true.'
+			identifier: notIdentical.alwaysTrue
+			count: 1
+			path: app/Models/AiProvider.php
+
+		-
+			rawMessage: Using nullsafe property access "?->value" on left side of ?? is unnecessary. Use -> instead.
+			identifier: nullsafe.neverNull
+			count: 1
+			path: app/Models/AiProvider.php
+
+		-
+			rawMessage: 'Method App\Models\AssistancePolicyVersion::active() should return App\Models\AssistancePolicyVersion|null but returns stdClass|null.'
+			identifier: return.type
+			count: 1
+			path: app/Models/AssistancePolicyVersion.php
+
+		-
+			rawMessage: 'Call to an undefined static method App\Models\Student::find().'
+			identifier: staticMethod.notFound
+			count: 1
+			path: app/Models/AssistanceRequest.php
+
+		-
+			rawMessage: 'Method App\Models\AssistanceRequest::agentDecisions() should return Illuminate\Database\Eloquent\Relations\HasMany<App\Models\AgentDecision, $this(App\Models\AssistanceRequest)> but returns Illuminate\Database\Eloquent\Builder<App\Models\AgentDecision>.'
+			identifier: return.type
+			count: 1
+			path: app/Models/AssistanceRequest.php
+
+		-
+			rawMessage: 'Property App\Models\AssistanceRequest::$submitted_at (Illuminate\Support\Carbon|null) does not accept Carbon\CarbonInterface.'
+			identifier: assign.propertyType
+			count: 1
+			path: app/Models/AssistanceRequest.php
+
+		-
+			rawMessage: 'Method App\Models\Organization::primaryWallet() should return App\Models\Wallet|null but returns stdClass.'
+			identifier: return.type
+			count: 1
+			path: app/Models/Organization.php
+
+		-
+			rawMessage: 'Method App\Models\Organization::primaryWallet() should return App\Models\Wallet|null but returns stdClass|null.'
+			identifier: return.type
+			count: 1
+			path: app/Models/Organization.php
+
+		-
+			rawMessage: 'Call to an undefined method Illuminate\Foundation\Auth\User::hasRole().'
+			identifier: method.notFound
+			count: 1
+			path: app/Policies/AgentDecisionPolicy.php
+
+		-
+			rawMessage: 'Call to an undefined method Illuminate\Foundation\Auth\User::hasRole().'
+			identifier: method.notFound
+			count: 1
+			path: app/Policies/InvoicePolicy.php
+
+		-
+			rawMessage: 'Call to an undefined method Illuminate\Foundation\Auth\User::hasAnyRole().'
+			identifier: method.notFound
+			count: 1
+			path: app/Policies/SettlementApprovalPolicy.php
+
+		-
+			rawMessage: 'Call to an undefined method Illuminate\Foundation\Auth\User::hasRole().'
+			identifier: method.notFound
+			count: 1
+			path: app/Policies/SettlementApprovalPolicy.php
+
+		-
+			rawMessage: 'Call to an undefined method Illuminate\Foundation\Auth\User::hasRole().'
+			identifier: method.notFound
+			count: 1
+			path: app/Policies/TransactionPolicy.php
+
+		-
 			rawMessage: Access to an undefined property Illuminate\Http\Request::$email.
 			identifier: property.notFound
 			count: 1
 			path: app/Providers/FortifyServiceProvider.php
 
 		-
+			rawMessage: 'Call to static method query() on an unknown class App\Services\TuitionAccount.'
+			identifier: class.notFound
+			count: 1
+			path: app/Services/AskEduFlow.php
+
+		-
+			rawMessage: PHPDoc tag @param for parameter $keywords with type list<string> is incompatible with native type string.
+			identifier: parameter.phpDocType
+			count: 1
+			path: app/Services/AskEduFlow.php
+
+		-
+			rawMessage: PHPDoc tag @param for parameter $stems with type list<string> is incompatible with native type string.
+			identifier: parameter.phpDocType
+			count: 1
+			path: app/Services/AskEduFlow.php
+
+		-
+			rawMessage: PHPDoc tag @return with type list<string> is incompatible with native type string.
+			identifier: return.phpDocType
+			count: 1
+			path: app/Services/AskEduFlow.php
+
+		-
+			rawMessage: Using nullsafe property access "?->auto_limit_base_units" on left side of ?? is unnecessary. Use -> instead.
+			identifier: nullsafe.neverNull
+			count: 1
+			path: app/Services/AskEduFlow.php
+
+		-
+			rawMessage: 'Call to an undefined static method App\Models\Transaction::create().'
+			identifier: staticMethod.notFound
+			count: 2
+			path: app/Services/CircleWalletService.php
+
+		-
+			rawMessage: 'Call to an undefined static method App\Models\Transaction::where().'
+			identifier: staticMethod.notFound
+			count: 1
+			path: app/Services/FinancialPolicyEngine.php
+
+		-
+			rawMessage: Access to an undefined property App\Models\Invoice::$updated_at.
+			identifier: property.notFound
+			count: 1
+			path: app/Services/InvoiceSettlement.php
+
+		-
+			rawMessage: 'Call to an undefined method Yukazakiri\Lepton\Contracts\WalletGateway::treasuryAddress().'
+			identifier: method.notFound
+			count: 1
+			path: app/Services/InvoiceSettlement.php
+
+		-
+			rawMessage: 'Parameter #1 $callback of method Illuminate\Support\Collection<int,stdClass>::map() expects callable(stdClass, int): array{transaction: App\Models\Transaction, verdict: string, checked: string, reason: string, block: int|null, on_chain: array<string, mixed>|null, chain_source: string}, Closure(App\Models\Transaction): array{transaction: App\Models\Transaction, verdict: string, checked: string, reason: string, block: int|null, on_chain: array<string, mixed>|null, chain_source: string} given.'
+			identifier: argument.type
+			count: 1
+			path: app/Services/LeptonReconciliationService.php
+
+		-
+			rawMessage: Using nullsafe property access on non-nullable type App\Models\Wallet. Use -> instead.
+			identifier: nullsafe.neverNull
+			count: 1
+			path: app/Services/LeptonReconciliationService.php
+
+		-
+			rawMessage: 'Offset ''error'' on array{chain: string, chain_id: int, block: int|null, rpc_host: non-empty-string|null, driver: string, live_available: false, onchain_balance: null, ledger_balance: float, ...} on left side of ??= always exists and is always null.'
+			identifier: nullCoalesce.offset
+			count: 2
+			path: app/Services/LeptonTreasuryService.php
+
+		-
+			rawMessage: Using nullsafe property access "?->address" on left side of ?? is unnecessary. Use -> instead.
+			identifier: nullsafe.neverNull
+			count: 1
+			path: app/Services/LeptonTreasuryService.php
+
+		-
+			rawMessage: 'Call to an undefined static method App\Models\Invoice::where().'
+			identifier: staticMethod.notFound
+			count: 1
+			path: app/Services/TreasuryForecastService.php
+
+		-
+			rawMessage: 'Call to an undefined static method App\Models\Transaction::create().'
+			identifier: staticMethod.notFound
+			count: 1
+			path: app/Services/TuitionSettlementService.php
+
+		-
 			rawMessage: 'Undefined variable: $this'
 			identifier: variable.undefined
 			count: 1
 			path: routes/console.php
+
+		-
+			rawMessage: 'Call to an undefined static method Illuminate\Support\Facades\Route::impersonate().'
+			identifier: staticMethod.notFound
+			count: 1
+			path: routes/web.php
+
+		-
+			rawMessage: Access to an undefined property Pest\PendingCalls\TestCall::$gate.
+			identifier: property.notFound
+			count: 4
+			path: tests/Feature/Ai/AdversarialAgentTest.php
+
+		-
+			rawMessage: Access to an undefined property Pest\PendingCalls\TestCall::$sanitizer.
+			identifier: property.notFound
+			count: 9
+			path: tests/Feature/Ai/AdversarialAgentTest.php
+
+		-
+			rawMessage: 'Call to an undefined method Pest\PendingCalls\TestCall::seed().'
+			identifier: method.notFound
+			count: 3
+			path: tests/Feature/Ai/AdversarialAgentTest.php
+
+		-
+			rawMessage: 'Call to an undefined static method App\Models\AcademicTerm::firstOrFail().'
+			identifier: staticMethod.notFound
+			count: 3
+			path: tests/Feature/Ai/AdversarialAgentTest.php
+
+		-
+			rawMessage: 'Call to an undefined static method App\Models\AgentDecision::create().'
+			identifier: staticMethod.notFound
+			count: 1
+			path: tests/Feature/Ai/AdversarialAgentTest.php
+
+		-
+			rawMessage: 'Call to an undefined static method App\Models\Organization::firstOrFail().'
+			identifier: staticMethod.notFound
+			count: 1
+			path: tests/Feature/Ai/AdversarialAgentTest.php
+
+		-
+			rawMessage: 'Call to an undefined static method App\Models\Student::firstOrFail().'
+			identifier: staticMethod.notFound
+			count: 3
+			path: tests/Feature/Ai/AdversarialAgentTest.php
+
+		-
+			rawMessage: 'Call to an undefined static method App\Models\AiProvider::create().'
+			identifier: staticMethod.notFound
+			count: 1
+			path: tests/Feature/Ai/AiProviderAdminTest.php
+
+		-
+			rawMessage: 'Call to static method table() on an unknown class DB.'
+			identifier: class.notFound
+			count: 2
+			path: tests/Feature/Ai/AiProviderAdminTest.php
+
+		-
+			rawMessage: 'Static method Illuminate\Support\Facades\Crypt::decryptString() invoked with 3 parameters, 1 required.'
+			identifier: arguments.count
+			count: 1
+			path: tests/Feature/Ai/AiProviderAdminTest.php
+
+		-
+			rawMessage: Access to an undefined property Pest\PendingCalls\TestCall::$fund.
+			identifier: property.notFound
+			count: 1
+			path: tests/Feature/Ai/ApprovalRatchetTest.php
+
+		-
+			rawMessage: Access to an undefined property Pest\PendingCalls\TestCall::$organization.
+			identifier: property.notFound
+			count: 1
+			path: tests/Feature/Ai/ApprovalRatchetTest.php
+
+		-
+			rawMessage: Access to an undefined property Pest\PendingCalls\TestCall::$policyVersion.
+			identifier: property.notFound
+			count: 1
+			path: tests/Feature/Ai/ApprovalRatchetTest.php
+
+		-
+			rawMessage: Access to an undefined property Pest\PendingCalls\TestCall::$student.
+			identifier: property.notFound
+			count: 1
+			path: tests/Feature/Ai/ApprovalRatchetTest.php
+
+		-
+			rawMessage: Access to an undefined property Pest\PendingCalls\TestCall::$term.
+			identifier: property.notFound
+			count: 1
+			path: tests/Feature/Ai/ApprovalRatchetTest.php
+
+		-
+			rawMessage: 'Call to an undefined method Pest\PendingCalls\TestCall::seed().'
+			identifier: method.notFound
+			count: 1
+			path: tests/Feature/Ai/ApprovalRatchetTest.php
+
+		-
+			rawMessage: 'Call to an undefined static method App\Models\AcademicTerm::firstOrFail().'
+			identifier: staticMethod.notFound
+			count: 3
+			path: tests/Feature/Ai/ApprovalRatchetTest.php
+
+		-
+			rawMessage: 'Call to an undefined static method App\Models\AssistanceFund::where().'
+			identifier: staticMethod.notFound
+			count: 4
+			path: tests/Feature/Ai/ApprovalRatchetTest.php
+
+		-
+			rawMessage: 'Call to an undefined static method App\Models\Organization::firstOrFail().'
+			identifier: staticMethod.notFound
+			count: 4
+			path: tests/Feature/Ai/ApprovalRatchetTest.php
+
+		-
+			rawMessage: 'Call to an undefined static method App\Models\Student::firstOrFail().'
+			identifier: staticMethod.notFound
+			count: 4
+			path: tests/Feature/Ai/ApprovalRatchetTest.php
+
+		-
+			rawMessage: 'Call to an undefined static method App\Models\Transaction::where().'
+			identifier: staticMethod.notFound
+			count: 1
+			path: tests/Feature/Ai/ApprovalRatchetTest.php
+
+		-
+			rawMessage: Access to an undefined property Pest\PendingCalls\TestCall::$fund.
+			identifier: property.notFound
+			count: 1
+			path: tests/Feature/Ai/ApprovalResumeEndpointTest.php
+
+		-
+			rawMessage: Access to an undefined property Pest\PendingCalls\TestCall::$officer.
+			identifier: property.notFound
+			count: 34
+			path: tests/Feature/Ai/ApprovalResumeEndpointTest.php
+
+		-
+			rawMessage: 'Call to an undefined method App\Models\AiProvider::first().'
+			identifier: method.notFound
+			count: 1
+			path: tests/Feature/Ai/ApprovalResumeEndpointTest.php
+
+		-
+			rawMessage: 'Call to an undefined method Pest\PendingCalls\TestCall::actingAs().'
+			identifier: method.notFound
+			count: 18
+			path: tests/Feature/Ai/ApprovalResumeEndpointTest.php
+
+		-
+			rawMessage: 'Call to an undefined method Pest\PendingCalls\TestCall::postJson().'
+			identifier: method.notFound
+			count: 1
+			path: tests/Feature/Ai/ApprovalResumeEndpointTest.php
+
+		-
+			rawMessage: 'Call to an undefined method Pest\PendingCalls\TestCall::seed().'
+			identifier: method.notFound
+			count: 1
+			path: tests/Feature/Ai/ApprovalResumeEndpointTest.php
+
+		-
+			rawMessage: 'Call to an undefined static method App\Models\AcademicTerm::firstOrFail().'
+			identifier: staticMethod.notFound
+			count: 1
+			path: tests/Feature/Ai/ApprovalResumeEndpointTest.php
+
+		-
+			rawMessage: 'Call to an undefined static method App\Models\AgentDecision::create().'
+			identifier: staticMethod.notFound
+			count: 1
+			path: tests/Feature/Ai/ApprovalResumeEndpointTest.php
+
+		-
+			rawMessage: 'Call to an undefined static method App\Models\AiProvider::create().'
+			identifier: staticMethod.notFound
+			count: 1
+			path: tests/Feature/Ai/ApprovalResumeEndpointTest.php
+
+		-
+			rawMessage: 'Call to an undefined static method App\Models\Approval::where().'
+			identifier: staticMethod.notFound
+			count: 3
+			path: tests/Feature/Ai/ApprovalResumeEndpointTest.php
+
+		-
+			rawMessage: 'Call to an undefined static method App\Models\AssistanceFund::where().'
+			identifier: staticMethod.notFound
+			count: 1
+			path: tests/Feature/Ai/ApprovalResumeEndpointTest.php
+
+		-
+			rawMessage: 'Call to an undefined static method App\Models\Organization::firstOrFail().'
+			identifier: staticMethod.notFound
+			count: 2
+			path: tests/Feature/Ai/ApprovalResumeEndpointTest.php
+
+		-
+			rawMessage: 'Call to an undefined static method App\Models\Student::firstOrFail().'
+			identifier: staticMethod.notFound
+			count: 1
+			path: tests/Feature/Ai/ApprovalResumeEndpointTest.php
+
+		-
+			rawMessage: 'Call to an undefined static method App\Models\Transaction::count().'
+			identifier: staticMethod.notFound
+			count: 1
+			path: tests/Feature/Ai/ApprovalResumeEndpointTest.php
+
+		-
+			rawMessage: 'Call to static method uuid7() on an unknown class Str.'
+			identifier: class.notFound
+			count: 1
+			path: tests/Feature/Ai/ApprovalResumeEndpointTest.php
+
+		-
+			rawMessage: Class AiProviderResolver not found.
+			identifier: class.notFound
+			count: 1
+			path: tests/Feature/Ai/ApprovalResumeEndpointTest.php
+
+		-
+			rawMessage: Access to an undefined property Pest\PendingCalls\TestCall::$account.
+			identifier: property.notFound
+			count: 1
+			path: tests/Feature/Ai/QnaGateTest.php
+
+		-
+			rawMessage: Access to an undefined property Pest\PendingCalls\TestCall::$student.
+			identifier: property.notFound
+			count: 2
+			path: tests/Feature/Ai/QnaGateTest.php
+
+		-
+			rawMessage: Access to an undefined property Pest\PendingCalls\TestCall::$term.
+			identifier: property.notFound
+			count: 1
+			path: tests/Feature/Ai/QnaGateTest.php
+
+		-
+			rawMessage: Access to an undefined property Pest\PendingCalls\TestCall::$user.
+			identifier: property.notFound
+			count: 10
+			path: tests/Feature/Ai/QnaGateTest.php
+
+		-
+			rawMessage: 'Call to an undefined method Pest\PendingCalls\TestCall::seed().'
+			identifier: method.notFound
+			count: 1
+			path: tests/Feature/Ai/QnaGateTest.php
+
+		-
+			rawMessage: 'Call to an undefined static method App\Models\AiProvider::create().'
+			identifier: staticMethod.notFound
+			count: 1
+			path: tests/Feature/Ai/QnaGateTest.php
+
+		-
+			rawMessage: 'Call to an undefined static method App\Models\Student::firstOrFail().'
+			identifier: staticMethod.notFound
+			count: 1
+			path: tests/Feature/Ai/QnaGateTest.php
+
+		-
+			rawMessage: Access to an undefined property Pest\PendingCalls\TestCall::$approver.
+			identifier: property.notFound
+			count: 5
+			path: tests/Feature/ApproveEscalatedRequestTest.php
+
+		-
+			rawMessage: Access to an undefined property Pest\PendingCalls\TestCall::$fund.
+			identifier: property.notFound
+			count: 6
+			path: tests/Feature/ApproveEscalatedRequestTest.php
+
+		-
+			rawMessage: Access to an undefined property Pest\PendingCalls\TestCall::$org.
+			identifier: property.notFound
+			count: 5
+			path: tests/Feature/ApproveEscalatedRequestTest.php
+
+		-
+			rawMessage: Access to an undefined property Pest\PendingCalls\TestCall::$term.
+			identifier: property.notFound
+			count: 6
+			path: tests/Feature/ApproveEscalatedRequestTest.php
+
+		-
+			rawMessage: Access to an undefined property Pest\PendingCalls\TestCall::$wallet.
+			identifier: property.notFound
+			count: 2
+			path: tests/Feature/ApproveEscalatedRequestTest.php
+
+		-
+			rawMessage: 'Call to an undefined static method App\Models\AgentDecision::create().'
+			identifier: staticMethod.notFound
+			count: 4
+			path: tests/Feature/ApproveEscalatedRequestTest.php
+
+		-
+			rawMessage: 'Call to an undefined static method App\Models\AssistanceFund::create().'
+			identifier: staticMethod.notFound
+			count: 1
+			path: tests/Feature/ApproveEscalatedRequestTest.php
+
+		-
+			rawMessage: 'Call to an undefined static method App\Models\Organization::create().'
+			identifier: staticMethod.notFound
+			count: 1
+			path: tests/Feature/ApproveEscalatedRequestTest.php
+
+		-
+			rawMessage: 'Call to an undefined static method App\Models\Wallet::create().'
+			identifier: staticMethod.notFound
+			count: 1
+			path: tests/Feature/ApproveEscalatedRequestTest.php
+
+		-
+			rawMessage: Access to an undefined property Pest\PendingCalls\TestCall::$account.
+			identifier: property.notFound
+			count: 1
+			path: tests/Feature/AskEduFlowEndpointTest.php
+
+		-
+			rawMessage: Access to an undefined property Pest\PendingCalls\TestCall::$student.
+			identifier: property.notFound
+			count: 1
+			path: tests/Feature/AskEduFlowEndpointTest.php
+
+		-
+			rawMessage: Access to an undefined property Pest\PendingCalls\TestCall::$term.
+			identifier: property.notFound
+			count: 1
+			path: tests/Feature/AskEduFlowEndpointTest.php
+
+		-
+			rawMessage: Access to an undefined property Pest\PendingCalls\TestCall::$user.
+			identifier: property.notFound
+			count: 12
+			path: tests/Feature/AskEduFlowEndpointTest.php
+
+		-
+			rawMessage: 'Call to an undefined method Pest\PendingCalls\TestCall::actingAs().'
+			identifier: method.notFound
+			count: 11
+			path: tests/Feature/AskEduFlowEndpointTest.php
+
+		-
+			rawMessage: 'Call to an undefined method Pest\PendingCalls\TestCall::postJson().'
+			identifier: method.notFound
+			count: 1
+			path: tests/Feature/AskEduFlowEndpointTest.php
+
+		-
+			rawMessage: 'Call to an undefined method Pest\PendingCalls\TestCall::seed().'
+			identifier: method.notFound
+			count: 1
+			path: tests/Feature/AskEduFlowEndpointTest.php
+
+		-
+			rawMessage: Access to an undefined property Pest\PendingCalls\TestCall::$ask.
+			identifier: property.notFound
+			count: 10
+			path: tests/Feature/AskEduFlowMatcherTest.php
+
+		-
+			rawMessage: 'Call to an undefined method Pest\PendingCalls\TestCall::seed().'
+			identifier: method.notFound
+			count: 1
+			path: tests/Feature/AskEduFlowMatcherTest.php
+
+		-
+			rawMessage: Access to an undefined property Illuminate\Database\Eloquent\Model::$properties.
+			identifier: property.notFound
+			count: 2
+			path: tests/Feature/AssistanceIntakeTest.php
+
+		-
+			rawMessage: Access to an undefined property Pest\PendingCalls\TestCall::$account.
+			identifier: property.notFound
+			count: 9
+			path: tests/Feature/AssistanceIntakeTest.php
+
+		-
+			rawMessage: Access to an undefined property Pest\PendingCalls\TestCall::$payload.
+			identifier: property.notFound
+			count: 15
+			path: tests/Feature/AssistanceIntakeTest.php
+
+		-
+			rawMessage: Access to an undefined property Pest\PendingCalls\TestCall::$student.
+			identifier: property.notFound
+			count: 24
+			path: tests/Feature/AssistanceIntakeTest.php
+
+		-
+			rawMessage: Access to an undefined property Pest\PendingCalls\TestCall::$term.
+			identifier: property.notFound
+			count: 12
+			path: tests/Feature/AssistanceIntakeTest.php
+
+		-
+			rawMessage: 'Call to an undefined method Pest\PendingCalls\TestCall::actingAs().'
+			identifier: method.notFound
+			count: 14
+			path: tests/Feature/AssistanceIntakeTest.php
+
+		-
+			rawMessage: 'Call to an undefined method Pest\PendingCalls\TestCall::get().'
+			identifier: method.notFound
+			count: 7
+			path: tests/Feature/AssistanceIntakeTest.php
+
+		-
+			rawMessage: 'Call to an undefined method Pest\PendingCalls\TestCall::post().'
+			identifier: method.notFound
+			count: 3
+			path: tests/Feature/AssistanceIntakeTest.php
+
+		-
+			rawMessage: 'Call to an undefined method Pest\PendingCalls\TestCall::postJson().'
+			identifier: method.notFound
+			count: 3
+			path: tests/Feature/AssistanceIntakeTest.php
+
+		-
+			rawMessage: 'Call to an undefined method Pest\PendingCalls\TestCall::travel().'
+			identifier: method.notFound
+			count: 1
+			path: tests/Feature/AssistanceIntakeTest.php
+
+		-
+			rawMessage: 'Call to an undefined method Pest\PendingCalls\TestCall::travelTo().'
+			identifier: method.notFound
+			count: 1
+			path: tests/Feature/AssistanceIntakeTest.php
+
+		-
+			rawMessage: 'Call to an undefined static method App\Models\AssistanceRequest::count().'
+			identifier: staticMethod.notFound
+			count: 6
+			path: tests/Feature/AssistanceIntakeTest.php
+
+		-
+			rawMessage: 'Call to an undefined static method App\Models\AssistanceRequest::sole().'
+			identifier: staticMethod.notFound
+			count: 6
+			path: tests/Feature/AssistanceIntakeTest.php
+
+		-
+			rawMessage: 'Call to an undefined static method Spatie\Activitylog\Models\Activity::where().'
+			identifier: staticMethod.notFound
+			count: 9
+			path: tests/Feature/AssistanceIntakeTest.php
+
+		-
+			rawMessage: 'Cannot call method all() on array<string, mixed>.'
+			identifier: method.nonObject
+			count: 2
+			path: tests/Feature/AssistanceIntakeTest.php
+
+		-
+			rawMessage: 'Match expression does not handle remaining value: string'
+			identifier: match.unhandled
+			count: 1
+			path: tests/Feature/AssistanceIntakeTest.php
+
+		-
+			rawMessage: 'Parameter #2 $data of method App\Actions\SubmitAssistanceRequest::handle() expects array{submission_key: string, type: string, requested_amount: string, reason: string}, non-empty-array<mixed> given.'
+			identifier: argument.type
+			count: 1
+			path: tests/Feature/AssistanceIntakeTest.php
+
+		-
+			rawMessage: 'Call to an undefined method Pest\PendingCalls\TestCall::actingAs().'
+			identifier: method.notFound
+			count: 3
+			path: tests/Feature/AssistanceRequestTest.php
+
+		-
+			rawMessage: 'Call to an undefined method Pest\PendingCalls\TestCall::assertDatabaseCount().'
+			identifier: method.notFound
+			count: 1
+			path: tests/Feature/AssistanceRequestTest.php
+
+		-
+			rawMessage: 'Call to an undefined method Pest\PendingCalls\TestCall::assertDatabaseHas().'
+			identifier: method.notFound
+			count: 1
+			path: tests/Feature/AssistanceRequestTest.php
+
+		-
+			rawMessage: 'Call to an undefined static method App\Models\AssistanceRequest::first().'
+			identifier: staticMethod.notFound
+			count: 1
+			path: tests/Feature/AssistanceRequestTest.php
+
+		-
+			rawMessage: Access to an undefined property Pest\PendingCalls\TestCall::$account.
+			identifier: property.notFound
+			count: 1
+			path: tests/Feature/AssistanceShowAiTest.php
+
+		-
+			rawMessage: Access to an undefined property Pest\PendingCalls\TestCall::$org.
+			identifier: property.notFound
+			count: 2
+			path: tests/Feature/AssistanceShowAiTest.php
+
+		-
+			rawMessage: Access to an undefined property Pest\PendingCalls\TestCall::$student.
+			identifier: property.notFound
+			count: 3
+			path: tests/Feature/AssistanceShowAiTest.php
+
+		-
+			rawMessage: Access to an undefined property Pest\PendingCalls\TestCall::$term.
+			identifier: property.notFound
+			count: 3
+			path: tests/Feature/AssistanceShowAiTest.php
+
+		-
+			rawMessage: Access to an undefined property Pest\PendingCalls\TestCall::$user.
+			identifier: property.notFound
+			count: 5
+			path: tests/Feature/AssistanceShowAiTest.php
+
+		-
+			rawMessage: Access to an undefined property Pest\PendingCalls\TestCall::$wallet.
+			identifier: property.notFound
+			count: 1
+			path: tests/Feature/AssistanceShowAiTest.php
+
+		-
+			rawMessage: 'Call to an undefined method Pest\PendingCalls\TestCall::actingAs().'
+			identifier: method.notFound
+			count: 2
+			path: tests/Feature/AssistanceShowAiTest.php
+
+		-
+			rawMessage: 'Call to an undefined method Pest\PendingCalls\TestCall::seed().'
+			identifier: method.notFound
+			count: 1
+			path: tests/Feature/AssistanceShowAiTest.php
+
+		-
+			rawMessage: 'Call to an undefined static method App\Models\Organization::first().'
+			identifier: staticMethod.notFound
+			count: 1
+			path: tests/Feature/AssistanceShowAiTest.php
+
+		-
+			rawMessage: 'Call to an undefined static method App\Models\Wallet::firstOrCreate().'
+			identifier: staticMethod.notFound
+			count: 1
+			path: tests/Feature/AssistanceShowAiTest.php
 
 		-
 			rawMessage: 'Call to an undefined method Pest\PendingCalls\TestCall::actingAs().'
@@ -207,13 +1473,7 @@ parameters:
 		-
 			rawMessage: 'Call to an undefined method Pest\PendingCalls\TestCall::post().'
 			identifier: method.notFound
-			count: 1
-			path: tests/Feature/Auth/RegistrationTest.php
-
-		-
-			rawMessage: 'Call to an undefined static method Spatie\Permission\Models\Role::firstOrCreate().'
-			identifier: staticMethod.notFound
-			count: 1
+			count: 2
 			path: tests/Feature/Auth/RegistrationTest.php
 
 		-
@@ -259,9 +1519,93 @@ parameters:
 			path: tests/Feature/Auth/VerificationNotificationTest.php
 
 		-
-			rawMessage: 'Call to an undefined method Pest\PendingCalls\TestCall::actingAs().'
+			rawMessage: 'Access to an undefined property App\Models\User|Illuminate\Database\Eloquent\Collection<int, App\Models\User>::$roles.'
+			identifier: property.notFound
+			count: 1
+			path: tests/Feature/BootstrapAdminTest.php
+
+		-
+			rawMessage: 'Call to an undefined method Pest\PendingCalls\TestCall::artisan().'
+			identifier: method.notFound
+			count: 4
+			path: tests/Feature/BootstrapAdminTest.php
+
+		-
+			rawMessage: 'Call to an undefined static method App\Models\Organization::count().'
+			identifier: staticMethod.notFound
+			count: 1
+			path: tests/Feature/BootstrapAdminTest.php
+
+		-
+			rawMessage: 'Call to an undefined static method App\Models\User::count().'
+			identifier: staticMethod.notFound
+			count: 7
+			path: tests/Feature/BootstrapAdminTest.php
+
+		-
+			rawMessage: 'Call to an undefined static method App\Models\User::where().'
+			identifier: staticMethod.notFound
+			count: 1
+			path: tests/Feature/BootstrapAdminTest.php
+
+		-
+			rawMessage: 'Call to an undefined static method Spatie\Activitylog\Models\Activity::where().'
+			identifier: staticMethod.notFound
+			count: 3
+			path: tests/Feature/BootstrapAdminTest.php
+
+		-
+			rawMessage: 'Call to an undefined static method Spatie\Permission\Models\Role::count().'
+			identifier: staticMethod.notFound
+			count: 3
+			path: tests/Feature/BootstrapAdminTest.php
+
+		-
+			rawMessage: Access to an undefined property Pest\PendingCalls\TestCall::$circleService.
+			identifier: property.notFound
+			count: 5
+			path: tests/Feature/CircleWalletServiceTest.php
+
+		-
+			rawMessage: Access to an undefined property Pest\PendingCalls\TestCall::$org.
+			identifier: property.notFound
+			count: 1
+			path: tests/Feature/CircleWalletServiceTest.php
+
+		-
+			rawMessage: Access to an undefined property Pest\PendingCalls\TestCall::$wallet.
+			identifier: property.notFound
+			count: 8
+			path: tests/Feature/CircleWalletServiceTest.php
+
+		-
+			rawMessage: 'Call to an undefined static method App\Models\Organization::create().'
+			identifier: staticMethod.notFound
+			count: 1
+			path: tests/Feature/CircleWalletServiceTest.php
+
+		-
+			rawMessage: 'Call to an undefined static method App\Models\Wallet::create().'
+			identifier: staticMethod.notFound
+			count: 1
+			path: tests/Feature/CircleWalletServiceTest.php
+
+		-
+			rawMessage: 'Call to an undefined method Pest\PendingCalls\TestCall::freezeSecond().'
+			identifier: method.notFound
+			count: 5
+			path: tests/Feature/CurrencyConverterTest.php
+
+		-
+			rawMessage: 'Call to an undefined method Pest\PendingCalls\TestCall::travel().'
 			identifier: method.notFound
 			count: 1
+			path: tests/Feature/CurrencyConverterTest.php
+
+		-
+			rawMessage: 'Call to an undefined method Pest\PendingCalls\TestCall::actingAs().'
+			identifier: method.notFound
+			count: 16
 			path: tests/Feature/DashboardTest.php
 
 		-
@@ -271,10 +1615,610 @@ parameters:
 			path: tests/Feature/DashboardTest.php
 
 		-
+			rawMessage: 'Call to an undefined method Pest\PendingCalls\TestCall::artisan().'
+			identifier: method.notFound
+			count: 3
+			path: tests/Feature/DatabaseSeederTest.php
+
+		-
+			rawMessage: 'Call to an undefined method Pest\PendingCalls\TestCall::seed().'
+			identifier: method.notFound
+			count: 4
+			path: tests/Feature/DatabaseSeederTest.php
+
+		-
+			rawMessage: 'Call to an undefined static method App\Models\AcademicTerm::count().'
+			identifier: staticMethod.notFound
+			count: 1
+			path: tests/Feature/DatabaseSeederTest.php
+
+		-
+			rawMessage: 'Call to an undefined static method App\Models\AcademicTerm::exists().'
+			identifier: staticMethod.notFound
+			count: 1
+			path: tests/Feature/DatabaseSeederTest.php
+
+		-
+			rawMessage: 'Call to an undefined static method App\Models\AssistanceRequest::count().'
+			identifier: staticMethod.notFound
+			count: 1
+			path: tests/Feature/DatabaseSeederTest.php
+
+		-
+			rawMessage: 'Call to an undefined static method App\Models\Organization::count().'
+			identifier: staticMethod.notFound
+			count: 1
+			path: tests/Feature/DatabaseSeederTest.php
+
+		-
+			rawMessage: 'Call to an undefined static method App\Models\Student::count().'
+			identifier: staticMethod.notFound
+			count: 1
+			path: tests/Feature/DatabaseSeederTest.php
+
+		-
+			rawMessage: 'Call to an undefined static method App\Models\Student::where().'
+			identifier: staticMethod.notFound
+			count: 1
+			path: tests/Feature/DatabaseSeederTest.php
+
+		-
+			rawMessage: 'Call to an undefined static method App\Models\TuitionAccount::count().'
+			identifier: staticMethod.notFound
+			count: 1
+			path: tests/Feature/DatabaseSeederTest.php
+
+		-
+			rawMessage: 'Call to an undefined static method App\Models\TuitionAccount::where().'
+			identifier: staticMethod.notFound
+			count: 1
+			path: tests/Feature/DatabaseSeederTest.php
+
+		-
+			rawMessage: 'Call to an undefined static method App\Models\User::count().'
+			identifier: staticMethod.notFound
+			count: 5
+			path: tests/Feature/DatabaseSeederTest.php
+
+		-
+			rawMessage: 'Call to an undefined static method App\Models\User::where().'
+			identifier: staticMethod.notFound
+			count: 2
+			path: tests/Feature/DatabaseSeederTest.php
+
+		-
+			rawMessage: 'Call to an undefined static method Spatie\Permission\Models\Permission::count().'
+			identifier: staticMethod.notFound
+			count: 1
+			path: tests/Feature/DatabaseSeederTest.php
+
+		-
+			rawMessage: 'Call to an undefined static method Spatie\Permission\Models\Role::count().'
+			identifier: staticMethod.notFound
+			count: 3
+			path: tests/Feature/DatabaseSeederTest.php
+
+		-
+			rawMessage: 'Call to an undefined method Pest\PendingCalls\TestCall::seed().'
+			identifier: method.notFound
+			count: 6
+			path: tests/Feature/DemoScenarioScaleTest.php
+
+		-
+			rawMessage: 'Call to an undefined static method App\Models\AssistanceRequest::firstOrFail().'
+			identifier: staticMethod.notFound
+			count: 1
+			path: tests/Feature/DemoScenarioScaleTest.php
+
+		-
+			rawMessage: 'Call to an undefined static method App\Models\Organization::firstOrFail().'
+			identifier: staticMethod.notFound
+			count: 4
+			path: tests/Feature/DemoScenarioScaleTest.php
+
+		-
+			rawMessage: Access to an undefined property Pest\PendingCalls\TestCall::$agent.
+			identifier: property.notFound
+			count: 10
+			path: tests/Feature/EduFlowAgentTest.php
+
+		-
+			rawMessage: Access to an undefined property Pest\PendingCalls\TestCall::$aidBudget.
+			identifier: property.notFound
+			count: 1
+			path: tests/Feature/EduFlowAgentTest.php
+
+		-
+			rawMessage: Access to an undefined property Pest\PendingCalls\TestCall::$cloudVendor.
+			identifier: property.notFound
+			count: 2
+			path: tests/Feature/EduFlowAgentTest.php
+
+		-
+			rawMessage: Access to an undefined property Pest\PendingCalls\TestCall::$equipmentVendor.
+			identifier: property.notFound
+			count: 4
+			path: tests/Feature/EduFlowAgentTest.php
+
+		-
+			rawMessage: Access to an undefined property Pest\PendingCalls\TestCall::$org.
+			identifier: property.notFound
+			count: 17
+			path: tests/Feature/EduFlowAgentTest.php
+
+		-
+			rawMessage: Access to an undefined property Pest\PendingCalls\TestCall::$techBudget.
+			identifier: property.notFound
+			count: 3
+			path: tests/Feature/EduFlowAgentTest.php
+
+		-
+			rawMessage: Access to an undefined property Pest\PendingCalls\TestCall::$wallet.
+			identifier: property.notFound
+			count: 7
+			path: tests/Feature/EduFlowAgentTest.php
+
+		-
+			rawMessage: 'Call to an undefined static method App\Models\AgentDecision::where().'
+			identifier: staticMethod.notFound
+			count: 4
+			path: tests/Feature/EduFlowAgentTest.php
+
+		-
+			rawMessage: 'Call to an undefined static method App\Models\Approval::first().'
+			identifier: staticMethod.notFound
+			count: 1
+			path: tests/Feature/EduFlowAgentTest.php
+
+		-
+			rawMessage: 'Call to an undefined static method App\Models\Approval::where().'
+			identifier: staticMethod.notFound
+			count: 4
+			path: tests/Feature/EduFlowAgentTest.php
+
+		-
+			rawMessage: 'Call to an undefined static method App\Models\AssistanceFund::create().'
+			identifier: staticMethod.notFound
+			count: 5
+			path: tests/Feature/EduFlowAgentTest.php
+
+		-
+			rawMessage: 'Call to an undefined static method App\Models\AssistancePolicyVersion::create().'
+			identifier: staticMethod.notFound
+			count: 5
+			path: tests/Feature/EduFlowAgentTest.php
+
+		-
+			rawMessage: 'Call to an undefined static method App\Models\Budget::create().'
+			identifier: staticMethod.notFound
+			count: 2
+			path: tests/Feature/EduFlowAgentTest.php
+
+		-
+			rawMessage: 'Call to an undefined static method App\Models\Invoice::create().'
+			identifier: staticMethod.notFound
+			count: 4
+			path: tests/Feature/EduFlowAgentTest.php
+
+		-
+			rawMessage: 'Call to an undefined static method App\Models\Organization::create().'
+			identifier: staticMethod.notFound
+			count: 1
+			path: tests/Feature/EduFlowAgentTest.php
+
+		-
+			rawMessage: 'Call to an undefined static method App\Models\Transaction::where().'
+			identifier: staticMethod.notFound
+			count: 1
+			path: tests/Feature/EduFlowAgentTest.php
+
+		-
+			rawMessage: 'Call to an undefined static method App\Models\Vendor::create().'
+			identifier: staticMethod.notFound
+			count: 2
+			path: tests/Feature/EduFlowAgentTest.php
+
+		-
+			rawMessage: 'Call to an undefined static method App\Models\Wallet::create().'
+			identifier: staticMethod.notFound
+			count: 1
+			path: tests/Feature/EduFlowAgentTest.php
+
+		-
+			rawMessage: 'Call to an undefined method Pest\PendingCalls\TestCall::seed().'
+			identifier: method.notFound
+			count: 3
+			path: tests/Feature/EducationModelsTest.php
+
+		-
+			rawMessage: 'Call to an undefined method Pest\PendingCalls\TestCall::travel().'
+			identifier: method.notFound
+			count: 1
+			path: tests/Feature/EducationModelsTest.php
+
+		-
+			rawMessage: 'Call to an undefined method Pest\PendingCalls\TestCall::travelTo().'
+			identifier: method.notFound
+			count: 3
+			path: tests/Feature/EducationModelsTest.php
+
+		-
+			rawMessage: 'Call to an undefined static method App\Models\AcademicTerm::count().'
+			identifier: staticMethod.notFound
+			count: 2
+			path: tests/Feature/EducationModelsTest.php
+
+		-
+			rawMessage: 'Call to an undefined static method App\Models\AcademicTerm::sole().'
+			identifier: staticMethod.notFound
+			count: 1
+			path: tests/Feature/EducationModelsTest.php
+
+		-
+			rawMessage: 'Call to an undefined static method App\Models\AssistanceRequest::count().'
+			identifier: staticMethod.notFound
+			count: 1
+			path: tests/Feature/EducationModelsTest.php
+
+		-
+			rawMessage: 'Call to an undefined static method App\Models\AssistanceRequest::findOrFail().'
+			identifier: staticMethod.notFound
+			count: 1
+			path: tests/Feature/EducationModelsTest.php
+
+		-
+			rawMessage: 'Call to an undefined static method App\Models\AssistanceRequest::sole().'
+			identifier: staticMethod.notFound
+			count: 1
+			path: tests/Feature/EducationModelsTest.php
+
+		-
+			rawMessage: 'Call to an undefined static method App\Models\Role::count().'
+			identifier: staticMethod.notFound
+			count: 1
+			path: tests/Feature/EducationModelsTest.php
+
+		-
+			rawMessage: 'Call to an undefined static method App\Models\Role::whereIn().'
+			identifier: staticMethod.notFound
+			count: 1
+			path: tests/Feature/EducationModelsTest.php
+
+		-
+			rawMessage: 'Call to an undefined static method App\Models\Student::count().'
+			identifier: staticMethod.notFound
+			count: 2
+			path: tests/Feature/EducationModelsTest.php
+
+		-
+			rawMessage: 'Call to an undefined static method App\Models\Student::findOrFail().'
+			identifier: staticMethod.notFound
+			count: 1
+			path: tests/Feature/EducationModelsTest.php
+
+		-
+			rawMessage: 'Call to an undefined static method App\Models\Student::sole().'
+			identifier: staticMethod.notFound
+			count: 1
+			path: tests/Feature/EducationModelsTest.php
+
+		-
+			rawMessage: 'Call to an undefined static method App\Models\Student::where().'
+			identifier: staticMethod.notFound
+			count: 1
+			path: tests/Feature/EducationModelsTest.php
+
+		-
+			rawMessage: 'Call to an undefined static method App\Models\TuitionAccount::count().'
+			identifier: staticMethod.notFound
+			count: 2
+			path: tests/Feature/EducationModelsTest.php
+
+		-
+			rawMessage: 'Call to an undefined static method App\Models\TuitionAccount::sole().'
+			identifier: staticMethod.notFound
+			count: 1
+			path: tests/Feature/EducationModelsTest.php
+
+		-
+			rawMessage: 'Call to an undefined static method App\Models\User::count().'
+			identifier: staticMethod.notFound
+			count: 2
+			path: tests/Feature/EducationModelsTest.php
+
+		-
+			rawMessage: 'Call to an undefined static method App\Models\User::where().'
+			identifier: staticMethod.notFound
+			count: 4
+			path: tests/Feature/EducationModelsTest.php
+
+		-
+			rawMessage: Access to an undefined property Pest\PendingCalls\TestCall::$agent.
+			identifier: property.notFound
+			count: 1
+			path: tests/Feature/EscalatedApprovalActionTest.php
+
+		-
+			rawMessage: Access to an undefined property Pest\PendingCalls\TestCall::$fund.
+			identifier: property.notFound
+			count: 5
+			path: tests/Feature/EscalatedApprovalActionTest.php
+
+		-
+			rawMessage: Access to an undefined property Pest\PendingCalls\TestCall::$officer.
+			identifier: property.notFound
+			count: 8
+			path: tests/Feature/EscalatedApprovalActionTest.php
+
+		-
+			rawMessage: Access to an undefined property Pest\PendingCalls\TestCall::$org.
+			identifier: property.notFound
+			count: 9
+			path: tests/Feature/EscalatedApprovalActionTest.php
+
+		-
+			rawMessage: Access to an undefined property Pest\PendingCalls\TestCall::$student.
+			identifier: property.notFound
+			count: 1
+			path: tests/Feature/EscalatedApprovalActionTest.php
+
+		-
+			rawMessage: Access to an undefined property Pest\PendingCalls\TestCall::$term.
+			identifier: property.notFound
+			count: 1
+			path: tests/Feature/EscalatedApprovalActionTest.php
+
+		-
+			rawMessage: Access to an undefined property Pest\PendingCalls\TestCall::$wallet.
+			identifier: property.notFound
+			count: 4
+			path: tests/Feature/EscalatedApprovalActionTest.php
+
+		-
+			rawMessage: Access to an undefined property Pest\PendingCalls\TestCall|Pest\Support\HigherOrderTapProxy::$student.
+			identifier: property.notFound
+			count: 2
+			path: tests/Feature/EscalatedApprovalActionTest.php
+
+		-
+			rawMessage: Access to an undefined property Pest\PendingCalls\TestCall|Pest\Support\HigherOrderTapProxy::$term.
+			identifier: property.notFound
+			count: 1
+			path: tests/Feature/EscalatedApprovalActionTest.php
+
+		-
+			rawMessage: 'Call to an undefined method Illuminate\Testing\TestResponse::assertActionVisible().'
+			identifier: method.notFound
+			count: 1
+			path: tests/Feature/EscalatedApprovalActionTest.php
+
+		-
+			rawMessage: 'Call to an undefined method Livewire\Features\SupportTesting\Testable::assertTableActionHidden().'
+			identifier: method.notFound
+			count: 1
+			path: tests/Feature/EscalatedApprovalActionTest.php
+
+		-
+			rawMessage: 'Call to an undefined method Livewire\Features\SupportTesting\Testable::assertTableActionVisible().'
+			identifier: method.notFound
+			count: 2
+			path: tests/Feature/EscalatedApprovalActionTest.php
+
+		-
+			rawMessage: 'Call to an undefined method Livewire\Features\SupportTesting\Testable::callTableAction().'
+			identifier: method.notFound
+			count: 1
+			path: tests/Feature/EscalatedApprovalActionTest.php
+
+		-
+			rawMessage: 'Call to an undefined method Livewire\Features\SupportTesting\Testable::filterTable().'
+			identifier: method.notFound
+			count: 1
+			path: tests/Feature/EscalatedApprovalActionTest.php
+
+		-
+			rawMessage: 'Call to an undefined method Pest\PendingCalls\TestCall::actingAs().'
+			identifier: method.notFound
+			count: 6
+			path: tests/Feature/EscalatedApprovalActionTest.php
+
+		-
+			rawMessage: 'Call to an undefined static method App\Models\Approval::where().'
+			identifier: staticMethod.notFound
+			count: 2
+			path: tests/Feature/EscalatedApprovalActionTest.php
+
+		-
+			rawMessage: 'Call to an undefined static method App\Models\AssistanceFund::create().'
+			identifier: staticMethod.notFound
+			count: 1
+			path: tests/Feature/EscalatedApprovalActionTest.php
+
+		-
+			rawMessage: 'Call to an undefined static method App\Models\AssistancePolicyVersion::create().'
+			identifier: staticMethod.notFound
+			count: 1
+			path: tests/Feature/EscalatedApprovalActionTest.php
+
+		-
+			rawMessage: 'Call to an undefined static method App\Models\Organization::create().'
+			identifier: staticMethod.notFound
+			count: 1
+			path: tests/Feature/EscalatedApprovalActionTest.php
+
+		-
+			rawMessage: 'Call to an undefined static method App\Models\Transaction::where().'
+			identifier: staticMethod.notFound
+			count: 1
+			path: tests/Feature/EscalatedApprovalActionTest.php
+
+		-
+			rawMessage: 'Call to an undefined static method App\Models\Wallet::create().'
+			identifier: staticMethod.notFound
+			count: 1
+			path: tests/Feature/EscalatedApprovalActionTest.php
+
+		-
 			rawMessage: 'Call to an undefined method Pest\PendingCalls\TestCall::get().'
 			identifier: method.notFound
 			count: 1
 			path: tests/Feature/ExampleTest.php
+
+		-
+			rawMessage: 'Call to an undefined method Pest\PendingCalls\TestCall::seed().'
+			identifier: method.notFound
+			count: 1
+			path: tests/Feature/ExplainerSettlementTest.php
+
+		-
+			rawMessage: 'Call to an undefined static method App\Models\Organization::create().'
+			identifier: staticMethod.notFound
+			count: 2
+			path: tests/Feature/ExplainerSettlementTest.php
+
+		-
+			rawMessage: 'Call to an undefined static method App\Models\Wallet::create().'
+			identifier: staticMethod.notFound
+			count: 2
+			path: tests/Feature/ExplainerSettlementTest.php
+
+		-
+			rawMessage: Access to an undefined property Pest\PendingCalls\TestCall::$admin.
+			identifier: property.notFound
+			count: 1
+			path: tests/Feature/Filament/AiProviderAdminUiTest.php
+
+		-
+			rawMessage: 'Call to an undefined method Livewire\Features\SupportTesting\Testable::fillForm().'
+			identifier: method.notFound
+			count: 6
+			path: tests/Feature/Filament/AiProviderAdminUiTest.php
+
+		-
+			rawMessage: 'Call to an undefined method Pest\PendingCalls\TestCall::actingAs().'
+			identifier: method.notFound
+			count: 1
+			path: tests/Feature/Filament/AiProviderAdminUiTest.php
+
+		-
+			rawMessage: 'Call to an undefined method Pest\PendingCalls\TestCall::artisan().'
+			identifier: method.notFound
+			count: 1
+			path: tests/Feature/Filament/AiProviderAdminUiTest.php
+
+		-
+			rawMessage: 'Call to an undefined method Pest\PendingCalls\TestCall::get().'
+			identifier: method.notFound
+			count: 1
+			path: tests/Feature/Filament/AiProviderAdminUiTest.php
+
+		-
+			rawMessage: 'Call to an undefined static method App\Models\AiProvider::create().'
+			identifier: staticMethod.notFound
+			count: 3
+			path: tests/Feature/Filament/AiProviderAdminUiTest.php
+
+		-
+			rawMessage: 'Call to an undefined static method App\Models\AiProvider::firstOrFail().'
+			identifier: staticMethod.notFound
+			count: 2
+			path: tests/Feature/Filament/AiProviderAdminUiTest.php
+
+		-
+			rawMessage: 'Call to an undefined static method App\Models\AiProvider::where().'
+			identifier: staticMethod.notFound
+			count: 2
+			path: tests/Feature/Filament/AiProviderAdminUiTest.php
+
+		-
+			rawMessage: 'Call to an undefined static method Spatie\Permission\Models\Role::firstOrCreate().'
+			identifier: staticMethod.notFound
+			count: 1
+			path: tests/Feature/Filament/AiProviderAdminUiTest.php
+
+		-
+			rawMessage: 'Call to static method table() on an unknown class DB.'
+			identifier: class.notFound
+			count: 1
+			path: tests/Feature/Filament/AiProviderAdminUiTest.php
+
+		-
+			rawMessage: 'Call to an undefined method Illuminate\Testing\TestResponse::assertActionDoesNotExist().'
+			identifier: method.notFound
+			count: 1
+			path: tests/Feature/Filament/AssistanceRequestResourceTest.php
+
+		-
+			rawMessage: 'Call to an undefined method Illuminate\Testing\TestResponse::assertCanSeeTableRecords().'
+			identifier: method.notFound
+			count: 1
+			path: tests/Feature/Filament/AssistanceRequestResourceTest.php
+
+		-
+			rawMessage: 'Call to an undefined method Livewire\Features\SupportTesting\Testable::searchTable().'
+			identifier: method.notFound
+			count: 1
+			path: tests/Feature/Filament/AssistanceRequestResourceTest.php
+
+		-
+			rawMessage: 'Call to an undefined method Pest\PendingCalls\TestCall::actingAs().'
+			identifier: method.notFound
+			count: 7
+			path: tests/Feature/Filament/AssistanceRequestResourceTest.php
+
+		-
+			rawMessage: 'Call to an undefined method Pest\PendingCalls\TestCall::get().'
+			identifier: method.notFound
+			count: 6
+			path: tests/Feature/Filament/AssistanceRequestResourceTest.php
+
+		-
+			rawMessage: Access to an undefined property Pest\PendingCalls\TestCall::$org.
+			identifier: property.notFound
+			count: 3
+			path: tests/Feature/Filament/EduFlowCommandCenterTest.php
+
+		-
+			rawMessage: Access to an undefined property Pest\PendingCalls\TestCall::$wallet.
+			identifier: property.notFound
+			count: 1
+			path: tests/Feature/Filament/EduFlowCommandCenterTest.php
+
+		-
+			rawMessage: 'Call to an undefined method Pest\PendingCalls\TestCall::actingAs().'
+			identifier: method.notFound
+			count: 5
+			path: tests/Feature/Filament/EduFlowCommandCenterTest.php
+
+		-
+			rawMessage: 'Call to an undefined static method App\Models\Invoice::create().'
+			identifier: staticMethod.notFound
+			count: 1
+			path: tests/Feature/Filament/EduFlowCommandCenterTest.php
+
+		-
+			rawMessage: 'Call to an undefined static method App\Models\Organization::firstOrCreate().'
+			identifier: staticMethod.notFound
+			count: 1
+			path: tests/Feature/Filament/EduFlowCommandCenterTest.php
+
+		-
+			rawMessage: 'Call to an undefined static method App\Models\Vendor::create().'
+			identifier: staticMethod.notFound
+			count: 1
+			path: tests/Feature/Filament/EduFlowCommandCenterTest.php
+
+		-
+			rawMessage: 'Call to an undefined static method App\Models\Wallet::firstOrCreate().'
+			identifier: staticMethod.notFound
+			count: 1
+			path: tests/Feature/Filament/EduFlowCommandCenterTest.php
+
+		-
+			rawMessage: 'Call to an undefined static method Spatie\Permission\Models\Role::firstOrCreate().'
+			identifier: staticMethod.notFound
+			count: 3
+			path: tests/Feature/Filament/EduFlowCommandCenterTest.php
 
 		-
 			rawMessage: 'Call to an undefined method Livewire\Features\SupportTesting\Testable::fillForm().'
@@ -343,6 +2287,468 @@ parameters:
 			path: tests/Feature/FilamentProfilePageTest.php
 
 		-
+			rawMessage: Access to an undefined property Pest\PendingCalls\TestCall::$budget.
+			identifier: property.notFound
+			count: 4
+			path: tests/Feature/FinancialPolicyEngineTest.php
+
+		-
+			rawMessage: Access to an undefined property Pest\PendingCalls\TestCall::$engine.
+			identifier: property.notFound
+			count: 8
+			path: tests/Feature/FinancialPolicyEngineTest.php
+
+		-
+			rawMessage: Access to an undefined property Pest\PendingCalls\TestCall::$org.
+			identifier: property.notFound
+			count: 11
+			path: tests/Feature/FinancialPolicyEngineTest.php
+
+		-
+			rawMessage: Access to an undefined property Pest\PendingCalls\TestCall::$vendor.
+			identifier: property.notFound
+			count: 5
+			path: tests/Feature/FinancialPolicyEngineTest.php
+
+		-
+			rawMessage: Access to an undefined property Pest\PendingCalls\TestCall::$wallet.
+			identifier: property.notFound
+			count: 8
+			path: tests/Feature/FinancialPolicyEngineTest.php
+
+		-
+			rawMessage: 'Call to an undefined static method App\Models\Budget::create().'
+			identifier: staticMethod.notFound
+			count: 3
+			path: tests/Feature/FinancialPolicyEngineTest.php
+
+		-
+			rawMessage: 'Call to an undefined static method App\Models\Invoice::create().'
+			identifier: staticMethod.notFound
+			count: 5
+			path: tests/Feature/FinancialPolicyEngineTest.php
+
+		-
+			rawMessage: 'Call to an undefined static method App\Models\Organization::create().'
+			identifier: staticMethod.notFound
+			count: 1
+			path: tests/Feature/FinancialPolicyEngineTest.php
+
+		-
+			rawMessage: 'Call to an undefined static method App\Models\Vendor::create().'
+			identifier: staticMethod.notFound
+			count: 2
+			path: tests/Feature/FinancialPolicyEngineTest.php
+
+		-
+			rawMessage: 'Call to an undefined static method App\Models\Wallet::create().'
+			identifier: staticMethod.notFound
+			count: 1
+			path: tests/Feature/FinancialPolicyEngineTest.php
+
+		-
+			rawMessage: 'Call to an undefined method Pest\PendingCalls\TestCall::get().'
+			identifier: method.notFound
+			count: 1
+			path: tests/Feature/InertiaLayoutResolverTest.php
+
+		-
+			rawMessage: 'Access to an undefined property Illuminate\Database\Eloquent\Collection<int, Illuminate\Database\Eloquent\Model>|Illuminate\Database\Eloquent\Model::$id.'
+			identifier: property.notFound
+			count: 8
+			path: tests/Feature/InstallationInstitutionTest.php
+
+		-
+			rawMessage: 'Call to an undefined method Pest\PendingCalls\TestCall::actingAs().'
+			identifier: method.notFound
+			count: 1
+			path: tests/Feature/InstallationInstitutionTest.php
+
+		-
+			rawMessage: 'Call to an undefined method Pest\PendingCalls\TestCall::artisan().'
+			identifier: method.notFound
+			count: 1
+			path: tests/Feature/InstallationInstitutionTest.php
+
+		-
+			rawMessage: 'Call to an undefined method Pest\PendingCalls\TestCall::mock().'
+			identifier: method.notFound
+			count: 3
+			path: tests/Feature/InstallationInstitutionTest.php
+
+		-
+			rawMessage: 'Parameter #1 $organization of static method App\Ai\Agents\SettlementOperatorFactory::make() expects App\Models\Organization|null, Illuminate\Database\Eloquent\Collection<int, Illuminate\Database\Eloquent\Model>|Illuminate\Database\Eloquent\Model given.'
+			identifier: argument.type
+			count: 1
+			path: tests/Feature/InstallationInstitutionTest.php
+
+		-
+			rawMessage: 'Access to an undefined property Illuminate\Database\Eloquent\Collection<int, Illuminate\Database\Eloquent\Model>|Illuminate\Database\Eloquent\Model::$id.'
+			identifier: property.notFound
+			count: 3
+			path: tests/Feature/InstitutionInstallationTest.php
+
+		-
+			rawMessage: 'Call to an undefined method Pest\PendingCalls\TestCall::artisan().'
+			identifier: method.notFound
+			count: 2
+			path: tests/Feature/InstitutionInstallationTest.php
+
+		-
+			rawMessage: 'Call to an undefined static method App\Models\AiProvider::count().'
+			identifier: staticMethod.notFound
+			count: 1
+			path: tests/Feature/InstitutionInstallationTest.php
+
+		-
+			rawMessage: 'Call to an undefined static method App\Models\AssistancePolicyVersion::count().'
+			identifier: staticMethod.notFound
+			count: 1
+			path: tests/Feature/InstitutionInstallationTest.php
+
+		-
+			rawMessage: 'Call to an undefined static method App\Models\Organization::count().'
+			identifier: staticMethod.notFound
+			count: 15
+			path: tests/Feature/InstitutionInstallationTest.php
+
+		-
+			rawMessage: 'Call to an undefined static method App\Models\User::count().'
+			identifier: staticMethod.notFound
+			count: 1
+			path: tests/Feature/InstitutionInstallationTest.php
+
+		-
+			rawMessage: 'Call to an undefined static method App\Models\Wallet::count().'
+			identifier: staticMethod.notFound
+			count: 1
+			path: tests/Feature/InstitutionInstallationTest.php
+
+		-
+			rawMessage: 'Call to an undefined static method Spatie\Activitylog\Models\Activity::where().'
+			identifier: staticMethod.notFound
+			count: 1
+			path: tests/Feature/InstitutionInstallationTest.php
+
+		-
+			rawMessage: 'Call to an undefined static method Spatie\Permission\Models\Role::count().'
+			identifier: staticMethod.notFound
+			count: 3
+			path: tests/Feature/InstitutionInstallationTest.php
+
+		-
+			rawMessage: 'Parameter #1 $data of method App\Actions\InitializeInstitution::handle() expects array{name: string, country: string, locale: string, timezone: string, currency: string}, array given.'
+			identifier: argument.type
+			count: 19
+			path: tests/Feature/InstitutionInstallationTest.php
+
+		-
+			rawMessage: Access to an undefined property Illuminate\Database\Eloquent\Model::$id.
+			identifier: property.notFound
+			count: 1
+			path: tests/Feature/InvoiceSettlementProofTest.php
+
+		-
+			rawMessage: Access to an undefined property Pest\PendingCalls\TestCall::$fakeHash.
+			identifier: property.notFound
+			count: 2
+			path: tests/Feature/InvoiceSettlementProofTest.php
+
+		-
+			rawMessage: Access to an undefined property Pest\PendingCalls\TestCall::$org.
+			identifier: property.notFound
+			count: 9
+			path: tests/Feature/InvoiceSettlementProofTest.php
+
+		-
+			rawMessage: Access to an undefined property Pest\PendingCalls\TestCall::$realHash.
+			identifier: property.notFound
+			count: 7
+			path: tests/Feature/InvoiceSettlementProofTest.php
+
+		-
+			rawMessage: Access to an undefined property Pest\PendingCalls\TestCall::$wallet.
+			identifier: property.notFound
+			count: 4
+			path: tests/Feature/InvoiceSettlementProofTest.php
+
+		-
+			rawMessage: 'Call to an undefined static method App\Models\Invoice::create().'
+			identifier: staticMethod.notFound
+			count: 1
+			path: tests/Feature/InvoiceSettlementProofTest.php
+
+		-
+			rawMessage: 'Call to an undefined static method App\Models\Organization::create().'
+			identifier: staticMethod.notFound
+			count: 1
+			path: tests/Feature/InvoiceSettlementProofTest.php
+
+		-
+			rawMessage: 'Call to an undefined static method App\Models\Transaction::create().'
+			identifier: staticMethod.notFound
+			count: 1
+			path: tests/Feature/InvoiceSettlementProofTest.php
+
+		-
+			rawMessage: 'Call to an undefined static method App\Models\Vendor::create().'
+			identifier: staticMethod.notFound
+			count: 1
+			path: tests/Feature/InvoiceSettlementProofTest.php
+
+		-
+			rawMessage: 'Call to an undefined static method App\Models\Wallet::create().'
+			identifier: staticMethod.notFound
+			count: 1
+			path: tests/Feature/InvoiceSettlementProofTest.php
+
+		-
+			rawMessage: 'Call to an undefined static method App\Models\Organization::create().'
+			identifier: staticMethod.notFound
+			count: 3
+			path: tests/Feature/LeptonPrecisionTest.php
+
+		-
+			rawMessage: 'Call to an undefined static method App\Models\Wallet::create().'
+			identifier: staticMethod.notFound
+			count: 3
+			path: tests/Feature/LeptonPrecisionTest.php
+
+		-
+			rawMessage: Access to an undefined property Pest\PendingCalls\TestCall::$app.
+			identifier: property.notFound
+			count: 6
+			path: tests/Feature/LeptonReconciliationTest.php
+
+		-
+			rawMessage: Access to an undefined property Pest\PendingCalls\TestCall::$fakeHash.
+			identifier: property.notFound
+			count: 11
+			path: tests/Feature/LeptonReconciliationTest.php
+
+		-
+			rawMessage: Access to an undefined property Pest\PendingCalls\TestCall::$org.
+			identifier: property.notFound
+			count: 22
+			path: tests/Feature/LeptonReconciliationTest.php
+
+		-
+			rawMessage: Access to an undefined property Pest\PendingCalls\TestCall::$realHash.
+			identifier: property.notFound
+			count: 16
+			path: tests/Feature/LeptonReconciliationTest.php
+
+		-
+			rawMessage: Access to an undefined property Pest\PendingCalls\TestCall::$wallet.
+			identifier: property.notFound
+			count: 16
+			path: tests/Feature/LeptonReconciliationTest.php
+
+		-
+			rawMessage: 'Call to an undefined method Pest\PendingCalls\TestCall::artisan().'
+			identifier: method.notFound
+			count: 5
+			path: tests/Feature/LeptonReconciliationTest.php
+
+		-
+			rawMessage: 'Call to an undefined static method App\Models\Invoice::create().'
+			identifier: staticMethod.notFound
+			count: 3
+			path: tests/Feature/LeptonReconciliationTest.php
+
+		-
+			rawMessage: 'Call to an undefined static method App\Models\Organization::create().'
+			identifier: staticMethod.notFound
+			count: 1
+			path: tests/Feature/LeptonReconciliationTest.php
+
+		-
+			rawMessage: 'Call to an undefined static method App\Models\Transaction::create().'
+			identifier: staticMethod.notFound
+			count: 1
+			path: tests/Feature/LeptonReconciliationTest.php
+
+		-
+			rawMessage: 'Call to an undefined static method App\Models\Vendor::create().'
+			identifier: staticMethod.notFound
+			count: 3
+			path: tests/Feature/LeptonReconciliationTest.php
+
+		-
+			rawMessage: 'Call to an undefined static method App\Models\Wallet::create().'
+			identifier: staticMethod.notFound
+			count: 1
+			path: tests/Feature/LeptonReconciliationTest.php
+
+		-
+			rawMessage: Access to an undefined property Pest\PendingCalls\TestCall::$app.
+			identifier: property.notFound
+			count: 4
+			path: tests/Feature/LeptonTreasuryPanelTest.php
+
+		-
+			rawMessage: Access to an undefined property Pest\PendingCalls\TestCall::$org.
+			identifier: property.notFound
+			count: 10
+			path: tests/Feature/LeptonTreasuryPanelTest.php
+
+		-
+			rawMessage: Access to an undefined property Pest\PendingCalls\TestCall::$wallet.
+			identifier: property.notFound
+			count: 15
+			path: tests/Feature/LeptonTreasuryPanelTest.php
+
+		-
+			rawMessage: 'Call to an undefined static method App\Models\Organization::create().'
+			identifier: staticMethod.notFound
+			count: 1
+			path: tests/Feature/LeptonTreasuryPanelTest.php
+
+		-
+			rawMessage: 'Call to an undefined static method App\Models\Transaction::create().'
+			identifier: staticMethod.notFound
+			count: 5
+			path: tests/Feature/LeptonTreasuryPanelTest.php
+
+		-
+			rawMessage: 'Call to an undefined static method App\Models\Wallet::create().'
+			identifier: staticMethod.notFound
+			count: 3
+			path: tests/Feature/LeptonTreasuryPanelTest.php
+
+		-
+			rawMessage: Access to an undefined property Illuminate\Notifications\DatabaseNotification::$id.
+			identifier: property.notFound
+			count: 2
+			path: tests/Feature/NotificationsTest.php
+
+		-
+			rawMessage: Access to an undefined property Illuminate\Notifications\DatabaseNotification::$read_at.
+			identifier: property.notFound
+			count: 3
+			path: tests/Feature/NotificationsTest.php
+
+		-
+			rawMessage: 'Call to an undefined method Pest\PendingCalls\TestCall::actingAs().'
+			identifier: method.notFound
+			count: 6
+			path: tests/Feature/NotificationsTest.php
+
+		-
+			rawMessage: 'Call to an undefined method Pest\PendingCalls\TestCall::get().'
+			identifier: method.notFound
+			count: 1
+			path: tests/Feature/NotificationsTest.php
+
+		-
+			rawMessage: Access to an undefined property Pest\PendingCalls\TestCall::$fund.
+			identifier: property.notFound
+			count: 6
+			path: tests/Feature/PolicyEvaluationTest.php
+
+		-
+			rawMessage: Access to an undefined property Pest\PendingCalls\TestCall::$org.
+			identifier: property.notFound
+			count: 1
+			path: tests/Feature/PolicyEvaluationTest.php
+
+		-
+			rawMessage: Access to an undefined property Pest\PendingCalls\TestCall::$policy.
+			identifier: property.notFound
+			count: 5
+			path: tests/Feature/PolicyEvaluationTest.php
+
+		-
+			rawMessage: Access to an undefined property Pest\PendingCalls\TestCall::$term.
+			identifier: property.notFound
+			count: 5
+			path: tests/Feature/PolicyEvaluationTest.php
+
+		-
+			rawMessage: Access to an undefined property Pest\PendingCalls\TestCall::$wallet.
+			identifier: property.notFound
+			count: 1
+			path: tests/Feature/PolicyEvaluationTest.php
+
+		-
+			rawMessage: 'Call to an undefined static method App\Models\AssistanceFund::create().'
+			identifier: staticMethod.notFound
+			count: 1
+			path: tests/Feature/PolicyEvaluationTest.php
+
+		-
+			rawMessage: 'Call to an undefined static method App\Models\AssistancePolicyVersion::create().'
+			identifier: staticMethod.notFound
+			count: 1
+			path: tests/Feature/PolicyEvaluationTest.php
+
+		-
+			rawMessage: 'Call to an undefined static method App\Models\Organization::create().'
+			identifier: staticMethod.notFound
+			count: 1
+			path: tests/Feature/PolicyEvaluationTest.php
+
+		-
+			rawMessage: 'Call to an undefined static method App\Models\Wallet::create().'
+			identifier: staticMethod.notFound
+			count: 1
+			path: tests/Feature/PolicyEvaluationTest.php
+
+		-
+			rawMessage: Access to an undefined property Pest\PendingCalls\TestCall::$org.
+			identifier: property.notFound
+			count: 4
+			path: tests/Feature/ReadmeAccuracyTest.php
+
+		-
+			rawMessage: 'Call to an undefined method Pest\PendingCalls\TestCall::seed().'
+			identifier: method.notFound
+			count: 1
+			path: tests/Feature/ReadmeAccuracyTest.php
+
+		-
+			rawMessage: 'Call to an undefined static method App\Models\Organization::firstOrFail().'
+			identifier: staticMethod.notFound
+			count: 1
+			path: tests/Feature/ReadmeAccuracyTest.php
+
+		-
+			rawMessage: 'Call to an undefined static method App\Models\User::where().'
+			identifier: staticMethod.notFound
+			count: 1
+			path: tests/Feature/ReadmeAccuracyTest.php
+
+		-
+			rawMessage: Access to an undefined property Pest\Mixins\Expectation<string|false|null>::$not.
+			identifier: property.notFound
+			count: 4
+			path: tests/Feature/ReleaseSafetyTest.php
+
+		-
+			rawMessage: 'Call to an undefined method Pest\PendingCalls\TestCall::get().'
+			identifier: method.notFound
+			count: 2
+			path: tests/Feature/SchoolRegistrationTest.php
+
+		-
+			rawMessage: 'Call to an undefined method Pest\PendingCalls\TestCall::post().'
+			identifier: method.notFound
+			count: 2
+			path: tests/Feature/SchoolRegistrationTest.php
+
+		-
+			rawMessage: 'Call to an undefined static method App\Models\User::count().'
+			identifier: staticMethod.notFound
+			count: 1
+			path: tests/Feature/SchoolRegistrationTest.php
+
+		-
+			rawMessage: 'Call to an undefined static method App\Models\User::where().'
+			identifier: staticMethod.notFound
+			count: 1
+			path: tests/Feature/SchoolRegistrationTest.php
+
+		-
 			rawMessage: 'Call to an undefined method Pest\PendingCalls\TestCall::actingAs().'
 			identifier: method.notFound
 			count: 3
@@ -407,3 +2813,51 @@ parameters:
 			identifier: method.notFound
 			count: 1
 			path: tests/Feature/SetupStarterKitTest.php
+
+		-
+			rawMessage: Access to an undefined property Pest\PendingCalls\TestCall::$forecastService.
+			identifier: property.notFound
+			count: 3
+			path: tests/Feature/TreasuryForecastTest.php
+
+		-
+			rawMessage: Access to an undefined property Pest\PendingCalls\TestCall::$org.
+			identifier: property.notFound
+			count: 6
+			path: tests/Feature/TreasuryForecastTest.php
+
+		-
+			rawMessage: Access to an undefined property Pest\PendingCalls\TestCall::$vendor.
+			identifier: property.notFound
+			count: 4
+			path: tests/Feature/TreasuryForecastTest.php
+
+		-
+			rawMessage: Access to an undefined property Pest\PendingCalls\TestCall::$wallet.
+			identifier: property.notFound
+			count: 3
+			path: tests/Feature/TreasuryForecastTest.php
+
+		-
+			rawMessage: 'Call to an undefined static method App\Models\Invoice::create().'
+			identifier: staticMethod.notFound
+			count: 3
+			path: tests/Feature/TreasuryForecastTest.php
+
+		-
+			rawMessage: 'Call to an undefined static method App\Models\Organization::create().'
+			identifier: staticMethod.notFound
+			count: 1
+			path: tests/Feature/TreasuryForecastTest.php
+
+		-
+			rawMessage: 'Call to an undefined static method App\Models\Vendor::create().'
+			identifier: staticMethod.notFound
+			count: 1
+			path: tests/Feature/TreasuryForecastTest.php
+
+		-
+			rawMessage: 'Call to an undefined static method App\Models\Wallet::create().'
+			identifier: staticMethod.notFound
+			count: 1
+			path: tests/Feature/TreasuryForecastTest.php

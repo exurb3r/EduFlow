@@ -62,7 +62,7 @@ class ApprovalCenter extends Page implements HasTable
                     ->color('gray'),
                 TextColumn::make('agentDecision.requested_amount')
                     ->label('Amount')
-                    ->formatStateUsing(fn ($state) => number_format((float) $state, 2).' USDC')
+                    ->formatStateUsing(fn ($state): string => number_format((float) $state, 2).' USDC')
                     ->weight('bold'),
                 TextColumn::make('agentDecision.policy_checked')
                     ->label('Policy Trigger')

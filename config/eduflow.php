@@ -1,6 +1,23 @@
 <?php
 
 return [
+    // Required outside local/testing; never choose an institution by row order.
+    'institution_id' => env('EDUFLOW_INSTITUTION_ID'),
+
+    /*
+    |--------------------------------------------------------------------------
+    | Dual-Currency Display
+    |--------------------------------------------------------------------------
+    |
+    | Settlement always happens in USDC base units. Staff-facing screens also
+    | show a local-currency equivalent so a reviewer can see the real value
+    | of what they are authorising. The rate used is the locked quote stored
+    | on the agent decision, never a live rate.
+    |
+    */
+    'display_currency' => env('EDUFLOW_DISPLAY_CURRENCY', 'PHP'),
+    'max_rate_age_seconds' => env('EDUFLOW_MAX_RATE_AGE_SECONDS', 900),
+
     /*
     |--------------------------------------------------------------------------
     | Campus Quick Resources
