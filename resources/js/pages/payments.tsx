@@ -143,8 +143,7 @@ export default function Payments({
                                         <div className="min-w-0 flex-1">
                                             <div className="flex flex-wrap items-center gap-x-2 gap-y-1">
                                                 <span className="clay-title">
-                                                    +{tx.amount}{' '}
-                                                    {tx.currency}
+                                                    +{tx.amount} {tx.currency}
                                                 </span>
                                                 <span
                                                     className={`rounded-full px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wider ${statusPillClass(tx.status)}`}
@@ -161,7 +160,9 @@ export default function Payments({
                                                     <button
                                                         type="button"
                                                         onClick={() =>
-                                                            copyHash(tx.tx_hash as string)
+                                                            copyHash(
+                                                                tx.tx_hash as string,
+                                                            )
                                                         }
                                                         className="clay-meta clay-focus inline-flex items-center gap-1.5 rounded-full px-2 py-0.5 transition-colors hover:bg-[var(--clay-surface-soft)] hover:text-[var(--clay-text)]"
                                                         title="Copy transaction hash"

@@ -94,7 +94,7 @@ class StudentAssistanceController extends Controller
      */
     private function policyView(?Organization $organization): array
     {
-        if ($organization === null) {
+        if (! $organization instanceof Organization) {
             return [
                 'auto_limit' => PolicyEngineService::MAX_AUTO_ASSISTANCE,
                 'currency' => 'USDC',
@@ -106,7 +106,7 @@ class StudentAssistanceController extends Controller
         $budget = $organization->budgets()->where('category', 'scholarships')->first();
 
         return [
-            'auto_limit' => (float) min(PolicyEngineService::MAX_AUTO_ASSISTANCE, $organization->max_auto_payment),
+            'auto_limit' => min(PolicyEngineService::MAX_AUTO_ASSISTANCE, $organization->max_auto_payment),
             'currency' => $organization->currency,
             'budget_remaining' => $budget !== null ? (float) $budget->remaining_amount : 0.0,
             'minimum_reserve' => (float) $organization->minimum_reserve,

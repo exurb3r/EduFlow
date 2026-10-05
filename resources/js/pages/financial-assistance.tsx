@@ -26,10 +26,7 @@ import {
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
-import {
-    index as financialAssistanceIndex,
-    store as financialAssistanceStore,
-} from '@/routes/financial-assistance';
+import { store as financialAssistanceStore } from '@/routes/financial-assistance';
 import { update as walletUpdate } from '@/routes/wallet';
 import type { Paginated } from '@/types';
 
@@ -314,10 +311,7 @@ export default function FinancialAssistance({
                                         }`}
                                         style={
                                             {
-                                                '--stagger': Math.min(
-                                                    index,
-                                                    8,
-                                                ),
+                                                '--stagger': Math.min(index, 8),
                                             } as React.CSSProperties
                                         }
                                     >

@@ -7,6 +7,7 @@ namespace App\Services;
 use App\Models\AgentDecision;
 use App\Models\Organization;
 use App\Models\StudentAssistanceRequest;
+use App\Models\Wallet;
 
 /**
  * Deterministic policy enforcement for student monetary assistance.
@@ -43,7 +44,7 @@ final class PolicyEngineService
             : 0.0;
 
         $wallet = $organization->primaryWallet();
-        $treasury = $wallet !== null ? (float) $wallet->balance : 0.0;
+        $treasury = $wallet instanceof Wallet ? (float) $wallet->balance : 0.0;
 
         $checks = [
             [

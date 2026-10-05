@@ -55,653 +55,647 @@
 |
 */
 
-.bulletin {
-    /* Ground steps — warm-leaning black so cream sits harmoniously */
-    --clay-bg: #0B0A09;
-    --clay-bg-deep: #060505;
-    --clay-surface: #141210;
-    --clay-surface-hi: #1B1815;
-    --clay-surface-soft: #100E0C;
-    --clay-surface-deep: #0D0B0A;
-    --clay-shadow-color: 0 0 0;
+    .bulletin {
+        /* Ground steps — warm-leaning black so cream sits harmoniously */
+        --clay-bg: #0b0a09;
+        --clay-bg-deep: #060505;
+        --clay-surface: #141210;
+        --clay-surface-hi: #1b1815;
+        --clay-surface-soft: #100e0c;
+        --clay-surface-deep: #0d0b0a;
+        --clay-shadow-color: 0 0 0;
 
-    /* Brand — cream ink on black paper */
-    --clay-ink: #F6F1E6;
-    --clay-text: #EAE4D6;
-    --clay-text-muted: #A8A192;
-    --clay-text-faint: #7C7466;
-    --clay-border: #292520;
-    --clay-primary: #E9DFC7;
-    --clay-primary-bright: #F5EDD9;
-    --clay-primary-soft: #2B261C;
-    --clay-primary-foreground: #191410;
-    --clay-accent: #D6C49A;
-    --clay-accent-soft: #2A2519;
-    --clay-brand-glow: 233 223 199;
-    --clay-accent-glow: 214 196 154;
+        /* Brand — cream ink on black paper */
+        --clay-ink: #f6f1e6;
+        --clay-text: #eae4d6;
+        --clay-text-muted: #a8a192;
+        --clay-text-faint: #7c7466;
+        --clay-border: #292520;
+        --clay-primary: #e9dfc7;
+        --clay-primary-bright: #f5edd9;
+        --clay-primary-soft: #2b261c;
+        --clay-primary-foreground: #191410;
+        --clay-accent: #d6c49a;
+        --clay-accent-soft: #2a2519;
+        --clay-brand-glow: 233 223 199;
+        --clay-accent-glow: 214 196 154;
 
-    /* Status — information only */
-    --status-pending: #F59E0B;
-    --status-progress: #C9A96A;
-    --status-resolved: #4CAF7D;
-    --status-urgent: #DC5050;
+        /* Status — information only */
+        --status-pending: #f59e0b;
+        --status-progress: #c9a96a;
+        --status-resolved: #4caf7d;
+        --status-urgent: #dc5050;
 
-    /* Semantic remap */
-    --background: var(--clay-bg);
-    --foreground: var(--clay-text);
-    --card: var(--clay-surface);
-    --card-foreground: var(--clay-text);
-    --popover: var(--clay-surface);
-    --popover-foreground: var(--clay-text);
-    --primary: var(--clay-primary);
-    --primary-foreground: var(--clay-primary-foreground);
-    --secondary: var(--clay-surface-hi);
-    --secondary-foreground: var(--clay-text);
-    --muted: var(--clay-surface-soft);
-    --muted-foreground: var(--clay-text-muted);
-    --accent: var(--clay-primary-soft);
-    --accent-foreground: #EFE3C0;
-    --destructive: var(--status-urgent);
-    --destructive-foreground: #FFFFFF;
-    --border: var(--clay-border);
-    --input: var(--clay-border);
-    --ring: var(--clay-primary);
+        /* Semantic remap */
+        --background: var(--clay-bg);
+        --foreground: var(--clay-text);
+        --card: var(--clay-surface);
+        --card-foreground: var(--clay-text);
+        --popover: var(--clay-surface);
+        --popover-foreground: var(--clay-text);
+        --primary: var(--clay-primary);
+        --primary-foreground: var(--clay-primary-foreground);
+        --secondary: var(--clay-surface-hi);
+        --secondary-foreground: var(--clay-text);
+        --muted: var(--clay-surface-soft);
+        --muted-foreground: var(--clay-text-muted);
+        --accent: var(--clay-primary-soft);
+        --accent-foreground: #efe3c0;
+        --destructive: var(--status-urgent);
+        --destructive-foreground: #ffffff;
+        --border: var(--clay-border);
+        --input: var(--clay-border);
+        --ring: var(--clay-primary);
 
-    /*
+        /*
     | The app shell paints from the --sidebar* set, not from --background.
     | --sidebar equals the ground: shell and content are one continuous
     | sheet; the inset variant is delineated by radius and shadow.
     */
-    --sidebar: var(--clay-bg);
-    --sidebar-foreground: var(--clay-text);
-    --sidebar-primary: var(--clay-primary);
-    --sidebar-primary-foreground: var(--clay-primary-foreground);
-    --sidebar-accent: var(--clay-primary-soft);
-    --sidebar-accent-foreground: #EFE3C0;
-    --sidebar-border: var(--clay-border);
-    --sidebar-ring: var(--clay-primary);
+        --sidebar: var(--clay-bg);
+        --sidebar-foreground: var(--clay-text);
+        --sidebar-primary: var(--clay-primary);
+        --sidebar-primary-foreground: var(--clay-primary-foreground);
+        --sidebar-accent: var(--clay-primary-soft);
+        --sidebar-accent-foreground: #efe3c0;
+        --sidebar-border: var(--clay-border);
+        --sidebar-ring: var(--clay-primary);
 
-    /* Typography — Inter for UI, JetBrains Mono for data */
-    --font-sans:
-        'Inter', ui-sans-serif, system-ui, sans-serif,
-        'Apple Color Emoji', 'Segoe UI Emoji';
-    --font-serif: var(--font-sans);
-    --font-display: var(--font-sans);
-    --font-mono: 'JetBrains Mono', ui-monospace, SFMono-Regular, monospace;
+        /* Typography — Inter for UI, JetBrains Mono for data */
+        --font-sans:
+            'Inter', ui-sans-serif, system-ui, sans-serif, 'Apple Color Emoji',
+            'Segoe UI Emoji';
+        --font-serif: var(--font-sans);
+        --font-display: var(--font-sans);
+        --font-mono: 'JetBrains Mono', ui-monospace, SFMono-Regular, monospace;
 
-    /* Type scale — six steps, nothing else */
-    --text-scale-2xs: 0.6875rem;
-    --text-scale-xs: 0.75rem;
-    --text-scale-sm: 0.875rem;
-    --text-scale-base: 1rem;
-    --text-scale-lg: 1.375rem;
-    --text-scale-xl: clamp(1.75rem, 1.25rem + 2.5vw, 2.5rem);
+        /* Type scale — six steps, nothing else */
+        --text-scale-2xs: 0.6875rem;
+        --text-scale-xs: 0.75rem;
+        --text-scale-sm: 0.875rem;
+        --text-scale-base: 1rem;
+        --text-scale-lg: 1.375rem;
+        --text-scale-xl: clamp(1.75rem, 1.25rem + 2.5vw, 2.5rem);
 
-    /* Spacing rhythm — 4pt base, section cadence steps at sm */
-    --clay-gutter: 1rem;
-    --clay-section: 2rem;
+        /* Spacing rhythm — 4pt base, section cadence steps at sm */
+        --clay-gutter: 1rem;
+        --clay-section: 2rem;
 
-    /* Clay geometry */
-    --radius: 1.25rem;
-    --radius-lg: 1.5rem;
-    --radius-md: 1rem;
-    --radius-sm: 0.75rem;
-    --clay-radius-xl: 1.75rem;
+        /* Clay geometry */
+        --radius: 1.25rem;
+        --radius-lg: 1.5rem;
+        --radius-md: 1rem;
+        --radius-sm: 0.75rem;
+        --clay-radius-xl: 1.75rem;
 
-    /* Elevation: black-ground shadows + a 1px top light edge.
+        /* Elevation: black-ground shadows + a 1px top light edge.
        --shadow-cta adds the brand glow for the primary action only. */
-    --shadow-2xs: 0 1px 2px rgb(0 0 0 / 0.4);
-    --shadow-xs: 0 1px 2px rgb(0 0 0 / 0.45);
-    /* Card edges catch warm cream light — the compensation layer. */
-    --clay-edge: rgb(240 232 212 / 0.07);
-    --shadow-sm:
-        0 2px 6px rgb(0 0 0 / 0.35), inset 0 1px 0 var(--clay-edge);
-    --shadow:
-        0 4px 12px rgb(0 0 0 / 0.4), inset 0 1px 0 var(--clay-edge);
-    --shadow-md:
-        0 10px 28px rgb(0 0 0 / 0.45), inset 0 1px 0 var(--clay-edge);
-    --shadow-lg:
-        0 20px 50px rgb(0 0 0 / 0.55), inset 0 1px 0 var(--clay-edge);
-    --shadow-cta:
-        0 10px 28px rgb(var(--clay-brand-glow) / 0.35),
-        0 4px 12px rgb(0 0 0 / 0.5);
+        --shadow-2xs: 0 1px 2px rgb(0 0 0 / 0.4);
+        --shadow-xs: 0 1px 2px rgb(0 0 0 / 0.45);
+        /* Card edges catch warm cream light — the compensation layer. */
+        --clay-edge: rgb(240 232 212 / 0.07);
+        --shadow-sm:
+            0 2px 6px rgb(0 0 0 / 0.35), inset 0 1px 0 var(--clay-edge);
+        --shadow: 0 4px 12px rgb(0 0 0 / 0.4), inset 0 1px 0 var(--clay-edge);
+        --shadow-md:
+            0 10px 28px rgb(0 0 0 / 0.45), inset 0 1px 0 var(--clay-edge);
+        --shadow-lg:
+            0 20px 50px rgb(0 0 0 / 0.55), inset 0 1px 0 var(--clay-edge);
+        --shadow-cta:
+            0 10px 28px rgb(var(--clay-brand-glow) / 0.35),
+            0 4px 12px rgb(0 0 0 / 0.5);
 
-    background-color: var(--clay-bg);
-    color: var(--foreground);
-    font-family: var(--font-sans);
-    font-optical-sizing: auto;
-    font-size: var(--text-scale-sm);
-    line-height: 1.5;
-    -webkit-font-smoothing: antialiased;
-    scrollbar-color: var(--clay-border) transparent;
-}
+        background-color: var(--clay-bg);
+        color: var(--foreground);
+        font-family: var(--font-sans);
+        font-optical-sizing: auto;
+        font-size: var(--text-scale-sm);
+        line-height: 1.5;
+        -webkit-font-smoothing: antialiased;
+        scrollbar-color: var(--clay-border) transparent;
+    }
 
-/*
+    /*
 | Light mode is the SECONDARY rendition: off-white ground, white clay,
 | navy ink — same geometry, same accents, so the brand holds across the
 | system preference.
 */
-html:not(.dark) .bulletin {
-    --clay-edge: #FFFFFF;
-    /* Light rendition: warm paper ground, deep warm-ink primary — the
+    html:not(.dark) .bulletin {
+        --clay-edge: #ffffff;
+        /* Light rendition: warm paper ground, deep warm-ink primary — the
        same cream identity read on white instead of black. */
-    --clay-bg: #F5F1E8;
-    --clay-bg-deep: #EDE8DB;
-    --clay-bg-deep: #EEF2F7;
-    --clay-surface: #FFFDF8;
-    --clay-surface-hi: #FFFFFF;
-    --clay-surface-soft: #EFEAE0;
-    --clay-surface-deep: #E7E1D2;
-    --clay-shadow-color: 40 33 24;
-    --clay-ink: #211C14;
-    --clay-text: #2B261D;
-    --clay-text-muted: #6E6553;
-    --clay-text-faint: #998F7C;
-    --clay-border: #E0D9C8;
-    --clay-primary: #262019;
-    --clay-primary-bright: #332B20;
-    --clay-primary-soft: #EDE6D4;
-    --clay-primary-foreground: #F5EDD9;
-    --clay-accent: #8A7448;
-    --clay-accent-soft: #F0E9D8;
+        --clay-bg: #f5f1e8;
+        --clay-bg-deep: #ede8db;
+        --clay-bg-deep: #eef2f7;
+        --clay-surface: #fffdf8;
+        --clay-surface-hi: #ffffff;
+        --clay-surface-soft: #efeae0;
+        --clay-surface-deep: #e7e1d2;
+        --clay-shadow-color: 40 33 24;
+        --clay-ink: #211c14;
+        --clay-text: #2b261d;
+        --clay-text-muted: #6e6553;
+        --clay-text-faint: #998f7c;
+        --clay-border: #e0d9c8;
+        --clay-primary: #262019;
+        --clay-primary-bright: #332b20;
+        --clay-primary-soft: #ede6d4;
+        --clay-primary-foreground: #f5edd9;
+        --clay-accent: #8a7448;
+        --clay-accent-soft: #f0e9d8;
 
-    --status-pending: #D97706;
-    --status-progress: #A98943;
-    --status-resolved: #2F855A;
-    --status-urgent: #C0362C;
+        --status-pending: #d97706;
+        --status-progress: #a98943;
+        --status-resolved: #2f855a;
+        --status-urgent: #c0362c;
 
-    --primary-foreground: var(--clay-primary-foreground);
-    --accent-foreground: #6E5A2E;
-    --sidebar-accent-foreground: #6E5A2E;
+        --primary-foreground: var(--clay-primary-foreground);
+        --accent-foreground: #6e5a2e;
+        --sidebar-accent-foreground: #6e5a2e;
 
-    --shadow-2xs: 0 1px 2px rgb(40 33 24 / 0.05);
-    --shadow-xs: 0 1px 2px rgb(40 33 24 / 0.06);
-    --shadow-sm:
-        0 2px 6px rgb(40 33 24 / 0.06), inset 0 1px 0 #FFFFFF;
-    --shadow:
-        0 4px 12px rgb(40 33 24 / 0.07), inset 0 1px 0 #FFFFFF;
-    --shadow-md:
-        0 10px 28px rgb(40 33 24 / 0.1), inset 0 1px 0 #FFFFFF;
-    --shadow-lg:
-        0 20px 50px rgb(40 33 24 / 0.14), inset 0 1px 0 #FFFFFF;
-    --shadow-cta:
-        0 10px 28px rgb(var(--clay-brand-glow) / 0.25),
-        0 4px 12px rgb(40 33 24 / 0.08);
-}
+        --shadow-2xs: 0 1px 2px rgb(40 33 24 / 0.05);
+        --shadow-xs: 0 1px 2px rgb(40 33 24 / 0.06);
+        --shadow-sm: 0 2px 6px rgb(40 33 24 / 0.06), inset 0 1px 0 #ffffff;
+        --shadow: 0 4px 12px rgb(40 33 24 / 0.07), inset 0 1px 0 #ffffff;
+        --shadow-md: 0 10px 28px rgb(40 33 24 / 0.1), inset 0 1px 0 #ffffff;
+        --shadow-lg: 0 20px 50px rgb(40 33 24 / 0.14), inset 0 1px 0 #ffffff;
+        --shadow-cta:
+            0 10px 28px rgb(var(--clay-brand-glow) / 0.25),
+            0 4px 12px rgb(40 33 24 / 0.08);
+    }
 
-/* -- Clay card: the primary surface ------------------------------------ */
+    /* -- Clay card: the primary surface ------------------------------------ */
 
-:where(.clay-card) {
-    background-color: var(--clay-surface);
-    border-radius: var(--radius);
-    box-shadow: var(--shadow);
-    transition:
-        transform 250ms cubic-bezier(0.22, 1, 0.36, 1),
-        box-shadow 250ms cubic-bezier(0.22, 1, 0.36, 1),
-        border-color 200ms ease;
-}
+    :where(.clay-card) {
+        background-color: var(--clay-surface);
+        border-radius: var(--radius);
+        box-shadow: var(--shadow);
+        transition:
+            transform 250ms cubic-bezier(0.22, 1, 0.36, 1),
+            box-shadow 250ms cubic-bezier(0.22, 1, 0.36, 1),
+            border-color 200ms ease;
+    }
 
-/*
+    /*
 | Affordance pair for interactive cards (.clay-press = "this opens
 | something"): lift + brand edge + cursor. Non-interactive cards never
 | get it, so hover meaning stays unambiguous.
 */
-:where(.clay-press) {
-    cursor: pointer;
-}
+    :where(.clay-press) {
+        cursor: pointer;
+    }
 
-:where(.clay-press):hover {
-    transform: translateY(-3px);
-    box-shadow: var(--shadow-md);
-}
+    :where(.clay-press):hover {
+        transform: translateY(-3px);
+        box-shadow: var(--shadow-md);
+    }
 
-:where(.clay-press):focus-visible {
-    outline: none;
-    box-shadow:
-        0 0 0 2px var(--clay-bg),
-        0 0 0 4px var(--clay-accent),
-        var(--shadow-md);
-}
+    :where(.clay-press):focus-visible {
+        outline: none;
+        box-shadow:
+            0 0 0 2px var(--clay-bg),
+            0 0 0 4px var(--clay-accent),
+            var(--shadow-md);
+    }
 
-:where(.clay-press):active {
-    transform: translateY(-1px);
-    box-shadow: var(--shadow-sm);
-    transition-duration: 80ms;
-}
+    :where(.clay-press):active {
+        transform: translateY(-1px);
+        box-shadow: var(--shadow-sm);
+        transition-duration: 80ms;
+    }
 
-:where(.clay-press):disabled,
-:where(.clay-press)[aria-disabled='true'] {
-    cursor: not-allowed;
-    opacity: 0.55;
-    transform: none;
-}
+    :where(.clay-press):disabled,
+    :where(.clay-press)[aria-disabled='true'] {
+        cursor: not-allowed;
+        opacity: 0.55;
+        transform: none;
+    }
 
-/* -- Chips: pressed wells; active chip raises -------------------------- */
+    /* -- Chips: pressed wells; active chip raises -------------------------- */
 
-:where(.clay-chip) {
-    display: inline-flex;
-    align-items: center;
-    gap: 0.375rem;
-    border-radius: 999px;
-    padding: 0.5rem 0.9375rem;
-    font-family: var(--font-mono);
-    font-size: 0.6875rem;
-    font-weight: 500;
-    text-transform: uppercase;
-    letter-spacing: 0.06em;
-    color: var(--clay-text-muted);
-    background-color: var(--clay-surface-soft);
-    box-shadow:
-        inset 0 1.5px 3px rgb(var(--clay-shadow-color) / 0.14),
-        inset 0 -1px 0 rgb(255 255 255 / 0.05);
-    transition:
-        background-color 150ms ease,
-        color 150ms ease,
-        box-shadow 150ms ease,
-        transform 120ms ease;
-}
+    :where(.clay-chip) {
+        display: inline-flex;
+        align-items: center;
+        gap: 0.375rem;
+        border-radius: 999px;
+        padding: 0.5rem 0.9375rem;
+        font-family: var(--font-mono);
+        font-size: 0.6875rem;
+        font-weight: 500;
+        text-transform: uppercase;
+        letter-spacing: 0.06em;
+        color: var(--clay-text-muted);
+        background-color: var(--clay-surface-soft);
+        box-shadow:
+            inset 0 1.5px 3px rgb(var(--clay-shadow-color) / 0.14),
+            inset 0 -1px 0 rgb(255 255 255 / 0.05);
+        transition:
+            background-color 150ms ease,
+            color 150ms ease,
+            box-shadow 150ms ease,
+            transform 120ms ease;
+    }
 
-:where(.clay-chip):hover {
-    color: var(--clay-text);
-    background-color: var(--clay-surface-hi);
-}
+    :where(.clay-chip):hover {
+        color: var(--clay-text);
+        background-color: var(--clay-surface-hi);
+    }
 
-:where(.clay-chip):active {
-    transform: scale(0.96);
-}
+    :where(.clay-chip):active {
+        transform: scale(0.96);
+    }
 
-:where(.clay-chip):focus-visible {
-    outline: none;
-    box-shadow:
-        inset 0 1.5px 3px rgb(var(--clay-shadow-color) / 0.14),
-        0 0 0 2px var(--clay-bg),
-        0 0 0 4px var(--clay-accent);
-}
+    :where(.clay-chip):focus-visible {
+        outline: none;
+        box-shadow:
+            inset 0 1.5px 3px rgb(var(--clay-shadow-color) / 0.14),
+            0 0 0 2px var(--clay-bg),
+            0 0 0 4px var(--clay-accent);
+    }
 
-/*
+    /*
 | Active chip = raised primary. Distinct silhouette AND elevation AND
 | weight, so the selected state never relies on color alone (WCAG 1.4.1).
 */
-:where(.clay-chip[data-active='true']) {
-    background-color: var(--clay-primary);
-    color: var(--clay-primary-foreground);
-    font-weight: 700;
-    box-shadow:
-        inset 0 1px 0 rgb(255 255 255 / 0.45),
-        0 4px 12px rgb(var(--clay-brand-glow) / 0.16);
-}
+    :where(.clay-chip[data-active='true']) {
+        background-color: var(--clay-primary);
+        color: var(--clay-primary-foreground);
+        font-weight: 700;
+        box-shadow:
+            inset 0 1px 0 rgb(255 255 255 / 0.45),
+            0 4px 12px rgb(var(--clay-brand-glow) / 0.16);
+    }
 
-:where(.clay-chip[data-active='true']):hover {
-    background-color: var(--clay-primary-bright);
-    color: var(--clay-primary-foreground);
-}
+    :where(.clay-chip[data-active='true']):hover {
+        background-color: var(--clay-primary-bright);
+        color: var(--clay-primary-foreground);
+    }
 
-/* -- Inset wells: icon chips, search surround, empty-state discs -------- */
+    /* -- Inset wells: icon chips, search surround, empty-state discs -------- */
 
-:where(.clay-inset) {
-    background-color: var(--clay-surface-soft);
-    border-radius: var(--radius-sm);
-    box-shadow:
-        inset 0 2px 4px rgb(var(--clay-shadow-color) / 0.1),
-        inset 0 -1px 0 rgb(255 255 255 / 0.06);
-}
+    :where(.clay-inset) {
+        background-color: var(--clay-surface-soft);
+        border-radius: var(--radius-sm);
+        box-shadow:
+            inset 0 2px 4px rgb(var(--clay-shadow-color) / 0.1),
+            inset 0 -1px 0 rgb(255 255 255 / 0.06);
+    }
 
-html:not(.dark) :where(.clay-inset) {
-    box-shadow:
-        inset 0 2px 4px rgb(40 33 24 / 0.07),
-        inset 0 -1px 0 #FFFFFF;
-}
+    html:not(.dark) :where(.clay-inset) {
+        box-shadow:
+            inset 0 2px 4px rgb(40 33 24 / 0.07),
+            inset 0 -1px 0 #ffffff;
+    }
 
-:where(.clay-icon-chip) {
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    border-radius: 999px;
-    color: var(--clay-primary);
-    background-color: var(--clay-primary-soft);
-    box-shadow: inset 0 1px 0 rgb(255 255 255 / 0.06);
-    transition:
-        background-color 200ms ease,
-        color 200ms ease,
-        transform 200ms cubic-bezier(0.22, 1, 0.36, 1);
-}
+    :where(.clay-icon-chip) {
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        border-radius: 999px;
+        color: var(--clay-primary);
+        background-color: var(--clay-primary-soft);
+        box-shadow: inset 0 1px 0 rgb(255 255 255 / 0.06);
+        transition:
+            background-color 200ms ease,
+            color 200ms ease,
+            transform 200ms cubic-bezier(0.22, 1, 0.36, 1);
+    }
 
-html:not(.dark) :where(.clay-icon-chip) {
-    box-shadow: inset 0 1px 0 #FFFFFF;
-}
+    html:not(.dark) :where(.clay-icon-chip) {
+        box-shadow: inset 0 1px 0 #ffffff;
+    }
 
-:where(.clay-press):hover :where(.clay-icon-chip),
-:where(a:hover) :where(.clay-icon-chip) {
-    background-color: var(--clay-primary);
-    color: var(--clay-primary-foreground);
-}
+    :where(.clay-press):hover :where(.clay-icon-chip),
+    :where(a:hover) :where(.clay-icon-chip) {
+        background-color: var(--clay-primary);
+        color: var(--clay-primary-foreground);
+    }
 
-:where(.clay-icon-chip) :where(svg) {
-    transition: transform 200ms cubic-bezier(0.22, 1, 0.36, 1);
-}
+    :where(.clay-icon-chip) :where(svg) {
+        transition: transform 200ms cubic-bezier(0.22, 1, 0.36, 1);
+    }
 
-/* -- Fields: token-driven; the inset tint rides on background-image so
+    /* -- Fields: token-driven; the inset tint rides on background-image so
 |     it never fights the utilities layer ------------------------------- */
 
-:where(.clay-field) {
-    background-image: linear-gradient(
-        rgb(var(--clay-shadow-color) / 0.06),
-        rgb(var(--clay-shadow-color) / 0.1)
-    );
-}
-
-:where(.clay-field):focus-visible {
-    outline: 2px solid var(--clay-accent);
-    outline-offset: 2px;
-}
-
-/* -- Status dots --------------------------------------------------------- */
-
-:where(.clay-tab) {
-    width: 0.5rem;
-    height: 0.5rem;
-    border-radius: 999px;
-    flex-shrink: 0;
-    box-shadow:
-        inset 0 1px 1px rgb(255 255 255 / 0.4),
-        0 1px 2px rgb(0 0 0 / 0.3);
-}
-
-.clay-tab-pending {
-    background-color: var(--status-pending);
-}
-
-.clay-tab-progress {
-    background-color: var(--status-progress);
-}
-
-.clay-tab-resolved {
-    background-color: var(--status-resolved);
-}
-
-.clay-tab-closed {
-    background-color: var(--clay-text-faint);
-}
-
-/* -- Typography helpers --------------------------------------------------- */
-
-/* Section label: small, spaced, quiet — scan line, not shout. */
-:where(.bulletin-eyebrow) {
-    font-size: var(--text-scale-xs);
-    font-weight: 600;
-    letter-spacing: 0.14em;
-    text-transform: uppercase;
-    color: var(--clay-text-muted);
-}
-
-/* Display numerals: size carries hierarchy; tabular for stable layout. */
-:where(.bulletin-figure) {
-    font-size: var(--text-scale-xl);
-    font-weight: 700;
-    line-height: 0.95;
-    letter-spacing: -0.03em;
-    font-variant-numeric: lining-nums tabular-nums;
-    color: var(--clay-ink);
-    transition: transform 250ms cubic-bezier(0.22, 1, 0.36, 1);
-}
-
-/* Stat numerals rise as their card lifts — one motion, one object. */
-:where(.clay-card):hover :where(.bulletin-figure) {
-    transform: translateY(-3px);
-}
-
-/* -- Feedback states ------------------------------------------------------ */
-
-/* Anything mid-flight dims and stops accepting input, in place. */
-:where([data-loading='true']) {
-    opacity: 0.6;
-    pointer-events: none;
-}
-
-:where([data-loading='true']) :where(svg) {
-    animation: clay-spin 800ms linear infinite;
-}
-
-@keyframes clay-spin {
-    to {
-        transform: rotate(360deg);
-    }
-}
-
-/* -- Micro-interactions ---------------------------------------------------- */
-
-/* Staggered entrance: fade + 12px rise. Apply .clay-rise with
-   style={{ '--stagger': index }}; the whole list beats as one gesture. */
-@keyframes clay-rise {
-    from {
-        opacity: 0;
-        transform: translateY(12px);
-    }
-    to {
-        opacity: 1;
-        transform: translateY(0);
-    }
-}
-
-:where(.clay-rise) {
-    animation: clay-rise 480ms cubic-bezier(0.22, 1, 0.36, 1) both;
-    animation-delay: calc(var(--stagger, 0) * 60ms);
-}
-
-/* Live region pulse for unread markers. */
-@keyframes clay-pulse-ring {
-    0%,
-    100% {
-        box-shadow: 0 0 0 0 rgb(var(--clay-brand-glow) / 0.45);
-    }
-    50% {
-        box-shadow: 0 0 0 5px rgb(var(--clay-brand-glow) / 0);
-    }
-}
-
-:where(.clay-ping) {
-    animation: clay-pulse-ring 2.4s ease-in-out infinite;
-}
-
-/* Ambient brand glow behind the page — on the black ground, warm cream
-   light IS the texture: candlelight top-right, parchment below. */
-:where(.clay-ambient) {
-    position: relative;
-    isolation: isolate;
-}
-
-:where(.clay-ambient)::before {
-    content: '';
-    position: fixed;
-    top: -22%;
-    right: -12%;
-    z-index: -1;
-    width: 62vw;
-    height: 62vw;
-    max-width: 760px;
-    max-height: 760px;
-    pointer-events: none;
-    background: radial-gradient(
-        circle,
-        rgb(var(--clay-brand-glow) / 0.13) 0%,
-        transparent 62%
-    );
-}
-
-:where(.clay-ambient)::after {
-    content: '';
-    position: fixed;
-    bottom: -30%;
-    left: -18%;
-    z-index: -1;
-    width: 55vw;
-    height: 55vw;
-    max-width: 640px;
-    max-height: 640px;
-    pointer-events: none;
-    background: radial-gradient(
-        circle,
-        rgb(var(--clay-accent-glow) / 0.07) 0%,
-        transparent 60%
-    );
-}
-
-html:not(.dark) :where(.clay-ambient)::before {
-    opacity: 0.5;
-}
-
-/* Brand-hue text selection — small, deliberate detail. */
-.bulletin ::selection {
-    background-color: rgb(var(--clay-brand-glow) / 0.35);
-    color: var(--clay-ink);
-}
-
-/* -- Reduced motion: all of it collapses to simple fades ------------------- */
-
-@media (prefers-reduced-motion: reduce) {
-    :where(.clay-rise) {
-        animation: clay-fade 240ms ease both;
-        animation-delay: 0ms;
+    :where(.clay-field) {
+        background-image: linear-gradient(
+            rgb(var(--clay-shadow-color) / 0.06),
+            rgb(var(--clay-shadow-color) / 0.1)
+        );
     }
 
-    :where(.clay-ping) {
-        animation: none;
+    :where(.clay-field):focus-visible {
+        outline: 2px solid var(--clay-accent);
+        outline-offset: 2px;
     }
 
-    :where(.clay-card),
-    :where(.clay-press),
-    :where(.clay-icon-chip),
-    :where(.clay-icon-chip svg),
+    /* -- Status dots --------------------------------------------------------- */
+
+    :where(.clay-tab) {
+        width: 0.5rem;
+        height: 0.5rem;
+        border-radius: 999px;
+        flex-shrink: 0;
+        box-shadow:
+            inset 0 1px 1px rgb(255 255 255 / 0.4),
+            0 1px 2px rgb(0 0 0 / 0.3);
+    }
+
+    .clay-tab-pending {
+        background-color: var(--status-pending);
+    }
+
+    .clay-tab-progress {
+        background-color: var(--status-progress);
+    }
+
+    .clay-tab-resolved {
+        background-color: var(--status-resolved);
+    }
+
+    .clay-tab-closed {
+        background-color: var(--clay-text-faint);
+    }
+
+    /* -- Typography helpers --------------------------------------------------- */
+
+    /* Section label: small, spaced, quiet — scan line, not shout. */
+    :where(.bulletin-eyebrow) {
+        font-size: var(--text-scale-xs);
+        font-weight: 600;
+        letter-spacing: 0.14em;
+        text-transform: uppercase;
+        color: var(--clay-text-muted);
+    }
+
+    /* Display numerals: size carries hierarchy; tabular for stable layout. */
     :where(.bulletin-figure) {
-        transition-duration: 0ms;
+        font-size: var(--text-scale-xl);
+        font-weight: 700;
+        line-height: 0.95;
+        letter-spacing: -0.03em;
+        font-variant-numeric: lining-nums tabular-nums;
+        color: var(--clay-ink);
+        transition: transform 250ms cubic-bezier(0.22, 1, 0.36, 1);
+    }
+
+    /* Stat numerals rise as their card lifts — one motion, one object. */
+    :where(.clay-card):hover :where(.bulletin-figure) {
+        transform: translateY(-3px);
+    }
+
+    /* -- Feedback states ------------------------------------------------------ */
+
+    /* Anything mid-flight dims and stops accepting input, in place. */
+    :where([data-loading='true']) {
+        opacity: 0.6;
+        pointer-events: none;
     }
 
     :where([data-loading='true']) :where(svg) {
-        animation-duration: 1.6s;
+        animation: clay-spin 800ms linear infinite;
     }
-}
 
-@keyframes clay-fade {
-    from {
-        opacity: 0;
+    @keyframes clay-spin {
+        to {
+            transform: rotate(360deg);
+        }
     }
-    to {
-        opacity: 1;
+
+    /* -- Micro-interactions ---------------------------------------------------- */
+
+    /* Staggered entrance: fade + 12px rise. Apply .clay-rise with
+   style={{ '--stagger': index }}; the whole list beats as one gesture. */
+    @keyframes clay-rise {
+        from {
+            opacity: 0;
+            transform: translateY(12px);
+        }
+        to {
+            opacity: 1;
+            transform: translateY(0);
+        }
     }
-}
 
-/* -- Typographic roles: the only sizes a page may use ------------------ */
+    :where(.clay-rise) {
+        animation: clay-rise 480ms cubic-bezier(0.22, 1, 0.36, 1) both;
+        animation-delay: calc(var(--stagger, 0) * 60ms);
+    }
 
-:where(.clay-h1) {
-    font-size: var(--text-scale-xl);
-    font-weight: 700;
-    letter-spacing: -0.02em;
-    line-height: 1.1;
-    color: var(--clay-ink);
-}
+    /* Live region pulse for unread markers. */
+    @keyframes clay-pulse-ring {
+        0%,
+        100% {
+            box-shadow: 0 0 0 0 rgb(var(--clay-brand-glow) / 0.45);
+        }
+        50% {
+            box-shadow: 0 0 0 5px rgb(var(--clay-brand-glow) / 0);
+        }
+    }
 
-:where(.clay-h2) {
-    font-size: var(--text-scale-lg);
-    font-weight: 700;
-    letter-spacing: -0.01em;
-    line-height: 1.15;
-    color: var(--clay-ink);
-}
+    :where(.clay-ping) {
+        animation: clay-pulse-ring 2.4s ease-in-out infinite;
+    }
 
-:where(.clay-title) {
-    font-size: var(--text-scale-base);
-    font-weight: 600;
-    line-height: 1.35;
-    color: var(--clay-ink);
-}
+    /* Ambient brand glow behind the page — on the black ground, warm cream
+   light IS the texture: candlelight top-right, parchment below. */
+    :where(.clay-ambient) {
+        position: relative;
+        isolation: isolate;
+    }
 
-:where(.clay-body) {
-    font-size: var(--text-scale-sm);
-    font-weight: 400;
-    line-height: 1.6;
-    color: var(--clay-text-muted);
-}
+    :where(.clay-ambient)::before {
+        content: '';
+        position: fixed;
+        top: -22%;
+        right: -12%;
+        z-index: -1;
+        width: 62vw;
+        height: 62vw;
+        max-width: 760px;
+        max-height: 760px;
+        pointer-events: none;
+        background: radial-gradient(
+            circle,
+            rgb(var(--clay-brand-glow) / 0.13) 0%,
+            transparent 62%
+        );
+    }
 
-:where(.clay-meta) {
-    font-family: var(--font-mono);
-    font-size: var(--text-scale-2xs);
-    font-weight: 400;
-    font-variant-numeric: tabular-nums;
-    letter-spacing: 0.01em;
-    color: var(--clay-text-faint);
-}
+    :where(.clay-ambient)::after {
+        content: '';
+        position: fixed;
+        bottom: -30%;
+        left: -18%;
+        z-index: -1;
+        width: 55vw;
+        height: 55vw;
+        max-width: 640px;
+        max-height: 640px;
+        pointer-events: none;
+        background: radial-gradient(
+            circle,
+            rgb(var(--clay-accent-glow) / 0.07) 0%,
+            transparent 60%
+        );
+    }
 
-/* Inter was built for UI: swap to its tightly-spaced display cut at
+    html:not(.dark) :where(.clay-ambient)::before {
+        opacity: 0.5;
+    }
+
+    /* Brand-hue text selection — small, deliberate detail. */
+    .bulletin ::selection {
+        background-color: rgb(var(--clay-brand-glow) / 0.35);
+        color: var(--clay-ink);
+    }
+
+    /* -- Reduced motion: all of it collapses to simple fades ------------------- */
+
+    @media (prefers-reduced-motion: reduce) {
+        :where(.clay-rise) {
+            animation: clay-fade 240ms ease both;
+            animation-delay: 0ms;
+        }
+
+        :where(.clay-ping) {
+            animation: none;
+        }
+
+        :where(.clay-card),
+        :where(.clay-press),
+        :where(.clay-icon-chip),
+        :where(.clay-icon-chip svg),
+        :where(.bulletin-figure) {
+            transition-duration: 0ms;
+        }
+
+        :where([data-loading='true']) :where(svg) {
+            animation-duration: 1.6s;
+        }
+    }
+
+    @keyframes clay-fade {
+        from {
+            opacity: 0;
+        }
+        to {
+            opacity: 1;
+        }
+    }
+
+    /* -- Typographic roles: the only sizes a page may use ------------------ */
+
+    :where(.clay-h1) {
+        font-size: var(--text-scale-xl);
+        font-weight: 700;
+        letter-spacing: -0.02em;
+        line-height: 1.1;
+        color: var(--clay-ink);
+    }
+
+    :where(.clay-h2) {
+        font-size: var(--text-scale-lg);
+        font-weight: 700;
+        letter-spacing: -0.01em;
+        line-height: 1.15;
+        color: var(--clay-ink);
+    }
+
+    :where(.clay-title) {
+        font-size: var(--text-scale-base);
+        font-weight: 600;
+        line-height: 1.35;
+        color: var(--clay-ink);
+    }
+
+    :where(.clay-body) {
+        font-size: var(--text-scale-sm);
+        font-weight: 400;
+        line-height: 1.6;
+        color: var(--clay-text-muted);
+    }
+
+    :where(.clay-meta) {
+        font-family: var(--font-mono);
+        font-size: var(--text-scale-2xs);
+        font-weight: 400;
+        font-variant-numeric: tabular-nums;
+        letter-spacing: 0.01em;
+        color: var(--clay-text-faint);
+    }
+
+    /* Inter was built for UI: swap to its tightly-spaced display cut at
    large sizes so headlines keep the same optical rhythm as body text. */
-:where(.clay-h1),
-:where(.bulletin-figure) {
-    font-feature-settings:
-        'ss01' on, 'cv11' on;
-}
+    :where(.clay-h1),
+    :where(.bulletin-figure) {
+        font-feature-settings:
+            'ss01' on,
+            'cv11' on;
+    }
 
-/* -- Ghost button: tertiary action. Invisible until you look for it —
+    /* -- Ghost button: tertiary action. Invisible until you look for it —
       the hover fill IS the affordance. ------------------------------- */
 
-:where(.clay-ghost) {
-    display: inline-flex;
-    align-items: center;
-    justify-content: center;
-    gap: 0.5rem;
-    border-radius: 999px;
-    padding: 0.5rem 1rem;
-    font-size: var(--text-scale-xs);
-    font-weight: 600;
-    color: var(--clay-text-muted);
-    background-color: transparent;
-    box-shadow: none;
-    transition:
-        background-color 150ms ease,
-        color 150ms ease,
-        transform 120ms ease;
+    :where(.clay-ghost) {
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        gap: 0.5rem;
+        border-radius: 999px;
+        padding: 0.5rem 1rem;
+        font-size: var(--text-scale-xs);
+        font-weight: 600;
+        color: var(--clay-text-muted);
+        background-color: transparent;
+        box-shadow: none;
+        transition:
+            background-color 150ms ease,
+            color 150ms ease,
+            transform 120ms ease;
+    }
+
+    :where(.clay-ghost):hover {
+        color: var(--clay-text);
+        background-color: var(--clay-surface-soft);
+    }
+
+    :where(.clay-ghost):active {
+        transform: scale(0.97);
+    }
+
+    :where(.clay-ghost):focus-visible {
+        outline: none;
+        box-shadow:
+            0 0 0 2px var(--clay-bg),
+            0 0 0 4px var(--clay-accent);
+    }
+
+    :where(.clay-ghost):disabled {
+        opacity: 0.4;
+        cursor: not-allowed;
+    }
+
+    /* -- Tooltip: warm charcoal slab, hairline cream edge, mono metadata voice -- */
+
+    :where(.clay-tooltip) {
+        background-color: var(--clay-surface-hi);
+        color: var(--clay-text);
+        border: 1px solid var(--clay-border);
+        border-radius: 0.75rem;
+        padding: 0.375rem 0.75rem;
+        font-size: var(--text-scale-2xs);
+        font-weight: 500;
+        letter-spacing: 0.01em;
+        box-shadow:
+            inset 0 1px 0 var(--clay-edge),
+            var(--shadow-md);
+    }
+
+    :where(.clay-tooltip) :where(svg) {
+        fill: var(--clay-surface-hi);
+        background-color: var(--clay-surface-hi);
+        color: var(--clay-surface-hi);
+    }
 }
-
-:where(.clay-ghost):hover {
-    color: var(--clay-text);
-    background-color: var(--clay-surface-soft);
-}
-
-:where(.clay-ghost):active {
-    transform: scale(0.97);
-}
-
-:where(.clay-ghost):focus-visible {
-    outline: none;
-    box-shadow:
-        0 0 0 2px var(--clay-bg),
-        0 0 0 4px var(--clay-accent);
-}
-
-:where(.clay-ghost):disabled {
-    opacity: 0.4;
-    cursor: not-allowed;
-}
-
-/* -- Tooltip: warm charcoal slab, hairline cream edge, mono metadata voice -- */
-
-:where(.clay-tooltip) {
-    background-color: var(--clay-surface-hi);
-    color: var(--clay-text);
-    border: 1px solid var(--clay-border);
-    border-radius: 0.75rem;
-    padding: 0.375rem 0.75rem;
-    font-size: var(--text-scale-2xs);
-    font-weight: 500;
-    letter-spacing: 0.01em;
-    box-shadow:
-        inset 0 1px 0 var(--clay-edge),
-        var(--shadow-md);
-}
-
-:where(.clay-tooltip) :where(svg) {
-    fill: var(--clay-surface-hi);
-    background-color: var(--clay-surface-hi);
-    color: var(--clay-surface-hi);
-}
-
-}
-

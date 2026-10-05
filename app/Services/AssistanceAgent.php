@@ -13,10 +13,10 @@ use App\Models\StudentAssistanceRequest;
  * agent will emit (plan.md section 7) so the UI, policy engine, and
  * payment pipeline are exercised end to end.
  */
-final class AssistanceAgent
+final readonly class AssistanceAgent
 {
     public function __construct(
-        private readonly PolicyEngineService $policyEngine,
+        private PolicyEngineService $policyEngine,
     ) {}
 
     /**

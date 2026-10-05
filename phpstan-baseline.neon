@@ -169,12 +169,6 @@ parameters:
 			path: app/Ai/Approvals/ApprovalResumeGate.php
 
 		-
-			rawMessage: 'Call to an undefined method Illuminate\Database\Eloquent\Model::recordExpense().'
-			identifier: method.notFound
-			count: 1
-			path: app/Ai/Tools/DisburseAssistance.php
-
-		-
 			rawMessage: 'Call to an undefined static method App\Models\AssistanceRequest::find().'
 			identifier: staticMethod.notFound
 			count: 1
@@ -655,6 +649,12 @@ parameters:
 			path: app/Http/Controllers/Settings/SecurityController.php
 
 		-
+			rawMessage: 'Call to an undefined static method App\Models\StudentAssistanceRequest::create().'
+			identifier: staticMethod.notFound
+			count: 1
+			path: app/Http/Controllers/StudentAssistanceController.php
+
+		-
 			rawMessage: 'Strict comparison using !== between non-empty-array<string, string> and array{} will always evaluate to true.'
 			identifier: notIdentical.alwaysTrue
 			count: 1
@@ -815,6 +815,18 @@ parameters:
 			identifier: nullsafe.neverNull
 			count: 1
 			path: app/Services/LeptonTreasuryService.php
+
+		-
+			rawMessage: 'Call to an undefined static method App\Models\Transaction::create().'
+			identifier: staticMethod.notFound
+			count: 1
+			path: app/Services/PaymentService.php
+
+		-
+			rawMessage: 'Call to an undefined static method App\Models\AgentDecision::create().'
+			identifier: staticMethod.notFound
+			count: 1
+			path: app/Services/PolicyEngineService.php
 
 		-
 			rawMessage: 'Call to an undefined static method App\Models\Invoice::where().'
@@ -2813,6 +2825,18 @@ parameters:
 			identifier: method.notFound
 			count: 1
 			path: tests/Feature/SetupStarterKitTest.php
+
+		-
+			rawMessage: 'Access to an undefined property Illuminate\Database\Eloquent\Collection<int, Illuminate\Database\Eloquent\Model>|Illuminate\Database\Eloquent\Model::$id.'
+			identifier: property.notFound
+			count: 6
+			path: tests/Feature/StudentAssistanceFlowTest.php
+
+		-
+			rawMessage: 'Call to an undefined method Pest\PendingCalls\TestCall::actingAs().'
+			identifier: method.notFound
+			count: 5
+			path: tests/Feature/StudentAssistanceFlowTest.php
 
 		-
 			rawMessage: Access to an undefined property Pest\PendingCalls\TestCall::$forecastService.

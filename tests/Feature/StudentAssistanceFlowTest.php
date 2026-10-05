@@ -28,7 +28,12 @@ test('financial assistance page renders policy and history for students', functi
 });
 
 test('request within the automatic limit is auto-approved and paid out', function (): void {
-    $organization = Organization::factory()->create();
+    $organization = Organization::factory()->create([
+        'minimum_reserve' => 10000.00,
+        'max_auto_payment' => 1000.00,
+        'max_daily_disbursement' => 5000.00,
+        'human_approval_threshold' => 1000.00,
+    ]);
     Wallet::factory()->create([
         'organization_id' => $organization->id,
         'balance' => 25420.00,
@@ -81,7 +86,12 @@ test('request within the automatic limit is auto-approved and paid out', functio
 });
 
 test('request above the automatic limit is partially approved and escalated', function (): void {
-    $organization = Organization::factory()->create();
+    $organization = Organization::factory()->create([
+        'minimum_reserve' => 10000.00,
+        'max_auto_payment' => 1000.00,
+        'max_daily_disbursement' => 5000.00,
+        'human_approval_threshold' => 1000.00,
+    ]);
     Wallet::factory()->create([
         'organization_id' => $organization->id,
         'balance' => 25420.00,
@@ -132,7 +142,12 @@ test('request above the automatic limit is partially approved and escalated', fu
 });
 
 test('submission without a linked wallet is rejected', function (): void {
-    Organization::factory()->create();
+    Organization::factory()->create([
+        'minimum_reserve' => 10000.00,
+        'max_auto_payment' => 1000.00,
+        'max_daily_disbursement' => 5000.00,
+        'human_approval_threshold' => 1000.00,
+    ]);
 
     $user = User::factory()->create([
         'wallet_address' => null,
@@ -149,7 +164,12 @@ test('submission without a linked wallet is rejected', function (): void {
 });
 
 test('payments page lists confirmed payouts for the linked wallet', function (): void {
-    $organization = Organization::factory()->create();
+    $organization = Organization::factory()->create([
+        'minimum_reserve' => 10000.00,
+        'max_auto_payment' => 1000.00,
+        'max_daily_disbursement' => 5000.00,
+        'human_approval_threshold' => 1000.00,
+    ]);
     $walletAddress = '0xa1b2c3d4e5f60718293a4b5c6d7e8f9012345678';
 
     $user = User::factory()->create([

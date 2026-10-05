@@ -6,8 +6,21 @@ namespace App\Models;
 
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
-use Illuminate\Database\Eloquent\Relations\HasMany;
+use Illuminate\Database\Eloquent\Relations\MorphMany;
+use Illuminate\Support\Carbon;
 
+/**
+ * @property int $id
+ * @property int $user_id
+ * @property int $organization_id
+ * @property string $request_type
+ * @property string $reason
+ * @property float $requested_amount
+ * @property float|null $approved_amount
+ * @property string $status
+ * @property string $reference_number
+ * @property Carbon|null $created_at
+ */
 class StudentAssistanceRequest extends Model
 {
     protected $fillable = [
@@ -31,10 +44,9 @@ class StudentAssistanceRequest extends Model
         return $this->belongsTo(Organization::class);
     }
 
-    public function transactions(): HasMany
+    public function transactions(): MorphMany
     {
-        return $this->hasMany(Transaction::class, 'reference_id')
-            ->where('reference_type', 'student_assistance_request');
+        return $this->morphMany(Transaction::class, 'reference');
     }
 
     public function totalPaid(): float

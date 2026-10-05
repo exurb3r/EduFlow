@@ -87,9 +87,7 @@ export default function Notifications({
                                 <Bell className="size-3.5" />
                                 EduFlow
                             </p>
-                            <h1 className="clay-h1 mt-2">
-                                Notifications
-                            </h1>
+                            <h1 className="clay-h1 mt-2">Notifications</h1>
                             {unread_count > 0 && (
                                 <p className="clay-body mt-2">
                                     <span className="clay-meta font-semibold text-[var(--clay-primary-bright)]">
@@ -120,9 +118,9 @@ export default function Notifications({
                             <span className="clay-inset flex size-12 items-center justify-center rounded-full">
                                 <Inbox className="size-5 text-[var(--clay-text-muted)]" />
                             </span>
-                            <div>                                    <p className="clay-h2">
-                                    Nothing here yet.
-                                </p>
+                            <div>
+                                {' '}
+                                <p className="clay-h2">Nothing here yet.</p>
                                 <p className="clay-body mx-auto mt-1.5 max-w-sm sm:mx-0">
                                     When staff reply to one of your tickets you
                                     will find it on this page.
@@ -133,7 +131,9 @@ export default function Notifications({
                                 className="clay-focus h-10 rounded-full border-[var(--clay-border)] bg-transparent px-5 text-xs font-semibold shadow-none"
                                 asChild
                             >
-                                <Link href={dashboard()}>Back to dashboard</Link>
+                                <Link href={dashboard()}>
+                                    Back to dashboard
+                                </Link>
                             </Button>
                         </div>
                     ) : (

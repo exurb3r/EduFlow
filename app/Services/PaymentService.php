@@ -8,6 +8,7 @@ use App\Models\Organization;
 use App\Models\StudentAssistanceRequest;
 use App\Models\Transaction;
 use App\Models\User;
+use App\Models\Wallet;
 use Illuminate\Support\Str;
 
 /**
@@ -22,11 +23,12 @@ final class PaymentService
     {
         $wallet = $organization->primaryWallet();
 
-        if ($wallet === null || $amount <= 0.0) {
+        if (! $wallet instanceof Wallet || $amount <= 0.0) {
             return null;
         }
 
-        $wallet->decrement('balance', $amount);
+        $wallet->balance = (float) $wallet->balance - $amount;
+        $wallet->save();
 
         if ($wallet->balance < 0) {
             $wallet->update(['balance' => 0]);
