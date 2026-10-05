@@ -9,6 +9,15 @@ use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 
+/**
+ * @property int $id
+ * @property int $student_id
+ * @property int $academic_term_id
+ * @property int $total_amount
+ * @property int $paid_amount
+ * @property-read Student $student
+ * @property-read AcademicTerm $academicTerm
+ */
 class TuitionAccount extends Model
 {
     /** @use HasFactory<TuitionAccountFactory> */

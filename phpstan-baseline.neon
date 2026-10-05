@@ -7,52 +7,10 @@ parameters:
 			path: app/Actions/ApproveEscalatedRequest.php
 
 		-
-			rawMessage: Access to an undefined property App\Models\Student::$user_id.
-			identifier: property.notFound
-			count: 1
-			path: app/Actions/ApproveEscalatedRequest.php
-
-		-
 			rawMessage: 'Call to an undefined static method App\Models\Approval::updateOrCreate().'
 			identifier: staticMethod.notFound
 			count: 1
 			path: app/Actions/ApproveEscalatedRequest.php
-
-		-
-			rawMessage: Using nullsafe property access "?->user_id" on left side of ?? is unnecessary. Use -> instead.
-			identifier: nullsafe.neverNull
-			count: 1
-			path: app/Actions/ApproveEscalatedRequest.php
-
-		-
-			rawMessage: Access to an undefined property App\Models\Student::$academic_status.
-			identifier: property.notFound
-			count: 2
-			path: app/Actions/EvaluateAssistancePolicy.php
-
-		-
-			rawMessage: Access to an undefined property App\Models\Student::$attendance_rate.
-			identifier: property.notFound
-			count: 1
-			path: app/Actions/EvaluateAssistancePolicy.php
-
-		-
-			rawMessage: Access to an undefined property App\Models\Student::$enrollment_status.
-			identifier: property.notFound
-			count: 2
-			path: app/Actions/EvaluateAssistancePolicy.php
-
-		-
-			rawMessage: Access to an undefined property App\Models\Student::$id.
-			identifier: property.notFound
-			count: 1
-			path: app/Actions/EvaluateAssistancePolicy.php
-
-		-
-			rawMessage: Access to an undefined property App\Models\Student::$tuitionAccounts.
-			identifier: property.notFound
-			count: 1
-			path: app/Actions/EvaluateAssistancePolicy.php
 
 		-
 			rawMessage: 'Call to an undefined static method App\Models\AgentDecision::create().'
@@ -163,12 +121,6 @@ parameters:
 			path: app/Ai/Advisory/QnaGate.php
 
 		-
-			rawMessage: Access to an undefined property App\Models\Student::$tuitionAccounts.
-			identifier: property.notFound
-			count: 1
-			path: app/Ai/Advisory/StudentBrief.php
-
-		-
 			rawMessage: Expression on left side of ?? is not nullable.
 			identifier: nullCoalesce.expr
 			count: 1
@@ -215,18 +167,6 @@ parameters:
 			identifier: argument.type
 			count: 1
 			path: app/Ai/Approvals/ApprovalResumeGate.php
-
-		-
-			rawMessage: 'Property App\Ai\Approvals\ApprovalResumeGate::$conversations is never read, only written.'
-			identifier: property.onlyWritten
-			count: 1
-			path: app/Ai/Approvals/ApprovalResumeGate.php
-
-		-
-			rawMessage: Access to an undefined property App\Models\Student::$payout_address.
-			identifier: property.notFound
-			count: 1
-			path: app/Ai/Tools/DisburseAssistance.php
 
 		-
 			rawMessage: 'Call to an undefined method Illuminate\Database\Eloquent\Model::recordExpense().'
@@ -469,12 +409,6 @@ parameters:
 			path: app/Filament/Resources/AssistanceRequests/Actions/ApproveEscalatedAction.php
 
 		-
-			rawMessage: 'Method App\Filament\Resources\AssistanceRequests\Actions\ApproveEscalatedAction::isVisibleUsing() should return Closure(): bool but returns Closure(App\Models\AssistanceRequest): bool.'
-			identifier: return.type
-			count: 1
-			path: app/Filament/Resources/AssistanceRequests/Actions/ApproveEscalatedAction.php
-
-		-
 			rawMessage: 'Method App\Filament\Resources\AssistanceRequests\Actions\ApproveEscalatedAction::schemaFor() has invalid return type Filament\Forms\Components\Component.'
 			identifier: class.notFound
 			count: 1
@@ -483,12 +417,6 @@ parameters:
 		-
 			rawMessage: 'Method App\Filament\Resources\AssistanceRequests\Actions\ApproveEscalatedAction::schemaFor() should return array<int, Filament\Forms\Components\Component> but returns array<int, Filament\Forms\Components\Placeholder|Filament\Forms\Components\Textarea>.'
 			identifier: return.type
-			count: 1
-			path: app/Filament/Resources/AssistanceRequests/Actions/ApproveEscalatedAction.php
-
-		-
-			rawMessage: 'PHPDoc tag @return with type (Closure)|null is not subtype of native type Closure.'
-			identifier: return.phpDocType
 			count: 1
 			path: app/Filament/Resources/AssistanceRequests/Actions/ApproveEscalatedAction.php
 
@@ -587,12 +515,6 @@ parameters:
 			identifier: argument.type
 			count: 1
 			path: app/Http/Controllers/AskEduFlowController.php
-
-		-
-			rawMessage: Access to an undefined property App\Models\AcademicTerm::$name.
-			identifier: property.notFound
-			count: 1
-			path: app/Http/Controllers/AssistanceRequestController.php
 
 		-
 			rawMessage: 'Call to an undefined static method App\Models\Transaction::where().'
@@ -733,18 +655,6 @@ parameters:
 			path: app/Http/Controllers/Settings/SecurityController.php
 
 		-
-			rawMessage: Access to an undefined property App\Models\AcademicTerm::$ends_on.
-			identifier: property.notFound
-			count: 1
-			path: app/Models/AcademicTerm.php
-
-		-
-			rawMessage: Access to an undefined property App\Models\AcademicTerm::$starts_on.
-			identifier: property.notFound
-			count: 1
-			path: app/Models/AcademicTerm.php
-
-		-
 			rawMessage: 'Strict comparison using !== between non-empty-array<string, string> and array{} will always evaluate to true.'
 			identifier: notIdentical.alwaysTrue
 			count: 1
@@ -793,24 +703,6 @@ parameters:
 			path: app/Models/Organization.php
 
 		-
-			rawMessage: Access to an undefined property App\Models\Student::$payout_address.
-			identifier: property.notFound
-			count: 1
-			path: app/Models/Student.php
-
-		-
-			rawMessage: Access to an undefined property App\Models\TuitionAccount::$paid_amount.
-			identifier: property.notFound
-			count: 1
-			path: app/Models/TuitionAccount.php
-
-		-
-			rawMessage: Access to an undefined property App\Models\TuitionAccount::$total_amount.
-			identifier: property.notFound
-			count: 1
-			path: app/Models/TuitionAccount.php
-
-		-
 			rawMessage: 'Call to an undefined method Illuminate\Foundation\Auth\User::hasRole().'
 			identifier: method.notFound
 			count: 1
@@ -845,12 +737,6 @@ parameters:
 			identifier: property.notFound
 			count: 1
 			path: app/Providers/FortifyServiceProvider.php
-
-		-
-			rawMessage: 'Method App\Services\Ai\AiProviderResolver::resolve() never returns Laravel\Ai\Enums\Lab so it can be removed from the return type.'
-			identifier: return.unusedType
-			count: 1
-			path: app/Services/Ai/AiProviderResolver.php
 
 		-
 			rawMessage: 'Call to static method query() on an unknown class App\Services\TuitionAccount.'
@@ -919,12 +805,6 @@ parameters:
 			path: app/Services/LeptonReconciliationService.php
 
 		-
-			rawMessage: Anonymous function never returns null so it can be removed from the return type.
-			identifier: return.unusedType
-			count: 2
-			path: app/Services/LeptonTreasuryService.php
-
-		-
 			rawMessage: 'Offset ''error'' on array{chain: string, chain_id: int, block: int|null, rpc_host: non-empty-string|null, driver: string, live_available: false, onchain_balance: null, ledger_balance: float, ...} on left side of ??= always exists and is always null.'
 			identifier: nullCoalesce.offset
 			count: 2
@@ -941,18 +821,6 @@ parameters:
 			identifier: staticMethod.notFound
 			count: 1
 			path: app/Services/TreasuryForecastService.php
-
-		-
-			rawMessage: Access to an undefined property App\Models\TuitionAccount::$id.
-			identifier: property.notFound
-			count: 2
-			path: app/Services/TuitionSettlementService.php
-
-		-
-			rawMessage: Access to an undefined property App\Models\TuitionAccount::$paid_amount.
-			identifier: property.notFound
-			count: 1
-			path: app/Services/TuitionSettlementService.php
 
 		-
 			rawMessage: 'Call to an undefined static method App\Models\Transaction::create().'
@@ -1031,12 +899,6 @@ parameters:
 			identifier: arguments.count
 			count: 1
 			path: tests/Feature/Ai/AiProviderAdminTest.php
-
-		-
-			rawMessage: 'Access to an undefined property App\Models\Student|Illuminate\Database\Eloquent\Collection<int, App\Models\Student>::$id.'
-			identifier: property.notFound
-			count: 2
-			path: tests/Feature/Ai/ApprovalRatchetTest.php
 
 		-
 			rawMessage: Access to an undefined property Pest\PendingCalls\TestCall::$fund.
@@ -1201,18 +1063,6 @@ parameters:
 			path: tests/Feature/Ai/ApprovalResumeEndpointTest.php
 
 		-
-			rawMessage: 'Access to an undefined property App\Models\AcademicTerm|Illuminate\Database\Eloquent\Collection<int, App\Models\AcademicTerm>::$id.'
-			identifier: property.notFound
-			count: 1
-			path: tests/Feature/Ai/QnaGateTest.php
-
-		-
-			rawMessage: 'Access to an undefined property App\Models\Student|Illuminate\Database\Eloquent\Collection<int, App\Models\Student>::$id.'
-			identifier: property.notFound
-			count: 1
-			path: tests/Feature/Ai/QnaGateTest.php
-
-		-
 			rawMessage: Access to an undefined property Pest\PendingCalls\TestCall::$account.
 			identifier: property.notFound
 			count: 1
@@ -1237,12 +1087,6 @@ parameters:
 			path: tests/Feature/Ai/QnaGateTest.php
 
 		-
-			rawMessage: Anonymous function has an unused use $seen.
-			identifier: closure.unusedUse
-			count: 1
-			path: tests/Feature/Ai/QnaGateTest.php
-
-		-
 			rawMessage: 'Call to an undefined method Pest\PendingCalls\TestCall::seed().'
 			identifier: method.notFound
 			count: 1
@@ -1261,16 +1105,58 @@ parameters:
 			path: tests/Feature/Ai/QnaGateTest.php
 
 		-
-			rawMessage: 'Access to an undefined property App\Models\AcademicTerm|Illuminate\Database\Eloquent\Collection<int, App\Models\AcademicTerm>::$id.'
+			rawMessage: Access to an undefined property Pest\PendingCalls\TestCall::$approver.
 			identifier: property.notFound
-			count: 1
-			path: tests/Feature/AskEduFlowEndpointTest.php
+			count: 5
+			path: tests/Feature/ApproveEscalatedRequestTest.php
 
 		-
-			rawMessage: 'Access to an undefined property App\Models\Student|Illuminate\Database\Eloquent\Collection<int, App\Models\Student>::$id.'
+			rawMessage: Access to an undefined property Pest\PendingCalls\TestCall::$fund.
 			identifier: property.notFound
+			count: 6
+			path: tests/Feature/ApproveEscalatedRequestTest.php
+
+		-
+			rawMessage: Access to an undefined property Pest\PendingCalls\TestCall::$org.
+			identifier: property.notFound
+			count: 5
+			path: tests/Feature/ApproveEscalatedRequestTest.php
+
+		-
+			rawMessage: Access to an undefined property Pest\PendingCalls\TestCall::$term.
+			identifier: property.notFound
+			count: 6
+			path: tests/Feature/ApproveEscalatedRequestTest.php
+
+		-
+			rawMessage: Access to an undefined property Pest\PendingCalls\TestCall::$wallet.
+			identifier: property.notFound
+			count: 2
+			path: tests/Feature/ApproveEscalatedRequestTest.php
+
+		-
+			rawMessage: 'Call to an undefined static method App\Models\AgentDecision::create().'
+			identifier: staticMethod.notFound
+			count: 4
+			path: tests/Feature/ApproveEscalatedRequestTest.php
+
+		-
+			rawMessage: 'Call to an undefined static method App\Models\AssistanceFund::create().'
+			identifier: staticMethod.notFound
 			count: 1
-			path: tests/Feature/AskEduFlowEndpointTest.php
+			path: tests/Feature/ApproveEscalatedRequestTest.php
+
+		-
+			rawMessage: 'Call to an undefined static method App\Models\Organization::create().'
+			identifier: staticMethod.notFound
+			count: 1
+			path: tests/Feature/ApproveEscalatedRequestTest.php
+
+		-
+			rawMessage: 'Call to an undefined static method App\Models\Wallet::create().'
+			identifier: staticMethod.notFound
+			count: 1
+			path: tests/Feature/ApproveEscalatedRequestTest.php
 
 		-
 			rawMessage: Access to an undefined property Pest\PendingCalls\TestCall::$account.
@@ -1325,12 +1211,6 @@ parameters:
 			identifier: method.notFound
 			count: 1
 			path: tests/Feature/AskEduFlowMatcherTest.php
-
-		-
-			rawMessage: 'Access to an undefined property App\Models\Student|Illuminate\Database\Eloquent\Collection<int, App\Models\Student>::$user.'
-			identifier: property.notFound
-			count: 1
-			path: tests/Feature/AssistanceIntakeTest.php
 
 		-
 			rawMessage: Access to an undefined property Illuminate\Database\Eloquent\Model::$properties.
@@ -1457,18 +1337,6 @@ parameters:
 			identifier: staticMethod.notFound
 			count: 1
 			path: tests/Feature/AssistanceRequestTest.php
-
-		-
-			rawMessage: 'Access to an undefined property App\Models\AcademicTerm|Illuminate\Database\Eloquent\Collection<int, App\Models\AcademicTerm>::$id.'
-			identifier: property.notFound
-			count: 1
-			path: tests/Feature/AssistanceShowAiTest.php
-
-		-
-			rawMessage: 'Access to an undefined property App\Models\Student|Illuminate\Database\Eloquent\Collection<int, App\Models\Student>::$id.'
-			identifier: property.notFound
-			count: 1
-			path: tests/Feature/AssistanceShowAiTest.php
 
 		-
 			rawMessage: Access to an undefined property Pest\PendingCalls\TestCall::$account.
@@ -1695,7 +1563,7 @@ parameters:
 		-
 			rawMessage: Access to an undefined property Pest\PendingCalls\TestCall::$circleService.
 			identifier: property.notFound
-			count: 4
+			count: 5
 			path: tests/Feature/CircleWalletServiceTest.php
 
 		-
@@ -1707,7 +1575,7 @@ parameters:
 		-
 			rawMessage: Access to an undefined property Pest\PendingCalls\TestCall::$wallet.
 			identifier: property.notFound
-			count: 6
+			count: 8
 			path: tests/Feature/CircleWalletServiceTest.php
 
 		-
@@ -1849,30 +1717,6 @@ parameters:
 			path: tests/Feature/DemoScenarioScaleTest.php
 
 		-
-			rawMessage: 'Access to an undefined property App\Models\AcademicTerm|Illuminate\Database\Eloquent\Collection<int, App\Models\AcademicTerm>::$id.'
-			identifier: property.notFound
-			count: 5
-			path: tests/Feature/EduFlowAgentTest.php
-
-		-
-			rawMessage: 'Access to an undefined property App\Models\Student|Illuminate\Database\Eloquent\Collection<int, App\Models\Student>::$id.'
-			identifier: property.notFound
-			count: 10
-			path: tests/Feature/EduFlowAgentTest.php
-
-		-
-			rawMessage: 'Access to an undefined property App\Models\Student|Illuminate\Database\Eloquent\Collection<int, App\Models\Student>::$payout_address.'
-			identifier: property.notFound
-			count: 1
-			path: tests/Feature/EduFlowAgentTest.php
-
-		-
-			rawMessage: 'Access to an undefined property App\Models\Student|Illuminate\Database\Eloquent\Collection<int, App\Models\Student>::$user_id.'
-			identifier: property.notFound
-			count: 5
-			path: tests/Feature/EduFlowAgentTest.php
-
-		-
 			rawMessage: Access to an undefined property Pest\PendingCalls\TestCall::$agent.
 			identifier: property.notFound
 			count: 10
@@ -1981,114 +1825,6 @@ parameters:
 			path: tests/Feature/EduFlowAgentTest.php
 
 		-
-			rawMessage: 'Access to an undefined property App\Models\AcademicTerm|Illuminate\Database\Eloquent\Collection<int, App\Models\AcademicTerm>::$ends_on.'
-			identifier: property.notFound
-			count: 1
-			path: tests/Feature/EducationModelsTest.php
-
-		-
-			rawMessage: 'Access to an undefined property App\Models\AcademicTerm|Illuminate\Database\Eloquent\Collection<int, App\Models\AcademicTerm>::$id.'
-			identifier: property.notFound
-			count: 1
-			path: tests/Feature/EducationModelsTest.php
-
-		-
-			rawMessage: 'Access to an undefined property App\Models\AcademicTerm|Illuminate\Database\Eloquent\Collection<int, App\Models\AcademicTerm>::$name.'
-			identifier: property.notFound
-			count: 1
-			path: tests/Feature/EducationModelsTest.php
-
-		-
-			rawMessage: 'Access to an undefined property App\Models\AcademicTerm|Illuminate\Database\Eloquent\Collection<int, App\Models\AcademicTerm>::$starts_on.'
-			identifier: property.notFound
-			count: 1
-			path: tests/Feature/EducationModelsTest.php
-
-		-
-			rawMessage: Access to an undefined property App\Models\Student::$academic_status.
-			identifier: property.notFound
-			count: 1
-			path: tests/Feature/EducationModelsTest.php
-
-		-
-			rawMessage: Access to an undefined property App\Models\Student::$enrollment_status.
-			identifier: property.notFound
-			count: 1
-			path: tests/Feature/EducationModelsTest.php
-
-		-
-			rawMessage: 'Access to an undefined property App\Models\Student|Illuminate\Database\Eloquent\Collection<int, App\Models\Student>::$assistanceRequests.'
-			identifier: property.notFound
-			count: 1
-			path: tests/Feature/EducationModelsTest.php
-
-		-
-			rawMessage: 'Access to an undefined property App\Models\Student|Illuminate\Database\Eloquent\Collection<int, App\Models\Student>::$attendance_rate.'
-			identifier: property.notFound
-			count: 1
-			path: tests/Feature/EducationModelsTest.php
-
-		-
-			rawMessage: 'Access to an undefined property App\Models\Student|Illuminate\Database\Eloquent\Collection<int, App\Models\Student>::$id.'
-			identifier: property.notFound
-			count: 1
-			path: tests/Feature/EducationModelsTest.php
-
-		-
-			rawMessage: 'Access to an undefined property App\Models\Student|Illuminate\Database\Eloquent\Collection<int, App\Models\Student>::$tuitionAccounts.'
-			identifier: property.notFound
-			count: 1
-			path: tests/Feature/EducationModelsTest.php
-
-		-
-			rawMessage: 'Access to an undefined property App\Models\Student|Illuminate\Database\Eloquent\Collection<int, App\Models\Student>::$user.'
-			identifier: property.notFound
-			count: 1
-			path: tests/Feature/EducationModelsTest.php
-
-		-
-			rawMessage: 'Access to an undefined property App\Models\Student|Illuminate\Database\Eloquent\Collection<int, App\Models\Student>::$year_level.'
-			identifier: property.notFound
-			count: 1
-			path: tests/Feature/EducationModelsTest.php
-
-		-
-			rawMessage: 'Access to an undefined property App\Models\TuitionAccount|Illuminate\Database\Eloquent\Collection<int, App\Models\TuitionAccount>::$academicTerm.'
-			identifier: property.notFound
-			count: 3
-			path: tests/Feature/EducationModelsTest.php
-
-		-
-			rawMessage: 'Access to an undefined property App\Models\TuitionAccount|Illuminate\Database\Eloquent\Collection<int, App\Models\TuitionAccount>::$academic_term_id.'
-			identifier: property.notFound
-			count: 1
-			path: tests/Feature/EducationModelsTest.php
-
-		-
-			rawMessage: 'Access to an undefined property App\Models\TuitionAccount|Illuminate\Database\Eloquent\Collection<int, App\Models\TuitionAccount>::$id.'
-			identifier: property.notFound
-			count: 1
-			path: tests/Feature/EducationModelsTest.php
-
-		-
-			rawMessage: 'Access to an undefined property App\Models\TuitionAccount|Illuminate\Database\Eloquent\Collection<int, App\Models\TuitionAccount>::$paid_amount.'
-			identifier: property.notFound
-			count: 1
-			path: tests/Feature/EducationModelsTest.php
-
-		-
-			rawMessage: 'Access to an undefined property App\Models\TuitionAccount|Illuminate\Database\Eloquent\Collection<int, App\Models\TuitionAccount>::$student.'
-			identifier: property.notFound
-			count: 3
-			path: tests/Feature/EducationModelsTest.php
-
-		-
-			rawMessage: 'Access to an undefined property App\Models\TuitionAccount|Illuminate\Database\Eloquent\Collection<int, App\Models\TuitionAccount>::$total_amount.'
-			identifier: property.notFound
-			count: 1
-			path: tests/Feature/EducationModelsTest.php
-
-		-
 			rawMessage: 'Call to an undefined method Pest\PendingCalls\TestCall::seed().'
 			identifier: method.notFound
 			count: 3
@@ -2195,18 +1931,6 @@ parameters:
 			identifier: staticMethod.notFound
 			count: 4
 			path: tests/Feature/EducationModelsTest.php
-
-		-
-			rawMessage: 'Access to an undefined property App\Models\AcademicTerm|Illuminate\Database\Eloquent\Collection<int, App\Models\AcademicTerm>::$id.'
-			identifier: property.notFound
-			count: 1
-			path: tests/Feature/EscalatedApprovalActionTest.php
-
-		-
-			rawMessage: 'Access to an undefined property App\Models\Student|Illuminate\Database\Eloquent\Collection<int, App\Models\Student>::$id.'
-			identifier: property.notFound
-			count: 1
-			path: tests/Feature/EscalatedApprovalActionTest.php
 
 		-
 			rawMessage: Access to an undefined property Pest\PendingCalls\TestCall::$agent.
@@ -2341,30 +2065,6 @@ parameters:
 			path: tests/Feature/ExampleTest.php
 
 		-
-			rawMessage: 'Access to an undefined property App\Models\AcademicTerm|Illuminate\Database\Eloquent\Collection<int, App\Models\AcademicTerm>::$id.'
-			identifier: property.notFound
-			count: 2
-			path: tests/Feature/ExplainerSettlementTest.php
-
-		-
-			rawMessage: 'Access to an undefined property App\Models\Student|Illuminate\Database\Eloquent\Collection<int, App\Models\Student>::$id.'
-			identifier: property.notFound
-			count: 2
-			path: tests/Feature/ExplainerSettlementTest.php
-
-		-
-			rawMessage: 'Access to an undefined property App\Models\Student|Illuminate\Database\Eloquent\Collection<int, App\Models\Student>::$user_id.'
-			identifier: property.notFound
-			count: 1
-			path: tests/Feature/ExplainerSettlementTest.php
-
-		-
-			rawMessage: 'Access to an undefined property App\Models\TuitionAccount|Illuminate\Database\Eloquent\Collection<int, App\Models\TuitionAccount>::$paid_amount.'
-			identifier: property.notFound
-			count: 1
-			path: tests/Feature/ExplainerSettlementTest.php
-
-		-
 			rawMessage: 'Call to an undefined method Pest\PendingCalls\TestCall::seed().'
 			identifier: method.notFound
 			count: 1
@@ -2441,30 +2141,6 @@ parameters:
 			identifier: class.notFound
 			count: 1
 			path: tests/Feature/Filament/AiProviderAdminUiTest.php
-
-		-
-			rawMessage: Access to an undefined property App\Models\AcademicTerm::$name.
-			identifier: property.notFound
-			count: 1
-			path: tests/Feature/Filament/AssistanceRequestResourceTest.php
-
-		-
-			rawMessage: Access to an undefined property App\Models\Student::$student_number.
-			identifier: property.notFound
-			count: 2
-			path: tests/Feature/Filament/AssistanceRequestResourceTest.php
-
-		-
-			rawMessage: Access to an undefined property App\Models\Student::$user.
-			identifier: property.notFound
-			count: 1
-			path: tests/Feature/Filament/AssistanceRequestResourceTest.php
-
-		-
-			rawMessage: 'Access to an undefined property App\Models\TuitionAccount|Illuminate\Database\Eloquent\Collection<int, App\Models\TuitionAccount>::$academicTerm.'
-			identifier: property.notFound
-			count: 1
-			path: tests/Feature/Filament/AssistanceRequestResourceTest.php
 
 		-
 			rawMessage: 'Call to an undefined method Illuminate\Testing\TestResponse::assertActionDoesNotExist().'
@@ -2941,24 +2617,6 @@ parameters:
 			path: tests/Feature/LeptonTreasuryPanelTest.php
 
 		-
-			rawMessage: 'Method Yukazakiri\Lepton\Contracts\ArcNetworkGateway@anonymous/tests/Feature/LeptonTreasuryPanelTest.php:105::treasuryAddress() never returns null so it can be removed from the return type.'
-			identifier: return.unusedType
-			count: 1
-			path: tests/Feature/LeptonTreasuryPanelTest.php
-
-		-
-			rawMessage: 'Method Yukazakiri\Lepton\Contracts\ArcNetworkGateway@anonymous/tests/Feature/LeptonTreasuryPanelTest.php:162::treasuryAddress() never returns null so it can be removed from the return type.'
-			identifier: return.unusedType
-			count: 1
-			path: tests/Feature/LeptonTreasuryPanelTest.php
-
-		-
-			rawMessage: 'Method Yukazakiri\Lepton\Contracts\ArcNetworkGateway@anonymous/tests/Feature/LeptonTreasuryPanelTest.php:53::treasuryAddress() never returns null so it can be removed from the return type.'
-			identifier: return.unusedType
-			count: 1
-			path: tests/Feature/LeptonTreasuryPanelTest.php
-
-		-
 			rawMessage: Access to an undefined property Illuminate\Notifications\DatabaseNotification::$id.
 			identifier: property.notFound
 			count: 2
@@ -2981,30 +2639,6 @@ parameters:
 			identifier: method.notFound
 			count: 1
 			path: tests/Feature/NotificationsTest.php
-
-		-
-			rawMessage: 'Access to an undefined property App\Models\AcademicTerm|Illuminate\Database\Eloquent\Collection<int, App\Models\AcademicTerm>::$id.'
-			identifier: property.notFound
-			count: 1
-			path: tests/Feature/PolicyEvaluationTest.php
-
-		-
-			rawMessage: Access to an undefined property App\Models\Student::$id.
-			identifier: property.notFound
-			count: 4
-			path: tests/Feature/PolicyEvaluationTest.php
-
-		-
-			rawMessage: Access to an undefined property App\Models\Student::$user_id.
-			identifier: property.notFound
-			count: 4
-			path: tests/Feature/PolicyEvaluationTest.php
-
-		-
-			rawMessage: 'Access to an undefined property App\Models\Student|Illuminate\Database\Eloquent\Collection<int, App\Models\Student>::$id.'
-			identifier: property.notFound
-			count: 1
-			path: tests/Feature/PolicyEvaluationTest.php
 
 		-
 			rawMessage: Access to an undefined property Pest\PendingCalls\TestCall::$fund.
