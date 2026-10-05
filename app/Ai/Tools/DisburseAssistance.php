@@ -105,7 +105,7 @@ class DisburseAssistance implements Approvable, Tool
         // A real destination is required. Never synthesise one.
         $recipient = $assistanceRequest->student?->payout_address;
 
-        if ($recipient === null || $assistanceRequest->student?->hasValidPayoutAddress() !== true) {
+        if ($recipient === null || $assistanceRequest->student->hasValidPayoutAddress() !== true) {
             return 'Not disbursed. No valid payout address is on file for this student.';
         }
 

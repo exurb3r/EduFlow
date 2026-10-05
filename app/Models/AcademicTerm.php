@@ -7,7 +7,16 @@ namespace App\Models;
 use Database\Factories\AcademicTermFactory;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
+use Illuminate\Support\Carbon;
 
+/**
+ * @property int $id
+ * @property string $name
+ * @property Carbon|null $starts_on
+ * @property Carbon|null $ends_on
+ * @property Carbon|null $created_at
+ * @property Carbon|null $updated_at
+ */
 class AcademicTerm extends Model
 {
     /** @use HasFactory<AcademicTermFactory> */
