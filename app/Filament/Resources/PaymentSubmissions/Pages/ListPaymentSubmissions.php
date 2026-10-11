@@ -13,7 +13,7 @@ class ListPaymentSubmissions extends ListRecords
 {
     protected static string $resource = PaymentSubmissionResource::class;
 
-    protected static ?string $title = 'Automated payment submission';
+    protected static ?string $title = 'Payment submissions';
 
     #[\Override]
     protected function getHeaderActions(): array
@@ -34,8 +34,7 @@ class ListPaymentSubmissions extends ListRecords
     #[\Override]
     public function getSubheading(): ?string
     {
-        return 'Every payment the automation has attempted, and exactly how far each one got. '
-            .'This table is read-only: a submission is written by the authorization workflow inside '
-            .'its own transaction, and only the worker or reconciliation may advance one.';
+        return 'Track queued work, provider acceptance and verified settlement. '
+            .'Need to approve a reserved bill? Open Payment approvals. This history cannot submit or retry a payment.';
     }
 }

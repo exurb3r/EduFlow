@@ -35,6 +35,8 @@ use Filament\Support\Icons\Heroicon;
 use Filament\Tables\Columns\TextColumn;
 use Filament\Tables\Concerns\InteractsWithTable;
 use Filament\Tables\Contracts\HasTable;
+use Filament\Tables\Enums\FiltersLayout;
+use Filament\Tables\Filters\SelectFilter;
 use Filament\Tables\Table;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Collection;
@@ -44,6 +46,7 @@ use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Gate;
 use Illuminate\Support\Str;
 use Illuminate\Validation\ValidationException;
+use Livewire\Attributes\Computed;
 use Livewire\Attributes\Locked;
 use SensitiveParameter;
 use UnitEnum;
@@ -54,9 +57,9 @@ class PaymentReviews extends Page implements HasTable
     use RestrictsFileUploadsToSchemaComponents;
 
     private const array DECISIONS = [
-        'approve_payment' => 'Reviewed — executor disabled',
-        'reject_payment' => 'Rejected — reservation held',
-        'hold_payment' => 'On hold — reservation held',
+        'approve_payment' => 'Approval recorded',
+        'reject_payment' => 'Rejected',
+        'hold_payment' => 'On hold',
     ];
 
     protected static string|BackedEnum|null $navigationIcon = Heroicon::ClipboardDocumentCheck;
@@ -109,9 +112,40 @@ class PaymentReviews extends Page implements HasTable
     #[\Override]
     public function getSubheading(): ?string
     {
-        return 'Review reserved payments here, not in Payment Submissions. Open Review payment to approve exact payment authority, reject, or hold. '
-            .'Approval requires an independent reviewer with directly assigned AuthorizePayment:PaymentIntent permission and enrolled MFA. '
-            .'Agent advice is not payment authority. This review does not itself send money.';
+        return 'Check the bill, recipient and exact amount. Record an independent decision; this page never sends money.';
+    }
+
+    /** @return array{awaiting: int, approved: int, held_or_rejected: int, released: int} */
+    #[Computed]
+    public function reviewOverview(): array
+    {
+        Gate::forUser($this->actor())->authorize('create', PaymentIntent::class);
+
+        return [
+            'awaiting' => $this->reservationsQuery()->whereDoesntHave('authorization')
+                ->whereDoesntHave('release.review', fn (Builder $query): Builder => $query->where('decision', 'approve_release'))->count(),
+            'approved' => $this->reservationsQuery()->whereHas('authorization', fn (Builder $query): Builder => $query->where('decision', 'approve_payment'))->count(),
+            'held_or_rejected' => $this->reservationsQuery()->whereHas('authorization', fn (Builder $query): Builder => $query->whereIn('decision', ['hold_payment', 'reject_payment']))->count(),
+            'released' => $this->reservationsQuery()->whereHas('release.review', fn (Builder $query): Builder => $query->where('decision', 'approve_release'))->count(),
+        ];
+    }
+
+    /** @return array{ready: bool, verified_staff: bool, direct_permission: bool, enrolled_factor: bool} */
+    #[Computed]
+    public function reviewerReadiness(): array
+    {
+        $user = $this->actor();
+        Gate::forUser($user)->authorize('create', PaymentIntent::class);
+        $verifiedStaff = $user->hasVerifiedEmail() && $user->hasAnyRole(['finance_officer', 'admin', 'super_admin']);
+        $directPermission = $user->checkPermissionTo('AuthorizePayment:PaymentIntent', 'web')
+            && $user->hasDirectPermission('AuthorizePayment:PaymentIntent');
+        $enrollment = PaymentReviewerEnrollment::query()
+            ->where('organization_id', app(InstallationInstitution::class)->current()?->id)
+            ->where('reviewer_id', $user->id)->first();
+        $enrolledFactor = $enrollment?->matchesCurrentFactor($user) ?? false;
+
+        return ['ready' => $verifiedStaff && $directPermission && $enrolledFactor,
+            'verified_staff' => $verifiedStaff, 'direct_permission' => $directPermission, 'enrolled_factor' => $enrolledFactor];
     }
 
     public function table(Table $table): Table
@@ -120,26 +154,31 @@ class PaymentReviews extends Page implements HasTable
 
         return $table
             ->query($this->reservationsQuery())
-            ->heading('Reserved institution payments')
-            ->description('Refreshes every 10 seconds. Review exact held payment evidence; recorded authority cannot execute a transfer.')
-            ->defaultSort('id', 'desc')->striped()->poll('10s')
+            ->heading('Payment review queue')
+            ->description('Open Review payment to approve, reject or hold. Recorded decisions are history, not proof of settlement.')
+            ->defaultSort('id', 'desc')->stackedOnMobile()
             ->columns([
-                TextColumn::make('id')->label('Reservation')->prefix('#')->sortable(),
-                TextColumn::make('payment_intent_id')->label('Payment intent')->prefix('#'),
-                TextColumn::make('invoice_id')->label('Bill')->prefix('#'),
+                TextColumn::make('bill_reference')->label('Bill')
+                    ->state(fn (PaymentReservation $record): string => $record->intent?->snapshot['invoice']['reference'] ?? '#'.$record->invoice_id)
+                    ->description(fn (PaymentReservation $record): string => 'Reservation #'.$record->id.' · Intent #'.$record->payment_intent_id)
+                    ->wrap(),
                 TextColumn::make('amount_base_units')->label('Reserved amount')->alignEnd()
-                    ->formatStateUsing(fn (PaymentReservation $record): string => $this->formatUsdc($record->amount_base_units)),
+                    ->formatStateUsing(fn (PaymentReservation $record): string => $this->formatUsdc($record->amount_base_units))
+                    ->weight('semibold'),
                 TextColumn::make('max_fee_base_units')->label('Fee ceiling')->alignEnd()
-                    ->formatStateUsing(fn (PaymentReservation $record): string => $this->formatUsdc($record->max_fee_base_units)),
-                TextColumn::make('intent.recipient_address')->label('Recipient')->limit(22)->wrap()
+                    ->formatStateUsing(fn (PaymentReservation $record): string => $this->formatUsdc($record->max_fee_base_units))
+                    ->toggleable(isToggledHiddenByDefault: true),
+                TextColumn::make('intent.recipient_address')->label('Recipient')->limit(18)->copyable()
                     ->tooltip(fn (PaymentReservation $record): ?string => $record->intent?->recipient_address),
-                TextColumn::make('intent.chain')->label('Chain')->badge()->color('gray'),
+                TextColumn::make('intent.chain')->label('Chain')->badge()->color('gray')->toggleable(isToggledHiddenByDefault: true),
                 TextColumn::make('review_decision')->label('Review')->badge()
                     ->state(fn (PaymentReservation $record): string => $record->authorization->decision ?? 'pending')
-                    ->formatStateUsing(fn (string $state): string => $state === 'pending' ? 'Pending' : (self::DECISIONS[$state] ?? 'Unknown — executor disabled'))
+                    ->formatStateUsing(fn (string $state): string => $state === 'pending' ? 'Not reviewed' : (self::DECISIONS[$state] ?? 'Unknown decision'))
                     ->color(fn (string $state): string => match ($state) {
-                        'reject_payment' => 'danger', 'pending', 'hold_payment' => 'warning', default => 'gray',
+                        'approve_payment' => 'info', 'reject_payment' => 'danger', 'pending', 'hold_payment' => 'warning', default => 'gray',
                     }),
+                TextColumn::make('next_step')->label('Next step')->wrap()
+                    ->state(fn (PaymentReservation $record): string => $this->reviewGuidance($record)),
                 TextColumn::make('evidence_mode')->label('Evidence mode')->badge()->color('gray')
                     ->state(fn (PaymentReservation $record): string => match ($record->snapshot['balance_observation']['is_fake'] ?? null) {
                         true => 'Simulation only', false => 'Network evidence', default => 'Unknown',
@@ -147,9 +186,25 @@ class PaymentReviews extends Page implements HasTable
                 TextColumn::make('created_at')->label('Reserved (UTC)')->dateTime('Y-m-d H:i:s', 'UTC')->sortable()
                     ->toggleable(isToggledHiddenByDefault: true),
             ])
+            ->filters([
+                SelectFilter::make('review_status')->label('Show payments')->placeholder('All review history')
+                    ->options(['awaiting' => 'Awaiting review', 'approved' => 'Approval recorded',
+                        'held_or_rejected' => 'On hold or rejected', 'released' => 'Capacity released'])
+                    ->query(function (Builder $query, array $data): Builder {
+                        return match ($data['value'] ?? null) {
+                            'awaiting' => $query->whereDoesntHave('authorization')
+                                ->whereDoesntHave('release.review', fn (Builder $review): Builder => $review->where('decision', 'approve_release')),
+                            'approved' => $query->whereHas('authorization', fn (Builder $review): Builder => $review->where('decision', 'approve_payment')),
+                            'held_or_rejected' => $query->whereHas('authorization', fn (Builder $review): Builder => $review->whereIn('decision', ['hold_payment', 'reject_payment'])),
+                            'released' => $query->whereHas('release.review', fn (Builder $review): Builder => $review->where('decision', 'approve_release')),
+                            default => $query,
+                        };
+                    }),
+            ], layout: FiltersLayout::AboveContent)
+            ->deferFilters(false)
             ->recordActions([
                 Action::make('viewPaymentEvidence')
-                    ->label(fn (PaymentReservation $record): string => $this->hasReview($record) ? 'Evidence only' : 'Evidence')
+                    ->label('View evidence')
                     ->icon(Heroicon::Eye)->color('gray')
                     ->visible(fn (PaymentReservation $record): bool => $record->intent instanceof PaymentIntent
                         && Gate::forUser($this->actor())->allows('view', $record->intent))
@@ -162,8 +217,8 @@ class PaymentReviews extends Page implements HasTable
                     ->modalSubmitAction(false)->modalCancelActionLabel('Close'),
                 Action::make('reviewReservedPayment')->label('Review payment')->icon(Heroicon::ClipboardDocumentCheck)
                     ->visible(fn (PaymentReservation $record): bool => $this->canReview($record))
-                    ->modalHeading('Review exact reserved payment')->modalWidth('6xl')
-                    ->modalDescription('Execution is disabled. This records independent payment authority only; no transfer or local payment state change. Rejecting or holding keeps the reservation held.')
+                    ->modalHeading('Review reserved payment')->modalWidth('5xl')->slideOver()
+                    ->modalDescription('Record authority for this exact payment. This page does not send money. Rejecting or holding does not release reserved capacity.')
                     ->modalSubmitActionLabel('Record payment review')
                     ->mountUsing(function (PaymentReservation $record, Schema $schema): void {
                         $reservation = $this->currentReservation($record);
@@ -217,12 +272,13 @@ class PaymentReviews extends Page implements HasTable
                             unset($data['password'], $data['mfa_code']);
                         }
                         Notification::make()->title('Payment review recorded')
-                            ->body('Authority evidence recorded only. Execution remains disabled; no transfer or local payment state change. The reservation remains held, including rejection or hold.')
+                            ->body('Decision recorded. No transfer was made by this page and local accounts are unchanged. Network approval may create queued submission work; rejection or hold keeps capacity reserved.')
                             ->success()->send();
                     }),
             ])
-            ->emptyStateHeading('No reserved payments')
-            ->emptyStateDescription('Institution payment reservations appear here after the funding workflow. This page cannot reserve funds, release holds or execute payments.');
+            ->emptyStateIcon(Heroicon::ClipboardDocumentCheck)
+            ->emptyStateHeading('No payments in this view')
+            ->emptyStateDescription('Clear filters to see review history. New payments appear after bill preparation and a reviewed funding reservation; neither step happens here.');
     }
 
     /** @return list<Action> */
@@ -230,7 +286,7 @@ class PaymentReviews extends Page implements HasTable
     protected function getHeaderActions(): array
     {
         return [
-            Action::make('enrollPaymentReviewer')->label('Enroll payment reviewer')->icon(Heroicon::UserPlus)
+            Action::make('enrollPaymentReviewer')->label('Set up reviewer')->icon(Heroicon::UserPlus)->color('gray')
                 ->visible(fn (): bool => Gate::forUser($this->actor())->allows('create', PaymentReviewerEnrollment::class))
                 ->modalHeading('Independently enroll payment reviewer')->modalWidth('5xl')
                 ->modalDescription('Pin another eligible staff member’s existing authenticator after independent identity and factor verification. Pinning protects against account factor replacement. Enrollment grants no payment permission, approves no payment and cannot execute a transfer. Existing enrollment cannot be rotated here.')
@@ -356,7 +412,7 @@ class PaymentReviews extends Page implements HasTable
     /** @return Builder<PaymentReservation> */
     private function reservationsQuery(): Builder
     {
-        return PaymentReservation::query()->with(['intent', 'authorization'])
+        return PaymentReservation::query()->with(['intent', 'authorization', 'release.review'])
             ->where('organization_id', app(InstallationInstitution::class)->current()?->id);
     }
 
@@ -378,10 +434,34 @@ class PaymentReviews extends Page implements HasTable
         $user = Auth::user();
 
         return $user instanceof User && $reservation->intent instanceof PaymentIntent && ! $this->hasReview($reservation)
+            && ! $this->isReleased($reservation) && $this->reviewerReadiness['ready']
             && $user->hasAnyRole(['finance_officer', 'admin', 'super_admin'])
             && $user->checkPermissionTo('AuthorizePayment:PaymentIntent', 'web')
             && $user->hasDirectPermission('AuthorizePayment:PaymentIntent')
             && Gate::forUser($user)->allows('authorizePayment', $reservation->intent);
+    }
+
+    private function isReleased(PaymentReservation $reservation): bool
+    {
+        return $reservation->release?->review?->decision === 'approve_release';
+    }
+
+    private function reviewGuidance(PaymentReservation $reservation): string
+    {
+        if ($this->isReleased($reservation)) {
+            return 'Capacity released · history only';
+        }
+        if ($this->hasReview($reservation)) {
+            return 'View recorded decision · not proof of payment';
+        }
+        if ($reservation->intent?->prepared_by === $this->actor()->id) {
+            return 'Another independent reviewer required';
+        }
+        if (! $this->reviewerReadiness['ready']) {
+            return 'Reviewer setup required · see checklist above';
+        }
+
+        return 'Inspect evidence, then record your decision';
     }
 
     private function hasReview(PaymentReservation $reservation): bool
@@ -394,6 +474,7 @@ class PaymentReviews extends Page implements HasTable
     private function authorizeReview(PaymentReservation $reservation): void
     {
         $user = $this->actor();
+        abort_if($this->isReleased($reservation), 403, 'Released reservation is history only.');
         abort_unless($user->hasAnyRole(['finance_officer', 'admin', 'super_admin'])
             && $user->checkPermissionTo('AuthorizePayment:PaymentIntent', 'web')
             && $user->hasDirectPermission('AuthorizePayment:PaymentIntent'), 403);
@@ -420,7 +501,8 @@ class PaymentReviews extends Page implements HasTable
             'organization_id' => $reservation->organization_id, 'invoice_id' => $reservation->invoice_id,
             'invoice_reference' => $intent->snapshot['invoice']['reference'] ?? null,
             'prepared_by' => $intent->prepared_by, 'reserved_by' => $reservation->reserved_by,
-            'reservation_key' => $reservation->reservation_key, 'reservation_state' => 'Held — application capacity only',
+            'reservation_key' => $reservation->reservation_key,
+            'reservation_state' => $this->isReleased($reservation) ? 'Released — application capacity returned' : 'Held — application capacity only',
             'amount' => $this->formatUsdc($intent->amount_base_units), 'max_fee' => $this->formatUsdc($intent->max_fee_base_units),
             'reserved_amount' => $this->formatUsdc($reservation->amount_base_units),
             'reserved_max_fee' => $this->formatUsdc($reservation->max_fee_base_units),
@@ -449,38 +531,41 @@ class PaymentReviews extends Page implements HasTable
     private function paymentEvidenceSchema(): array
     {
         return [
-            Section::make('Exact payment and held capacity')->description('No external funds are locked and no local payment state is changed. Every decision keeps the reservation held.')
+            Section::make('1. Check payment details')->description('Exact reserved amounts and recipient. Review records do not move funds or release held capacity.')
                 ->schema([
                     TextEntry::make('payment_intent_id')->label('Payment intent ID')->state(fn (): ?int => $this->mountedIntentId),
                     TextEntry::make('payment_reservation_id')->label('Reservation ID')->state(fn (): ?int => $this->mountedReservationId),
-                    $this->evidenceEntry('organization_id', 'Institution ID'), $this->evidenceEntry('invoice_id', 'Bill ID'),
                     $this->evidenceEntry('invoice_reference', 'Bill reference')->columnSpanFull(),
-                    $this->evidenceEntry('prepared_by', 'Prepared by user ID'), $this->evidenceEntry('reserved_by', 'Reserved by user ID'),
                     $this->evidenceEntry('amount', 'Exact payment amount'), $this->evidenceEntry('max_fee', 'Exact fee ceiling'),
-                    $this->evidenceEntry('reserved_amount', 'Held payment amount'), $this->evidenceEntry('reserved_max_fee', 'Held fee ceiling'),
                     $this->evidenceEntry('source_address', 'Source treasury')->copyable()->columnSpanFull(),
                     $this->evidenceEntry('recipient_address', 'Recipient')->copyable()->columnSpanFull(),
                     $this->evidenceEntry('chain', 'Chain'), $this->evidenceEntry('chain_id', 'Chain ID'),
-                    IconEntry::make('is_fake')->label('Simulation / fake evidence')->boolean()
-                        ->state(fn (): mixed => $this->mountedPaymentEvidence['is_fake'] ?? null)->placeholder('Unknown'),
-                    IconEntry::make('can_execute')->label('Can execute')->boolean()->state(false),
+                    TextEntry::make('evidence_mode')->label('Evidence mode')->badge()->color('gray')
+                        ->state(fn (): string => match ($this->mountedPaymentEvidence['is_fake'] ?? null) {
+                            true => 'Simulation only', false => 'Network evidence', default => 'Unknown',
+                        }),
                     $this->evidenceEntry('reservation_state', 'Reservation state')->columnSpanFull(),
                 ])->columns(['default' => 1, 'md' => 2])->columnSpanFull(),
-            Section::make('Bound digests and approvals')->schema([
-                TextEntry::make('intent_digest')->label('Mounted intent SHA-256')->state(fn (): string => $this->mountedIntentDigest)->wrap()->copyable()->columnSpanFull(),
-                TextEntry::make('reservation_digest')->label('Mounted reservation SHA-256')->state(fn (): string => $this->mountedReservationDigest)->wrap()->copyable()->columnSpanFull(),
-                $this->evidenceEntry('reserved_intent_digest', 'Intent digest bound by reservation')->copyable()->columnSpanFull(),
-                $this->evidenceEntry('reservation_key', 'Reservation key (UUID)')->copyable()->columnSpanFull(),
-                $this->evidenceEntry('funding_window_id', 'Funding window ID'), $this->evidenceEntry('funding_window_approval_id', 'Funding approval ID'),
-                $this->evidenceEntry('funding_valid_until', 'Funding window expiry (UTC)')->columnSpanFull(),
-                $this->evidenceEntry('funding_window_digest', 'Approved funding window SHA-256')->copyable()->columnSpanFull(),
-                $this->evidenceEntry('funding_approval_digest', 'Funding approval SHA-256 bound by reservation')->copyable()->columnSpanFull(),
-                $this->evidenceEntry('invoice_review_digest', 'Bill review SHA-256')->copyable()->columnSpanFull(),
-                $this->evidenceEntry('destination_approval_digest', 'Recipient approval SHA-256')->copyable()->columnSpanFull(),
-                $this->evidenceEntry('policy_activation_digest', 'Finance policy activation SHA-256')->copyable()->columnSpanFull(),
-                $this->evidenceEntry('integrity', 'Evidence integrity')->columnSpanFull(),
-            ])->columns(['default' => 1, 'md' => 2])->columnSpanFull(),
-            Section::make('Recorded payment review — never execution')->visible(fn (): bool => $this->mountedReviewEvidence !== [])
+            Section::make('Evidence and integrity')->description('Inspect source approvals and bound SHA-256 digests. Current evidence is rechecked when you submit your decision.')
+                ->collapsible()->collapsed()->schema([
+                    $this->evidenceEntry('organization_id', 'Institution ID'), $this->evidenceEntry('invoice_id', 'Bill ID'),
+                    $this->evidenceEntry('prepared_by', 'Prepared by user ID'), $this->evidenceEntry('reserved_by', 'Reserved by user ID'),
+                    $this->evidenceEntry('reserved_amount', 'Held payment amount'), $this->evidenceEntry('reserved_max_fee', 'Held fee ceiling'),
+                    IconEntry::make('can_execute')->label('Can execute from this page')->boolean()->state(false),
+                    TextEntry::make('intent_digest')->label('Mounted intent SHA-256')->state(fn (): string => $this->mountedIntentDigest)->wrap()->copyable()->columnSpanFull(),
+                    TextEntry::make('reservation_digest')->label('Mounted reservation SHA-256')->state(fn (): string => $this->mountedReservationDigest)->wrap()->copyable()->columnSpanFull(),
+                    $this->evidenceEntry('reserved_intent_digest', 'Intent digest bound by reservation')->copyable()->columnSpanFull(),
+                    $this->evidenceEntry('reservation_key', 'Reservation key (UUID)')->copyable()->columnSpanFull(),
+                    $this->evidenceEntry('funding_window_id', 'Funding window ID'), $this->evidenceEntry('funding_window_approval_id', 'Funding approval ID'),
+                    $this->evidenceEntry('funding_valid_until', 'Funding window expiry (UTC)')->columnSpanFull(),
+                    $this->evidenceEntry('funding_window_digest', 'Approved funding window SHA-256')->copyable()->columnSpanFull(),
+                    $this->evidenceEntry('funding_approval_digest', 'Funding approval SHA-256 bound by reservation')->copyable()->columnSpanFull(),
+                    $this->evidenceEntry('invoice_review_digest', 'Bill review SHA-256')->copyable()->columnSpanFull(),
+                    $this->evidenceEntry('destination_approval_digest', 'Recipient approval SHA-256')->copyable()->columnSpanFull(),
+                    $this->evidenceEntry('policy_activation_digest', 'Finance policy activation SHA-256')->copyable()->columnSpanFull(),
+                    $this->evidenceEntry('integrity', 'Evidence integrity')->columnSpanFull(),
+                ])->columns(['default' => 1, 'md' => 2])->columnSpanFull(),
+            Section::make('Recorded decision — not settlement')->visible(fn (): bool => $this->mountedReviewEvidence !== [])
                 ->schema([
                     $this->reviewEntry('id', 'Payment review ID'), $this->reviewEntry('reviewed_by', 'Reviewed by user ID'),
                     $this->reviewEntry('decision', 'Decision')->formatStateUsing(fn (string $state): string => self::DECISIONS[$state] ?? $state)->columnSpanFull(),
@@ -502,22 +587,25 @@ class PaymentReviews extends Page implements HasTable
         $rules = ReviewVendorPayment::inputRules();
 
         return [
-            Section::make('Independent payment review')->description('Approval records bounded authority, not a transfer. Fake evidence is simulation only. Rejection or hold does not release reserved capacity.')
+            Section::make('2. Record your decision')->description('Approval grants time-limited authority for this exact payment. Simulation evidence remains simulation only.')
                 ->schema([
                     TextEntry::make('request_key')->label('Server-generated review request key (UUID)')
                         ->state(fn (): string => $this->mountedRequestKey)->wrap()->copyable()->columnSpanFull(),
                     Select::make('decision')->options([
-                        'approve_payment' => 'Approve exact payment authority — executor disabled',
-                        'reject_payment' => 'Reject payment — keep reservation held',
-                        'hold_payment' => 'Hold payment — keep reservation held',
+                        'approve_payment' => 'Approve exact payment authority',
+                        'reject_payment' => 'Reject payment',
+                        'hold_payment' => 'Hold for investigation',
                     ])->required()->rules($rules['decision'])->live()->columnSpanFull(),
                     Textarea::make('reason')->label('Review reason')->required()->rules($rules['reason'])->maxLength(1000)->rows(3)->columnSpanFull(),
-                    TextInput::make('valid_until')->label('Authority valid until (UTC)')->placeholder('2026-10-10T08:03:00+00:00')
+                    TextInput::make('valid_until')->label('Authority expires at (UTC)')->placeholder(fn (): string => now()->utc()->addMinutes(3)->toIso8601String())
                         ->visible(fn (Get $get): bool => $get('decision') === 'approve_payment')
                         ->required(fn (Get $get): bool => $get('decision') === 'approve_payment')
                         ->rules($rules['valid_until'])
-                        ->helperText('Use Y-m-dTH:i:s+00:00. Approval must expire within five minutes and no later than the reviewed funding window.')
+                        ->helperText('Pre-filled for three minutes, capped by the funding window. Format: Y-m-dTH:i:s+00:00; maximum five minutes. Reopen the review if expired.')
                         ->columnSpanFull(),
+                ])->columns(['default' => 1, 'md' => 2])->columnSpanFull(),
+            Section::make('3. Confirm your identity')->description('Use your own current password and an unused code from your independently enrolled authenticator.')
+                ->schema([
                     TextInput::make('password')->label('Current password')->password()->autocomplete('current-password')
                         ->required()->rules($rules['password']),
                     Select::make('mfa_method')->label('Authenticator method')->options([
@@ -527,7 +615,7 @@ class PaymentReviews extends Page implements HasTable
                         ->required()->rules($rules['mfa_code'])->minLength(6)->maxLength(6)
                         ->helperText('Use the configured authenticator, including any leading zero. Email and recovery codes are not accepted.'),
                     Checkbox::make('attestation')
-                        ->label('I reviewed these exact payment and reservation IDs, amounts, source, recipient, chain and digests. My decision records authority only, not a transfer. Execution stays disabled, no local payment state changes, and rejection or hold keeps the reservation held.')
+                        ->label('I reviewed these exact payment and reservation IDs, amounts, source, recipient, chain and digests. This page records my decision without sending money or changing local accounts. Network approval may queue submission work for a separately enabled executor. Rejection or hold keeps capacity reserved.')
                         ->required()->accepted()->columnSpanFull(),
                 ])->columns(['default' => 1, 'md' => 2])->columnSpanFull(),
         ];

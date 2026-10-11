@@ -4,6 +4,8 @@ declare(strict_types=1);
 
 namespace App\Filament\Resources\PaymentSubmissions\Pages;
 
+use App\DTOs\Money;
+use App\Enums\CurrencyCode;
 use App\Filament\Resources\PaymentSubmissions\PaymentSubmissionResource;
 use App\Models\PaymentSubmissionOutbox;
 use Filament\Actions\Action;
@@ -75,7 +77,7 @@ class ViewPaymentSubmission extends ViewRecord
                     ]),
 
                 Section::make('Authority')
-                    ->description('Who authorized this, and on what evidence. No payment is sent on anything less.')
+                    ->description('Historical authority bound to this submission. Current validity must be checked separately.')
                     ->columns(2)
                     ->schema([
                         TextEntry::make('snapshot.authorized_by')
@@ -103,18 +105,18 @@ class ViewPaymentSubmission extends ViewRecord
                             ->helperText('bounds on-chain gas only — the rail may charge more'),
                     ]),
 
-                Section::make('The rail')
+                Section::make('Provider response')
                     ->description('What the rail itself returned. A handle is its own identifier; it is not an on-chain reference.')
                     ->columns(2)
                     ->schema([
                         TextEntry::make('provider_idempotency_key')
                             ->label('Provider identity')
                             ->copyable()
-                            ->helperText('the rail recognises this key on a retry, so a replay cannot pay twice'),
+                            ->helperText('Stable request identity; provider acceptance and safe recovery still require evidence.'),
                         TextEntry::make('provider_handle')
-                            ->label("Rail's transaction id")
+                            ->label('Provider transaction ID')
                             ->copyable()
-                            ->placeholder('none — nothing in flight')
+                            ->placeholder('not recorded — outcome may be unknown')
                             ->state(fn (): ?string => $entry->provider_handle),
                         TextEntry::make('result.provider_reference')
                             ->label('On-chain reference')
@@ -122,7 +124,7 @@ class ViewPaymentSubmission extends ViewRecord
                             ->placeholder('not published yet')
                             ->state(fn (): ?string => $entry->result['provider_reference'] ?? null),
                         TextEntry::make('attempts')
-                            ->label('Submissions attempted')
+                            ->label('Workflow attempts recorded')
                             ->state(fn (): string => sprintf('%d of %d', (int) $entry->attempts, (int) $entry->max_attempts)),
                     ]),
 
@@ -138,7 +140,7 @@ class ViewPaymentSubmission extends ViewRecord
                     ]),
 
                 Section::make('Every attempt, append-only')
-                    ->description('One row per submission. Nothing here is ever rewritten — an uncertain outcome is reconciled, not edited.')
+                    ->description('Append-only workflow observations. A recorded attempt is not proof that a transfer was submitted.')
                     ->schema([
                         RepeatableEntry::make('attemptRecords')
                             ->hiddenLabel()
@@ -171,7 +173,7 @@ class ViewPaymentSubmission extends ViewRecord
 
                 Section::make('Evidence')
                     ->description('The digests that bind this submission to the authorization it was created from. Change any one and the row stops verifying.')
-                    ->columns(2)
+                    ->columns(2)->collapsible()->collapsed()
                     ->schema([
                         TextEntry::make('request_key')->label('Submission identity')->copyable(),
                         TextEntry::make('snapshot_digest')
@@ -217,14 +219,14 @@ class ViewPaymentSubmission extends ViewRecord
     {
         return match ($entry->state) {
             'queued' => 'queued for the worker',
-            'running' => 'being submitted right now',
+            'running' => 'worker processing; submission not confirmed',
             'accepted' => 'the rail has taken it; no on-chain reference yet',
             'submitted' => 'an on-chain reference exists; settlement not yet proven',
             'completed' => 'verified settled on Arc',
             'unknown' => 'unresolved — nobody knows what happened',
-            'blocked' => 'blocked before reaching the rail',
+            'blocked' => 'blocked by workflow checks',
             'failed' => 'the rail reported it failed',
-            'paused' => 'held by an operator',
+            'paused' => 'submission paused',
             default => (string) $entry->state,
         };
     }
@@ -258,13 +260,14 @@ class ViewPaymentSubmission extends ViewRecord
             'submitted' => 'An on-chain reference exists. Reconciliation checks it against the chain to prove the '
                 .'money actually moved to the authorized recipient.',
             'completed' => 'Arc verified a successful execution with the authorized sender, recipient and amount. '
-                .'The ledger was written from that verdict alone.',
+                .'Any mirror ledger entry must come from that verdict, not provider acknowledgement. This does not settle the local payable.',
             'unknown' => 'The rail could not answer, or answered in a shape that named nothing. The payment may '
-                .'well have been accepted. Capacity stays held and no retry is attempted until it is reconciled.',
-            'blocked' => 'Stopped before reaching the rail — an expired authority, a disabled runtime or the stop '
-                .'switch. Nothing was sent, and nothing should be inferred from it.',
-            'failed' => 'The rail reported the transfer as failed. No USDC moved.',
-            default => 'Still waiting for the worker. Nothing has been sent.',
+                .'have been accepted. Capacity stays held. Investigate the existing attempt before any resend; safe recovery is not yet proven.',
+            'blocked' => 'Workflow checks blocked further submission. Inspect recorded attempts and provider evidence; '
+                .'this status alone does not rule out an earlier uncertain transfer.',
+            'failed' => 'The provider reported failure. This is not verified settlement and does not by itself prove no funds moved.',
+            'running' => 'The worker is processing this entry. Provider acceptance or broadcast has not been confirmed by this status.',
+            default => 'Submission work is waiting or paused. Inspect prior attempts before drawing conclusions about funds.',
         };
     }
 
@@ -288,23 +291,11 @@ class ViewPaymentSubmission extends ViewRecord
 
     private static function amount(PaymentSubmissionOutbox $entry): string
     {
-        $base = $entry->snapshot['amount_base_units'] ?? null;
-
-        if (! is_numeric($base)) {
-            return 'unknown';
-        }
-
-        return number_format(((float) $base) / 1_000000, 2).' USDC';
+        return Money::formatExact($entry->snapshot['amount_base_units'] ?? null, CurrencyCode::USDC->value);
     }
 
     private static function fee(PaymentSubmissionOutbox $entry): string
     {
-        $base = $entry->snapshot['max_fee_base_units'] ?? null;
-
-        if (! is_numeric($base)) {
-            return 'unknown';
-        }
-
-        return number_format(((float) $base) / 1_000000, 2).' USDC';
+        return Money::formatExact($entry->snapshot['max_fee_base_units'] ?? null, CurrencyCode::USDC->value);
     }
 }

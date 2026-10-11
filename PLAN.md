@@ -6,6 +6,28 @@
 
 ## Where Things Stand — Start Here in a New Session
 
+**Admin UI audit and approval redesign (2026-10-11):** Payment Approvals now puts exact
+review counts, a short safety notice and the review queue ahead of setup guidance. The shared
+admin/finance page uses a ReUI Frame/card/step composition adapted to Blade, not React ReUI
+components mounted inside Livewire. It provides a reviewer-prerequisite checklist, explicit
+next-step reasons, a visible review-history filter, a three-stage review drawer and expandable
+digest evidence. Mobile tables stack into cards. Payment Submissions has a readable navigation
+label, exact six-decimal USDC amounts and separate provider-ID/hash/settlement wording; missing
+handles never imply no transfer. No payment execution setting was changed. **222 affected
+Pest tests pass (925 assertions); the asset build passes.** Chromium browser checks exercised
+desktop, finance mobile, dark mode and opening the review drawer with isolated test fixtures,
+not live approvals. See **§16.6** for screen availability and remaining work.
+
+**Read this correction before older live-run notes below:** no genuine, independently
+human-approved payment has yet been proven through the current workflow. The earlier live
+runner used synthetic staff accounts, authenticator factors and purported review evidence;
+database records from that runner are not proof of human consent. Outbox #3 remains an
+unresolved investigation, with no established provider handle or chain hash. A balance
+snapshot, an empty provider-history observation or an HTTP 400 does **not** prove no payment
+was accepted. Earlier conclusions that `--quiet` caused the error, or that a fee-shaped response
+proved nothing broadcast, remain unestablished. Investigate existing attempts before resending.
+The package's published `v2.8.0` has not been adopted here: EduFlow still locks `v2.7.0`.
+
 **Payment approval navigation (2026-10-11):** `PaymentReviews` is now explicitly registered in the admin panel as **Automation → Payment Approvals**, with a shortcut from Payment Submissions. Previously only the finance route was registered. Both panels retain the existing review policy, independent reviewer/direct permission/MFA requirements, and exact reservation evidence. This UI records authority only; it does not itself submit a transfer. Submission history is read-only, and agent advice is not payment authority. Navigation/rendering and existing authorization/dashboard regressions pass (88 tests combined). Live payment transport and safe unresolved-attempt recovery remain separate blockers.
 
 **The rail is live as of 2026-10-11.** Circle CLI v1.2.1 is installed via npm global
@@ -2985,6 +3007,53 @@ vendorDestinationVersion, invoiceVersionReview}`, `CollectionBatch::preparer`,
 `BudgetSnapshot::budget`. Tests: `tests/Feature/Filament/FinanceSupervisorDashboardTest.php`
 and the reworked `EduFlowCommandCenterTest`.
 
+### 16.6 Current screen availability and remaining work (2026-10-11)
+
+Backend records, visible screens and end-to-end payment acceptance are three separate delivery
+claims. Current routes and page actions establish the following, not universal admin availability:
+
+| Capability | `/admin` | `/finance` | Remaining limitation |
+| --- | --- | --- | --- |
+| Installation/operations overview, identity, providers and staff | Available | Not the finance role | Readiness/configuration is not settlement proof |
+| Exact reserved-payment review and independent reviewer enrollment | **Automation → Payment Approvals** (`/admin/payment-reviews`) | **Payment Approvals** (`/finance/payment-reviews`) | Requires direct `AuthorizePayment:PaymentIntent`, verified eligible staff, independently enrolled current factor and maker/checker separation; review does not itself transfer |
+| Submission queue/history, provider detail and attempts | **Automation → Payment Submissions** (`/admin/payment-submissions`), read-only | No submission resource registered | Unknown outcomes need investigation; a hash or provider ID is not verified settlement |
+| Aggregate collection capture and independent source review | No dedicated admin screen | **Collections** (`/finance/collections`) | Offchain evidence only; no individual payer matching or inbound USDC collection |
+| Closed-set budget capture, background run evidence and plan review | No dedicated admin screen | **Finance Supervisor** (`/finance/finance-supervisor`) | Accepting a plan never grants payment authority |
+| Invoice source review, beneficiary approval, draft preparation and funding/reservation | Legacy invoice CRUD is available, not the complete safe workflow | Several authenticated HTTP actions exist; complete operator wizard absent | Need linked source/destination/policy/budget/funding screens rather than scripts or fabricated reviewers |
+| Reviewed capacity release and funding rollover | No screen | No screen | Backend actions/tests exist; authorization/unknown outcomes cannot be discarded to free capacity |
+| Recurring mandate create/review/suspend, ceilings and occurrence inspection | No management screen | Aggregate metrics only | Records, evaluator and scanner exist; service authority and automatic payment handoff remain absent |
+| Advisory recurring-candidate ranking / category classification | Provider settings only | No ranking-review screen | Ranker exists; category classifier and supervisor integration remain pending; live provider configuration needed |
+| Retrospective agreement per released occurrence (§18.6) | No review screen | Aggregate feedback metric only | Service/model exist; no authenticated per-occurrence review endpoint or UI found in current routes; feedback is never approval |
+| Approval ownership, reminders, safe recovery and stop controls (§14.9) | Partial visibility/settings | Existing plan/collection inbox and notification foundations | Complete payment-investigation assignment, safe recovery controls and operator health still need acceptance coverage |
+| Genuine human-approved current-workflow Arc settlement | **Not demonstrated** | **Not demonstrated** | Transport error, package adoption, unresolved recovery and total-cost fee policy remain open |
+
+The redesigned review page reports **historical recorded decisions**, including expired and
+simulation-only approvals; its approval count is not currently executable authority. Released
+reservations remain readable history and disappear from awaiting-review counts. Reviewer setup
+is account-level readiness, not permission to review one's own bill or bypass fresh validation.
+Payment Submissions preserves provider wording and full six-decimal figures, with no send/retry
+action. The UI does not claim that `unknown` is safe to dispatch.
+
+**Known dashboard audit debt:** `AutonomyLaneWidget` still hardcodes “None approved” and old
+“neither exists” wording, while `EvidenceTimelineWidget` still says “No executor is shipped”.
+The executor and mandate records now exist; those widgets must read their real records before
+the entire §14.9 dashboard can be called truthful. `AutomationLaneStats` also exists but is not
+in the admin dashboard's explicit widget list. Presence of a widget class is not deployment.
+
+Next work, in dependency order:
+
+1. Verify/adopt the async package safely, establish the Circle HTTP 400 cause, and resolve
+   existing attempts read-only. Fix duplicate unknown-attempt recording and any reconciliation
+   path that could resend a possibly accepted payment. Preserve holds and uncertainty.
+2. Complete the normal source-to-reservation operator flow, funding renewal/release controls,
+   truthful dashboard bindings and investigation ownership. Prove one actual independent
+   staff authorization reaches one matching verified Arc testnet transfer; never synthesize consent.
+3. Add standing-mandate and occurrence screens, reviewed ceilings/revocation, then explicit
+   institution-scoped service authority for release-to-submission. Initial allowance stays zero.
+4. Add advisory-ranking review and retrospective per-occurrence feedback, keeping feedback,
+   proposal acceptance, payment authorization and verified settlement distinct. Finish fee-cost
+   policy and college pilot evidence before claiming production readiness.
+
 ---
 
 ## 17. End-to-End Fee-to-Vendor Trace — What Is Built and What Is Not
@@ -3062,9 +3131,11 @@ complete the authorization chain looks.
 
 ## 18. Bounded Autonomous Lane — Standing Mandate Design
 
-**Status: design only. Nothing here is implemented, and nothing here changes §17.** It
-records the owner's request for a small capped lane where eligible recurring bills pay
-themselves on testnet, and the constraints that follow from it.
+**Status (2026-10-11): backend foundation delivered; operator UI and automatic execution
+handoff incomplete.** Mandate/review/occurrence records, deterministic evaluator, scheduled
+scanner and aggregate metrics exist. Management screens and institution-scoped service
+authority do not. No genuine current-workflow automatic settlement has been demonstrated.
+Section 16.6 separates available screens from backend-only capabilities.
 
 ### 18.1 The correction that shapes this design
 

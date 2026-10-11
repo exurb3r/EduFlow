@@ -40,6 +40,12 @@ class PaymentSubmissionResource extends Resource
 
     protected static ?int $navigationSort = 1;
 
+    protected static ?string $navigationLabel = 'Payment Submissions';
+
+    protected static ?string $modelLabel = 'payment submission';
+
+    protected static ?string $pluralModelLabel = 'payment submissions';
+
     protected static ?string $recordTitleAttribute = 'request_key';
 
     #[\Override]

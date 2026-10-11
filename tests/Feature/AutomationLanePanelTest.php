@@ -2,6 +2,7 @@
 
 declare(strict_types=1);
 
+use App\DTOs\Money;
 use App\Filament\Pages\PaymentReviews;
 use App\Filament\Resources\PaymentSubmissions\PaymentSubmissionResource;
 use App\Models\PaymentSubmissionOutbox;
@@ -135,18 +136,33 @@ test('admin can access payment submissions list and view pages', function (): vo
 
     $listResponse = $this->actingAs($admin)->get(PaymentSubmissionResource::getUrl('index'));
     $listResponse->assertSuccessful();
-    $listResponse->assertSee('Automated payment submission');
+    $listResponse->assertSee('Payment submissions');
     $listResponse->assertSee('Payment approvals');
     $listResponse->assertSee(PaymentReviews::getUrl(), false);
     $listResponse->assertSee('accepted by the rail');
+    $listResponse->assertSee('Investigate unresolved attempts before any resend.');
+    $listResponse->assertDontSee('none — no transfer in flight');
+    $listResponse->assertDontSee('exists only once the transfer completed');
+    $listResponse->assertSee(Money::formatExact($entry->snapshot['amount_base_units'], 'USDC'));
 
     $viewResponse = $this->actingAs($admin)->get(PaymentSubmissionResource::getUrl('view', ['record' => $entry]));
     $viewResponse->assertSuccessful();
     $viewResponse->assertSee('What the automation did, in order');
     $viewResponse->assertSee('116c7ce7-8f2f-53ac-8b06-f18aac151ce3');
+    $viewResponse->assertSee(Money::formatExact($entry->snapshot['amount_base_units'], 'USDC'));
+    $viewResponse->assertSee(Money::formatExact($entry->snapshot['max_fee_base_units'], 'USDC'));
 
     $approvalResponse = $this->actingAs($admin)->get(PaymentReviews::getUrl(panel: 'admin'));
     $approvalResponse->assertSuccessful();
     $approvalResponse->assertSee('Payment approvals');
     $approvalResponse->assertSee('Agent advice is not payment authority.');
+});
+
+test('unresolved submission detail never treats a missing provider handle as proof of no transfer', function (): void {
+    $admin = User::factory()->create()->assignRole(Role::findOrCreate('super_admin', 'web'));
+    $entry = laneBillFor('unknown', ['last_error' => 'Service returned error 400: Invalid request body']);
+    $response = $this->actingAs($admin)->get(PaymentSubmissionResource::getUrl('view', ['record' => $entry]));
+    $response->assertSuccessful()->assertSee('not recorded — outcome may be unknown')
+        ->assertSee('Investigate the existing attempt before any resend; safe recovery is not yet proven.')
+        ->assertDontSee('none — nothing in flight')->assertDontSee('No USDC moved.');
 });

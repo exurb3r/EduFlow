@@ -4,6 +4,8 @@ declare(strict_types=1);
 
 namespace App\Filament\Resources\PaymentSubmissions\Tables;
 
+use App\DTOs\Money;
+use App\Enums\CurrencyCode;
 use App\Models\PaymentSubmissionOutbox;
 use Filament\Actions\ViewAction;
 use Filament\Tables\Columns\TextColumn;
@@ -25,6 +27,10 @@ class PaymentSubmissionsTable
     public static function configure(Table $table): Table
     {
         return $table
+            ->heading('Submission history')
+            ->description('Read-only provider attempts. Accepted means the provider acknowledged a request; only verified settlement proves payment. Investigate unresolved attempts before any resend.')
+            ->poll('10s')
+            ->stackedOnMobile()
             ->columns([
                 TextColumn::make('state')
                     ->label('State')
@@ -43,7 +49,7 @@ class PaymentSubmissionsTable
                     })
                     ->formatStateUsing(fn (string $state): string => match ($state) {
                         'accepted' => 'accepted by the rail',
-                        'submitted' => 'reference held',
+                        'submitted' => 'hash awaiting verification',
                         'completed' => 'verified settled',
                         'unknown' => 'unresolved',
                         default => $state,
@@ -51,9 +57,10 @@ class PaymentSubmissionsTable
                     ->sortable(),
 
                 TextColumn::make('stage')
-                    ->label('Stage')
+                    ->label('Workflow stage')
                     ->wrap()
-                    ->placeholder('not yet dispatched'),
+                    ->placeholder('not yet dispatched')
+                    ->toggleable(isToggledHiddenByDefault: true),
 
                 TextColumn::make('invoice.reference')
                     ->label('Bill')
@@ -72,32 +79,35 @@ class PaymentSubmissionsTable
                     ->tooltip(fn (PaymentSubmissionOutbox $record): ?string => $record->snapshot['recipient_address'] ?? null),
 
                 TextColumn::make('provider_handle')
-                    ->label('Rail handle')
+                    ->label('Provider transaction ID')
                     ->copyable()
                     ->limit(14)
-                    ->placeholder('none — no transfer in flight')
+                    ->placeholder('not recorded — outcome may be unknown')
                     // A handle is not a hash. Labelling it as one is how an
                     // in-flight payment gets read as settled.
-                    ->description("the rail's own transaction id, not an on-chain reference"),
+                    ->description('Provider acknowledgement, not settlement')
+                    ->toggleable(isToggledHiddenByDefault: true),
 
                 TextColumn::make('result.provider_reference')
-                    ->label('On-chain reference')
+                    ->label('Transaction hash')
                     ->copyable()
                     ->limit(12)
                     ->placeholder('not yet published')
-                    ->description('exists only once the transfer completed'),
+                    ->description('A published hash still requires on-chain verification')
+                    ->toggleable(isToggledHiddenByDefault: true),
 
                 TextColumn::make('attempts')
-                    ->label('Tries')
+                    ->label('Attempts')
                     ->alignment('right')
                     ->badge()
-                    ->color(fn ($state): string => (int) $state > 1 ? 'warning' : 'gray'),
+                    ->color(fn ($state): string => (int) $state > 1 ? 'warning' : 'gray')
+                    ->toggleable(isToggledHiddenByDefault: true),
 
                 TextColumn::make('last_error')
-                    ->label('What the rail said')
+                    ->label('Provider detail')
                     ->wrap()
                     ->limit(120)
-                    ->placeholder('nothing to report')
+                    ->placeholder('no detail recorded')
                     // Shown verbatim. Rewriting or suppressing the provider's
                     // own wording is what makes a refusal indistinguishable
                     // from an outage.
@@ -115,7 +125,7 @@ class PaymentSubmissionsTable
                         'queued' => 'queued',
                         'running' => 'running',
                         'accepted' => 'accepted by the rail',
-                        'submitted' => 'reference held',
+                        'submitted' => 'hash awaiting verification',
                         'unknown' => 'unresolved',
                         'completed' => 'verified settled',
                         'blocked' => 'blocked',
@@ -127,13 +137,13 @@ class PaymentSubmissionsTable
                 SelectFilter::make('needs attention')
                     ->label('Needs attention')
                     ->options([
-                        'open' => 'still owed work',
-                        'in_flight' => 'the rail already owns it',
-                        'terminal_unresolved' => 'finished without paying',
+                        'open' => 'queued, running or paused',
+                        'in_flight' => 'accepted or awaiting verification',
+                        'terminal_unresolved' => 'unresolved, blocked or failed',
                     ])
                     ->query(function (Builder $query, array $data): Builder {
                         return match ($data['value'] ?? null) {
-                            'open' => $query->whereIn('state', PaymentSubmissionOutbox::DISPATCHABLE_STATES),
+                            'open' => $query->whereIn('state', ['queued', 'running', 'paused']),
                             'in_flight' => $query->whereIn('state', PaymentSubmissionOutbox::IN_FLIGHT_STATES),
                             'terminal_unresolved' => $query->whereIn('state', ['unknown', 'blocked', 'failed']),
                             default => $query,
@@ -142,18 +152,12 @@ class PaymentSubmissionsTable
             ])
             ->defaultSort('updated_at', 'desc')
             ->recordActions([
-                ViewAction::make(),
+                ViewAction::make()->label('Inspect attempt'),
             ]);
     }
 
     private static function amount(PaymentSubmissionOutbox $record): string
     {
-        $base = $record->snapshot['amount_base_units'] ?? null;
-
-        if (! is_numeric($base)) {
-            return 'unknown';
-        }
-
-        return number_format(((float) $base) / 1_000000, 2).' USDC';
+        return Money::formatExact($record->snapshot['amount_base_units'] ?? null, CurrencyCode::USDC->value);
     }
 }
