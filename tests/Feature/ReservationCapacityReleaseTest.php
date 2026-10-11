@@ -148,7 +148,7 @@ test('a hold cannot be released twice and a decided release is final', function 
 
     ['proposal' => $proposal] = proposeRelease($hold);
 
-    expect(fn () => proposeRelease($hold))->toThrow(ValidationException::class);
+    expect(fn (): array => proposeRelease($hold))->toThrow(ValidationException::class);
 
     app(ReviewReservationRelease::class)->handle($c['reviewer'], $proposal, $proposal->content_digest,
         'approve_release', 'Capacity returned.');

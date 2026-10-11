@@ -28,8 +28,13 @@ use App\Services\PaymentSettlementReconciler;
 function scriptedTransport(callable $submit, callable $resolve): AsyncPaymentTransport
 {
     $transport = Mockery::mock(AsyncPaymentTransport::class);
-    $transport->shouldReceive('submit')->andReturnUsing($submit);
-    $transport->shouldReceive('resolve')->andReturnUsing($resolve);
+
+    if (! $transport instanceof AsyncPaymentTransport) {
+        throw new RuntimeException('Mockery did not build a payment transport.');
+    }
+
+    mockExpectation($transport, 'submit')->andReturnUsing($submit);
+    mockExpectation($transport, 'resolve')->andReturnUsing($resolve);
     $transport->shouldReceive('estimate')->andReturn(['data' => ['medium' => ['networkFee' => '0.0177']]]);
     app()->instance(AsyncPaymentTransport::class, $transport);
 
@@ -70,7 +75,7 @@ test('an accepted transfer records a handle and no reference, because no hash ex
         ->and(PaymentSubmissionAttempt::query()->firstOrFail()->outcome)->toBe('accepted');
 
     // No local ledger row may exist for a transfer that has not settled.
-    expect(Transaction::count())->toBe(0);
+    expect(Transaction::query()->count())->toBe(0);
 });
 
 test('an accepted transfer is never dispatchable again', function (): void {
@@ -104,7 +109,7 @@ test('a still-pending acceptance stays accepted and keeps its capacity', functio
         ->and($entry->stage)->toBe('accepted_pending')
         // Still in flight, so still not something anyone may conclude about.
         ->and($entry->result['provider_reference'])->toBeNull()
-        ->and(Transaction::count())->toBe(0);
+        ->and(Transaction::query()->count())->toBe(0);
 });
 
 test('a rail that cannot be asked is unknown, never a failed transfer', function (): void {
@@ -126,7 +131,7 @@ test('a rail that cannot be asked is unknown, never a failed transfer', function
 
     expect($verdict['verdict'])->toBe('unknown')
         ->and($entry->state)->toBe('accepted')
-        ->and(Transaction::count())->toBe(0);
+        ->and(Transaction::query()->count())->toBe(0);
 });
 
 test('a handle with no hash yet is still pending, not a completed transfer', function (): void {

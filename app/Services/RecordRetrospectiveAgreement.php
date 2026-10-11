@@ -76,7 +76,6 @@ final readonly class RecordRetrospectiveAgreement
                 ]);
             }
 
-            /** @var MandateRetrospectiveReview $review */
             $review = new MandateRetrospectiveReview([
                 'organization_id' => $institution->id,
                 'mandate_occurrence_id' => $stored->id,
@@ -118,7 +117,6 @@ final readonly class RecordRetrospectiveAgreement
      */
     public function rate(Organization $institution): array
     {
-        /** @var MandateOccurrence[] $released */
         $released = MandateOccurrence::query()->where('organization_id', $institution->id)
             ->where('disposition', 'release')->get();
 

@@ -20,6 +20,7 @@ use App\Models\User;
 use App\Settings\AiSettings;
 use Database\Seeders\DatabaseSeeder;
 use Illuminate\Auth\Access\AuthorizationException;
+use Illuminate\Support\Str;
 use Laravel\Ai\Approvals\Decision;
 use Laravel\Ai\Approvals\PendingApproval;
 use Laravel\Ai\Responses\AgentResponse;

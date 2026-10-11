@@ -99,7 +99,6 @@ final readonly class ReviewReservationRelease
                 throw ValidationException::withMessages(['review' => 'The held draft no longer exists; independent investigation required.']);
             }
 
-            /** @var PaymentReservationReleaseReview $review */
             $review = new PaymentReservationReleaseReview([
                 'organization_id' => $institution->id,
                 'payment_reservation_release_id' => $stored->id,

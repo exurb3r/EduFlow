@@ -6,8 +6,11 @@ namespace App\Services\Advisory;
 
 use App\Ai\Advisory\AdvisoryMandateRanking;
 use App\Settings\AiSettings;
-use Illuminate\Support\Str;
+use Laravel\Ai\Classification;
+use Laravel\Ai\Classification\Boolean;
+use Laravel\Ai\Responses\Data\BooleanAnswer;
 use Throwable;
+use UnexpectedValueException;
 
 /**
  * Ask a cheap classification model which bills might deserve a standing
@@ -35,6 +38,9 @@ use Throwable;
  */
 final readonly class MandateCandidateRanker
 {
+    /** How sure the model must be before a bill is read as recurring. */
+    private const float THRESHOLD = 0.75;
+
     public function __construct(private AiSettings $settings) {}
 
     /**
@@ -53,29 +59,24 @@ final readonly class MandateCandidateRanker
             $text = $this->describe($bill);
 
             try {
-                $recurring = Str::decide(
-                    value: $text,
-                    question: 'Is this bill for a subscription or a service that repeats on a regular cycle?',
-                    criteria: [
+                $recurring = $this->decide(
+                    $text,
+                    'Is this bill for a subscription or a service that repeats on a regular cycle?',
+                    [
                         'true' => 'Recurring: monthly or annual hosting, utilities, licences, maintenance or a repeating service contract.',
                         'false' => 'Not recurring: one-off capital equipment, a single repair, a project or a first-time purchase.',
                     ],
-                    // A high bar on purpose. A bill that merely looks recurring
-                    // is worse than one that looks not, because the cost of a
-                    // wrong yes is an unattended payment.
-                    threshold: 0.75,
-                    timeout: $timeout,
+                    $timeout,
                 );
 
-                $stable = Str::decide(
-                    value: $text,
-                    question: 'Does this bill keep roughly the same amount each cycle?',
-                    criteria: [
+                $stable = $this->decide(
+                    $text,
+                    'Does this bill keep roughly the same amount each cycle?',
+                    [
                         'true' => 'Stable: a fixed fee or a predictable recurring quantity.',
                         'false' => 'Variable: the amount changes with usage, overruns, or one-off charges.',
                     ],
-                    threshold: 0.75,
-                    timeout: $timeout,
+                    $timeout,
                 );
             } catch (Throwable $e) {
                 // Any provider problem takes the whole ranking away rather than
@@ -101,6 +102,30 @@ final readonly class MandateCandidateRanker
             narrative: 'Advisory only. A supervisor still signs any standing mandate, and each occurrence '
                 .'is still decided by the deterministic evaluator against that mandate.',
         );
+    }
+
+    /**
+     * One yes/no classification about one bill, read at a high bar.
+     *
+     * @param  array{true: string, false: string}  $criteria
+     */
+    private function decide(string $state, string $question, array $criteria, int $timeout): bool
+    {
+        $answer = Classification::of($state)
+            ->question('decision', new Boolean($question, $criteria))
+            ->timeout($timeout)
+            ->classify()
+            ->answer('decision');
+
+        // A malformed answer invalidates the whole ranking, not just this bill.
+        if (! $answer instanceof BooleanAnswer) {
+            throw new UnexpectedValueException('Classification did not return a boolean answer.');
+        }
+
+        // A high bar on purpose. A bill that merely looks recurring is worse
+        // than one that looks not, because the cost of a wrong yes is an
+        // unattended payment, so anything below this reads as "no".
+        return $answer->isTrue(self::THRESHOLD);
     }
 
     /**

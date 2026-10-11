@@ -154,7 +154,8 @@ test('versioned invoice source cannot enter legacy payment cycle policy draft or
         ->and(fn () => app(CircleWalletService::class)->executePaymentBaseUnits($context['wallet'], '0x'.str_repeat('2', 40), 1, TransactionType::VENDOR_PAYMENT, InvoiceVersion::class, $bill->id))->toThrow(InvalidArgumentException::class);
     $result = app(EduFlowAgent::class)->runAutonomousCycle($context['institution']);
     expect($context['invoice']->fresh()->status)->toBe('pending')->and(Transaction::query()->count())->toBe(0)
-        ->and($result)->toBeArray();
+        ->and($result['stats']['auto_paid'])->toBe(0)
+        ->and($result['stats']['total_disbursed_usdc'])->toBe(0.0);
 });
 
 test('authenticated evidence review is separate immutable and repeat safe but never payment authority', function (string $decision): void {

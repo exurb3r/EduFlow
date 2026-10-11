@@ -73,7 +73,7 @@ final readonly class FundingWindowContext
         // A renewal names what it replaces. The block lives inside the digest
         // rather than outside it, so a window that lies about its lineage is a
         // window whose evidence does not verify.
-        if ($supersedes !== null) {
+        if ($supersedes instanceof FundingWindow) {
             $snapshot['supersedes'] = ['funding_window_id' => $supersedes->id,
                 'snapshot_digest' => $supersedes->snapshot_digest,
                 'valid_until' => $supersedes->snapshot['valid_until'] ?? null,

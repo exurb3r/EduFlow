@@ -83,9 +83,10 @@ final readonly class ApproveFundingWindow
                 throw ValidationException::withMessages(['funding' => 'Funding review state changed; fresh observation required.']);
             }
 
-            if ($existing !== null && $existing->isSuperseded()) {
-                throw ValidationException::withMessages(['funding' => 'Approved capacity already exists; a second window requires reviewed rollover from the approved one.']);
-            }
+            // No superseded check is repeated here: an existing approval for a
+            // different window was already refused above if it was superseded,
+            // and one for this window returned early. Reaching this line means
+            // the institution has no retired approval standing in the way.
 
             $this->context->requireCurrent($reviewer, $stored, $balance);
             $approval = new FundingWindowApproval(['organization_id' => $institution->id, 'funding_window_id' => $stored->id,

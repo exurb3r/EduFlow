@@ -6,6 +6,7 @@ namespace App\Models;
 
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
+use Illuminate\Support\Carbon;
 use LogicException;
 use Throwable;
 
@@ -93,7 +94,6 @@ class MandateOccurrence extends Model
                 && $this->chain === 'ARC-TESTNET'
                 && $this->chain_id === 5042002
                 && in_array($this->disposition, ['release', 'escalate', 'blocked'], true)
-                && $this->due_at !== null
                 && is_string($this->checks_digest)
                 && hash_equals($this->checks_digest, PaymentIntent::digest($this->checks));
         } catch (Throwable) {
@@ -129,7 +129,7 @@ class MandateOccurrence extends Model
             'payment_intent_id' => $this->payment_intent_id,
             'occurrence_digest' => $this->occurrence_digest,
             'disposition' => $this->disposition,
-            'due_at' => $this->due_at?->toIso8601String(),
+            'due_at' => $this->due_at->toIso8601String(),
             'amount_base_units' => (string) $this->amount_base_units,
             'chain' => $this->chain,
             'chain_id' => $this->chain_id,

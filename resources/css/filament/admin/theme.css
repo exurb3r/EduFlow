@@ -12,7 +12,11 @@
      */
     .fi-finance-heading-link {
         text-decoration-line: underline;
-        text-decoration-color: color-mix(in oklab, currentColor 35%, transparent);
+        text-decoration-color: color-mix(
+            in oklab,
+            currentColor 35%,
+            transparent
+        );
         text-underline-offset: 3px;
         transition: text-decoration-color 150ms ease;
 

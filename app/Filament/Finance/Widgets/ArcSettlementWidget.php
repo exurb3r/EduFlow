@@ -91,7 +91,7 @@ class ArcSettlementWidget extends BaseWidget
             ->color($balance !== [] ? 'info' : 'gray');
 
         $status = app(LeptonTreasuryService::class)->status($institution->primaryWallet());
-        $chain = strtoupper((string) ($status['chain'] ?? 'ARC-TESTNET'));
+        $chain = strtoupper($status['chain'] === '' ? 'ARC-TESTNET' : $status['chain']);
 
         $chainStat = Stat::make('Chain', $chain)
             ->description($status['live_available']
@@ -109,18 +109,29 @@ class ArcSettlementWidget extends BaseWidget
             $chainStat->description('MAINNET — the pilot executes on ARC-TESTNET only; no implicit fallback exists');
         }
 
-        $driverStat = Stat::make('Execution driver', (string) ($status['driver'] ?? 'unknown'))
+        $driverStat = Stat::make('Execution driver', $status['driver'] === '' ? 'unknown' : $status['driver'])
             ->description($status['is_fake']
                 ? 'Fake gateway: no wallet, no chain, no real funds'
                 : 'Circle Agent Wallet through Lepton')
             ->descriptionIcon(Heroicon::CommandLine)
             ->color($status['is_fake'] ? 'warning' : 'primary');
 
-        $freshness = $window === null
-            ? 'no evidence'
-            : ($age === null ? 'unreadable' : ($age > self::STALE_AFTER_MINUTES * 60 ? 'stale' : 'current'));
+        // Colour follows the same four states as the label, decided once here so
+        // the wording and the colour can never disagree.
+        $evidenceState = match (true) {
+            $window === null => 'no evidence',
+            $age === null => 'unreadable',
+            $age > self::STALE_AFTER_MINUTES * 60 => 'stale',
+            default => 'current',
+        };
 
-        $evidenceStat = Stat::make('Funding evidence', $window === null ? 'None captured' : ucfirst($freshness))
+        $evidenceColour = match ($evidenceState) {
+            'current' => 'success',
+            'stale' => 'warning',
+            default => 'gray',
+        };
+
+        $evidenceStat = Stat::make('Funding evidence', $window === null ? 'None captured' : ucfirst($evidenceState))
             ->description($window === null
                 ? 'Capture and independently review a budget snapshot to open a funding window'
                 : sprintf(
@@ -131,12 +142,7 @@ class ArcSettlementWidget extends BaseWidget
                     Money::formatExact(data_get($window->snapshot, 'capacity.cash_base_units'), 'USDC'),
                 ))
             ->descriptionIcon(Heroicon::Clock)
-            ->color(match ($freshness) {
-                'current' => 'success',
-                'stale' => 'warning',
-                'no evidence', 'unreadable' => 'gray',
-                default => 'danger',
-            })
+            ->color($evidenceColour)
             ->url(PaymentReviews::getUrl(panel: 'finance'));
 
         return [$usdcStat, $nativeStat, $chainStat, $evidenceStat, $driverStat];

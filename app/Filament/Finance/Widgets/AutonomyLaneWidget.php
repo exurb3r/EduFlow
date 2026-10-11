@@ -68,7 +68,7 @@ class AutonomyLaneWidget extends BaseWidget
             ? Money::formatExact($policy->max_auto_payment_base_units, 'USDC')
             : 'No active policy')
             ->description($policy !== null
-                ? sprintf('Policy %s · activated %s. A ceiling, not an authorization.', $policy->version, $activation?->created_at?->toDateString() ?? 'unrecorded')
+                ? sprintf('Policy %s · activated %s. A ceiling, not an authorization.', $policy->version, $activation->created_at->toDateString())
                 : 'No policy activation exists. Every amount currently escalates to a human.')
             ->descriptionIcon(Heroicon::Scale)
             ->color($policy !== null ? 'info' : 'warning');

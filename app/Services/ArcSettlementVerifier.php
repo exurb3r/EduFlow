@@ -76,17 +76,16 @@ final readonly class ArcSettlementVerifier
         }
 
         if ($receipt === null) {
-            return $this->classifyWithoutReceipt($txHash, $expected);
+            return $this->classifyWithoutReceipt($txHash);
         }
 
         return $this->classifyReceipt($receipt, $expected, $txHash);
     }
 
     /**
-     * @param  array<string, mixed>  $expected
      * @return array<string, mixed>
      */
-    private function classifyWithoutReceipt(string $txHash, array $expected): array
+    private function classifyWithoutReceipt(string $txHash): array
     {
         $transaction = $this->call('eth_getTransactionByHash', [$txHash]);
 
@@ -100,7 +99,7 @@ final readonly class ArcSettlementVerifier
             return $this->verdict('not_found', 'Hash is well-formed but absent from the chain. Absence is not evidence of fabrication; reconcile against the provider before concluding anything.', null);
         }
 
-        if (! is_array($transaction) || ! is_string($transaction['blockNumber'] ?? null)) {
+        if (! is_string($transaction['blockNumber'] ?? null)) {
             return $this->verdict('pending', 'Transaction is known but not yet included in a block. It may still settle.', null);
         }
 
@@ -277,7 +276,7 @@ final readonly class ArcSettlementVerifier
 
         $moved = $this->hexQuantity($value, 18);
 
-        return $moved !== null && $moved->isEqualTo($this->authorizedAmount($expected['amount_base_units']));
+        return $moved instanceof BigDecimal && $moved->isEqualTo($this->authorizedAmount($expected['amount_base_units']));
     }
 
     /**
@@ -300,14 +299,21 @@ final readonly class ArcSettlementVerifier
         foreach ($logs as $log) {
             // `topics` is a list; `data` is a single 32-byte hex payload, not
             // a list of its own.
-            if (! is_array($log) || ! is_array($log['topics'] ?? null) || ! is_string($log['data'] ?? null)) {
+            if (! is_array($log)) {
                 continue;
             }
-
-            if (strtolower((string) ($log['topics'][0] ?? '')) !== self::TRANSFER_TOPIC || count($log['topics']) < 3) {
+            if (! is_array($log['topics'] ?? null)) {
                 continue;
             }
-
+            if (! is_string($log['data'] ?? null)) {
+                continue;
+            }
+            if (strtolower((string) ($log['topics'][0] ?? '')) !== self::TRANSFER_TOPIC) {
+                continue;
+            }
+            if (count($log['topics']) < 3) {
+                continue;
+            }
             // Decimals are a property of the emitter, never inferred from the
             // payload. Reading an 18-decimal system log as 6-decimal is how a
             // genuinely settled payment gets recorded as `mismatched`, and an
@@ -320,14 +326,16 @@ final readonly class ArcSettlementVerifier
 
             $logFrom = '0x'.substr(strtolower((string) $log['topics'][1]), 26);
             $logTo = '0x'.substr(strtolower((string) $log['topics'][2]), 26);
-
-            if ($logFrom !== strtolower($expected['sender']) || $logTo !== strtolower($expected['recipient'])) {
+            if ($logFrom !== strtolower($expected['sender'])) {
+                continue;
+            }
+            if ($logTo !== strtolower($expected['recipient'])) {
                 continue;
             }
 
             $moved = $this->hexQuantity((string) $log['data'], $decimals);
 
-            if ($moved !== null && $moved->isEqualTo($this->authorizedAmount($expected['amount_base_units']))) {
+            if ($moved instanceof BigDecimal && $moved->isEqualTo($this->authorizedAmount($expected['amount_base_units']))) {
                 $matched[] = $decimals === 18 ? 'native_system_log' : 'erc20_log';
             }
         }
@@ -353,7 +361,7 @@ final readonly class ArcSettlementVerifier
             $gas = $this->hexQuantity($gasUsed, 0);
             $pricePerGas = $this->hexQuantity($price, 0);
 
-            if ($gas === null || $pricePerGas === null) {
+            if (! $gas instanceof BigDecimal || ! $pricePerGas instanceof BigDecimal) {
                 return null;
             }
 

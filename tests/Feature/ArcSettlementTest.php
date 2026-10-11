@@ -15,6 +15,7 @@ use App\Services\IsolatedPaymentExecutor;
 use App\Services\PaymentSettlementReconciler;
 use Brick\Math\BigInteger;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Str;
 use Illuminate\Validation\ValidationException;
 use Mockery\MockInterface;
 use Yukazakiri\Lepton\Contracts\ArcNetworkGateway;
@@ -31,6 +32,10 @@ use Yukazakiri\Lepton\DTOs\TransferResult;
  * the uncomfortable ones — that a hash alone proves nothing, that a lookup
  * failure is never fabrication, that inclusion is not finality, and that a
  * mismatched amount is a mismatch even when everything else lines up.
+ */
+/**
+ * @param  array{chain?:string, chain_id?:int, sender?:string, recipient?:string, amount_base_units?:int, max_fee_base_units?:int}  $overrides
+ * @return array{chain:string, chain_id:int, sender:string, recipient:string, amount_base_units:int, max_fee_base_units:int}
  */
 function verifierExpected(array $overrides = []): array
 {
@@ -55,11 +60,16 @@ function hexQty(int|string|BigInteger $value): string
 function stubArc(array $responses, string $expectation = 'any'): ArcNetworkGateway&MockInterface
 {
     $arc = Mockery::mock(ArcNetworkGateway::class);
+
+    if (! $arc instanceof ArcNetworkGateway) {
+        throw new RuntimeException('Mockery did not build an Arc gateway.');
+    }
+
     $arc->shouldReceive('chainCode')->andReturn('ARC-TESTNET');
     $arc->shouldReceive('chainId')->andReturn(5042002);
     $arc->shouldReceive('rpcUrl')->andReturn('https://rpc.testnet.arc.network');
-    $arc->shouldReceive('explorerUrl')->andReturnUsing(fn (string $hash): string => 'https://explorer.testnet.arc.network/tx/'.$hash);
-    $arc->shouldReceive('rpc')->andReturnUsing(function (string $method, array $params) use ($responses): mixed {
+    mockExpectation($arc, 'explorerUrl')->andReturnUsing(fn (string $hash): string => 'https://explorer.testnet.arc.network/tx/'.$hash);
+    mockExpectation($arc, 'rpc')->andReturnUsing(function (string $method, array $params) use ($responses): mixed {
         if (! array_key_exists($method, $responses)) {
             throw new RuntimeException('Unexpected Arc read: '.$method);
         }
@@ -419,7 +429,12 @@ function executorEntry(): array
 function executorGateway(?Throwable $throws = null, bool $fake = false): WalletGateway&MockInterface
 {
     $wallets = Mockery::mock(WalletGateway::class);
-    $wallets->shouldReceive('transfer')->andReturnUsing(
+
+    if (! $wallets instanceof WalletGateway) {
+        throw new RuntimeException('Mockery did not build a wallet gateway.');
+    }
+
+    mockExpectation($wallets, 'transfer')->andReturnUsing(
         function (string $from, string $to, int $amount, array $options = []) use ($throws, $fake): TransferResult {
             if ($throws instanceof Throwable) {
                 throw $throws;
@@ -490,7 +505,12 @@ test('the fee preflight validates without broadcasting a write', function (): vo
 
     $seen = [];
     $wallets = Mockery::mock(WalletGateway::class);
-    $wallets->shouldReceive('transfer')->andReturnUsing(
+
+    if (! $wallets instanceof WalletGateway) {
+        throw new RuntimeException('Mockery did not build a wallet gateway.');
+    }
+
+    mockExpectation($wallets, 'transfer')->andReturnUsing(
         function (string $from, string $to, int $amount, array $options = []) use (&$seen): TransferResult {
             $seen = $options;
 
@@ -685,7 +705,7 @@ test('a mirrored settlement records the exact amount and never settles the local
         ->and($mirror->metadata['local_accounts_changed'])->toBeFalse()
         ->and($mirror->provider_tx_hash)->toBe('0x'.str_repeat('f', 64))
         ->and($mirror->network)->toBe('ARC-TESTNET')
-        ->and(PaymentIntent::query()->findOrFail($entry->payment_intent_id)->exists())->toBeTrue();
+        ->and(PaymentIntent::query()->whereKey($entry->payment_intent_id)->exists())->toBeTrue();
 });
 
 test('an unreachable rail leaves the payment unknown and never settled or completed', function (): void {
@@ -695,7 +715,12 @@ test('an unreachable rail leaves the payment unknown and never settled or comple
     // submitted, not failed, and above all not completed.
     $c = mandateContext();
     $wallets = Mockery::mock(WalletGateway::class);
-    $wallets->shouldReceive('transfer')->andThrow(new RuntimeException('circle: command not found'));
+
+    if (! $wallets instanceof WalletGateway) {
+        throw new RuntimeException('Mockery did not build a wallet gateway.');
+    }
+
+    mockExpectation($wallets, 'transfer')->andThrow(new RuntimeException('circle: command not found'));
     $executor = new IsolatedPaymentExecutor($wallets, app(InstallationInstitution::class));
 
     $entry = new PaymentSubmissionOutbox(['request_key' => (string) Str::uuid()]);

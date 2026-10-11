@@ -199,9 +199,9 @@ test('autonomous cycle streams ordered public SSE events, disclaims settlement, 
     ]);
 
     $response->assertSuccessful();
-    expect($response->headers->get('Content-Type'))->toContain('text/event-stream')
-        ->and($response->headers->get('Cache-Control'))->toContain('no-store')
-        ->and($response->headers->get('X-Accel-Buffering'))->toBe('no');
+    expect($response->baseResponse->headers->get('Content-Type'))->toContain('text/event-stream')
+        ->and($response->baseResponse->headers->get('Cache-Control'))->toContain('no-store')
+        ->and($response->baseResponse->headers->get('X-Accel-Buffering'))->toBe('no');
 
     $content = $response->streamedContent();
     $lines = array_values(array_filter(explode("\n\n", trim($content)), fn (string $block): bool => str_starts_with($block, 'data: ')));

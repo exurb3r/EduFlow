@@ -97,17 +97,17 @@ class AdoptionActivityChart extends ChartWidget
             ];
         }
 
-        $total = array_sum(array_map(static fn (array $dataset): int|float => array_sum($dataset['data']), $datasets));
+        $total = array_sum(array_map(static fn (array $dataset): int => array_sum($dataset['data']), $datasets));
 
         if ($total <= 0) {
             return [];
         }
 
         return [
-            'labels' => array_values(array_map(
+            'labels' => array_map(
                 static fn (string $day): string => date('M j', strtotime($day)),
-                array_values($this->windowTimestamps()),
-            )),
+                $this->windowTimestamps(),
+            ),
             'datasets' => $datasets,
         ];
     }

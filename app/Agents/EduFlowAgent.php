@@ -18,7 +18,6 @@ use App\Models\AssistanceRequest;
 use App\Models\Budget;
 use App\Models\Invoice;
 use App\Models\Organization;
-use App\Models\Transaction;
 use App\Models\User;
 use App\Services\CircleWalletService;
 use App\Services\DecisionExplainer;
@@ -181,7 +180,7 @@ class EduFlowAgent
         // 3. OBSERVE & EVALUATE STUDENT ASSISTANCE
         // Deterministic integer policy with locked FX quote (PLAN Part 2):
         // request -> quote lock -> canonical USDC evaluation -> disburse or escalate.
-        $aidBudget = Budget::where('organization_id', $org->id)
+        Budget::where('organization_id', $org->id)
             ->where('category', 'assistance')
             ->first();
 
@@ -433,15 +432,6 @@ class EduFlowAgent
         }
 
         $onProgress($event);
-    }
-
-    private function paymentResponseSummary(Transaction $transaction): string
-    {
-        return match ($transaction->metadata['is_fake'] ?? null) {
-            true => 'Fake-driver simulation response recorded. No live transfer occurred; this is not chain-verified settlement.',
-            false => 'Unverified live provider response recorded. On-chain settlement has not been verified.',
-            default => 'Provider response recorded without simulation provenance. On-chain settlement has not been verified.',
-        };
     }
 
     /**

@@ -7,6 +7,7 @@ use App\Models\MandateRetrospectiveReview;
 use App\Services\MandateOccurrenceScanner;
 use App\Services\MandateOutcomeMetrics;
 use App\Services\RecordRetrospectiveAgreement;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Validation\ValidationException;
 
 /**

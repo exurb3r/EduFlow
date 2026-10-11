@@ -27,12 +27,12 @@ use Yukazakiri\Lepton\Support\Amounts;
  * So `submit()` must pass `--quiet` and must never invent a hash, and
  * `resolve()` is the only place a hash may enter the system.
  */
-final class CircleAgentWalletTransport implements AsyncPaymentTransport
+final readonly class CircleAgentWalletTransport implements AsyncPaymentTransport
 {
     public function __construct(
-        private readonly string $binary,
-        private readonly int $timeout = 120,
-        private readonly int $usdcDecimals = 6,
+        private string $binary,
+        private int $timeout = 120,
+        private int $usdcDecimals = 6,
     ) {}
 
     public static function fromConfig(): self
@@ -113,10 +113,12 @@ final class CircleAgentWalletTransport implements AsyncPaymentTransport
             : [];
 
         foreach ($transactions as $transaction) {
-            if (! is_array($transaction) || strtolower((string) ($transaction['id'] ?? '')) !== strtolower($handle)) {
+            if (! is_array($transaction)) {
                 continue;
             }
-
+            if (strtolower((string) ($transaction['id'] ?? '')) !== strtolower($handle)) {
+                continue;
+            }
             $state = strtoupper((string) ($transaction['state'] ?? ''));
 
             return match ($state) {
@@ -167,7 +169,7 @@ final class CircleAgentWalletTransport implements AsyncPaymentTransport
         try {
             $process->run();
         } catch (Throwable $e) {
-            throw new RuntimeException('Circle CLI could not be invoked: '.$e->getMessage(), previous: $e);
+            throw new RuntimeException('Circle CLI could not be invoked: '.$e->getMessage(), $e->getCode(), previous: $e);
         }
 
         if (! $process->isSuccessful()) {

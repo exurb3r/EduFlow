@@ -15,6 +15,7 @@ use Filament\Support\Icons\Heroicon;
 use Filament\Widgets\StatsOverviewWidget as BaseWidget;
 use Filament\Widgets\StatsOverviewWidget\Stat;
 use Illuminate\Support\Carbon;
+use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\DB;
 use Throwable;
 
@@ -96,7 +97,7 @@ class OperationsHealthWidget extends BaseWidget
             ->descriptionIcon(Heroicon::ExclamationTriangle)
             ->color($staleWindows > 0 ? 'warning' : 'success');
 
-        $user = auth()->user();
+        $user = Auth::user();
         $unread = $user instanceof User ? $user->unreadNotifications()->count() : 0;
 
         $notificationStat = Stat::make('Notifications awaiting you', (string) $unread)

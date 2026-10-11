@@ -45,6 +45,7 @@ use Filament\Facades\Filament;
 use Filament\Widgets\ChartWidget;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Str;
+use Livewire\Features\SupportTesting\Testable;
 use Livewire\Livewire;
 use ReflectionMethod;
 use RuntimeException;
@@ -140,6 +141,30 @@ function financeDashboardContext(): array
     return ['actor' => $actor, 'reviewer' => $reviewer, 'institution' => $institution, 'batch' => $batch, 'bill' => $invoice];
 }
 
+/** Narrow a Livewire test handle to the finance dashboard it booted. */
+function bootedFinanceDashboard(Testable $page): FinanceDashboard
+{
+    $instance = $page->instance();
+
+    if (! $instance instanceof FinanceDashboard) {
+        throw new RuntimeException('The Livewire test did not boot the finance dashboard.');
+    }
+
+    return $instance;
+}
+
+/** Narrow a Livewire test handle to the chart widget it booted. */
+function bootedChart(Testable $page): ChartWidget
+{
+    $instance = $page->instance();
+
+    if (! $instance instanceof ChartWidget) {
+        throw new RuntimeException('The Livewire test did not boot a chart widget.');
+    }
+
+    return $instance;
+}
+
 /**
  * Read a chart widget's protected payload through the one accessor it has.
  *
@@ -230,8 +255,8 @@ function stubDashboardArcBalance(string $native): void
     $arc->shouldReceive('blockNumber')->andReturn('0x64');
     $arc->shouldReceive('rpcUrl')->andReturn('https://rpc.testnet.arc.network');
     $arc->shouldReceive('treasuryAddress')->andReturn('0x'.str_repeat('5', 40));
-    $arc->shouldReceive('addressExplorerUrl')->andReturnNull();
-    $arc->shouldReceive('rpc')->andReturnUsing(fn (string $method): mixed => match ($method) {
+    mockExpectation($arc, 'addressExplorerUrl')->andReturnNull();
+    mockExpectation($arc, 'rpc')->andReturnUsing(fn (string $method): mixed => match ($method) {
         'eth_chainId' => '0x'.BigInteger::of(5042002)->toBase(16),
         'eth_getBalance' => '0x'.BigInteger::of($native)->toBase(16),
         'eth_getBlockByNumber' => [
@@ -269,7 +294,7 @@ test('finance panel root is the supervisor dashboard and renders every required 
             PaymentDecisionChart::class,
             OperationsHealthWidget::class,
         ])
-        ->and(Livewire::actingAs($c['reviewer'])->test(FinanceDashboard::class)->instance()->getWidgets())->toBe([
+        ->and(bootedFinanceDashboard(Livewire::actingAs($c['reviewer'])->test(FinanceDashboard::class))->getWidgets())->toBe([
             ApprovalInboxWidget::class,
             CollectionsOverviewWidget::class,
             CollectionsTrendChart::class,
@@ -305,7 +330,7 @@ test('collections chart splits reported money by review state instead of summing
         ->assertSee('Reported collections by review state')
         ->assertSee('Reviewed — can fund a plan');
 
-    $data = chartPayload($chart->instance());
+    $data = chartPayload(bootedChart($chart));
 
     expect(array_column($data['datasets'], 'label'))->toBe([
         'Reviewed — can fund a plan',
@@ -334,7 +359,7 @@ test('headroom chart plots allocation and cash separately and skips corrupt evid
 
     $chart->assertSuccessful()->assertSee('Approved allocation against realized cash headroom');
 
-    $data = chartPayload($chart->instance());
+    $data = chartPayload(bootedChart($chart));
 
     expect(array_column($data['datasets'], 'label'))->toBe(['Approved allocation', 'Realized cash headroom'])
         ->and($data['datasets'][0]['data'])->toBe([20000.0])
@@ -346,7 +371,7 @@ test('charts report an honest empty state instead of a flat zero graph', functio
     Filament::setCurrentPanel(Filament::getPanel('finance'));
     actingAs($c['reviewer']);
 
-    expect(chartPayload(Livewire::actingAs($c['reviewer'])->test(PaymentDecisionChart::class)->instance()))->toBe([]);
+    expect(chartPayload(bootedChart(Livewire::actingAs($c['reviewer'])->test(PaymentDecisionChart::class))))->toBe([]);
 
     Livewire::actingAs($c['reviewer'])
         ->test(PaymentDecisionChart::class)
@@ -368,7 +393,7 @@ test('decision chart reports the full denominator, not approvals alone', functio
         ->assertSee('Background work by run state')
         ->assertSee('Waiting for review');
 
-    $data = chartPayload(Livewire::actingAs($c['reviewer'])->test(WorkflowRunStateChart::class)->instance());
+    $data = chartPayload(bootedChart(Livewire::actingAs($c['reviewer'])->test(WorkflowRunStateChart::class)));
 
     expect($data['labels'])->toContain('Waiting for review')
         ->and(array_sum($data['datasets'][0]['data']))->toBeGreaterThan(0);
@@ -409,12 +434,12 @@ test('collections panel separates reviewed money from reported money without inv
         'cash_evidence_reference' => 'synthetic', 'source_stream_disjoint' => true, 'received_not_forecast' => true,
     ]);
 
-    Livewire::actingAs($c['reviewer'])
+    $widget = Livewire::actingAs($c['reviewer'])
         ->test(CollectionsOverviewWidget::class)
         ->assertSuccessful()
         ->assertSee('Collections by source and currency')
-        ->assertSee('tuition.cashier')
-        ->assertCanSeeTableRecords([$c['batch'], $unreviewed]);
+        ->assertSee('tuition.cashier');
+    $widget->__call('assertCanSeeTableRecords', [[$c['batch'], $unreviewed]]);
 
     /**
      * The panel reports evidence buckets rather than one spendable total,
@@ -502,14 +527,14 @@ test('workflow panel reports durable run state and never implies a payment', fun
     $run = FinanceWorkflowRun::query()->where('kind', 'budget_plan')->firstOrFail();
     app(FinanceWorkflows::class)->process($run->id);
 
-    Livewire::actingAs($c['reviewer'])
+    $widget = Livewire::actingAs($c['reviewer'])
         ->test(WorkflowRunWidget::class)
         ->assertSuccessful()
         ->assertSee('Background finance work')
         ->assertSee('Budget planner')
         ->assertSee('Waiting for review')
-        ->assertSee('Budget snapshot #')
-        ->assertCanSeeTableRecords([$run->fresh()]);
+        ->assertSee('Budget snapshot #');
+    $widget->__call('assertCanSeeTableRecords', [[$run->fresh()]]);
 
     expect(Transaction::query()->count())->toBe(0);
 });

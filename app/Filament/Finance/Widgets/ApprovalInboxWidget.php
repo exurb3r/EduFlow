@@ -9,13 +9,17 @@ use App\Filament\Pages\Collections;
 use App\Filament\Pages\FinanceSupervisor;
 use App\Filament\Pages\PaymentReviews;
 use App\Models\CollectionBatch;
+use App\Models\FinancePolicyVersion;
 use App\Models\FinanceWorkflowRun;
+use App\Models\Invoice;
 use App\Models\PaymentIntent;
 use App\Models\PaymentReservation;
 use App\Models\User;
+use App\Models\VendorDestinationVersion;
 use App\Services\InstallationInstitution;
 use Filament\Widgets\Widget;
 use Illuminate\Support\Carbon;
+use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Gate;
 
 /**
@@ -37,7 +41,7 @@ class ApprovalInboxWidget extends Widget
     #[\Override]
     public static function canView(): bool
     {
-        $user = auth()->user();
+        $user = Auth::user();
 
         return $user instanceof User
             && Gate::forUser($user)->allows('viewAny', FinanceWorkflowRun::class);
@@ -89,7 +93,7 @@ class ApprovalInboxWidget extends Widget
                 'received' => Money::formatExact($batch->received_minor_units, $batch->currency),
                 'restricted' => Money::formatExact($batch->restricted_minor_units, $batch->currency),
                 'interval' => $this->interval($batch),
-                'owner' => $batch->preparer?->name ?? 'Unknown',
+                'owner' => $this->ownerName($batch->preparer),
                 'age' => $this->age($batch->created_at),
                 'decision' => null,
                 'url' => Collections::getUrl(panel: 'finance'),
@@ -139,15 +143,15 @@ class ApprovalInboxWidget extends Widget
                 return [
                     'id' => $reservation->id,
                     'intentId' => $intent->id,
-                    'reference' => $invoice?->reference ?? 'Invoice #'.$intent->invoice_id,
+                    'reference' => $this->invoiceReference($invoice, $intent),
                     'amount' => Money::formatExact($reservation->amount_base_units, $intent->currency),
                     'fee' => Money::formatExact($reservation->max_fee_base_units, $intent->currency),
-                    'dueDate' => $invoice?->due_date?->toDateString() ?? 'Not recorded',
-                    'policyVersion' => $intent->financePolicyVersion?->version ?? 'Not recorded',
-                    'destinationVersion' => $intent->vendorDestinationVersion?->version ?? 'Not recorded',
+                    'dueDate' => $this->dueDate($invoice),
+                    'policyVersion' => $this->policyVersion($intent->financePolicyVersion),
+                    'destinationVersion' => $this->destinationVersion($intent->vendorDestinationVersion),
                     'chain' => $intent->chain.' '.$intent->chain_id,
                     'recipient' => $this->shortAddress($intent->recipient_address),
-                    'owner' => $intent->preparer?->name ?? 'Unknown',
+                    'owner' => $this->ownerName($intent->preparer),
                     'age' => $this->age($reservation->created_at),
                     'url' => PaymentReviews::getUrl(panel: 'finance'),
                 ];
@@ -167,6 +171,38 @@ class ApprovalInboxWidget extends Widget
         }
 
         return strlen($address) > 14 ? substr($address, 0, 6).'…'.substr($address, -4) : $address;
+    }
+
+    /**
+     * Who recorded a row, or that the staff account is no longer readable.
+     *
+     * A deleted or unavailable record must not break the inbox, so every related
+     * label is resolved explicitly: an absent record reports what is missing
+     * instead of rendering as an empty cell.
+     */
+    private function ownerName(?User $user): string
+    {
+        return $user instanceof User ? $user->name : 'Unknown';
+    }
+
+    private function invoiceReference(?Invoice $invoice, PaymentIntent $intent): string
+    {
+        return $invoice instanceof Invoice ? $invoice->reference : 'Invoice #'.$intent->invoice_id;
+    }
+
+    private function dueDate(?Invoice $invoice): string
+    {
+        return $invoice instanceof Invoice ? $invoice->due_date->toDateString() : 'Not recorded';
+    }
+
+    private function policyVersion(?FinancePolicyVersion $policy): string
+    {
+        return $policy instanceof FinancePolicyVersion ? $policy->version : 'Not recorded';
+    }
+
+    private function destinationVersion(?VendorDestinationVersion $destination): string
+    {
+        return $destination instanceof VendorDestinationVersion ? $destination->version : 'Not recorded';
     }
 
     private function age(mixed $timestamp): string

@@ -23,6 +23,7 @@ use Filament\Widgets\StatsOverviewWidget\Stat;
  */
 class AutomationLaneStats extends StatsOverviewWidget
 {
+    #[\Override]
     protected function getStats(): array
     {
         $counts = app(AutomationLaneStatus::class)->counts();

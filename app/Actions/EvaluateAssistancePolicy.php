@@ -71,7 +71,7 @@ class EvaluateAssistancePolicy
         foreach ($todayDecisions as $decisionRow) {
             if (isset($decisionRow->input_snapshot['approved_base_units'])) {
                 $todaySpentBase += (int) $decisionRow->input_snapshot['approved_base_units'];
-            } elseif ($decisionRow->approved_amount !== null && (string) $decisionRow->approved_amount !== '') {
+            } elseif ((string) $decisionRow->approved_amount !== '') {
                 $todaySpentBase += Money::fromDecimal((string) $decisionRow->approved_amount, CurrencyCode::USDC)->toBaseUnits();
             }
         }

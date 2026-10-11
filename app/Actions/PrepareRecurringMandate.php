@@ -126,7 +126,7 @@ final readonly class PrepareRecurringMandate
                 'fee_ceiling_base_units' => (string) BigInteger::of($data['fee_ceiling_base_units']),
                 'daily_limit_base_units' => (string) BigInteger::of($data['daily_limit_base_units']),
                 'period_limit_base_units' => (string) BigInteger::of($data['period_limit_base_units']),
-                'reason' => $data['reason'] ?? null,
+                'reason' => $data['reason'],
                 'prepared_by' => $actor->id,
             ];
 
@@ -191,7 +191,7 @@ final readonly class PrepareRecurringMandate
 
         $activation = FinancePolicyActivation::current(app(InstallationInstitution::class)->require()->id);
 
-        if ($policy === null || ! $policy->hasValidContent() || $activation === null
+        if ($policy === null || ! $policy->hasValidContent() || ! $activation instanceof FinancePolicyActivation
             || $activation->finance_policy_version_id !== $policy->id
             || ! $activation->hasValidHistory()
             || $policy->created_by === $actor->id) {
@@ -222,7 +222,7 @@ final readonly class PrepareRecurringMandate
         $starts = $this->parse($data['starts_at']);
         $ends = $this->parse($data['ends_at']);
 
-        if ($starts === null || $ends === null || $starts >= $ends) {
+        if (! $starts instanceof CarbonImmutable || ! $ends instanceof CarbonImmutable || $starts >= $ends) {
             throw ValidationException::withMessages(['ends_at' => 'A mandate must end after it starts.']);
         }
 

@@ -13,6 +13,11 @@ use App\Models\Transaction;
 use App\Models\User;
 use Filament\Actions\Testing\TestAction;
 use Filament\Facades\Filament;
+use Filament\Forms\Components\FileUpload;
+use Filament\Forms\Components\TextInput;
+use Filament\Infolists\Components\TextEntry;
+use Filament\Schemas\Schema;
+use Illuminate\Filesystem\FilesystemAdapter;
 use Illuminate\Http\UploadedFile;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Storage;
@@ -20,6 +25,7 @@ use Illuminate\Support\Str;
 use Illuminate\Validation\ValidationException;
 use Livewire\Features\SupportFileUploads\FileUploadConfiguration;
 use Livewire\Features\SupportFileUploads\GenerateSignedUploadUrl;
+use Livewire\Features\SupportTesting\Testable;
 use Livewire\Livewire;
 use Spatie\Permission\Models\Role;
 use Yukazakiri\Lepton\Contracts\ArcNetworkGateway;
@@ -29,6 +35,65 @@ use function Pest\Laravel\actingAs;
 use function Pest\Laravel\get;
 use function Pest\Laravel\post;
 
+/**
+ * Narrow a Livewire test handle to the page it booted.
+ *
+ * Livewire types the booted component as the base `Component`, so page state
+ * and computed accessors are invisible until the instance is named.
+ */
+function collectionsPage(Testable $page): Collections
+{
+    $instance = $page->instance();
+
+    if (! $instance instanceof Collections) {
+        throw new RuntimeException('The Livewire test did not boot the collections page.');
+    }
+
+    return $instance;
+}
+
+/**
+ * The label a cashier sees for a field inside the mounted action schema.
+ *
+ * The capture wizard holds form fields and the detail drawers hold infolist
+ * entries, and both are what the cashier reads; the schema itself reports them
+ * only as the base component type.
+ */
+function collectionSchemaLabel(Schema $schema, string $statePath): ?string
+{
+    $component = $schema->getComponentByStatePath($statePath);
+
+    if ($component instanceof TextInput || $component instanceof FileUpload || $component instanceof TextEntry) {
+        return $component->getLabel();
+    }
+
+    throw new RuntimeException('Expected a labelled field at '.$statePath.'.');
+}
+
+/** The single collection batch under test, named rather than inferred. */
+function soleCollectionBatch(): CollectionBatch
+{
+    return CollectionBatch::query()->sole();
+}
+
+/** The single review recorded against a collection. */
+function soleCollectionReview(): CollectionBatchReview
+{
+    return CollectionBatchReview::query()->sole();
+}
+
+/** The private local disk the captured receipt is stored on. */
+function collectionEvidenceDisk(): FilesystemAdapter
+{
+    $disk = Storage::disk('local');
+
+    if (! $disk instanceof FilesystemAdapter) {
+        throw new RuntimeException('Collection evidence must live on a local filesystem disk.');
+    }
+
+    return $disk;
+}
+
 /** @return array{institution: Organization, cashier: User, reviewer: User} */
 function cashierCollectionContext(string $panel = 'finance'): array
 {
@@ -37,11 +102,16 @@ function cashierCollectionContext(string $panel = 'finance'): array
     app()->instance(ArcNetworkGateway::class, Mockery::mock(ArcNetworkGateway::class));
     app()->instance(WalletGateway::class, Mockery::mock(WalletGateway::class));
     $institution = Organization::factory()->create(['currency' => 'PHP']);
+
+    if (! $institution instanceof Organization) {
+        throw new RuntimeException('The organization factory returned something else.');
+    }
+
     $cashier = User::factory()->create()->assignRole(Role::findOrCreate('finance_officer', 'web'));
     $reviewer = User::factory()->create()->assignRole(Role::findOrCreate('super_admin', 'web'));
     Filament::setCurrentPanel(Filament::getPanel($panel));
 
-    return compact('institution', 'cashier', 'reviewer');
+    return ['institution' => $institution, 'cashier' => $cashier, 'reviewer' => $reviewer];
 }
 
 /** @return array<string, mixed> */
@@ -71,12 +141,13 @@ test('cashier collections screen is available in both panels with plain entry la
     $page = Livewire::test(Collections::class);
     $page->__call('mountAction', ['captureCollectionBatch']);
     $page->assertSee('Payment channel')->assertDontSee('Capture key (UUID)')->assertDontSee('Source document SHA-256')->assertDontSee('ISO 8601');
-    $schema = $page->instance()->getSchema($page->instance()->getMountedActionSchemaName());
-    expect($schema->getComponentByStatePath('source_reference')->getLabel())->toBe('Receipt / report number')
-        ->and($schema->getComponentByStatePath('source_document')->getLabel())->toBe('Receipt or collection report')
+    $instance = collectionsPage($page);
+    $schema = $instance->getSchema($instance->getMountedActionSchemaName());
+    expect(collectionSchemaLabel($schema, 'source_reference'))->toBe('Receipt / report number')
+        ->and(collectionSchemaLabel($schema, 'source_document'))->toBe('Receipt or collection report')
         ->and($schema->getComponentByStatePath('source_document_digest'))->toBeNull()
         ->and($schema->getComponentByStatePath('capture_key'))->toBeNull();
-    expect(Str::isUuid($page->instance()->captureKey))->toBeTrue()
+    expect(Str::isUuid($instance->captureKey))->toBeTrue()
         ->and(CollectionBatch::query()->count())->toBe(0)->and(Transaction::query()->count())->toBe(0);
 })->with(['finance', 'admin']);
 
@@ -88,16 +159,16 @@ test('cashier entry derives identity and document fingerprint and retains privat
     $page = Livewire::test(Collections::class);
     $page->__call('callAction', ['captureCollectionBatch', $input]);
     $page->__call('assertHasNoFormErrors', []);
-    $batch = CollectionBatch::query()->sole();
+    $batch = soleCollectionBatch();
     $document = $batch->snapshot['source_document'];
-    expect($batch->hasValidSnapshot())->toBeTrue()->and($batch->capture_key)->toBe($page->instance()->captureKey)
+    expect($batch->hasValidSnapshot())->toBeTrue()->and($batch->capture_key)->toBe(collectionsPage($page)->captureKey)
         ->and($batch->source_document_digest)->toBe($expectedDigest)->and($batch->source_reference)->toBe('or-001234')
         ->and($batch->received_minor_units)->toBe(10001)->and($batch->restricted_minor_units)->toBe(2001)
         ->and($batch->snapshot['cash_evidence_reference'])->toBe('Uploaded receipt/report: or-001234')
-        ->and($document['name'])->toBe('cashier-report.csv')->and(Storage::disk('local')->visibility($document['path']))->toBe('private')
+        ->and($document['name'])->toBe('cashier-report.csv')->and(collectionEvidenceDisk()->visibility($document['path']))->toBe('private')
         ->and($batch->evidence()['bank_balance_verified'])->toBeFalse()->and($batch->evidence()['can_execute'])->toBeFalse()
         ->and(CollectionBatchReview::query()->count())->toBe(0)->and(Transaction::query()->count())->toBe(0);
-    Storage::disk('local')->assertExists($document['path']);
+    collectionEvidenceDisk()->assertExists($document['path']);
 });
 
 test('signed collection upload HTTP request reaches private immutable capture without a client digest', function (): void {
@@ -113,10 +184,10 @@ test('signed collection upload HTTP request reaches private immutable capture wi
     $page->call('_finishUpload', 'mountedActions.0.data.source_document', $upload->json('paths'), false, false);
     $page->__call('callMountedAction', []);
     $page->__call('assertHasNoFormErrors', []);
-    $batch = CollectionBatch::query()->sole();
+    $batch = soleCollectionBatch();
     expect($batch->hasValidSnapshot())->toBeTrue()
         ->and($batch->source_document_digest)->toBe(hash('sha256', $input['source_document']->getContent()));
-    Storage::disk('local')->assertExists($batch->snapshot['source_document']['path']);
+    collectionEvidenceDisk()->assertExists($batch->snapshot['source_document']['path']);
 });
 
 test('cashier entry requires an actual upload and does not accept arbitrary storage paths', function (mixed $document): void {
@@ -154,7 +225,7 @@ test('cashier duplicate upload cannot count again or store a second retained fil
     $c = cashierCollectionContext();
     $batch = captureCashierDocument($c['cashier']);
     $input = array_replace(cashierCollectionInput(), ['source_reference' => 'OR-999999', 'source_stream' => 'digital-wallet-fees']);
-    expect(fn () => captureCashierDocument($c['cashier'], $input))->toThrow(ValidationException::class)
+    expect(fn (): CollectionBatch => captureCashierDocument($c['cashier'], $input))->toThrow(ValidationException::class)
         ->and(CollectionBatch::query()->count())->toBe(1)
         ->and(Storage::disk('local')->allFiles('collection-evidence'))->toBe([$batch->snapshot['source_document']['path']]);
 });
@@ -207,8 +278,9 @@ test('cashier upload validation refuses unsafe types empty files and oversized p
         'type' => UploadedFile::fake()->createWithContent('receipt.html', '<script>alert(1)</script>'),
         'empty' => UploadedFile::fake()->createWithContent('receipt.csv', ''),
         'size' => UploadedFile::fake()->create('receipt.pdf', 10241, 'application/pdf'),
+        default => throw new LogicException('Unknown collection upload case.'),
     };
-    expect(fn () => captureCashierDocument($c['cashier'], $input))->toThrow(ValidationException::class)
+    expect(fn (): CollectionBatch => captureCashierDocument($c['cashier'], $input))->toThrow(ValidationException::class)
         ->and(CollectionBatch::query()->count())->toBe(0)->and(Storage::disk('local')->allFiles('collection-evidence'))->toBe([]);
 })->with(['type', 'empty', 'size']);
 
@@ -240,6 +312,11 @@ test('private collection proof is unavailable outside the selected institution',
     $c = cashierCollectionContext();
     $batch = captureCashierDocument($c['cashier']);
     $other = Organization::factory()->create();
+
+    if (! $other instanceof Organization) {
+        throw new RuntimeException('The organization factory returned something else.');
+    }
+
     config(['eduflow.institution_id' => $other->id]);
     actingAs($c['reviewer']);
     get(route('finance.collection-batches.document', $batch))->assertForbidden();
@@ -257,7 +334,7 @@ test('collection details expose proof download and reviewer can save an independ
     $page->__call('callAction', [TestAction::make('reviewCollectionBatch')->table($batch), ['decision' => 'approve_receipts',
         'verification_reference' => 'Original cashier register page 12', 'reason' => 'Total and restrictions independently checked.', 'attestation' => true]]);
     $page->__call('assertHasNoFormErrors', []);
-    expect(CollectionBatchReview::query()->sole()->reviewed_by)->toBe($c['reviewer']->id)
+    expect(soleCollectionReview()->reviewed_by)->toBe($c['reviewer']->id)
         ->and($batch->evidence()['receipts_reviewed'])->toBeTrue()->and(Transaction::query()->count())->toBe(0);
 });
 
@@ -267,10 +344,10 @@ test('cashier review stays independent and overview counts records not money', f
     actingAs($c['cashier']);
     $page = Livewire::test(Collections::class);
     $page->__call('assertActionHidden', [TestAction::make('reviewCollectionBatch')->table($batch)]);
-    expect($page->instance()->collectionOverview())->toBe(['awaiting' => 1, 'approved' => 0, 'held_or_rejected' => 0]);
+    expect(collectionsPage($page)->collectionOverview())->toBe(['awaiting' => 1, 'approved' => 0, 'held_or_rejected' => 0]);
     app(ReviewCollectionBatch::class)->handle($c['reviewer'], $batch, $batch->snapshot_digest, 'approve_receipts', 'Checked original register', 'Totals and restrictions match.');
     actingAs($c['reviewer']);
-    expect(Livewire::test(Collections::class)->instance()->collectionOverview())->toBe(['awaiting' => 0, 'approved' => 1, 'held_or_rejected' => 0])
+    expect(collectionsPage(Livewire::test(Collections::class))->collectionOverview())->toBe(['awaiting' => 0, 'approved' => 1, 'held_or_rejected' => 0])
         ->and(Transaction::query()->count())->toBe(0);
 });
 
@@ -282,7 +359,7 @@ test('cashier entry preserves exact six-decimal USDC without rounded table or de
     $page->__call('callAction', ['captureCollectionBatch', $input]);
     $page->__call('assertHasNoFormErrors', []);
     $page->assertSee('0.000003 USDC')->assertSee('0.000001 USDC');
-    expect(CollectionBatch::query()->sole()->received_minor_units)->toBe(3);
+    expect(soleCollectionBatch()->received_minor_units)->toBe(3);
 });
 
 test('legacy collection records remain readable without claiming retained source files', function (): void {

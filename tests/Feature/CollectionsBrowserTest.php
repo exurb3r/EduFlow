@@ -24,7 +24,7 @@ function collectionBrowserStaff(): array
     $cashier = User::factory()->create(['name' => 'Synthetic cashier'])->assignRole(Role::findOrCreate('finance_officer', 'web'));
     $reviewer = User::factory()->create(['name' => 'Synthetic reviewer'])->assignRole(Role::findOrCreate('super_admin', 'web'));
 
-    return compact('cashier', 'reviewer');
+    return ['cashier' => $cashier, 'reviewer' => $reviewer];
 }
 
 test('cashier can finish three-step collection entry after a completed upload in a browser', function (): void {
@@ -58,8 +58,8 @@ test('cashier can finish three-step collection entry after a completed upload in
     expect($batch->hasValidSnapshot())->toBeTrue()->and($batch->received_minor_units)->toBe(10001)->and($batch->restricted_minor_units)->toBe(2001)
         ->and($batch->evidence()['accounts_changed'])->toBeFalse()->and(CollectionBatchReview::query()->count())->toBe(0)
         ->and(Transaction::query()->count())->toBe(0);
-    Storage::disk('local')->assertExists($batch->snapshot['source_document']['path']);
-});
+    expect(Storage::disk('local')->exists($batch->snapshot['source_document']['path']))->toBeTrue();
+})->group('browser');
 
 test('collection entry stays usable on mobile with no page overflow', function (): void {
     $this->withVite();
@@ -69,7 +69,7 @@ test('collection entry stays usable on mobile with no page overflow', function (
     expect($page->script('document.documentElement.scrollWidth <= window.innerWidth'))->toBeTrue();
     $page->click('Record collection')->assertSee('Receipt / report number')->assertNoJavaScriptErrors();
     expect($page->script('document.documentElement.scrollWidth <= window.innerWidth'))->toBeTrue();
-});
+})->group('browser');
 
 test('independent reviewer can inspect a retained collection report in a browser', function (): void {
     $this->withVite();
@@ -86,4 +86,4 @@ test('independent reviewer can inspect a retained collection report in a browser
     $page->click('.fi-modal-close-btn:visible')->click('Review')->assertSee('What did you check?')
         ->assertSee('Your review')->assertNoJavaScriptErrors();
     expect(CollectionBatchReview::query()->count())->toBe(0)->and(Transaction::query()->count())->toBe(0);
-});
+})->group('browser');

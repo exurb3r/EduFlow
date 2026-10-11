@@ -10,6 +10,7 @@ use App\Models\PaymentIntent;
 use App\Models\PaymentReservation;
 use App\Models\Transaction;
 use App\Services\ReservationCapacity;
+use Illuminate\Support\Str;
 use Illuminate\Validation\ValidationException;
 
 use function Pest\Laravel\travel;

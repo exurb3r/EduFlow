@@ -7,6 +7,7 @@ namespace App\Models;
 use DateTimeInterface;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
+use Illuminate\Support\Carbon;
 use LogicException;
 
 /**
@@ -85,7 +86,7 @@ class FundingWindowApproval extends Model
             throw new LogicException('An approval may only be retired by its own live successor.');
         }
 
-        $this->superseded_at = now();
+        $this->superseded_at = Carbon::now();
         $this->superseded_by_approval_id = $successor->id;
         $this->save();
     }

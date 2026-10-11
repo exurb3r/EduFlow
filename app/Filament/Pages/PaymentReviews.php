@@ -190,15 +190,13 @@ class PaymentReviews extends Page implements HasTable
                 SelectFilter::make('review_status')->label('Show payments')->placeholder('All review history')
                     ->options(['awaiting' => 'Awaiting review', 'approved' => 'Approval recorded',
                         'held_or_rejected' => 'On hold or rejected', 'released' => 'Capacity released'])
-                    ->query(function (Builder $query, array $data): Builder {
-                        return match ($data['value'] ?? null) {
-                            'awaiting' => $query->whereDoesntHave('authorization')
-                                ->whereDoesntHave('release.review', fn (Builder $review): Builder => $review->where('decision', 'approve_release')),
-                            'approved' => $query->whereHas('authorization', fn (Builder $review): Builder => $review->where('decision', 'approve_payment')),
-                            'held_or_rejected' => $query->whereHas('authorization', fn (Builder $review): Builder => $review->whereIn('decision', ['hold_payment', 'reject_payment'])),
-                            'released' => $query->whereHas('release.review', fn (Builder $review): Builder => $review->where('decision', 'approve_release')),
-                            default => $query,
-                        };
+                    ->query(fn (Builder $query, array $data): Builder => match ($data['value'] ?? null) {
+                        'awaiting' => $query->whereDoesntHave('authorization')
+                            ->whereDoesntHave('release.review', fn (Builder $review): Builder => $review->where('decision', 'approve_release')),
+                        'approved' => $query->whereHas('authorization', fn (Builder $review): Builder => $review->where('decision', 'approve_payment')),
+                        'held_or_rejected' => $query->whereHas('authorization', fn (Builder $review): Builder => $review->whereIn('decision', ['hold_payment', 'reject_payment'])),
+                        'released' => $query->whereHas('release.review', fn (Builder $review): Builder => $review->where('decision', 'approve_release')),
+                        default => $query,
                     }),
             ], layout: FiltersLayout::AboveContent)
             ->deferFilters(false)
@@ -434,7 +432,7 @@ class PaymentReviews extends Page implements HasTable
         $user = Auth::user();
 
         return $user instanceof User && $reservation->intent instanceof PaymentIntent && ! $this->hasReview($reservation)
-            && ! $this->isReleased($reservation) && $this->reviewerReadiness['ready']
+            && ! $this->isReleased($reservation) && $this->reviewerReadiness()['ready']
             && $user->hasAnyRole(['finance_officer', 'admin', 'super_admin'])
             && $user->checkPermissionTo('AuthorizePayment:PaymentIntent', 'web')
             && $user->hasDirectPermission('AuthorizePayment:PaymentIntent')
@@ -457,7 +455,7 @@ class PaymentReviews extends Page implements HasTable
         if ($reservation->intent?->prepared_by === $this->actor()->id) {
             return 'Another independent reviewer required';
         }
-        if (! $this->reviewerReadiness['ready']) {
+        if (! $this->reviewerReadiness()['ready']) {
             return 'Reviewer setup required · see checklist above';
         }
 

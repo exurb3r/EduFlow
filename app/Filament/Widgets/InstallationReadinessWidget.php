@@ -80,8 +80,8 @@ class InstallationReadinessWidget extends BaseWidget
 
         $features = $this->features();
         $openGates = array_keys(array_filter([
-            'Registration' => $features?->registration_enabled ?? false,
-            'Impersonation' => $features?->user_impersonation_enabled ?? false,
+            'Registration' => $features instanceof ApplicationFeaturesSettings && $features->registration_enabled,
+            'Impersonation' => $features instanceof ApplicationFeaturesSettings && $features->user_impersonation_enabled,
         ]));
 
         $onboardingStat = Stat::make('School onboarding', $openGates === [] ? 'Locked down' : 'Open: '.implode(', ', $openGates))
@@ -92,15 +92,15 @@ class InstallationReadinessWidget extends BaseWidget
 
         $ai = $this->ai();
 
-        $aiStat = Stat::make('Advisory AI', ($ai?->advisory_enabled ?? false) ? 'Enabled' : 'Off by default')
+        $aiStat = Stat::make('Advisory AI', $ai instanceof AiSettings && $ai->advisory_enabled ? 'Enabled' : 'Off by default')
             ->description(sprintf(
                 '%s · disclosure %s · settlement proposals %s',
                 AiProvider::query()->where('is_active', true)->count().' active provider(s)',
-                ($ai?->disclosure_accepted ?? false) ? 'accepted' : 'not accepted',
-                ($ai?->allow_settlement_proposals ?? false) ? 'ALLOWED' : 'not allowed',
+                $ai instanceof AiSettings && $ai->disclosure_accepted ? 'accepted' : 'not accepted',
+                $ai instanceof AiSettings && $ai->allow_settlement_proposals ? 'ALLOWED' : 'not allowed',
             ))
             ->descriptionIcon('heroicon-o-sparkles')
-            ->color($ai?->advisory_enabled ?? false ? 'info' : 'gray')
+            ->color($ai instanceof AiSettings && $ai->advisory_enabled ? 'info' : 'gray')
             ->url(AiProviderResource::getUrl('index'));
 
         $status = app(LeptonTreasuryService::class)->status($institution->primaryWallet());

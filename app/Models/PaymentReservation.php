@@ -7,6 +7,7 @@ namespace App\Models;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasOne;
+use Illuminate\Support\Carbon;
 use Illuminate\Support\Str;
 use LogicException;
 use Throwable;
@@ -23,8 +24,10 @@ use Throwable;
  * @property int $max_fee_base_units
  * @property array<string, mixed> $snapshot
  * @property string $snapshot_digest
+ * @property Carbon $created_at
  * @property-read PaymentIntent|null $intent
  * @property-read PaymentAuthorization|null $authorization
+ * @property-read PaymentReservationRelease|null $release
  */
 class PaymentReservation extends Model
 {

@@ -31,7 +31,7 @@ test('database seeder creates the default roles', function (): void {
     }
 
     expect(Role::query()->where('name', RoleEnums::USER->value)->where('guard_name', 'web')->exists())->toBeTrue()
-        ->and(User::where('email', 'juan@eduflow.test')->exists())->toBeTrue()
+        ->and(User::query()->where('email', 'juan@eduflow.test')->exists())->toBeTrue()
         ->and(Student::where('student_number', 'DEMO-JUAN')->exists())->toBeTrue()
         ->and(AcademicTerm::exists())->toBeTrue()
         ->and(TuitionAccount::where('total_amount', 300000000)->where('paid_amount', 0)->exists())->toBeTrue();
@@ -71,7 +71,7 @@ test('explicit demo user seeding preserves local accounts and is idempotent', fu
     $this->seed(DemoUsersSeeder::class);
     $this->seed(DemoUsersSeeder::class);
 
-    $admin = User::where('email', 'admin@admin.com')->sole();
+    $admin = User::query()->where('email', 'admin@admin.com')->sole();
 
     expect(User::count())->toBe(2)
         ->and($admin->hasRole(RoleEnums::SUPER_ADMIN))->toBeTrue()
@@ -99,7 +99,7 @@ test('explicit demo user seeding refuses non demo environments before writing', 
 test('seeded admin receives the complete permission catalogue and can access module resources', function (): void {
     $this->seed(DatabaseSeeder::class);
 
-    $admin = User::where('email', 'admin@admin.com')->sole();
+    $admin = User::query()->where('email', 'admin@admin.com')->sole();
     Filament::setCurrentPanel('admin');
     $permissions = FilamentShield::getEntitiesPermissions();
 
@@ -113,7 +113,7 @@ test('seeded admin receives the complete permission catalogue and can access mod
         ->and($admin->can('ManageSocialLoginSettings'))->toBeTrue()
         ->and($admin->can('AuthorizePayment:PaymentIntent'))->toBeTrue()
         ->and($admin->hasDirectPermission('AuthorizePayment:PaymentIntent'))->toBeFalse()
-        ->and($admin->getAllPermissions()->count())->toBe(Permission::where('guard_name', 'web')->count());
+        ->and($admin->getAllPermissions()->count())->toBe(Permission::query()->where('guard_name', 'web')->count());
 
     $this->actingAs($admin)->get(PostResource::getUrl('index', panel: 'admin'))->assertSuccessful();
 });
@@ -129,8 +129,8 @@ test('role seeding scopes permissions to the web guard and preserves the current
 
     expect(Filament::getCurrentPanel()->getId())->toBe('finance')
         ->and($superAdmin->hasPermissionTo('View:CustomReport', 'web'))->toBeTrue()
-        ->and($superAdmin->permissions->contains('guard_name', 'api'))->toBeFalse()
-        ->and($superAdmin->permissions->count())->toBe(Permission::where('guard_name', 'web')->count());
+        ->and($superAdmin->permissions()->get()->contains('guard_name', 'api'))->toBeFalse()
+        ->and($superAdmin->permissions()->count())->toBe(Permission::query()->where('guard_name', 'web')->count());
 });
 
 test('rerunning demo user seeding repairs admin permissions without changing existing credentials', function (): void {
@@ -149,5 +149,5 @@ test('rerunning demo user seeding repairs admin permissions without changing exi
     expect($admin->can('ViewAny:Post'))->toBeTrue()
         ->and($admin->getRawOriginal('password'))->toBe($password)
         ->and($admin->name)->toBe($name)
-        ->and(User::where('email', 'admin@admin.com')->count())->toBe(1);
+        ->and(User::query()->where('email', 'admin@admin.com')->count())->toBe(1);
 });

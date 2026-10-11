@@ -57,6 +57,7 @@ class Organization extends Model
         ];
     }
 
+    /** @return HasMany<Wallet, $this> */
     public function wallets(): HasMany
     {
         return $this->hasMany(Wallet::class);

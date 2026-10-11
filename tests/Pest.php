@@ -4,6 +4,8 @@ declare(strict_types=1);
 
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Notifications\Notification;
+use Mockery\CompositeExpectation;
+use Mockery\MockInterface;
 use Tests\TestCase;
 
 /*
@@ -44,6 +46,28 @@ expect()->extend('toBeOne', fn () => $this->toBe(1));
 | global functions to help you to reduce the number of lines of code in your test files.
 |
 */
+
+if (! function_exists('mockExpectation')) {
+    /**
+     * Narrow a Mockery expectation to the concrete class.
+     *
+     * `Mockery::mock()` reports `shouldReceive()` as `ExpectationInterface|
+     * HigherOrderMessage`, neither of which declares the fluent setters the
+     * tests actually use (`andReturnUsing()`, `andThrow()`, ...). Mockery
+     * always returns a `Mockery\CompositeExpectation` in practice, so this
+     * states it once instead of pretending the interface is richer than it is.
+     */
+    function mockExpectation(MockInterface $mock, string $method): CompositeExpectation
+    {
+        $expectation = $mock->shouldReceive($method);
+
+        if (! $expectation instanceof CompositeExpectation) {
+            throw new RuntimeException('Mockery returned an expectation that cannot be configured further.');
+        }
+
+        return $expectation;
+    }
+}
 
 if (! function_exists('makeDatabaseNotification')) {
     /**

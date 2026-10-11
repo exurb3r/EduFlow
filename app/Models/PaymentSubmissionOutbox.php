@@ -31,6 +31,7 @@ use Throwable;
  * @property int $payment_intent_id
  * @property int $invoice_id
  * @property string $provider_idempotency_key
+ * @property string|null $provider_handle
  * @property string $state
  * @property string|null $stage
  * @property int $attempts
@@ -49,7 +50,7 @@ use Throwable;
  */
 class PaymentSubmissionOutbox extends Model
 {
-    /** @var array<string, string> States that mean work is still owed. */
+    /** @var list<string> States that mean work is still owed. */
     public const array OPEN_STATES = ['queued', 'running', 'unknown', 'accepted', 'submitted'];
 
     /**
@@ -65,7 +66,7 @@ class PaymentSubmissionOutbox extends Model
      * transaction id, but no on-chain hash exists yet. That is an in-flight
      * payment, not work still to do.
      *
-     * @var array<string, string>
+     * @var list<string>
      */
     public const array DISPATCHABLE_STATES = ['queued', 'running', 'unknown'];
 
@@ -73,11 +74,11 @@ class PaymentSubmissionOutbox extends Model
      * States in which the rail already owns a transfer and only observation is
      * left. Neither may ever be handed to a submitter.
      *
-     * @var array<string, string>
+     * @var list<string>
      */
     public const array IN_FLIGHT_STATES = ['accepted', 'submitted'];
 
-    /** @var array<string, string> States that are terminal for this entry. */
+    /** @var list<string> States that are terminal for this entry. */
     public const array TERMINAL_STATES = ['blocked', 'failed', 'completed', 'paused'];
 
     protected $fillable = ['request_key', 'organization_id', 'payment_authorization_id', 'payment_reservation_id',

@@ -35,7 +35,7 @@ final readonly class CaptureCollectionBatch
     {
         Gate::forUser($actor)->authorize('create', CollectionBatch::class);
         $contents = null;
-        if ($sourceDocument !== null) {
+        if ($sourceDocument instanceof UploadedFile) {
             Validator::make(['source_document' => $sourceDocument], ['source_document' => self::documentRules()])->validate();
             $contents = $sourceDocument instanceof TemporaryUploadedFile ? $sourceDocument->get() : $sourceDocument->getContent();
             if (! is_string($contents) || $contents === '' || strlen($contents) > 10 * 1024 * 1024) {
@@ -63,7 +63,7 @@ final readonly class CaptureCollectionBatch
             'currency' => $currency->value, 'received_minor_units' => (string) $received, 'restricted_minor_units' => (string) $restricted,
             'collected_from' => $from->toIso8601String(), 'collected_until' => $until->toIso8601String(),
             'cash_evidence_reference' => $data['cash_evidence_reference'], 'source_stream_disjoint_attested' => true, 'received_not_forecast_attested' => true];
-        if ($sourceDocument !== null) {
+        if ($sourceDocument instanceof UploadedFile) {
             $name = basename(str_replace('\\', '/', $sourceDocument->getClientOriginalName()));
             $name = mb_substr(preg_replace('/[\x00-\x1f\x7f]/', '', $name), 0, 255);
             $snapshot['source_document'] = ['disk' => 'local',

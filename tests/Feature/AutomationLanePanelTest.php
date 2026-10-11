@@ -65,7 +65,7 @@ test('every state is placed in the bucket its meaning supports', function (): vo
     $seen = [];
     foreach ($buckets as $bucket => $states) {
         foreach ($states as $state) {
-            if (in_array($state, $seen, true)) {
+            if (isset($seen[$state])) {
                 expect(isset($deliberateOverlap[$state]) && in_array($bucket, $deliberateOverlap[$state], true))
                     ->toBeTrue("{$state} is counted in two buckets at once, which was never decided.");
             }

@@ -86,7 +86,7 @@ class BudgetCapacityWidget extends TableWidget
                         : 'Schema v1 staff attestation. Readable, but cannot open a funding window.'),
                 TextColumn::make('validity')->label('Evidence window')
                     ->state(fn (BudgetSnapshot $record): string => (string) ($record->snapshot['valid_until'] ?? 'Not recorded'))
-                    ->description(fn (BudgetSnapshot $record): string => 'As of '.((string) ($record->snapshot['as_of'] ?? '—')))
+                    ->description(fn (BudgetSnapshot $record): string => 'As of '.(($record->snapshot['as_of'] ?? '—')))
                     ->color(fn (BudgetSnapshot $record): string => $this->freshness($record) === 'expired' ? 'danger' : 'gray'),
                 $this->amountColumn('allocation', 'Approved allocation'),
                 $this->amountColumn('already_spent', 'Already spent')

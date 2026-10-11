@@ -6,7 +6,6 @@ use App\Ai\Advisory\BriefGuard;
 use App\Ai\Advisory\QnaGate;
 use App\Ai\Advisory\StudentBrief;
 use App\Ai\Agents\AskEduFlowAgent;
-use App\Enums\CurrencyCode;
 use App\Models\AcademicTerm;
 use App\Models\AiProvider;
 use App\Models\AssistancePolicyVersion;
@@ -259,6 +258,6 @@ it('fences the student question so it cannot displace the brief', function (): v
 it('exposes the display currency symbol alongside the code', function (): void {
     $brief = briefFor();
 
-    expect($brief->displayCurrency)->toBeInstanceOf(CurrencyCode::class)
+    expect($brief->displayCurrency->value)->toBe('PHP')
         ->and($brief->toPromptBlock())->toContain('Display currency: PHP');
 });

@@ -226,7 +226,7 @@ class RecurringMandate extends Model
     /** Current, approved, inside its own dates, and not revoked. */
     public function isLive(?DateTimeInterface $at = null): bool
     {
-        $at = $at === null ? now() : Carbon::parse($at->format('Y-m-d H:i:s'));
+        $at = $at instanceof DateTimeInterface ? Carbon::parse($at->format('Y-m-d H:i:s')) : now();
 
         return $this->state === 'approved' && $this->starts_at->lte($at) && $this->ends_at->gt($at);
     }
@@ -271,10 +271,10 @@ class RecurringMandate extends Model
         return $this->belongsTo(Vendor::class);
     }
 
-    /** @return BelongsTo<VendorDestination, $this> */
-    public function vendorDestination(): BelongsTo
+    /** @return BelongsTo<VendorDestinationVersion, $this> */
+    public function vendorDestinationVersion(): BelongsTo
     {
-        return $this->belongsTo(VendorDestination::class, 'vendor_destination_version_id');
+        return $this->belongsTo(VendorDestinationVersion::class, 'vendor_destination_version_id');
     }
 
     /** @return array<string, mixed> */

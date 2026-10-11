@@ -107,7 +107,7 @@ class PaymentSubmissionAttempt extends Model
             'attempt_number' => $this->attempt_number,
             'outcome' => $this->outcome,
             'provider_reference' => $this->provider_reference,
-            'observed_at' => $this->observed_at?->toIso8601String(),
+            'observed_at' => $this->observed_at->toIso8601String(),
             // An unknown outcome is explicitly not a failure and not a success.
             'settled' => false,
             'can_execute' => false,

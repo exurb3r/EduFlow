@@ -11,6 +11,7 @@ use App\Actions\ReviewRecurringMandate;
 use App\DTOs\Money;
 use App\Enums\CurrencyCode;
 use App\Models\Budget;
+use App\Models\FinancePolicyVersion;
 use App\Models\MandateOccurrence;
 use App\Models\Organization;
 use App\Models\PaymentIntent;
@@ -90,7 +91,16 @@ function mandateContext(string $ceiling = '5000000'): array
         'wallet' => $wallet, 'vendor' => $vendor, 'destination' => $version, 'policy' => $policy];
 }
 
-/** @return array<string, mixed> */
+/**
+ * @param  array<string, mixed>  $c
+ * @return array{
+ *     budget_id: int, vendor_id: int, vendor_destination_version_id: int, wallet_id: int,
+ *     finance_policy_version_id: int, obligation_reference: string, obligation_digest: string,
+ *     starts_at: string, ends_at: string, due_window_days: int,
+ *     per_occurrence_ceiling_base_units: int|string, fee_ceiling_base_units: int|string,
+ *     daily_limit_base_units: int|string, period_limit_base_units: int|string, reason: string
+ * }
+ */
 function mandateInput(array $c, string $ceiling = '5000000'): array
 {
     return [
@@ -157,6 +167,7 @@ test('a written mandate is a draft that authorizes nothing', function (): void {
         ->and($mandate->hasValidSnapshot())->toBeTrue()
         ->and($mandate->chain)->toBe('ARC-TESTNET')
         ->and($mandate->chain_id)->toBe(5042002)
+        ->and($mandate->vendorDestinationVersion()->sole()->id)->toBe($c['destination']->id)
         ->and($mandate->evidence()['can_execute'])->toBeFalse()
         ->and($mandate->evidence()['mandate_authorized'])->toBeFalse();
 });

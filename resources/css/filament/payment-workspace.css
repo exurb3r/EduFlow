@@ -7,7 +7,11 @@
         --payment-text: var(--color-gray-950);
         --payment-muted: var(--color-gray-600);
         --payment-accent: var(--color-primary-700);
-        --payment-accent-soft: color-mix(in oklab, var(--color-primary-100) 50%, white);
+        --payment-accent-soft: color-mix(
+            in oklab,
+            var(--color-primary-100) 50%,
+            white
+        );
         --payment-success: var(--color-success-600);
         display: grid;
         grid-template-columns: minmax(0, 1fr);
@@ -18,13 +22,25 @@
 
     .dark .fi-payment-workspace {
         --payment-surface: var(--color-gray-900);
-        --payment-muted-surface: color-mix(in oklab, var(--color-gray-800) 55%, var(--color-gray-900));
-        --payment-frame: color-mix(in oklab, var(--color-gray-800) 55%, var(--color-gray-950));
+        --payment-muted-surface: color-mix(
+            in oklab,
+            var(--color-gray-800) 55%,
+            var(--color-gray-900)
+        );
+        --payment-frame: color-mix(
+            in oklab,
+            var(--color-gray-800) 55%,
+            var(--color-gray-950)
+        );
         --payment-border: var(--color-gray-700);
         --payment-text: var(--color-gray-100);
         --payment-muted: var(--color-gray-400);
         --payment-accent: var(--color-primary-300);
-        --payment-accent-soft: color-mix(in oklab, var(--color-primary-900) 30%, var(--color-gray-900));
+        --payment-accent-soft: color-mix(
+            in oklab,
+            var(--color-primary-900) 30%,
+            var(--color-gray-900)
+        );
         --payment-success: var(--color-success-400);
     }
 
@@ -103,7 +119,11 @@
     }
 
     .fi-payment-metric-focus {
-        border-color: color-mix(in oklab, var(--payment-accent) 35%, var(--payment-border));
+        border-color: color-mix(
+            in oklab,
+            var(--payment-accent) 35%,
+            var(--payment-border)
+        );
         background: var(--payment-accent-soft);
 
         & .fi-payment-metric-value {

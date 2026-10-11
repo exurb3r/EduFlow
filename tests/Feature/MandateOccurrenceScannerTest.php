@@ -9,6 +9,7 @@ use App\Actions\PrepareFundingWindow;
 use App\Actions\PrepareRecurringMandate;
 use App\Actions\ReviewInvoiceVersion;
 use App\Actions\ReviewRecurringMandate;
+use App\Models\BudgetSnapshot;
 use App\Models\Invoice;
 use App\Models\MandateOccurrence;
 use App\Models\PaymentIntent;
@@ -18,7 +19,7 @@ use App\Models\RecurringMandate;
 use App\Models\Transaction as TransactionModel;
 use App\Services\MandateOccurrenceScanner;
 use Brick\Math\BigInteger;
-use Mockery\Expectation;
+use Illuminate\Support\Str;
 use Yukazakiri\Lepton\Contracts\ArcNetworkGateway;
 
 /**
@@ -64,15 +65,17 @@ function scannerBills(array $c, string $amount = '4.000000', int $dueInDays = 0)
     return $bill->id;
 }
 
-/** @param array<string, mixed> $c */
 function scannerBalance(string $native = '100000000000000000007'): void
 {
     $arc = Mockery::mock(ArcNetworkGateway::class);
+
+    if (! $arc instanceof ArcNetworkGateway) {
+        throw new RuntimeException('Mockery did not build an Arc gateway.');
+    }
+
     $arc->shouldReceive('chainCode')->andReturn('ARC-TESTNET');
     $arc->shouldReceive('chainId')->andReturn(5042002);
-    /** @var Expectation $rpc */
-    $rpc = $arc->shouldReceive('rpc');
-    $rpc->andReturnUsing(fn (string $method): mixed => match ($method) {
+    mockExpectation($arc, 'rpc')->andReturnUsing(fn (string $method): mixed => match ($method) {
         'eth_chainId' => '0x'.BigInteger::of(5042002)->toBase(16),
         'eth_getBalance' => '0x'.BigInteger::of($native)->toBase(16),
         'eth_getBlockByNumber' => ['number' => '0x64', 'hash' => '0x'.str_repeat('a', 64),
@@ -82,7 +85,7 @@ function scannerBalance(string $native = '100000000000000000007'): void
     app()->instance(ArcNetworkGateway::class, $arc);
 }
 
-/** @param array<string, mixed> $c */
+/** @param  array<string, mixed>  $c */
 function scannerLiveMandate(array $c, RecurringMandate $mandate): RecurringMandate
 {
     // A reviewed, live funding window is a precondition for release, so the
@@ -357,9 +360,14 @@ test('unreadable live evidence is recorded as blocked rather than skipped', func
 
     // The treasury read now fails.
     $arc = Mockery::mock(ArcNetworkGateway::class);
+
+    if (! $arc instanceof ArcNetworkGateway) {
+        throw new RuntimeException('Mockery did not build an Arc gateway.');
+    }
+
     $arc->shouldReceive('chainCode')->andReturn('ARC-TESTNET');
     $arc->shouldReceive('chainId')->andReturn(5042002);
-    $arc->shouldReceive('rpc')->andThrow(new RuntimeException('gateway timeout'));
+    mockExpectation($arc, 'rpc')->andThrow(new RuntimeException('gateway timeout'));
     app()->instance(ArcNetworkGateway::class, $arc);
 
     $summary = app(MandateOccurrenceScanner::class)->scan($c['institution']);

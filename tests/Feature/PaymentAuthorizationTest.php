@@ -46,6 +46,7 @@ use Illuminate\Support\Facades\Gate;
 use Illuminate\Support\Facades\RateLimiter;
 use Illuminate\Support\Str;
 use Illuminate\Validation\ValidationException;
+use Livewire\Features\SupportTesting\Testable;
 use Livewire\Livewire;
 use Mockery\Expectation;
 use PragmaRX\Google2FA\Google2FA;
@@ -62,6 +63,18 @@ use function Pest\Laravel\post;
 use function Pest\Laravel\postJson;
 use function Pest\Laravel\travel;
 use function Pest\Laravel\travelTo;
+
+/** Narrow a Livewire test handle to the page it booted, for computed-page access. */
+function paymentReviewsInstance(Testable $page): PaymentReviews
+{
+    $instance = $page->instance();
+
+    if (! $instance instanceof PaymentReviews) {
+        throw new RuntimeException('The Livewire test did not boot the payment review page.');
+    }
+
+    return $instance;
+}
 
 /** @return array<string, mixed> */
 function paymentAuthorizationContext(string $method = 'filament_app', bool $fake = false): array
@@ -199,6 +212,7 @@ test('independent MFA payment approval binds exact reserved amount without sendi
         ->and($authorization->evidence()['payment_approved'])->toBeTrue()->and($authorization->evidence()['can_execute'])->toBeFalse()
         ->and($authorization->evidence()['payments_submitted'])->toBe(0)->and($authorization->evidence()['current_execution_checks_required'])->toBeTrue()
         ->and($c['drafts'][0]->evidence()['approved'])->toBeTrue()->and($c['drafts'][0]->evidence()['can_execute'])->toBeFalse()
+        ->and($c['drafts'][0]->authorization?->id)->toBe($authorization->id)
         ->and(Gate::forUser($c['reviewer'])->allows('execute', $c['drafts'][0]))->toBeFalse()
         ->and($c['wallet']->fresh()->balance)->toBe(999999.0)->and($c['budget']->fresh()->remaining_amount)->toBe(999999.0)
         ->and(Invoice::query()->where('status', '!=', 'pending')->count())->toBe(0)
@@ -552,7 +566,7 @@ test('payment approval workspace reports historical decisions separately from aw
         ->assertSee('Historical decisions, not current authority or settlement')
         ->assertSee('Your reviewer setup')
         ->assertSee('Account prerequisites met');
-    $overview = $page->instance()->reviewOverview();
+    $overview = paymentReviewsInstance($page)->reviewOverview();
     expect($overview['awaiting'])->toBe(1)->and($overview[$bucket])->toBe(1)->and($overview['released'])->toBe(0);
     $page->__call('filterTable', ['review_status', 'awaiting']);
     $page->__call('assertCanSeeTableRecords', [[$second]]);
@@ -578,7 +592,7 @@ test('payment approval workspace explains missing reviewer prerequisites without
     actingAs($c['reviewer']);
     $page = Livewire::test(PaymentReviews::class)->assertSee('Setup required')->assertSee('Reviewer setup required');
     $page->__call('assertActionHidden', [TestAction::make('reviewReservedPayment')->table($c['hold'])]);
-    expect($page->instance()->reviewerReadiness()['ready'])->toBeFalse()
+    expect(paymentReviewsInstance($page)->reviewerReadiness()['ready'])->toBeFalse()
         ->and(PaymentAuthorization::query()->count())->toBe(0)->and(Transaction::query()->count())->toBe(0);
 })->with(['permission', 'email', 'factor']);
 
@@ -590,7 +604,7 @@ test('payment approval workspace excludes released capacity from awaiting review
     Filament::setCurrentPanel(Filament::getPanel('finance'));
     actingAs($c['reviewer']);
     $page = Livewire::test(PaymentReviews::class)->assertSee('Capacity released · history only');
-    expect($page->instance()->reviewOverview())->toBe(['awaiting' => 0, 'approved' => 0, 'held_or_rejected' => 0, 'released' => 1]);
+    expect(paymentReviewsInstance($page)->reviewOverview())->toBe(['awaiting' => 0, 'approved' => 0, 'held_or_rejected' => 0, 'released' => 1]);
     $page->__call('assertActionHidden', [TestAction::make('reviewReservedPayment')->table($c['hold'])]);
     $page->__call('mountAction', [TestAction::make('viewPaymentEvidence')->table($c['hold'])]);
     $page->assertSet('mountedPaymentEvidence.reservation_state', 'Released — application capacity returned');
@@ -615,7 +629,7 @@ test('payment approval workspace labels simulation approval as historical rather
     actingAs($c['reviewer']);
     $page = Livewire::test(PaymentReviews::class)->assertSee('Simulation only')
         ->assertSee('Historical decisions, not current authority or settlement');
-    expect($page->instance()->reviewOverview()['approved'])->toBe(1)
+    expect(paymentReviewsInstance($page)->reviewOverview()['approved'])->toBe(1)
         ->and(PaymentAuthorization::query()->firstOrFail()->evidence()['payment_approved'])->toBeFalse()
         ->and(PaymentSubmissionOutbox::query()->count())->toBe(0);
 });

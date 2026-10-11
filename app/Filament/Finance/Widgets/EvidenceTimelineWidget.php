@@ -61,7 +61,7 @@ class EvidenceTimelineWidget extends TableWidget
             ->columns([
                 TextColumn::make('id')->label('Draft')->prefix('#')->sortable(),
                 TextColumn::make('bill')->label('Source document')
-                    ->state(fn (PaymentIntent $record): string => $record->invoice?->reference ?? 'Invoice #'.$record->invoice_id)
+                    ->state(fn (PaymentIntent $record): string => $record->invoice === null ? 'Invoice #'.$record->invoice_id : $record->invoice->reference)
                     ->description(fn (PaymentIntent $record): string => sprintf(
                         'Version #%s · review %s',
                         $record->invoice_version_id ?? '—',

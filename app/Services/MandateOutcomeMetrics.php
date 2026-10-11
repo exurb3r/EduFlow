@@ -48,8 +48,8 @@ final readonly class MandateOutcomeMetrics
      */
     public function decisions(Organization $institution, ?Carbon $since = null, ?Carbon $until = null): array
     {
-        $since = $since ?? Carbon::now()->subDays(30);
-        $until = $until ?? Carbon::now();
+        $since ??= Carbon::now()->subDays(30);
+        $until ??= Carbon::now();
 
         $occurrences = MandateOccurrence::query()
             ->where('organization_id', $institution->id)
@@ -111,7 +111,7 @@ final readonly class MandateOutcomeMetrics
      */
     public function escalationReasons(Organization $institution, ?Carbon $since = null): array
     {
-        $since = $since ?? Carbon::now()->subDays(30);
+        $since ??= Carbon::now()->subDays(30);
         $reasons = [];
 
         MandateOccurrence::query()
@@ -123,11 +123,16 @@ final readonly class MandateOutcomeMetrics
                 $checks = $occurrence->checks ?? [];
 
                 foreach ($checks as $name => $check) {
-                    if (! is_array($check) || ($check['passed'] ?? true) === true || ($check['severity'] ?? null) !== 'escalate') {
+                    if (! is_array($check)) {
                         continue;
                     }
-
-                    $key = is_string($name) ? $name : 'unknown';
+                    if (($check['passed'] ?? true) === true) {
+                        continue;
+                    }
+                    if (($check['severity'] ?? null) !== 'escalate') {
+                        continue;
+                    }
+                    $key = $name;
 
                     $reasons[$key] = ($reasons[$key] ?? 0) + 1;
                 }

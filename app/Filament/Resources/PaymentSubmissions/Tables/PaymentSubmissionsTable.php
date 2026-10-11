@@ -141,13 +141,11 @@ class PaymentSubmissionsTable
                         'in_flight' => 'accepted or awaiting verification',
                         'terminal_unresolved' => 'unresolved, blocked or failed',
                     ])
-                    ->query(function (Builder $query, array $data): Builder {
-                        return match ($data['value'] ?? null) {
-                            'open' => $query->whereIn('state', ['queued', 'running', 'paused']),
-                            'in_flight' => $query->whereIn('state', PaymentSubmissionOutbox::IN_FLIGHT_STATES),
-                            'terminal_unresolved' => $query->whereIn('state', ['unknown', 'blocked', 'failed']),
-                            default => $query,
-                        };
+                    ->query(fn (Builder $query, array $data): Builder => match ($data['value'] ?? null) {
+                        'open' => $query->whereIn('state', ['queued', 'running', 'paused']),
+                        'in_flight' => $query->whereIn('state', PaymentSubmissionOutbox::IN_FLIGHT_STATES),
+                        'terminal_unresolved' => $query->whereIn('state', ['unknown', 'blocked', 'failed']),
+                        default => $query,
                     }),
             ])
             ->defaultSort('updated_at', 'desc')

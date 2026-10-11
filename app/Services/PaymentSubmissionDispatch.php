@@ -35,9 +35,8 @@ final readonly class PaymentSubmissionDispatch
         $this->requireRuntime();
 
         $institution = $this->institutions->require();
-        $now = now();
+        $now = Carbon::now();
 
-        /** @var PaymentSubmissionOutbox $entry */
         $entries = PaymentSubmissionOutbox::query()
             ->where('organization_id', $institution->id)
             ->whereIn('state', PaymentSubmissionDispatch::DISPATCHABLE)
@@ -50,10 +49,9 @@ final readonly class PaymentSubmissionDispatch
         $dispatched = 0;
 
         foreach ($entries as $entry) {
-            // Claiming marks the lease. The unique key and the identity
-            // digests make a duplicate dispatch impossible; this only stops
-            // two scheduler ticks racing on the same row.
-            $entry->dispatched_at = $entry->dispatched_at ?? $now;
+            // This timestamp records dispatch, not a claim that the worker ran.
+            // Job uniqueness and execution-time checks remain separate guards.
+            $entry->dispatched_at ??= $now;
             $entry->save();
 
             $this->bus->dispatch(new ProcessPaymentSubmission($entry->id));

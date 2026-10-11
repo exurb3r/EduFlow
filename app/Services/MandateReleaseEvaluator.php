@@ -70,9 +70,9 @@ final readonly class MandateReleaseEvaluator
         $this->checkFeeWithinCeiling($mandate, $facts, $checks);
         $this->checkDestinationUnchanged($mandate, $facts, $checks);
         $this->checkPolicyUnchanged($mandate, $facts, $checks);
-        $this->checkCapacity($mandate, $facts, $checks);
+        $this->checkCapacity($facts, $checks);
         $this->checkCumulativeCaps($mandate, $facts, $checks);
-        $this->checkRailReadiness($mandate, $facts, $checks);
+        $this->checkRailReadiness($facts, $checks);
 
         // `evaluated_at` is metadata rather than a check, so the filters guard
         // on shape rather than assuming every entry is a gate.
@@ -104,7 +104,10 @@ final readonly class MandateReleaseEvaluator
     {
         $failed = [];
         foreach ($checks as $name => $check) {
-            if (! is_array($check) || ($check['passed'] ?? true) === true) {
+            if (! is_array($check)) {
+                continue;
+            }
+            if (($check['passed'] ?? true) === true) {
                 continue;
             }
             $failed[] = ($check['reason'] ?? $name);
@@ -124,6 +127,8 @@ final readonly class MandateReleaseEvaluator
      *
      * A check that fails says which gate held and what would change it, so an
      * operator sees "destination changed" rather than "cannot pay".
+     *
+     * @param  array<string, mixed>  $checks
      */
     private function record(array &$checks, string $name, bool $passed, string $severity, ?string $reason = null): void
     {
@@ -134,7 +139,7 @@ final readonly class MandateReleaseEvaluator
         }
     }
 
-    /** @param array<string, mixed> $facts */
+    /** @param array<string, mixed> $checks */
     private function checkMandateAuthorized(RecurringMandate $mandate, array &$checks): void
     {
         $review = $mandate->review;
@@ -144,7 +149,7 @@ final readonly class MandateReleaseEvaluator
             'A mandate that no independent reviewer approved authorizes nothing, however plausible it looks.');
     }
 
-    /** @param array<string, mixed> $facts */
+    /** @param array<string, mixed> $checks */
     private function checkMandateLive(RecurringMandate $mandate, CarbonImmutable $at, array &$checks): void
     {
         $this->record($checks, 'mandate_live', $mandate->isLive($at), 'blocked',
@@ -154,7 +159,7 @@ final readonly class MandateReleaseEvaluator
             'The approved per-occurrence ceiling is zero. The initial allowance is zero by design, so nothing is released until a reviewer raises it.');
     }
 
-    /** @param array<string, mixed> $facts */
+    /** @param array<string, mixed> $checks */
     private function checkChainAndCurrency(RecurringMandate $mandate, array &$checks): void
     {
         // Testnet only, and the identity is exact. A mainnet chain id must never
@@ -166,7 +171,10 @@ final readonly class MandateReleaseEvaluator
             'The mandate must name the configured Arc testnet identity exactly; no fallback to another rail exists.');
     }
 
-    /** @param array<string, mixed> $facts */
+    /**
+     * @param  array<string, mixed>  $facts
+     * @param  array<string, mixed>  $checks
+     */
     private function checkObligationIdentity(RecurringMandate $mandate, array &$facts, array &$checks): void
     {
         $key = $facts['occurrence_key'] ?? null;
@@ -184,7 +192,10 @@ final readonly class MandateReleaseEvaluator
             'The occurrence identity does not belong to the mandate\'s own obligation, or does not match its key. Releasing it would pay something nobody authorized.');
     }
 
-    /** @param array<string, mixed> $facts */
+    /**
+     * @param  array<string, mixed>  $facts
+     * @param  array<string, mixed>  $checks
+     */
     private function checkNotPreviouslyFulfilled(RecurringMandate $mandate, array $facts, array &$checks): void
     {
         $key = (string) ($facts['occurrence_digest'] ?? '');
@@ -197,7 +208,10 @@ final readonly class MandateReleaseEvaluator
             'This obligation occurrence has already been recorded. A repeat is the same payment, not a second one.');
     }
 
-    /** @param array<string, mixed> $facts */
+    /**
+     * @param  array<string, mixed>  $facts
+     * @param  array<string, mixed>  $checks
+     */
     private function checkAmountWithinCeiling(RecurringMandate $mandate, array $facts, array &$checks): void
     {
         $bill = $this->units($facts['bill_amount_base_units'] ?? 0);
@@ -208,7 +222,10 @@ final readonly class MandateReleaseEvaluator
                 $bill, $mandate->per_occurrence_ceiling_base_units));
     }
 
-    /** @param array<string, mixed> $facts */
+    /**
+     * @param  array<string, mixed>  $facts
+     * @param  array<string, mixed>  $checks
+     */
     private function checkFeeWithinCeiling(RecurringMandate $mandate, array $facts, array &$checks): void
     {
         $fee = $this->units($facts['max_fee_base_units'] ?? 0);
@@ -219,7 +236,10 @@ final readonly class MandateReleaseEvaluator
                 $fee, $mandate->fee_ceiling_base_units));
     }
 
-    /** @param array<string, mixed> $facts */
+    /**
+     * @param  array<string, mixed>  $facts
+     * @param  array<string, mixed>  $checks
+     */
     private function checkDestinationUnchanged(RecurringMandate $mandate, array $facts, array &$checks): void
     {
         $version = VendorDestinationVersion::query()
@@ -237,7 +257,10 @@ final readonly class MandateReleaseEvaluator
             'The vendor destination differs from the mandate\'s currently reviewed version. A changed recipient is held for renewed review, never guessed from the last payment.');
     }
 
-    /** @param array<string, mixed> $facts */
+    /**
+     * @param  array<string, mixed>  $facts
+     * @param  array<string, mixed>  $checks
+     */
     private function checkPolicyUnchanged(RecurringMandate $mandate, array $facts, array &$checks): void
     {
         $current = FinancePolicyVersion::query()
@@ -251,8 +274,11 @@ final readonly class MandateReleaseEvaluator
             'The active finance policy is no longer the version this mandate was approved against.');
     }
 
-    /** @param array<string, mixed> $facts */
-    private function checkCapacity(RecurringMandate $mandate, array $facts, array &$checks): void
+    /**
+     * @param  array<string, mixed>  $facts
+     * @param  array<string, mixed>  $checks
+     */
+    private function checkCapacity(array $facts, array &$checks): void
     {
         $bill = $this->units($facts['bill_amount_base_units'] ?? 0);
         $fee = $this->units($facts['max_fee_base_units'] ?? 0);
@@ -266,7 +292,10 @@ final readonly class MandateReleaseEvaluator
             'The bill plus fee plus all active holds no longer fits the available protected cash.');
     }
 
-    /** @param array<string, mixed> $facts */
+    /**
+     * @param  array<string, mixed>  $facts
+     * @param  array<string, mixed>  $checks
+     */
     private function checkCumulativeCaps(RecurringMandate $mandate, array $facts, array &$checks): void
     {
         $bill = $this->units($facts['bill_amount_base_units'] ?? 0);
@@ -283,8 +312,11 @@ final readonly class MandateReleaseEvaluator
             'Releasing this bill would breach the mandate\'s period cumulative cap.');
     }
 
-    /** @param array<string, mixed> $facts */
-    private function checkRailReadiness(RecurringMandate $mandate, array $facts, array &$checks): void
+    /**
+     * @param  array<string, mixed>  $facts
+     * @param  array<string, mixed>  $checks
+     */
+    private function checkRailReadiness(array $facts, array &$checks): void
     {
         // Simulated evidence must never be released, and the stop switch holds
         // work without argument. A failed funding window blocks rather than

@@ -8,6 +8,7 @@ use App\Settings\AiSettings;
 use Laravel\Ai\Ai;
 use Laravel\Ai\Prompts\ClassificationPrompt;
 use Laravel\Ai\Responses\Data\BooleanAnswer;
+use Laravel\Ai\Responses\Data\ChoiceAnswer;
 
 /**
  * The mandate-candidate ranking lane.
@@ -18,8 +19,6 @@ use Laravel\Ai\Responses\Data\BooleanAnswer;
  * three properties that keep it advisory: it cannot produce authority, it never
  * sees the decision inputs, and it fails closed rather than open.
  */
-
-/** @param list<array<string, mixed>> $bills */
 function candidateBills(): array
 {
     return [
@@ -81,7 +80,7 @@ test('a successful classification produces advice and never an authority', funct
 
     // Two questions per bill: is it recurring, and is the amount stable.
     // Bill 1 reads as recurring but variable; bill 2 as a fixed one-off.
-    // Answers are keyed by the question name `Str::decide` uses, and must be
+    // Answers are keyed by the named boolean question, and must be
     // real Answer objects -- the fake passes values through unmarshalled.
     Ai::fakeClassification([
         ['decision' => new BooleanAnswer(0.9)], ['decision' => new BooleanAnswer(0.2)],
@@ -113,6 +112,17 @@ test('a provider failure takes the whole ranking rather than a partial one', fun
     Ai::fakeClassification(function (ClassificationPrompt $prompt): never {
         throw new RuntimeException('classification gateway unavailable');
     });
+
+    expect(app(MandateCandidateRanker::class)->rank(candidateBills()))->toBeNull();
+});
+
+test('a malformed classification discards earlier advisory results too', function (): void {
+    withAiEnabled();
+    Ai::fakeClassification([
+        ['decision' => new BooleanAnswer(0.95)],
+        ['decision' => new BooleanAnswer(0.95)],
+        ['decision' => new ChoiceAnswer('not-a-boolean', ['not-a-boolean' => 1.0])],
+    ]);
 
     expect(app(MandateCandidateRanker::class)->rank(candidateBills()))->toBeNull();
 });

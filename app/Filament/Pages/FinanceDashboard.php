@@ -85,10 +85,14 @@ class FinanceDashboard extends BaseDashboard
         }
 
         $gate = Gate::forUser($user);
+        if ($gate->allows('viewAny', FinanceWorkflowRun::class)) {
+            return true;
+        }
+        if ($gate->allows('create', CollectionBatch::class)) {
+            return true;
+        }
 
-        return $gate->allows('viewAny', FinanceWorkflowRun::class)
-            || $gate->allows('create', CollectionBatch::class)
-            || $gate->allows('create', PaymentIntent::class);
+        return $gate->allows('create', PaymentIntent::class);
     }
 
     #[\Override]

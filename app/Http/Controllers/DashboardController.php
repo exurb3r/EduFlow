@@ -11,6 +11,7 @@ use App\Models\AssistanceRequest;
 use App\Models\Transaction;
 use App\Models\User;
 use App\Services\CurrencyConverter;
+use DateTimeInterface;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Http\Request;
 use Illuminate\Notifications\DatabaseNotification;
@@ -220,13 +221,18 @@ class DashboardController extends Controller
             ->latest()
             ->limit(self::RECENT_NOTIFICATIONS)
             ->get()
-            ->map(fn (DatabaseNotification $notification): array => [
-                'id' => $notification->id,
-                'title' => (string) ($notification->data['title'] ?? Str::headline(class_basename($notification->type))),
-                'body' => isset($notification->data['message']) ? (string) $notification->data['message'] : null,
-                'readAt' => $notification->read_at?->format('M d, Y h:i A'),
-                'createdAt' => $notification->created_at->format('M d, Y h:i A'),
-            ])
+            ->map(function (DatabaseNotification $notification): array {
+                $readAt = $notification->read_at;
+                $createdAt = $notification->created_at;
+
+                return [
+                    'id' => (string) $notification->getKey(),
+                    'title' => (string) ($notification->data['title'] ?? Str::headline(class_basename((string) $notification->type))),
+                    'body' => isset($notification->data['message']) ? (string) $notification->data['message'] : null,
+                    'readAt' => $readAt instanceof DateTimeInterface ? $readAt->format('M d, Y h:i A') : null,
+                    'createdAt' => $createdAt instanceof DateTimeInterface ? $createdAt->format('M d, Y h:i A') : 'Unknown',
+                ];
+            })
             ->values()
             ->all();
 

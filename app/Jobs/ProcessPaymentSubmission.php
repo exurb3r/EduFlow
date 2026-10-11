@@ -43,7 +43,7 @@ class ProcessPaymentSubmission implements ShouldQueue
         }
 
         $entry->heartbeat_at = Carbon::now();
-        $entry->attempts = $entry->attempts + 1;
+        $entry->attempts += 1;
         $entry->state = 'running';
         $entry->stage = 'revalidating_authority';
         $entry->save();

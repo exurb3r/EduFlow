@@ -67,7 +67,6 @@ final readonly class ReviewRecurringMandate
                 throw ValidationException::withMessages(['mandate' => 'A mandate may not be authorized by the person who wrote it.']);
             }
 
-            /** @var RecurringMandateReview $review */
             $review = new RecurringMandateReview([
                 'organization_id' => $institution->id,
                 'recurring_mandate_id' => $stored->id,

@@ -63,7 +63,7 @@ final readonly class MandateOccurrenceScanner
             return ['scanned' => 0, 'release' => 0, 'escalate' => 0, 'blocked' => 0, 'skipped' => 0];
         }
 
-        $at = $at ?? CarbonImmutable::now();
+        $at ??= CarbonImmutable::now();
         $summary = ['scanned' => 0, 'release' => 0, 'escalate' => 0, 'blocked' => 0, 'skipped' => 0];
 
         foreach ($this->liveMandates($institution, $at) as $mandate) {
@@ -279,10 +279,9 @@ final readonly class MandateOccurrenceScanner
 
         foreach (MandateOccurrence::query()->where('recurring_mandate_id', $mandate->id)
             ->where('disposition', 'release')->get() as $occurrence) {
-            if ($occurrence->due_at === null || $occurrence->due_at->lt($since)) {
+            if ($occurrence->due_at->lt($since)) {
                 continue;
             }
-
             $total = $total->plus($occurrence->amount_base_units);
         }
 
@@ -347,8 +346,10 @@ final readonly class MandateOccurrenceScanner
             }
 
             $validUntil = (string) ($snapshot->snapshot['valid_until'] ?? '');
-
-            if ($validUntil === '' || Carbon::parse($validUntil)->lt(Carbon::now())) {
+            if ($validUntil === '') {
+                continue;
+            }
+            if (Carbon::parse($validUntil)->lt(Carbon::now())) {
                 continue;
             }
 
@@ -367,7 +368,7 @@ final readonly class MandateOccurrenceScanner
     {
         $invoice = $bill->invoice;
 
-        if ($invoice === null || $invoice->due_date === null || ! $bill->hasValidSnapshot()) {
+        if ($invoice === null || ! $bill->hasValidSnapshot()) {
             return false;
         }
 

@@ -29,6 +29,7 @@ use Filament\Facades\Filament;
 use Filament\Widgets\AccountWidget;
 use Filament\Widgets\FilamentInfoWidget;
 use Illuminate\Support\Str;
+use Livewire\Features\SupportTesting\Testable;
 use Livewire\Livewire;
 use ReflectionMethod;
 use Spatie\Permission\Models\Role;
@@ -73,11 +74,23 @@ test('filament admin dashboard renders the installation console', function (): v
     $response->assertSee('Installation &amp; operations', escape: false);
 });
 
+/** Narrow a Livewire test handle to the dashboard it booted. */
+function bootedDashboard(Testable $page): Dashboard
+{
+    $instance = $page->instance();
+
+    if (! $instance instanceof Dashboard) {
+        throw new RuntimeException('The Livewire test did not boot the admin dashboard.');
+    }
+
+    return $instance;
+}
+
 test('admin dashboard pins its widgets instead of rendering every registered one', function (): void {
     $admin = User::factory()->create();
     $admin->assignRole('super_admin');
 
-    $widgets = Livewire::actingAs($admin)->test(Dashboard::class)->instance()->getWidgets();
+    $widgets = bootedDashboard(Livewire::actingAs($admin)->test(Dashboard::class))->getWidgets();
 
     expect($widgets)->toBe([
         InstallationReadinessWidget::class,

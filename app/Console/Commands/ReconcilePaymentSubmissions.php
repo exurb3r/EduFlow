@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Console\Commands;
 
 use App\Models\PaymentSubmissionOutbox;
+use App\Models\Transaction;
 use App\Services\InstallationInstitution;
 use App\Services\PaymentSettlementReconciler;
 use Illuminate\Console\Command;
@@ -76,7 +77,7 @@ class ReconcilePaymentSubmissions extends Command
             $mirrored = false;
 
             if ($this->option('mirror')) {
-                $mirrored = $reconciler->mirrorSettlement($entry, $verdict) !== null;
+                $mirrored = $reconciler->mirrorSettlement($entry, $verdict) instanceof Transaction;
             }
 
             $this->info(sprintf(

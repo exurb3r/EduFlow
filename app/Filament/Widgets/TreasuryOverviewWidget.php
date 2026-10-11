@@ -88,8 +88,8 @@ class TreasuryOverviewWidget extends BaseWidget
             ->color('info')
             ->url(Collections::getUrl(panel: 'finance'));
 
-        $intents = PaymentIntent::query()->where('organization_id', $institutionId)->count();
-        $reservations = PaymentReservation::query()->where('organization_id', $institutionId)->count();
+        PaymentIntent::query()->where('organization_id', $institutionId)->count();
+        PaymentReservation::query()->where('organization_id', $institutionId)->count();
         $authorizations = PaymentAuthorization::query()->where('organization_id', $institutionId)
             ->get(['decision'])
             ->countBy(fn (PaymentAuthorization $authorization): string => $authorization->decision);

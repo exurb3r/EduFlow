@@ -198,16 +198,16 @@ test('autonomous cycle proposes but never initiates payment, and still escalates
     foreach ($events as $event) {
         expect($event)->toHaveKeys(['phase', 'title', 'summary'])
             ->and(array_diff(array_keys($event), ['phase', 'title', 'summary', 'decision_id', 'policy', 'status', 'reference']))->toBe([])
-            ->and($event['phase'])->toBeString()
-            ->and($event['title'])->toBeString()
-            ->and($event['summary'])->toBeString();
+            ->and($event['phase'])->not->toBeEmpty()
+            ->and($event['title'])->not->toBeEmpty()
+            ->and($event['summary'])->not->toBeEmpty();
 
         if (isset($event['decision_id'])) {
             $recordedDecision = AgentDecision::query()->findOrFail($event['decision_id']);
-            expect($event['decision_id'])->toBeInt()
+            expect($event['decision_id'])->toBeGreaterThan(0)
                 ->and($event['policy'])->toBe($recordedDecision->policy_checked)
-                ->and($event['reference'])->toBeString()
-                ->and($event['status'])->toBeString();
+                ->and($event['reference'])->not->toBeEmpty()
+                ->and($event['status'])->not->toBeEmpty();
 
             if (in_array($event['title'], ['Invoice policy result recorded', 'Assistance policy result recorded'], true)) {
                 expect($event['summary'])->toBe($recordedDecision->reasoning_summary)

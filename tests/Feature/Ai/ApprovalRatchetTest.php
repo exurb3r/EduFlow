@@ -170,9 +170,9 @@ it('refuses to invent a payout address for a student who has none', function ():
 it('is still an approvable tool even when it auto-approves', function (): void {
     // The tool must implement Approvable so the SDK routes it through the
     // approval machinery at all; needsApproval() only relaxes it per call.
-    expect(disburseTool())
-        ->toBeInstanceOf(Approvable::class)
-        ->toBeInstanceOf(Tool::class);
+    $toolClass = new ReflectionClass(disburseTool());
+    expect($toolClass->implementsInterface(Approvable::class))->toBeTrue()
+        ->and($toolClass->implementsInterface(Tool::class))->toBeTrue();
 });
 
 it('pauses on an over-limit proposal when the operator agent runs', function (): void {

@@ -134,9 +134,13 @@ final readonly class ReservationCapacity
 
         foreach ($approvals as $approval) {
             $window = $windows->get($approval->funding_window_id);
-
-            if (! $window instanceof FundingWindow || ! $window->hasValidSnapshot()
-                || ! $approval->hasValidEvidence($window)) {
+            if (! $window instanceof FundingWindow) {
+                continue;
+            }
+            if (! $window->hasValidSnapshot()) {
+                continue;
+            }
+            if (! $approval->hasValidEvidence($window)) {
                 continue;
             }
 
@@ -180,8 +184,13 @@ final readonly class ReservationCapacity
             }
 
             $reservation = PaymentReservation::query()->find($release->payment_reservation_id);
-
-            if ($reservation === null || ! $release->hasValidEvidence($reservation) || ! $review->hasValidEvidence($release)) {
+            if ($reservation === null) {
+                continue;
+            }
+            if (! $release->hasValidEvidence($reservation)) {
+                continue;
+            }
+            if (! $review->hasValidEvidence($release)) {
                 continue;
             }
 

@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Services;
 
+use App\Models\Organization;
 use App\Models\PaymentSubmissionOutbox;
 use App\Services\Payments\AsyncPaymentTransport;
 use Illuminate\Validation\ValidationException;
@@ -51,7 +52,7 @@ final readonly class IsolatedPaymentExecutor
 
         // Preflight must go to the same rail as the submission, or the ceiling
         // would be checked against a network the money does not move on.
-        $transport = $this->transportFor($entry);
+        $transport = $this->transportFor();
 
         if ($transport instanceof AsyncPaymentTransport) {
             return $transport->estimate($request) ?? [];
@@ -77,7 +78,7 @@ final readonly class IsolatedPaymentExecutor
      * failure: the payment may still have been accepted, and the honest
      * response is to reconcile the existing attempt rather than send again.
      *
-     * @return array{outcome:string, provider_reference:?string, detail:array<string, mixed>}
+     * @return array{outcome:string, provider_reference:?string, provider_handle:?string, detail:array<string, mixed>}
      */
     public function submit(PaymentSubmissionOutbox $entry): array
     {
@@ -102,7 +103,7 @@ final readonly class IsolatedPaymentExecutor
         // single payment. Such rails are driven through their own transport,
         // which submits exactly once and reports *acceptance*, which is a fact
         // the system can hold honestly.
-        $transport = $this->transportFor($entry);
+        $transport = $this->transportFor();
 
         if ($transport instanceof AsyncPaymentTransport) {
             try {
@@ -146,18 +147,19 @@ final readonly class IsolatedPaymentExecutor
             report($exception);
 
             // Uncertain, not failed. Capacity stays held until reconciled.
-            return ['outcome' => 'unknown', 'provider_reference' => null,
+            return ['outcome' => 'unknown', 'provider_reference' => null, 'provider_handle' => null,
                 'detail' => ['error' => $exception->getMessage(), 'provider_exception' => true]];
         }
 
         if ($result->isFake || config('lepton.default') === 'fake') {
-            return ['outcome' => 'blocked', 'provider_reference' => null,
+            return ['outcome' => 'blocked', 'provider_reference' => null, 'provider_handle' => null,
                 'detail' => ['reason' => 'Fake driver. Simulation is never submitted as a network transfer.', 'is_fake' => true]];
         }
 
         return [
             'outcome' => 'submitted',
             'provider_reference' => $result->txHash,
+            'provider_handle' => null,
             'detail' => [
                 'from' => $result->fromAddress,
                 'to' => $result->toAddress,
@@ -176,16 +178,14 @@ final readonly class IsolatedPaymentExecutor
      * way, and the transport itself is resolved from the container so a test can
      * supply its own rather than reaching for a real binary.
      */
-    private function transportFor(PaymentSubmissionOutbox $entry): ?AsyncPaymentTransport
+    private function transportFor(): ?AsyncPaymentTransport
     {
         $mode = (string) config('eduflow.submission.transport', 'auto');
-
         $wantsAsync = match ($mode) {
             'circle_agent_wallet' => true,
             'synchronous' => false,
             default => config('lepton.default') === 'circle',
         };
-
         if (! $wantsAsync) {
             return null;
         }
@@ -206,7 +206,7 @@ final readonly class IsolatedPaymentExecutor
 
         $institution = $this->institutions->current();
 
-        if ($institution === null) {
+        if (! $institution instanceof Organization) {
             throw ValidationException::withMessages(['payment' => 'Institution context unavailable; no transfer attempted.']);
         }
 

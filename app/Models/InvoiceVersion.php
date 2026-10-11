@@ -28,6 +28,7 @@ use Throwable;
  * @property string $status
  * @property array<string, mixed> $snapshot
  * @property string $snapshot_digest
+ * @property-read Invoice|null $invoice
  */
 class InvoiceVersion extends Model
 {

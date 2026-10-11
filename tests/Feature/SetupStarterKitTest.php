@@ -154,7 +154,7 @@ test('setup starter kit command has correct signature and description', function
 
     expect($command->getName())->toBe('setup:starter-kit')
         ->and($command->getDescription())->toContain('KoamiStarterKit')
-        ->and($command)->toBeInstanceOf(Command::class);
+        ->and((new ReflectionClass($command))->isSubclassOf(Command::class))->toBeTrue();
 });
 
 test('setup starter kit exposes scriptable options', function (): void {
@@ -735,10 +735,11 @@ test('push is skipped without git metadata or with no-push flag', function (): v
 
     try {
         // No .git directory: returns before any process call.
-        invokeSetupMethod(makeSetupCommandWithOptions([]), 'maybePushToOrigin', ['acme-corp', 'my-app', true, true, $dir]);
-        invokeSetupMethod(makeSetupCommandWithOptions(['--no-push' => true]), 'maybePushToOrigin', ['acme-corp', 'my-app', true, true, $dir]);
+        $withoutGit = invokeSetupMethod(makeSetupCommandWithOptions([]), 'maybePushToOrigin', ['acme-corp', 'my-app', true, true, $dir]);
+        $pushDisabled = invokeSetupMethod(makeSetupCommandWithOptions(['--no-push' => true]), 'maybePushToOrigin', ['acme-corp', 'my-app', true, true, $dir]);
 
-        expect(true)->toBeTrue();
+        expect($withoutGit)->toBeNull()->and($pushDisabled)->toBeNull()
+            ->and(is_dir($dir.'/.git'))->toBeFalse();
     } finally {
         removeStarterKitSandbox($dir);
     }

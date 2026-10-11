@@ -6,6 +6,7 @@ namespace App\Models;
 
 use App\Enums\CurrencyCode;
 use Brick\Math\BigInteger;
+use Illuminate\Database\Eloquent\Collection;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
@@ -29,6 +30,10 @@ use Throwable;
  * @property Carbon $collected_until
  * @property array<string, mixed> $snapshot
  * @property string $snapshot_digest
+ * @property Carbon $created_at
+ * @property-read User|null $preparer
+ * @property-read Collection<int, CollectionBatchReview> $reviews
+ * @property-read Collection<int, FinanceWorkflowRun> $workflowRuns
  */
 class CollectionBatch extends Model
 {

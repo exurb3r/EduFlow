@@ -11,6 +11,7 @@ use App\Models\Transaction;
 use App\Services\IsolatedPaymentExecutor;
 use App\Services\PaymentSubmissionDispatch;
 use Illuminate\Database\QueryException;
+use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\Bus;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Str;
@@ -197,7 +198,7 @@ test('an expired worker lease reopens as unknown rather than being retried blind
     config(['eduflow.submission.enabled' => true, 'queue.default' => 'database']);
 
     $entry->state = 'running';
-    $entry->heartbeat_at = now()->subHour();
+    $entry->heartbeat_at = Carbon::now()->subHour();
     $entry->save();
 
     expect(app(PaymentSubmissionDispatch::class)->recoverStaleLeases())->toBe(1);

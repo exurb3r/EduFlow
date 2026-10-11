@@ -25,9 +25,11 @@ class PaymentReservationReleasePolicy
 
     public function view(User $user, PaymentReservationRelease $release): bool
     {
-        return $user->exists && $this->institutions->current() instanceof Organization
+        $institution = $this->institutions->current();
+
+        return $user->exists && $institution instanceof Organization
             && $user->hasAnyRole(['finance_officer', 'admin', 'super_admin'])
-            && $release->organization_id === $this->institutions->current()?->id;
+            && $release->organization_id === $institution->id;
     }
 
     public function propose(User $user, PaymentReservation $reservation): bool

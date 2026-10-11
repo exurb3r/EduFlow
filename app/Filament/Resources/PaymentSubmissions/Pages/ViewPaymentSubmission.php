@@ -61,9 +61,9 @@ class ViewPaymentSubmission extends ViewRecord
                     ->schema([
                         TextEntry::make('state')
                             ->label('Where it is now')
-                            ->state(fn (): string => self::plainState($entry))
+                            ->state(fn (): string => $this->plainState($entry))
                             ->badge()
-                            ->color(fn (): string => self::stateColor($entry->state)),
+                            ->color(fn (): string => $this->stateColor($entry->state)),
 
                         TextEntry::make('stage')
                             ->label('How far it got')
@@ -72,7 +72,7 @@ class ViewPaymentSubmission extends ViewRecord
 
                         TextEntry::make('explanation')
                             ->label('What that means')
-                            ->state(fn (): string => self::explain($entry))
+                            ->state(fn (): string => $this->explain($entry))
                             ->color('gray'),
                     ]),
 
@@ -95,13 +95,13 @@ class ViewPaymentSubmission extends ViewRecord
                             ->copyable(),
                         TextEntry::make('snapshot.amount_base_units')
                             ->label('Amount')
-                            ->state(fn (): string => self::amount($entry)),
+                            ->state(fn (): string => $this->amount($entry)),
                         TextEntry::make('snapshot.chain')
                             ->label('Chain')
                             ->state(fn (): string => sprintf('%s (%s)', $entry->snapshot['chain'] ?? 'unknown', $entry->snapshot['chain_id'] ?? '?')),
                         TextEntry::make('snapshot.max_fee_base_units')
                             ->label('Approved fee ceiling')
-                            ->state(fn (): string => self::fee($entry))
+                            ->state(fn (): string => $this->fee($entry))
                             ->helperText('bounds on-chain gas only — the rail may charge more'),
                     ]),
 
@@ -144,7 +144,7 @@ class ViewPaymentSubmission extends ViewRecord
                     ->schema([
                         RepeatableEntry::make('attemptRecords')
                             ->hiddenLabel()
-                            ->state(fn (): array => self::attempts($entry))
+                            ->state(fn (): array => $this->attempts($entry))
                             ->schema([
                                 TextEntry::make('happened_at')
                                     ->label('When')
@@ -188,7 +188,7 @@ class ViewPaymentSubmission extends ViewRecord
     /**
      * @return array<int, array<string, mixed>>
      */
-    private static function attempts(PaymentSubmissionOutbox $entry): array
+    private function attempts(PaymentSubmissionOutbox $entry): array
     {
         return $entry->attempts()
             ->orderBy('attempt_number')
@@ -198,24 +198,24 @@ class ViewPaymentSubmission extends ViewRecord
                 'outcome' => $attempt->outcome,
                 'provider_reference' => $attempt->provider_reference,
                 'observed_at' => $attempt->observed_at?->toDateTimeString(),
-                'detail' => self::detailFor($attempt),
+                'detail' => $this->detailFor($attempt),
             ])
             ->all();
     }
 
-    private static function detailFor($attempt): string
+    private function detailFor($attempt): string
     {
         $response = $attempt->response_snapshot ?? [];
         $detail = $response['detail'] ?? [];
 
-        if ($detail === [] || $detail === null) {
+        if ($detail === []) {
             return 'no response recorded';
         }
 
-        return is_string($detail) ? $detail : json_encode($detail);
+        return is_string($detail) ? $detail : (string) json_encode($detail);
     }
 
-    private static function plainState(PaymentSubmissionOutbox $entry): string
+    private function plainState(PaymentSubmissionOutbox $entry): string
     {
         return match ($entry->state) {
             'queued' => 'queued for the worker',
@@ -231,7 +231,7 @@ class ViewPaymentSubmission extends ViewRecord
         };
     }
 
-    private static function stateColor(PaymentSubmissionOutbox|string $state): string
+    private function stateColor(PaymentSubmissionOutbox|string $state): string
     {
         $state = $state instanceof PaymentSubmissionOutbox ? $state->state : $state;
 
@@ -251,7 +251,7 @@ class ViewPaymentSubmission extends ViewRecord
      * money moved". Conflating them is the failure this whole subsystem exists
      * to prevent, so the explanation never does.
      */
-    private static function explain(PaymentSubmissionOutbox $entry): string
+    private function explain(PaymentSubmissionOutbox $entry): string
     {
         return match ($entry->state) {
             'accepted' => 'Circle has accepted the transfer and issued its own transaction id. No on-chain '
@@ -289,12 +289,12 @@ class ViewPaymentSubmission extends ViewRecord
         }
     }
 
-    private static function amount(PaymentSubmissionOutbox $entry): string
+    private function amount(PaymentSubmissionOutbox $entry): string
     {
         return Money::formatExact($entry->snapshot['amount_base_units'] ?? null, CurrencyCode::USDC->value);
     }
 
-    private static function fee(PaymentSubmissionOutbox $entry): string
+    private function fee(PaymentSubmissionOutbox $entry): string
     {
         return Money::formatExact($entry->snapshot['max_fee_base_units'] ?? null, CurrencyCode::USDC->value);
     }

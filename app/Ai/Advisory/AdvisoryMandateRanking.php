@@ -44,10 +44,8 @@ final readonly class AdvisoryMandateRanking
     {
         $candidates = $this->candidates;
 
-        usort($candidates, function (array $a, array $b): int {
-            return [$b['stable_amount'] ? 1 : 0, $b['recurring_likelihood']]
-                <=> [$a['stable_amount'] ? 1 : 0, $a['recurring_likelihood']];
-        });
+        usort($candidates, fn (array $a, array $b): int => [$b['stable_amount'] ? 1 : 0, $b['recurring_likelihood']]
+            <=> [$a['stable_amount'] ? 1 : 0, $a['recurring_likelihood']]);
 
         return $candidates;
     }

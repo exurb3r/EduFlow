@@ -17,7 +17,13 @@
      * glance without anyone having to hover a tooltip.
      */
     .fi-finance-evidence {
-        font-family: var(--fi-font-mono, ui-monospace, SFMono-Regular, Menlo, monospace);
+        font-family: var(
+            --fi-font-mono,
+            ui-monospace,
+            SFMono-Regular,
+            Menlo,
+            monospace
+        );
         font-size: 0.75rem;
         letter-spacing: -0.01em;
         color: var(--color-gray-500);
@@ -45,7 +51,11 @@
      */
     .fi-finance-heading-link {
         text-decoration-line: underline;
-        text-decoration-color: color-mix(in oklab, currentColor 35%, transparent);
+        text-decoration-color: color-mix(
+            in oklab,
+            currentColor 35%,
+            transparent
+        );
         text-underline-offset: 3px;
         transition: text-decoration-color 150ms ease;
 
