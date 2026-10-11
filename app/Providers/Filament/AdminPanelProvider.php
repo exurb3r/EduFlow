@@ -4,6 +4,7 @@ namespace App\Providers\Filament;
 
 use AlizHarb\ActivityLog\ActivityLogPlugin;
 use App\Filament\Pages\Auth\EditProfile;
+use App\Filament\Pages\Collections;
 use App\Filament\Pages\Dashboard;
 use App\Filament\Pages\PaymentReviews;
 use BezhanSalleh\FilamentShield\FilamentShieldPlugin;
@@ -74,6 +75,7 @@ class AdminPanelProvider extends PanelProvider
             ->discoverClusters(in: app_path('Filament/Clusters'), for: 'App\Filament\Clusters')
             ->pages([
                 Dashboard::class,
+                Collections::class,
                 PaymentReviews::class,
             ])
             ->discoverWidgets(in: app_path('Filament/Widgets'), for: 'App\Filament\Widgets')

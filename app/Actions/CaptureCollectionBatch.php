@@ -13,14 +13,17 @@ use App\Models\User;
 use App\Services\FinanceWorkflows;
 use App\Services\InstallationInstitution;
 use Illuminate\Database\Eloquent\Builder;
+use Illuminate\Http\UploadedFile;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Gate;
+use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Facades\Validator;
 use Illuminate\Support\Str;
 use Illuminate\Validation\Rule;
 use Illuminate\Validation\ValidationException;
 use InvalidArgumentException;
+use Livewire\Features\SupportFileUploads\TemporaryUploadedFile;
 use OverflowException;
 
 final readonly class CaptureCollectionBatch
@@ -28,9 +31,18 @@ final readonly class CaptureCollectionBatch
     public function __construct(private InstallationInstitution $institutions, private FinanceWorkflows $workflows) {}
 
     /** @param array<string, mixed> $data */
-    public function handle(User $actor, array $data): CollectionBatch
+    public function handle(User $actor, array $data, ?UploadedFile $sourceDocument = null): CollectionBatch
     {
         Gate::forUser($actor)->authorize('create', CollectionBatch::class);
+        $contents = null;
+        if ($sourceDocument !== null) {
+            Validator::make(['source_document' => $sourceDocument], ['source_document' => self::documentRules()])->validate();
+            $contents = $sourceDocument instanceof TemporaryUploadedFile ? $sourceDocument->get() : $sourceDocument->getContent();
+            if (! is_string($contents) || $contents === '' || strlen($contents) > 10 * 1024 * 1024) {
+                throw ValidationException::withMessages(['source_document' => 'Upload a nonempty receipt or report, up to 10 MB.']);
+            }
+            $data['source_document_digest'] = hash('sha256', $contents);
+        }
         $data = Validator::make($data, self::inputRules())->validate();
         $currency = CurrencyCode::from($data['currency']);
         try {
@@ -51,8 +63,15 @@ final readonly class CaptureCollectionBatch
             'currency' => $currency->value, 'received_minor_units' => (string) $received, 'restricted_minor_units' => (string) $restricted,
             'collected_from' => $from->toIso8601String(), 'collected_until' => $until->toIso8601String(),
             'cash_evidence_reference' => $data['cash_evidence_reference'], 'source_stream_disjoint_attested' => true, 'received_not_forecast_attested' => true];
+        if ($sourceDocument !== null) {
+            $name = basename(str_replace('\\', '/', $sourceDocument->getClientOriginalName()));
+            $name = mb_substr(preg_replace('/[\x00-\x1f\x7f]/', '', $name), 0, 255);
+            $snapshot['source_document'] = ['disk' => 'local',
+                'path' => 'collection-evidence/'.$institution->id.'/'.$snapshot['capture_key'].'/'.$snapshot['source_document_digest'],
+                'name' => trim($name) === '' ? 'receipt' : $name, 'mime_type' => $sourceDocument->getMimeType(), 'size_bytes' => strlen($contents)];
+        }
 
-        return DB::transaction(function () use ($actor, $institution, $snapshot, $from, $until, $received, $restricted): CollectionBatch {
+        return DB::transaction(function () use ($actor, $institution, $snapshot, $from, $until, $received, $restricted, $contents): CollectionBatch {
             Organization::query()->whereKey($institution->id)->lockForUpdate()->firstOrFail();
             Gate::forUser($actor)->authorize('create', CollectionBatch::class);
             /** @var CollectionBatch|null $existing */
@@ -78,7 +97,18 @@ final readonly class CaptureCollectionBatch
                         });
                 })->exists();
             if ($duplicate) {
-                throw ValidationException::withMessages(['source_reference' => 'Source document, reference or collection interval is already represented; new keys cannot count it twice.']);
+                throw ValidationException::withMessages(['source_reference' => 'This document, receipt/report number, or payment-channel period is already recorded. Open the existing collection instead; do not change its channel to bypass this check.']);
+            }
+            if ($contents !== null) {
+                $disk = Storage::disk('local');
+                $path = $snapshot['source_document']['path'];
+                if ($disk->exists($path)) {
+                    if (! hash_equals($snapshot['source_document_digest'], hash('sha256', $disk->get($path)))) {
+                        throw ValidationException::withMessages(['source_document' => 'Stored receipt differs from this upload. Ask finance staff to investigate.']);
+                    }
+                } elseif (! $disk->put($path, $contents, ['visibility' => 'private'])) {
+                    throw ValidationException::withMessages(['source_document' => 'Receipt could not be stored. Retry without changing the report details.']);
+                }
             }
             /** @var CollectionBatch $batch */
             $batch = CollectionBatch::query()->create(['capture_key' => $snapshot['capture_key'], 'organization_id' => $institution->id,
@@ -105,5 +135,11 @@ final readonly class CaptureCollectionBatch
             'collected_until' => ['required', 'date_format:Y-m-d\TH:i:sP', 'before_or_equal:now'],
             'cash_evidence_reference' => ['required', 'string', 'min:3', 'max:255'], 'source_stream_disjoint' => ['required', 'accepted'],
             'received_not_forecast' => ['required', 'accepted']];
+    }
+
+    /** @return list<string> */
+    public static function documentRules(): array
+    {
+        return ['required', 'file', 'max:10240', 'extensions:pdf,jpg,jpeg,png,csv', 'mimetypes:application/pdf,image/jpeg,image/png,text/csv,text/plain,application/csv'];
     }
 }

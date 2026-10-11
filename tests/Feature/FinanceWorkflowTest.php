@@ -151,7 +151,7 @@ test('cashier and finance supervisor pages display exact evidence and record pla
     Filament::setCurrentPanel(Filament::getPanel('finance'));
     actingAs($c['reviewer']);
     get(FinanceSupervisor::getUrl(panel: 'finance'))->assertSuccessful()->assertSee('Finance supervisor');
-    get(Collections::getUrl(panel: 'finance'))->assertSuccessful()->assertSee('Collections ledger');
+    get(Collections::getUrl(panel: 'finance'))->assertSuccessful()->assertSee('Record fees received');
     $page = Livewire::test(FinanceSupervisor::class)->assertSee('Background finance runs');
     $page->__call('callAction', [TestAction::make('reviewFinancePlan')->table($run),
         ['decision' => 'accept_plan', 'reason' => 'Supervisor checked exact plan.', 'attestation' => true]]);

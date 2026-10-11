@@ -3017,7 +3017,7 @@ claims. Current routes and page actions establish the following, not universal a
 | Installation/operations overview, identity, providers and staff | Available | Not the finance role | Readiness/configuration is not settlement proof |
 | Exact reserved-payment review and independent reviewer enrollment | **Automation → Payment Approvals** (`/admin/payment-reviews`) | **Payment Approvals** (`/finance/payment-reviews`) | Requires direct `AuthorizePayment:PaymentIntent`, verified eligible staff, independently enrolled current factor and maker/checker separation; review does not itself transfer |
 | Submission queue/history, provider detail and attempts | **Automation → Payment Submissions** (`/admin/payment-submissions`), read-only | No submission resource registered | Unknown outcomes need investigation; a hash or provider ID is not verified settlement |
-| Aggregate collection capture and independent source review | No dedicated admin screen | **Collections** (`/finance/collections`) | Offchain evidence only; no individual payer matching or inbound USDC collection |
+| Aggregate collection capture and independent source review | **Finance records → Collections** (`/admin/collections`) | **Collections** (`/finance/collections`) | Cashier-friendly three-step capture with private receipt/report upload and independent review; offchain evidence only, no individual payer matching or inbound USDC collection |
 | Closed-set budget capture, background run evidence and plan review | No dedicated admin screen | **Finance Supervisor** (`/finance/finance-supervisor`) | Accepting a plan never grants payment authority |
 | Invoice source review, beneficiary approval, draft preparation and funding/reservation | Legacy invoice CRUD is available, not the complete safe workflow | Several authenticated HTTP actions exist; complete operator wizard absent | Need linked source/destination/policy/budget/funding screens rather than scripts or fabricated reviewers |
 | Reviewed capacity release and funding rollover | No screen | No screen | Backend actions/tests exist; authorization/unknown outcomes cannot be discarded to free capacity |
@@ -3033,6 +3033,24 @@ reservations remain readable history and disappear from awaiting-review counts. 
 is account-level readiness, not permission to review one's own bill or bypass fresh validation.
 Payment Submissions preserves provider wording and full six-decimal figures, with no send/retry
 action. The UI does not claim that `unknown` is safe to dispatch.
+
+**Collections usability handoff (2026-10-11):** Both panels expose the same role-checked
+Collections page. `Record collection` opens **Receipt → Amount & dates → Check & save**.
+Cashiers select a payment channel, copy an existing receipt/report/register number, upload
+a PDF/JPG/PNG/CSV (10 MB maximum), and enter exact original-currency totals, restricted funds
+and a completed period using local-time date pickers. Capture UUID and SHA-256 are generated
+server-side; no hash, source slug or ISO timestamp needs to be typed. Existing source streams
+stay selectable, so staff must keep the same register/channel rather than bypass overlap checks.
+Uploaded proof is stored privately and included in immutable snapshot identity. Authorized
+staff can download only the bound, hash-checked bytes; old digest-only API records remain
+readable and explicitly have no retained upload. Review stays maker/checker separated and
+final; held/rejected evidence cannot be edited or approved later through this page. Overview
+counts are recorded decisions, not spendable balances. Capture/review still changes no student
+balance, does not establish a bank balance, never funds Arc and never grants payment authority.
+Regression coverage includes both panels, upload validation/privacy, duplicate/idempotency
+protection, the signed upload HTTP endpoint, timezone identity and independent review. Browser coverage tests wizard navigation,
+calendar selection and save from a signed completed-upload fixture; installed Pest browser
+server does not parse multipart uploads, so end-to-end browser multipart transport is not claimed verified.
 
 **Known dashboard audit debt:** `AutonomyLaneWidget` still hardcodes “None approved” and old
 “neither exists” wording, while `EvidenceTimelineWidget` still says “No executor is shipped”.

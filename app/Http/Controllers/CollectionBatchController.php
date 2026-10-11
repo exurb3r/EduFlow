@@ -12,6 +12,8 @@ use App\Models\CollectionBatch;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Gate;
+use Illuminate\Support\Facades\Storage;
+use Symfony\Component\HttpFoundation\StreamedResponse;
 
 class CollectionBatchController extends Controller
 {
@@ -36,5 +38,23 @@ class CollectionBatchController extends Controller
 
         return response()->json(['data' => ['id' => $result->id, 'content' => $result->content(), 'review_digest' => $result->review_digest,
             'arc_funding_verified' => false, 'can_execute' => false]]);
+    }
+
+    public function document(Request $request, CollectionBatch $collectionBatch): StreamedResponse
+    {
+        Gate::forUser($request->user())->authorize('view', $collectionBatch);
+        abort_unless($collectionBatch->hasValidSnapshot(), 409, 'Collection evidence changed; download blocked.');
+        $document = $collectionBatch->snapshot['source_document'] ?? null;
+        abort_unless(is_array($document), 404, 'No uploaded document retained for this collection.');
+        $disk = Storage::disk('local');
+        abort_unless($disk->exists($document['path']), 404, 'Receipt file missing; ask finance staff to investigate.');
+        $contents = $disk->get($document['path']);
+        abort_unless(strlen($contents) === $document['size_bytes'] && hash_equals($collectionBatch->source_document_digest, hash('sha256', $contents)),
+            409, 'Receipt file changed; download blocked.');
+
+        return response()->streamDownload(static function () use ($contents): void {
+            echo $contents;
+        }, $document['name'], ['Content-Type' => $document['mime_type'],
+            'X-Content-Type-Options' => 'nosniff', 'Cache-Control' => 'private, no-store']);
     }
 }
