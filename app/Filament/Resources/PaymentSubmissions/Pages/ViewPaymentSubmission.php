@@ -8,9 +8,9 @@ use App\Filament\Resources\PaymentSubmissions\PaymentSubmissionResource;
 use App\Models\PaymentSubmissionOutbox;
 use Filament\Actions\Action;
 use Filament\Infolists\Components\RepeatableEntry;
-use Filament\Infolists\Components\Section;
 use Filament\Infolists\Components\TextEntry;
 use Filament\Resources\Pages\ViewRecord;
+use Filament\Schemas\Components\Section;
 use Filament\Schemas\Schema;
 use Throwable;
 use Yukazakiri\Lepton\Contracts\ArcNetworkGateway;
@@ -80,7 +80,7 @@ class ViewPaymentSubmission extends ViewRecord
                     ->schema([
                         TextEntry::make('snapshot.authorized_by')
                             ->label('Authorized by')
-                            ->state(fn (): string => $entry->snapshot['authorized_by'] ?? 'unknown'),
+                            ->state(fn (): string => (string) ($entry->snapshot['authorized_by'] ?? 'unknown')),
                         TextEntry::make('snapshot.authorized_until')
                             ->label('Authority valid until')
                             ->state(fn (): ?string => $entry->snapshot['authorized_until'] ?? null)

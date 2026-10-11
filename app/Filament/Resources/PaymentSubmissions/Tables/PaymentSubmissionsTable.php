@@ -78,14 +78,14 @@ class PaymentSubmissionsTable
                     ->placeholder('none — no transfer in flight')
                     // A handle is not a hash. Labelling it as one is how an
                     // in-flight payment gets read as settled.
-                    ->helperText("the rail's own transaction id, not an on-chain reference"),
+                    ->description("the rail's own transaction id, not an on-chain reference"),
 
                 TextColumn::make('result.provider_reference')
                     ->label('On-chain reference')
                     ->copyable()
                     ->limit(12)
                     ->placeholder('not yet published')
-                    ->helperText('exists only once the transfer completed'),
+                    ->description('exists only once the transfer completed'),
 
                 TextColumn::make('attempts')
                     ->label('Tries')

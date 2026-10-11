@@ -4,7 +4,9 @@ declare(strict_types=1);
 
 use App\Filament\Resources\PaymentSubmissions\PaymentSubmissionResource;
 use App\Models\PaymentSubmissionOutbox;
+use App\Models\User;
 use App\Services\Advisory\AutomationLaneStatus;
+use Spatie\Permission\Models\Role;
 
 /**
  * The admin's window onto the automated submission lane.
@@ -119,4 +121,24 @@ test('a completed entry names the reference that proved it', function (): void {
     $entry = laneBillFor('completed', ['result' => ['provider_reference' => $hash]]);
 
     expect($entry->result['provider_reference'])->toBe($hash);
+});
+
+test('admin can access payment submissions list and view pages', function (): void {
+    $admin = User::factory()->create();
+    $admin->assignRole(Role::findOrCreate('super_admin', 'web'));
+
+    $entry = laneBillFor('accepted', [
+        'provider_handle' => '116c7ce7-8f2f-53ac-8b06-f18aac151ce3',
+        'last_error' => 'In flight observation.',
+    ]);
+
+    $listResponse = $this->actingAs($admin)->get(PaymentSubmissionResource::getUrl('index'));
+    $listResponse->assertSuccessful();
+    $listResponse->assertSee('Automated payment submission');
+    $listResponse->assertSee('accepted by the rail');
+
+    $viewResponse = $this->actingAs($admin)->get(PaymentSubmissionResource::getUrl('view', ['record' => $entry]));
+    $viewResponse->assertSuccessful();
+    $viewResponse->assertSee('What the automation did, in order');
+    $viewResponse->assertSee('116c7ce7-8f2f-53ac-8b06-f18aac151ce3');
 });
