@@ -6,6 +6,8 @@
 
 ## Where Things Stand — Start Here in a New Session
 
+**Payment approval navigation (2026-10-11):** `PaymentReviews` is now explicitly registered in the admin panel as **Automation → Payment Approvals**, with a shortcut from Payment Submissions. Previously only the finance route was registered. Both panels retain the existing review policy, independent reviewer/direct permission/MFA requirements, and exact reservation evidence. This UI records authority only; it does not itself submit a transfer. Submission history is read-only, and agent advice is not payment authority. Navigation/rendering and existing authorization/dashboard regressions pass (88 tests combined). Live payment transport and safe unresolved-attempt recovery remain separate blockers.
+
 **The rail is live as of 2026-10-11.** Circle CLI v1.2.1 is installed via npm global
 (`@circle-fin/cli`); PATH resolves a stale `mise` shim named `circle` first, so `LEPTON_CIRCLE_BIN`
 points at the real binary. The agent session is **authenticated for ARC-TESTNET and ARC** (valid,

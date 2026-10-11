@@ -2,6 +2,7 @@
 
 declare(strict_types=1);
 
+use App\Filament\Pages\PaymentReviews;
 use App\Filament\Resources\PaymentSubmissions\PaymentSubmissionResource;
 use App\Models\PaymentSubmissionOutbox;
 use App\Models\User;
@@ -135,10 +136,17 @@ test('admin can access payment submissions list and view pages', function (): vo
     $listResponse = $this->actingAs($admin)->get(PaymentSubmissionResource::getUrl('index'));
     $listResponse->assertSuccessful();
     $listResponse->assertSee('Automated payment submission');
+    $listResponse->assertSee('Payment approvals');
+    $listResponse->assertSee(PaymentReviews::getUrl(), false);
     $listResponse->assertSee('accepted by the rail');
 
     $viewResponse = $this->actingAs($admin)->get(PaymentSubmissionResource::getUrl('view', ['record' => $entry]));
     $viewResponse->assertSuccessful();
     $viewResponse->assertSee('What the automation did, in order');
     $viewResponse->assertSee('116c7ce7-8f2f-53ac-8b06-f18aac151ce3');
+
+    $approvalResponse = $this->actingAs($admin)->get(PaymentReviews::getUrl(panel: 'admin'));
+    $approvalResponse->assertSuccessful();
+    $approvalResponse->assertSee('Payment approvals');
+    $approvalResponse->assertSee('Agent advice is not payment authority.');
 });

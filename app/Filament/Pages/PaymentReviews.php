@@ -61,11 +61,11 @@ class PaymentReviews extends Page implements HasTable
 
     protected static string|BackedEnum|null $navigationIcon = Heroicon::ClipboardDocumentCheck;
 
-    protected static string|UnitEnum|null $navigationGroup = 'Financial Operations';
+    protected static string|UnitEnum|null $navigationGroup = 'Automation';
 
-    protected static ?string $navigationLabel = 'Payment Reviews';
+    protected static ?string $navigationLabel = 'Payment Approvals';
 
-    protected static ?string $title = 'Payment reviews';
+    protected static ?string $title = 'Payment approvals';
 
     protected static ?int $navigationSort = 3;
 
@@ -104,6 +104,14 @@ class PaymentReviews extends Page implements HasTable
     {
         return Auth::user() instanceof User
             && Gate::forUser(Auth::user())->allows('create', PaymentIntent::class);
+    }
+
+    #[\Override]
+    public function getSubheading(): ?string
+    {
+        return 'Review reserved payments here, not in Payment Submissions. Open Review payment to approve exact payment authority, reject, or hold. '
+            .'Approval requires an independent reviewer with directly assigned AuthorizePayment:PaymentIntent permission and enrolled MFA. '
+            .'Agent advice is not payment authority. This review does not itself send money.';
     }
 
     public function table(Table $table): Table
