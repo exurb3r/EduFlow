@@ -19,6 +19,7 @@ use App\Http\Controllers\PaymentReviewerEnrollmentController;
 use App\Http\Controllers\StudentAssistanceController;
 use App\Http\Controllers\StudentDashboardController;
 use App\Http\Controllers\StudentPaymentsController;
+use App\Http\Controllers\StudentTuitionPaymentController;
 use App\Http\Controllers\StudentWalletController;
 use App\Http\Controllers\VendorDestinationController;
 use Illuminate\Support\Facades\Route;
@@ -44,6 +45,10 @@ Route::middleware(['auth', 'verified'])->group(function (): void {
     Route::get('financial-assistance', [StudentAssistanceController::class, 'index'])->name('financial-assistance.index');
     Route::post('financial-assistance', [StudentAssistanceController::class, 'store'])->name('financial-assistance.store');
     Route::get('payments', [StudentPaymentsController::class, 'index'])->name('payments.index');
+    Route::get('student/wallet', [StudentWalletController::class, 'show'])->name('student.wallet.show');
+    Route::post('student/wallet/refresh', [StudentWalletController::class, 'refresh'])->middleware('throttle:10,1')->name('student.wallet.refresh');
+    Route::post('student/tuition/quote', [StudentTuitionPaymentController::class, 'quote'])->middleware('throttle:20,1')->name('student.tuition.quote');
+    Route::post('student/tuition/pay', [StudentTuitionPaymentController::class, 'store'])->middleware('throttle:5,1')->name('student.tuition.pay');
     Route::patch('wallet', [StudentWalletController::class, 'update'])->name('wallet.update');
 });
 

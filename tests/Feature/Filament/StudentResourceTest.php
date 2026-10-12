@@ -10,6 +10,7 @@ use App\Models\AcademicTerm;
 use App\Models\Student;
 use App\Models\TuitionAccount;
 use App\Models\User;
+use Filament\Actions\DeleteAction;
 use Livewire\Livewire;
 use Spatie\Permission\Models\Role;
 
@@ -171,4 +172,58 @@ test('a linked record, not the role, is what puts a balance on the dashboard', f
             ->where('finance.tuitionAccount.remaining_amount', '275000000'));
 
     expect(TuitionAccount::query()->count())->toBe(1);
+});
+
+test('a student with financial history on file cannot be deleted from the edit page', function (): void {
+    $student = Student::factory()->create();
+    $term = AcademicTerm::factory()->create();
+    TuitionAccount::factory()->for($student)->for($term)->create([
+        'total_amount' => 300000000,
+        'paid_amount' => 0,
+    ]);
+
+    $this->actingAs(User::factory()->create()->assignRole('super_admin'));
+    filament()->setCurrentPanel('finance');
+
+    Livewire::test(EditStudent::class, ['record' => $student->getKey()])
+        ->callAction(DeleteAction::class);
+
+    // The guard halts before any query runs, so the row survives. The panel
+    // explains why instead of raising a foreign-key error.
+    expect(Student::query()->find($student->getKey()))->not->toBeNull();
+});
+
+test('a student with nothing on file can still be deleted', function (): void {
+    $student = Student::factory()->withoutPayoutAddress()->create();
+
+    $this->actingAs(User::factory()->create()->assignRole('super_admin'));
+    filament()->setCurrentPanel('finance');
+
+    Livewire::test(EditStudent::class, ['record' => $student->getKey()])
+        ->callAction(DeleteAction::class)
+        ->assertHasNoActionErrors();
+
+    expect(Student::query()->find($student->getKey()))->toBeNull();
+});
+
+test('a student is only deletable once their financial history is gone', function (): void {
+    $student = Student::factory()->create();
+    $term = AcademicTerm::factory()->create();
+
+    expect($student->deletionBlockedReason())->toBeNull();
+
+    $account = TuitionAccount::factory()->for($student)->for($term)->create([
+        'total_amount' => 300000000,
+        'paid_amount' => 0,
+    ]);
+
+    expect($student->fresh()->deletionBlockedReason())
+        ->toContain('1 tuition account')
+        ->toContain('financial history');
+
+    // Clearing the history is what unblocks the delete; the student row itself
+    // was never the thing protecting the money.
+    $account->delete();
+
+    expect($student->fresh()->deletionBlockedReason())->toBeNull();
 });

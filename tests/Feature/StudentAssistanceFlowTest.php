@@ -4,14 +4,19 @@ declare(strict_types=1);
 
 use App\Models\Budget;
 use App\Models\Organization;
+use App\Models\Student;
 use App\Models\Transaction;
 use App\Models\User;
 use App\Models\Wallet;
 use Illuminate\Support\Facades\DB;
 
 test('financial assistance page renders policy and history for students', function (): void {
-    $user = User::factory()->create([
-        'wallet_address' => '0xa1b2c3d4e5f60718293a4b5c6d7e8f9012345678',
+    $user = User::factory()->create();
+    $payoutAddress = '0xa1b2c3d4e5f60718293a4b5c6d7e8f9012345678';
+
+    Student::factory()->create([
+        'user_id' => $user->id,
+        'payout_address' => $payoutAddress,
     ]);
 
     $response = $this->actingAs($user)->get(route('financial-assistance.index'));
@@ -23,7 +28,7 @@ test('financial assistance page renders policy and history for students', functi
         ->has('policy')
         ->where('policy.auto_limit', 100)
         ->where('policy.currency', 'USDC')
-        ->where('wallet.address', '0xa1b2c3d4e5f60718293a4b5c6d7e8f9012345678')
+        ->where('wallet.address', $payoutAddress)
     );
 });
 
@@ -45,8 +50,12 @@ test('request within the automatic limit is auto-approved and paid out', functio
         'remaining_amount' => 2000.00,
     ]);
 
-    $user = User::factory()->create([
-        'wallet_address' => '0xa1b2c3d4e5f60718293a4b5c6d7e8f9012345678',
+    $user = User::factory()->create();
+    $payoutAddress = '0xa1b2c3d4e5f60718293a4b5c6d7e8f9012345678';
+
+    Student::factory()->create([
+        'user_id' => $user->id,
+        'payout_address' => $payoutAddress,
     ]);
 
     $response = $this->actingAs($user)->post(route('financial-assistance.store'), [
@@ -103,8 +112,12 @@ test('request above the automatic limit is partially approved and escalated', fu
         'remaining_amount' => 2000.00,
     ]);
 
-    $user = User::factory()->create([
-        'wallet_address' => '0xa1b2c3d4e5f60718293a4b5c6d7e8f9012345678',
+    $user = User::factory()->create();
+    $payoutAddress = '0xa1b2c3d4e5f60718293a4b5c6d7e8f9012345678';
+
+    Student::factory()->create([
+        'user_id' => $user->id,
+        'payout_address' => $payoutAddress,
     ]);
 
     $response = $this->actingAs($user)->post(route('financial-assistance.store'), [
@@ -149,9 +162,8 @@ test('submission without a linked wallet is rejected', function (): void {
         'human_approval_threshold' => 1000.00,
     ]);
 
-    $user = User::factory()->create([
-        'wallet_address' => null,
-    ]);
+    $user = User::factory()->create();
+    Student::factory()->withoutPayoutAddress()->create(['user_id' => $user->id]);
 
     $response = $this->actingAs($user)->post(route('financial-assistance.store'), [
         'amount' => 50,
@@ -172,8 +184,10 @@ test('payments page lists confirmed payouts for the linked wallet', function ():
     ]);
     $walletAddress = '0xa1b2c3d4e5f60718293a4b5c6d7e8f9012345678';
 
-    $user = User::factory()->create([
-        'wallet_address' => $walletAddress,
+    $user = User::factory()->create();
+    $student = Student::factory()->create([
+        'user_id' => $user->id,
+        'payout_address' => $walletAddress,
     ]);
 
     Transaction::factory()->create([
@@ -192,7 +206,7 @@ test('payments page lists confirmed payouts for the linked wallet', function ():
         'status' => 'confirmed',
     ]);
 
-    $response = $this->actingAs($user)->get(route('payments.index'));
+    $response = $this->actingAs($student->user)->get(route('payments.index'));
 
     $response->assertOk();
     $response->assertInertia(fn ($page) => $page
@@ -200,5 +214,34 @@ test('payments page lists confirmed payouts for the linked wallet', function ():
         ->has('transactions.data', 1)
         ->where('transactions.data.0.amount', 80)
         ->where('totals.confirmed', 80)
+        ->where('wallet.address', $walletAddress)
     );
+});
+
+test('payments page matches the wallet address regardless of letter case', function (): void {
+    $organization = Organization::factory()->create();
+    $storedAddress = '0xABCDEF1234567890ABCDEF1234567890ABCDEF12';
+    $usedAddress = '0xabcdef1234567890abcdef1234567890abcdef12';
+
+    $user = User::factory()->create();
+    $student = Student::factory()->create([
+        'user_id' => $user->id,
+        'payout_address' => $usedAddress,
+    ]);
+
+    Transaction::factory()->create([
+        'organization_id' => $organization->id,
+        'type' => 'student_assistance',
+        'recipient_address' => $storedAddress,
+        'amount' => 120.00,
+        'status' => 'confirmed',
+    ]);
+
+    $this->actingAs($student->user)
+        ->get(route('payments.index'))
+        ->assertOk()
+        ->assertInertia(fn ($page) => $page
+            ->has('transactions.data', 1)
+            ->where('totals.confirmed', 120)
+        );
 });

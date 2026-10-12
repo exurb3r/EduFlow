@@ -11,6 +11,7 @@ use App\Models\AssistanceRequest;
 use App\Models\Transaction;
 use App\Models\User;
 use App\Services\CurrencyConverter;
+use App\Services\StudentWalletService;
 use DateTimeInterface;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Http\Request;
@@ -113,8 +114,14 @@ class DashboardController extends Controller
             }
         }
 
+        // The wallet is the payout address on the student record, the same one
+        // the wallet screen and the disbursement path use.
+        $walletAddress = $student !== null
+            ? app(StudentWalletService::class)->addressFor($student)
+            : null;
+
         $transactionQuery = Transaction::query()
-            ->where('recipient_address', $user->wallet_address ?? '')
+            ->paidTo($walletAddress)
             ->whereIn('type', ['student_assistance', 'refund']);
 
         $recentTransactions = (clone $transactionQuery)
@@ -139,7 +146,7 @@ class DashboardController extends Controller
         return [
             'tuitionAccount' => $tuitionAccountData,
             'wallet' => [
-                'address' => $user->wallet_address,
+                'address' => $walletAddress,
             ],
             'totals' => [
                 'confirmed' => (float) (clone $transactionQuery)->where('status', 'confirmed')->sum('amount'),

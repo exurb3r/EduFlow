@@ -5,6 +5,7 @@ import {
     HandCoins,
     LayoutGrid,
     ReceiptText,
+    Wallet,
 } from 'lucide-react';
 import AppLogo from '@/components/app-logo';
 import { NavFooter } from '@/components/nav-footer';
@@ -22,6 +23,7 @@ import {
 import { dashboard } from '@/routes';
 import { index as financialAssistanceIndex } from '@/routes/financial-assistance';
 import { index as paymentsIndex } from '@/routes/payments';
+import { show as walletShow } from '@/routes/student/wallet';
 import type { NavItem } from '@/types';
 
 const mainNavItems: NavItem[] = [
@@ -39,6 +41,11 @@ const mainNavItems: NavItem[] = [
         title: 'My Payments',
         href: paymentsIndex(),
         icon: ReceiptText,
+    },
+    {
+        title: 'My Wallet',
+        href: walletShow(),
+        icon: Wallet,
     },
 ];
 

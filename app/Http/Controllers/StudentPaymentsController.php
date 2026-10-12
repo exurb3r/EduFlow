@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Http\Controllers;
 
 use App\Models\Transaction;
+use App\Services\StudentWalletService;
 use Illuminate\Http\Request;
 use Inertia\Inertia;
 use Inertia\Response;
@@ -16,9 +17,11 @@ class StudentPaymentsController extends Controller
     public function index(Request $request): Response
     {
         $user = $request->user();
+        $student = $user->student()->firstOrFail();
+        $walletAddress = app(StudentWalletService::class)->addressFor($student);
 
         $transactions = Transaction::query()
-            ->where('recipient_address', $user->wallet_address ?? '')
+            ->paidTo($walletAddress)
             ->whereIn('type', ['student_assistance', 'refund'])
             ->latest('executed_at')
             ->paginate(self::PER_PAGE)
@@ -37,7 +40,7 @@ class StudentPaymentsController extends Controller
             ]);
 
         $confirmedTotal = (float) Transaction::query()
-            ->where('recipient_address', $user->wallet_address ?? '')
+            ->paidTo($walletAddress)
             ->whereIn('type', ['student_assistance', 'refund'])
             ->where('status', 'confirmed')
             ->sum('amount');
@@ -45,7 +48,7 @@ class StudentPaymentsController extends Controller
         return Inertia::render('payments', [
             'transactions' => $transactions,
             'wallet' => [
-                'address' => $user->wallet_address,
+                'address' => $walletAddress,
             ],
             'totals' => [
                 'confirmed' => $confirmedTotal,

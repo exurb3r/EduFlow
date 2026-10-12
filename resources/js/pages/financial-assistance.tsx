@@ -1,4 +1,4 @@
-import { Head, useForm } from '@inertiajs/react';
+import { Head, Link, useForm } from '@inertiajs/react';
 import {
     ArrowRight,
     BadgeCheck,
@@ -10,24 +10,15 @@ import {
     Split,
     Wallet,
 } from 'lucide-react';
-import { useState } from 'react';
 import { toast } from 'sonner';
 
 import InputError from '@/components/input-error';
 import { Button } from '@/components/ui/button';
-import {
-    Dialog,
-    DialogContent,
-    DialogDescription,
-    DialogFooter,
-    DialogHeader,
-    DialogTitle,
-} from '@/components/ui/dialog';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
 import { store as financialAssistanceStore } from '@/routes/financial-assistance';
-import { update as walletUpdate } from '@/routes/wallet';
+import { show as walletShow } from '@/routes/student/wallet';
 import type { Paginated } from '@/types';
 
 interface AssistanceDecisionView {
@@ -104,15 +95,9 @@ export default function FinancialAssistance({
     policy,
     highlightId = 0,
 }: FinancialAssistanceProps) {
-    const [isWalletOpen, setIsWalletOpen] = useState(false);
-
     const form = useForm({
         amount: '',
         reason: '',
-    });
-
-    const walletForm = useForm({
-        wallet_address: wallet.address ?? '',
     });
 
     const hasWallet = Boolean(wallet.address);
@@ -133,21 +118,6 @@ export default function FinancialAssistance({
                 toast.error(
                     'Could not submit the request. Check the fields and your wallet.',
                 );
-            },
-        });
-    };
-
-    const submitWallet = (e: React.FormEvent) => {
-        e.preventDefault();
-
-        walletForm.patch(walletUpdate.url(), {
-            preserveScroll: true,
-            onSuccess: () => {
-                setIsWalletOpen(false);
-                toast.success('Payout wallet linked.');
-            },
-            onError: () => {
-                toast.error('That wallet address was not accepted.');
             },
         });
     };
@@ -199,10 +169,9 @@ export default function FinancialAssistance({
                                 </span>
                             </p>
                         </div>
-                        <button
-                            type="button"
-                            onClick={() => setIsWalletOpen(true)}
-                            className="clay-card clay-press p-4 text-left sm:p-5"
+                        <Link
+                            href={walletShow()}
+                            className="clay-card clay-press block p-4 text-left sm:p-5"
                         >
                             <p className="bulletin-eyebrow flex items-center gap-2">
                                 <Wallet className="size-3.5" />
@@ -213,7 +182,7 @@ export default function FinancialAssistance({
                                     ? `${wallet.address?.slice(0, 10)}…${wallet.address?.slice(-6)}`
                                     : 'Link a wallet →'}
                             </p>
-                        </button>
+                        </Link>
                     </section>
 
                     {/* Request form */}
@@ -413,70 +382,6 @@ export default function FinancialAssistance({
                     </section>
                 </div>
             </div>
-
-            {/* Wallet dialog */}
-            <Dialog open={isWalletOpen} onOpenChange={setIsWalletOpen}>
-                <DialogContent className="bulletin clay-card border-[var(--clay-border)] sm:max-w-md">
-                    <DialogHeader>
-                        <DialogTitle className="clay-h2 flex items-center gap-3">
-                            <span className="clay-icon-chip size-9 shrink-0">
-                                <Wallet className="size-4" />
-                            </span>
-                            Payout wallet
-                        </DialogTitle>
-                        <DialogDescription className="clay-body">
-                            Approved assistance is paid in {policy.currency} to
-                            this address on the Arc network.
-                        </DialogDescription>
-                    </DialogHeader>
-
-                    <form onSubmit={submitWallet} className="grid gap-4">
-                        <div className="space-y-1.5">
-                            <Label
-                                htmlFor="wallet_address"
-                                className="bulletin-eyebrow"
-                            >
-                                Wallet address
-                            </Label>
-                            <Input
-                                id="wallet_address"
-                                placeholder="0x…"
-                                value={walletForm.data.wallet_address}
-                                onChange={(e) =>
-                                    walletForm.setData(
-                                        'wallet_address',
-                                        e.target.value,
-                                    )
-                                }
-                                className="clay-field clay-focus font-mono shadow-none"
-                                required
-                            />
-                            <InputError
-                                message={walletForm.errors.wallet_address}
-                            />
-                        </div>
-
-                        <DialogFooter className="gap-2 sm:gap-0">
-                            <Button
-                                type="button"
-                                variant="outline"
-                                className="clay-focus rounded-full border-[var(--clay-border)] bg-transparent font-semibold shadow-none"
-                                onClick={() => setIsWalletOpen(false)}
-                            >
-                                Cancel
-                            </Button>
-                            <Button
-                                type="submit"
-                                disabled={walletForm.processing}
-                                data-loading={walletForm.processing}
-                                className="clay-focus rounded-full bg-[var(--clay-primary)] font-semibold text-[var(--clay-primary-foreground)] shadow-[var(--shadow-cta)] hover:bg-[var(--clay-primary-bright)]"
-                            >
-                                Save wallet
-                            </Button>
-                        </DialogFooter>
-                    </form>
-                </DialogContent>
-            </Dialog>
         </>
     );
 }

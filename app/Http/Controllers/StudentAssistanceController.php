@@ -7,10 +7,13 @@ namespace App\Http\Controllers;
 use App\Enums\AssistanceDecisionStatus;
 use App\Models\AgentDecision;
 use App\Models\Organization;
+use App\Models\Student;
 use App\Models\StudentAssistanceRequest;
+use App\Models\User;
 use App\Services\AssistanceAgent;
 use App\Services\PaymentService;
 use App\Services\PolicyEngineService;
+use App\Services\StudentWalletService;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Str;
@@ -35,7 +38,7 @@ class StudentAssistanceController extends Controller
         return Inertia::render('financial-assistance', [
             'requests' => $requests,
             'wallet' => [
-                'address' => $user->wallet_address,
+                'address' => $this->payoutAddressFor($user),
             ],
             'policy' => $this->policyView($organization),
             'highlightId' => (int) $request->session()->get('highlight_request_id', 0),
@@ -51,7 +54,9 @@ class StudentAssistanceController extends Controller
             'reason' => ['required', 'string', 'min:10', 'max:1000'],
         ]);
 
-        if (blank($user->wallet_address)) {
+        // The payout address is the wallet. Without a usable one there is no
+        // destination to pay, and a destination is never invented.
+        if ($this->payoutAddressFor($user) === null) {
             return back()
                 ->withErrors(['wallet_address' => 'Link a payout wallet before requesting assistance.'])
                 ->withInput();
@@ -87,6 +92,22 @@ class StudentAssistanceController extends Controller
 
         return to_route('financial-assistance.index')
             ->with('highlight_request_id', $assistanceRequest->id);
+    }
+
+    /**
+     * The student's payout address, but only when it is a usable Arc
+     * destination. This is the same address the wallet screen shows and the
+     * disbursement path pays, so all three can never disagree.
+     */
+    private function payoutAddressFor(User $user): ?string
+    {
+        $student = $user->student()->first();
+
+        if (! $student instanceof Student) {
+            return null;
+        }
+
+        return app(StudentWalletService::class)->addressFor($student);
     }
 
     /**

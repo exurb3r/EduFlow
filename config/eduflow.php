@@ -85,6 +85,20 @@ return [
 
     /*
     |--------------------------------------------------------------------------
+    | Student Wallet Balance Cache
+    |--------------------------------------------------------------------------
+    |
+    | How long a student's on-chain balance is served from cache before the
+    | next read goes back to Arc. A wallet balance is a live chain reading, so
+    | this is deliberately short: long enough that opening a screen is one RPC
+    | call rather than several, short enough that the number shown is current.
+    | The refresh action on the wallet screen bypasses it entirely.
+    |
+    */
+    'wallet_balance_cache_seconds' => env('EDUFLOW_WALLET_BALANCE_CACHE_SECONDS', 30),
+
+    /*
+    |--------------------------------------------------------------------------
     | Campus Quick Resources
     |--------------------------------------------------------------------------
     |
