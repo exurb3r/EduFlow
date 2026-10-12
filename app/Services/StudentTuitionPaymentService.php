@@ -5,16 +5,17 @@ declare(strict_types=1);
 namespace App\Services;
 
 use App\DTOs\WalletReadState;
+use App\Enums\StudentTuitionPaymentState;
 use App\Enums\TransactionStatus;
 use App\Enums\TransactionType;
 use App\Models\Student;
 use App\Models\StudentTuitionPayment;
+use App\Models\StudentTuitionPaymentAttempt;
 use App\Models\StudentWallet;
 use App\Models\Transaction;
 use App\Models\TuitionAccount;
 use App\Models\Wallet;
 use Illuminate\Support\Facades\DB;
-use Illuminate\Support\Str;
 use InvalidArgumentException;
 use RuntimeException;
 use Throwable;
@@ -48,6 +49,9 @@ class StudentTuitionPaymentService
         private readonly ArcNetworkGateway $arc,
         private readonly CircleAgentWalletCli $cli,
         private readonly StudentWalletService $studentWallets,
+        // The same strict predicate an outgoing payment is held to, so an
+        // inbound receipt is never verified by a weaker standard.
+        private readonly ArcSettlementVerifier $settlement,
     ) {}
 
     /**
@@ -89,14 +93,32 @@ class StudentTuitionPaymentService
 
     /**
      * Transfer the amount and record it once the chain confirms it.
+     *
+     * `$requestKey` is the identity this payment keeps for its whole life. It is
+     * the caller's job to derive it from what the payer actually confirmed, so
+     * a refreshed page or a lost response after submitting recovers this
+     * attempt instead of sending a second transfer.
      */
-    public function pay(Student $student, TuitionAccount $account, int $amountBaseUnits): StudentTuitionPayment
+    public function pay(Student $student, TuitionAccount $account, int $amountBaseUnits, string $requestKey): StudentTuitionPayment
     {
-        $quote = $this->quote($student, $account, $amountBaseUnits);
+        $this->assertPayable($student, $account, $amountBaseUnits);
 
         $wallet = $student->wallet;
-        $recipient = $quote['recipient'];
-        $chain = $quote['chain'];
+        $recipient = $this->recipientAddress();
+        $chain = $this->studentWallets->chain();
+        $fee = $this->quoteFee($wallet->address, $amountBaseUnits);
+
+        // Written before a signer is asked to move anything, so a retry after a
+        // crash or a lost response has something to find.
+        $attempt = $this->recordAttempt($student, $account, $wallet, $amountBaseUnits, $requestKey, $fee);
+
+        // A rehearsal is recorded as a rehearsal. Nothing is allocated to
+        // tuition and nothing is credited to the treasury from it, because
+        // nothing settled: posting it as revenue would be the specific lie this
+        // lane exists to stop.
+        if ($this->wallets instanceof FakeLeptonGateway) {
+            return $this->rehearse($student, $account, $wallet, $amountBaseUnits, $fee, $recipient, $chain, $requestKey);
+        }
 
         try {
             $result = $this->wallets->transfer(
@@ -106,41 +128,249 @@ class StudentTuitionPaymentService
                 [
                     'chain' => $chain,
                     'rpcUrl' => $this->rpcUrl(),
-                    'idempotencyKey' => (string) Str::uuid(),
+                    'idempotencyKey' => $this->idempotencyKey($requestKey),
                 ],
             );
         } catch (LeptonCliException $e) {
+            $this->markUnknown($attempt, $this->readableFailure($e));
+
             throw new RuntimeException($this->readableFailure($e), $e->getCode(), previous: $e);
         }
 
-        // A hash on its own is not a settlement: read the transaction back.
-        $verified = $this->verifyOnChain($result->txHash);
+        $verdict = $this->settlement->verify([
+            'chain' => $chain,
+            'chain_id' => $this->chainId(),
+            'sender' => $wallet->address,
+            'recipient' => $recipient,
+            'amount_base_units' => $amountBaseUnits,
+            'max_fee_base_units' => $this->feeBaseUnits($fee, roundUp: true),
+        ], $result->txHash);
 
-        $fee = is_array($result->raw['data'] ?? null)
-            ? (string) ($result->raw['data']['networkFee'] ?? $quote['network_fee'])
-            : $quote['network_fee'];
+        if ($verdict['verdict'] !== 'verified') {
+            $this->markUnverified($attempt, $result->txHash, (string) $verdict['verdict'], (string) $verdict['reason']);
 
-        return DB::transaction(function () use ($student, $account, $wallet, $result, $amountBaseUnits, $fee, $recipient, $chain, $verified): StudentTuitionPayment {
-            $payment = StudentTuitionPayment::create([
+            // Nothing is posted. A hash that exists, or a receipt that executed,
+            // is not yet money in the treasury: the attempt is preserved so it
+            // is observed and reconciled rather than sent again.
+            throw new RuntimeException('This payment could not be confirmed on chain, so it has not been recorded on your tuition account. Do not send it again; finance staff are checking the existing attempt.');
+        }
+
+        $this->markVerified($attempt, $result->txHash, $verdict, $fee);
+
+        return DB::transaction(function () use ($student, $account, $wallet, $result, $amountBaseUnits, $fee, $recipient, $chain, $requestKey): StudentTuitionPayment {
+            $payment = $this->receipt([
+                'request_key' => $requestKey,
                 'student_id' => $student->getKey(),
                 'tuition_account_id' => $account->getKey(),
                 'student_wallet_id' => $wallet->getKey(),
                 'tx_hash' => $result->txHash,
                 'amount_base_units' => $amountBaseUnits,
                 'network_fee' => $fee,
-                'payer_address' => $result->fromAddress,
+                'payer_address' => $wallet->address,
                 'recipient_address' => $recipient,
                 'chain' => $chain,
-                'tx_verified_on_chain' => $verified,
+                'tx_verified_on_chain' => true,
+                'simulated' => false,
                 'executed_at' => now(),
             ]);
 
-            $account->increment('paid_amount', $amountBaseUnits);
+            // A receipt already written under this key means this posting has
+            // happened. Returning it without allocating again is what makes a
+            // repeated confirmation idempotent rather than a second credit.
+            if (! $payment->wasRecentlyCreated) {
+                return $payment;
+            }
+
+            $this->allocateToTuition($account, $payment);
 
             $this->creditTreasuryLedger($account->student, $amountBaseUnits, $recipient, $result->txHash, $fee, $payment);
 
             return $payment;
         });
+    }
+
+    /**
+     * Write one receipt, or return the one already written for this attempt.
+     *
+     * @param  array<string, mixed>  $attributes
+     */
+    private function receipt(array $attributes): StudentTuitionPayment
+    {
+        $existing = StudentTuitionPayment::query()
+            ->where('request_key', $attributes['request_key'])
+            ->first();
+
+        if ($existing instanceof StudentTuitionPayment) {
+            return $existing;
+        }
+
+        return StudentTuitionPayment::create($attributes);
+    }
+
+    /**
+     * Record a rehearsal, and nothing else.
+     *
+     * The journey between the student's confirmation and the receipt has to be
+     * exercisable before a payment provider is configured, so the receipt is
+     * written and plainly marked. It carries no allocation, no ledger row and
+     * no chain claim, and `isReal()` answers false for it everywhere it is read.
+     */
+    private function rehearse(
+        Student $student,
+        TuitionAccount $account,
+        StudentWallet $wallet,
+        int $amountBaseUnits,
+        string $fee,
+        string $recipient,
+        string $chain,
+        string $requestKey,
+    ): StudentTuitionPayment {
+        return $this->receipt([
+            'request_key' => $requestKey,
+            'student_id' => $student->getKey(),
+            'tuition_account_id' => $account->getKey(),
+            'student_wallet_id' => $wallet->getKey(),
+            'tx_hash' => 'rehearsal:'.$requestKey,
+            'amount_base_units' => $amountBaseUnits,
+            'network_fee' => $fee,
+            'payer_address' => $wallet->address,
+            'recipient_address' => $recipient,
+            'chain' => $chain,
+            'tx_verified_on_chain' => false,
+            'simulated' => true,
+            'executed_at' => now(),
+        ]);
+    }
+
+    /**
+     * Credit verified movement to tuition exactly once, under a lock.
+     *
+     * Concurrent payments cannot over-credit the debt because the account is
+     * re-read locked and the applied amount is the defined outstanding balance.
+     * A genuine overpayment is recorded explicitly rather than dropped: an
+     * amount larger than what is owed is a liability to the student, never
+     * silent budget cash.
+     */
+    private function allocateToTuition(TuitionAccount $account, StudentTuitionPayment $payment): void
+    {
+        $stored = TuitionAccount::query()
+            ->whereKey($account->getKey())
+            ->lockForUpdate()
+            ->firstOrFail();
+
+        $outstanding = max(0, $stored->remainingAmount());
+        $applied = min($payment->amount_base_units, $outstanding);
+        $overpayment = max(0, $payment->amount_base_units - $outstanding);
+
+        $payment->forceFill([
+            'applied_base_units' => $applied,
+            'overpayment_base_units' => $overpayment,
+        ])->save();
+
+        if ($applied <= 0) {
+            return;
+        }
+
+        $stored->increment('paid_amount', $applied);
+    }
+
+    /**
+     * Write the durable attempt before a signer is asked to move money.
+     *
+     * The `request_key` is what a retry reuses, so this is an upsert on that
+     * key rather than an insert: a second call with the same key returns the
+     * same row and therefore the same provider identity instead of minting a
+     * second transfer. The fee recorded is the one quoted for this specific
+     * transfer, never a placeholder.
+     */
+    private function recordAttempt(
+        Student $student,
+        TuitionAccount $account,
+        StudentWallet $wallet,
+        int $amountBaseUnits,
+        string $requestKey,
+        string $quotedFee,
+    ): StudentTuitionPaymentAttempt {
+        $snapshot = $this->studentWallets->snapshot($student);
+        $available = is_string($snapshot->balance) ? $this->usdcBaseUnitsFrom($snapshot->balance) : 0;
+        $feeBaseUnits = $this->feeBaseUnits($quotedFee, roundUp: true);
+
+        return StudentTuitionPaymentAttempt::query()->updateOrCreate(
+            ['request_key' => $requestKey],
+            [
+                'student_id' => $student->getKey(),
+                'tuition_account_id' => $account->getKey(),
+                'student_wallet_id' => $wallet->getKey(),
+                'amount_base_units' => $amountBaseUnits,
+                'quoted_network_fee' => $quotedFee,
+                'fee_ceiling_base_units' => $feeBaseUnits,
+                'available_base_units' => $available,
+                'total_base_units' => $amountBaseUnits + $feeBaseUnits,
+                'payer_address' => $wallet->address,
+                'recipient_address' => $this->recipientAddress(),
+                'chain' => $this->studentWallets->chain(),
+                'chain_id' => $this->chainId(),
+                'state' => StudentTuitionPaymentState::PREPARED->value,
+                'stage' => 'recorded_not_sent',
+                'attempts' => 0,
+                'last_error' => null,
+            ],
+        );
+    }
+
+    private function markUnknown(StudentTuitionPaymentAttempt $attempt, string $reason): void
+    {
+        $attempt->forceFill([
+            'state' => StudentTuitionPaymentState::UNKNOWN->value,
+            'stage' => 'provider_refused_or_unreachable',
+            'last_error' => $reason,
+            'attempts' => $attempt->attempts + 1,
+        ])->save();
+    }
+
+    private function markUnverified(StudentTuitionPaymentAttempt $attempt, string $txHash, string $verdict, string $reason): void
+    {
+        $attempt->forceFill([
+            'provider_reference' => $txHash,
+            'state' => StudentTuitionPaymentState::AWAITING_VERIFICATION->value,
+            'stage' => 'reference_published_movement_unverified',
+            'settlement_verdict' => $verdict,
+            'settlement_reason' => $reason,
+            'last_error' => $reason,
+        ])->save();
+    }
+
+    /** @param array<string, mixed> $verdict */
+    private function markVerified(StudentTuitionPaymentAttempt $attempt, string $txHash, array $verdict, string $fee): void
+    {
+        $attempt->forceFill([
+            'provider_reference' => $txHash,
+            'state' => StudentTuitionPaymentState::VERIFIED->value,
+            'stage' => 'verified_movement',
+            'quoted_network_fee' => $fee,
+            'settlement_verdict' => $verdict['verdict'],
+            'settlement_reason' => $verdict['reason'],
+            'settlement_verified_at' => now(),
+            'last_error' => null,
+        ])->save();
+    }
+
+    private function idempotencyKey(string $requestKey): string
+    {
+        return 'tuition:'.$requestKey;
+    }
+
+    /**
+     * The chain an attempt belongs to, read from the installation's Arc config.
+     *
+     * A verification against the wrong chain proves nothing: an identical hash
+     * can exist on a different network and would be read as the same movement.
+     */
+    private function chainId(): int
+    {
+        $chainId = config('lepton.arc.chain_id', 5042002);
+
+        return (int) (is_numeric($chainId) ? $chainId : 5042002);
     }
 
     /**
@@ -190,10 +420,12 @@ class StudentTuitionPaymentService
         }
 
         if ($amountBaseUnits > $account->remainingAmount()) {
+            $owed = $account->remainingAmount();
+
             throw new RuntimeException(sprintf(
-                'Enter %.2f USDC or less — %.2f is still owed on this account.',
-                $account->remainingAmount() / 10 ** self::USDC_DECIMALS,
-                $account->remainingAmount() / 10 ** self::USDC_DECIMALS,
+                'Enter %s USDC or less — %s is still owed on this account.',
+                Amounts::toDecimalString($owed, self::USDC_DECIMALS),
+                Amounts::toDecimalString($owed, self::USDC_DECIMALS),
             ));
         }
 
@@ -206,16 +438,26 @@ class StudentTuitionPaymentService
         $fee = $this->quoteFee($wallet->address, $amountBaseUnits);
         $balanceBaseUnits = $this->usdcBaseUnitsFrom($snapshot->balance);
 
-        if ($balanceBaseUnits - $this->feeBaseUnits($fee) < $amountBaseUnits) {
+        // Compared against the fee rounded UP. Flooring it here is how a wallet
+        // holding exactly the quoted total ends up short by a remainder, which
+        // is a failed transfer the payer was told would work.
+        if ($balanceBaseUnits - $this->feeBaseUnits($fee, roundUp: true) < $amountBaseUnits) {
             throw new RuntimeException(sprintf(
-                'The wallet holds %.2f USDC but this payment needs %.2f plus about %s in network fees. Enter a smaller amount.',
-                $balanceBaseUnits / 10 ** self::USDC_DECIMALS,
-                $amountBaseUnits / 10 ** self::USDC_DECIMALS,
+                'The wallet holds %s USDC but this payment needs %s plus about %s in network fees. Enter a smaller amount.',
+                Amounts::toDecimalString($balanceBaseUnits, self::USDC_DECIMALS),
+                Amounts::toDecimalString($amountBaseUnits, self::USDC_DECIMALS),
                 $fee,
             ));
         }
     }
 
+    /**
+     * The fee the rail will charge, or a refusal when it will not say.
+     *
+     * An unreadable quote throws rather than resolving to a figure. A payer
+     * told a transfer is free will be charged one, and the difference is money
+     * they never agreed to spend.
+     */
     private function quoteFee(string $fromAddress, int $amountBaseUnits): string
     {
         if ($this->wallets instanceof FakeLeptonGateway) {
@@ -229,37 +471,22 @@ class StudentTuitionPaymentService
                 $amountBaseUnits,
                 $this->studentWallets->chain(),
             );
-        } catch (LeptonCliException) {
-            // A quote that cannot be read is reported as unknown, never as zero,
-            // so a payer is never told a transfer is free.
-            return '0.000000';
+        } catch (LeptonCliException $e) {
+            throw new RuntimeException(
+                'The network fee could not be read, so this payment cannot be quoted. Try again; if it persists, ask finance staff.',
+                $e->getCode(),
+                previous: $e,
+            );
         }
 
         $data = is_array($response['data'] ?? null) ? $response['data'] : $response;
         $fee = $data['networkFee'] ?? $data['medium']['networkFee'] ?? null;
 
-        return is_string($fee) && $fee !== '' ? $fee : '0.000000';
-    }
-
-    /**
-     * Read the transaction back from the chain.
-     *
-     * A hash in hand is only a claim that a transfer was submitted. Until the
-     * transaction is seen on-chain the payment is not recorded as settled.
-     */
-    private function verifyOnChain(string $txHash): bool
-    {
-        if ($this->wallets instanceof FakeLeptonGateway) {
-            return true;
+        if (! is_string($fee) || preg_match('/^\d+(\.\d+)?$/D', trim($fee)) !== 1 || (float) $fee <= 0.0) {
+            throw new RuntimeException('The network did not report a fee for this transfer, so it cannot be quoted.');
         }
 
-        try {
-            $tx = $this->arc->rpc('eth_getTransactionByHash', [$txHash]);
-        } catch (Throwable) {
-            return false;
-        }
-
-        return is_array($tx) && $tx !== [];
+        return $fee;
     }
 
     /**
@@ -272,24 +499,33 @@ class StudentTuitionPaymentService
     }
 
     /**
-     * The fee is 18-decimal native USDC. Truncated to the 6 decimals the ledger
-     * speaks, because a sub-cent fee is noise; the exact string is kept on the
-     * payment record.
+     * The fee is 18-decimal native USDC. It is converted exactly, and rounded
+     * up when asked, so an affordability check can never treat a sub-unit
+     * remainder as free: a wallet holding exactly the floored total is short by
+     * that remainder and the transfer fails after the payer was told it would
+     * work.
      */
-    private function feeBaseUnits(string $fee): int
+    private function feeBaseUnits(string $fee, bool $roundUp = false): int
     {
-        if (! preg_match('/^\d+(\.\d+)?$/', $fee)) {
+        if (preg_match('/^(\d+)(?:\.(\d+))?$/D', trim($fee), $matches) !== 1) {
             return 0;
         }
 
-        [$whole, $fraction] = array_pad(explode('.', $fee, 2), 2, '');
-        $whole = ltrim($whole, '0') ?: '0';
+        $whole = ltrim($matches[1], '0') ?: '0';
+        $fraction = $matches[2] ?? '';
 
         if (strlen($whole) > 12) {
             return 0;
         }
 
-        return ((int) $whole) * 1_000_000 + (int) str_pad(substr($fraction, 0, 6), 6, '0');
+        $truncated = substr($fraction.'000000', 0, 6);
+        $baseUnits = ((int) $whole) * 1_000_000 + (int) $truncated;
+
+        if ($roundUp && strlen($fraction) > 6 && ltrim(substr($fraction, 6), '0') !== '') {
+            $baseUnits++;
+        }
+
+        return $baseUnits;
     }
 
     /**

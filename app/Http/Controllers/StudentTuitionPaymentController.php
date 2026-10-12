@@ -9,6 +9,7 @@ use App\Models\TuitionAccount;
 use App\Services\StudentTuitionPaymentService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
+use Illuminate\Support\Str;
 
 /**
  * Tuition paid from the student's own wallet into the institution treasury.
@@ -16,6 +17,10 @@ use Illuminate\Http\Request;
  * The recipient is read from LEPTON_TREASURY_ADDRESS on the server and is never
  * taken from the request, and the student is always the authenticated user's
  * own record, so there is no id or address to forge.
+ *
+ * The `request_key` is minted by the server and echoed back to the payer on
+ * both the quote and the payment, so a confirmation, a retry and a page reload
+ * all converge on one durable payment attempt instead of a second transfer.
  */
 class StudentTuitionPaymentController extends Controller
 {
@@ -33,7 +38,10 @@ class StudentTuitionPaymentController extends Controller
 
         $quote = $this->payments->quote($student, $account, (int) $validated['amount_base_units']);
 
-        return response()->json($quote);
+        return response()->json([
+            ...$quote,
+            'request_key' => $this->requestKey($request),
+        ]);
     }
 
     public function store(Request $request): JsonResponse
@@ -42,19 +50,48 @@ class StudentTuitionPaymentController extends Controller
 
         $validated = $request->validate([
             'amount_base_units' => ['required', 'integer', 'min:1'],
+            // Echoed back from the quote, so the same identity is used for the
+            // transfer and for the posting that consumes its verification.
+            'request_key' => ['required', 'uuid'],
         ]);
 
-        $payment = $this->payments->pay($student, $account, (int) $validated['amount_base_units']);
+        $requestKey = (string) $validated['request_key'];
+
+        $payment = $this->payments->pay($student, $account, (int) $validated['amount_base_units'], $requestKey);
 
         return response()->json([
+            'request_key' => $requestKey,
             'tx_hash' => $payment->tx_hash,
             'amount' => $payment->amount(),
             'network_fee' => $payment->fee(),
             'recipient' => $payment->recipient_address,
             'chain' => $payment->chain,
             'verified' => $payment->tx_verified_on_chain,
-            'remaining' => $account->fresh()->remainingAmount() / 10 ** 6,
+            // A rehearsal says so, rather than presenting a receipt the payer
+            // could mistake for a settled payment.
+            'simulated' => $payment->simulated,
+            'applied_base_units' => $payment->applied_base_units,
+            'overpayment_base_units' => $payment->overpayment_base_units,
+            'remaining_base_units' => $account->fresh()->remainingAmount(),
         ]);
+    }
+
+    /**
+     * The identity a payment attempt keeps for its whole life.
+     *
+     * A client that already holds a key sends it back and keeps it; otherwise
+     * the server mints one. Either way the key is not derived from anything the
+     * client can influence about the transfer itself.
+     */
+    private function requestKey(Request $request): string
+    {
+        $provided = $request->input('request_key');
+
+        if (is_string($provided) && Str::isUuid($provided)) {
+            return $provided;
+        }
+
+        return Str::uuid()->toString();
     }
 
     /**

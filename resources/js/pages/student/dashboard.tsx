@@ -64,6 +64,21 @@ function shortAddress(address: string): string {
 }
 
 /**
+ * USDC's 6 decimals, formatted without a float. The amounts reach the browser as
+ * exact base units from the server, so a value this large cannot be rounded
+ * into the wrong receipt.
+ */
+function formatBaseUnits(baseUnits: number): string {
+    const whole = Math.floor(baseUnits / 1_000_000);
+    const cents = String(Math.round((baseUnits % 1_000_000) / 10_000)).padStart(
+        2,
+        '0',
+    );
+
+    return `${whole.toLocaleString('en-US')}.${cents}`;
+}
+
+/**
  * An on-chain balance arrives as an exact decimal string at Arc's 18
  * decimals, so it is grouped with BigInt and never passes through a float.
  */
@@ -118,11 +133,20 @@ export default function StudentDashboard({
     const [payError, setPayError] = useState<string | null>(null);
     const [quoting, setQuoting] = useState(false);
     const [paying, setPaying] = useState(false);
+    /**
+     * The identity this attempt keeps for its whole life, minted when the quote
+     * is requested and echoed back by both endpoints. Holding it in state is
+     * what stops a retry from becoming a second transfer.
+     */
+    const [requestKey, setRequestKey] = useState<string | null>(null);
     const [receipt, setReceipt] = useState<{
         amount: string;
         network_fee: string;
         tx_hash: string;
-        remaining: number;
+        simulated: boolean;
+        applied_base_units: number;
+        overpayment_base_units: number;
+        remaining_base_units: number;
     } | null>(null);
 
     const defaultPayBaseUnits = Math.min(
@@ -161,6 +185,7 @@ export default function StudentDashboard({
                 body: JSON.stringify({
                     tuition_account_id: tuitionAccount?.id,
                     amount_base_units: baseUnits,
+                    request_key: requestKey ?? undefined,
                 }),
             });
 
@@ -177,6 +202,7 @@ export default function StudentDashboard({
             }
 
             setPayQuote(payload);
+            setRequestKey(payload.request_key ?? null);
         } catch {
             setPayError('Could not reach the payment network.');
         } finally {
@@ -193,7 +219,8 @@ export default function StudentDashboard({
             return;
         }
 
-        if (!payQuote) {
+        if (!payQuote || !requestKey) {
+            setPayError('Get a fresh fee quote before sending this payment.');
             await requestQuote(baseUnits);
 
             return;
@@ -217,6 +244,7 @@ export default function StudentDashboard({
                 body: JSON.stringify({
                     tuition_account_id: tuitionAccount?.id,
                     amount_base_units: baseUnits,
+                    request_key: requestKey,
                 }),
             });
 
@@ -234,7 +262,10 @@ export default function StudentDashboard({
                 amount: payload.amount,
                 network_fee: payload.network_fee,
                 tx_hash: payload.tx_hash,
-                remaining: payload.remaining,
+                simulated: payload.simulated,
+                applied_base_units: payload.applied_base_units,
+                overpayment_base_units: payload.overpayment_base_units,
+                remaining_base_units: payload.remaining_base_units,
             });
 
             // The wallet balance and paid figures both changed on-chain.
@@ -344,13 +375,23 @@ export default function StudentDashboard({
 
                             {receipt ? (
                                 <div className="grid gap-4">
-                                    <p className="clay-title text-[var(--status-resolved)]">
-                                        Payment sent.
+                                    <p
+                                        className={
+                                            receipt.simulated
+                                                ? 'clay-title text-[var(--status-pending)]'
+                                                : 'clay-title text-[var(--status-resolved)]'
+                                        }
+                                    >
+                                        {receipt.simulated
+                                            ? 'Rehearsal — nothing was sent.'
+                                            : 'Payment sent.'}
                                     </p>
                                     <dl className="grid gap-3 text-sm">
                                         <div className="flex items-baseline justify-between gap-4">
                                             <dt className="clay-meta">
-                                                Paid to the institution
+                                                {receipt.simulated
+                                                    ? 'Would be sent to the institution'
+                                                    : 'Paid to the institution'}
                                             </dt>
                                             <dd className="clay-title tabular-nums">
                                                 {receipt.amount}
@@ -358,7 +399,9 @@ export default function StudentDashboard({
                                         </div>
                                         <div className="flex items-baseline justify-between gap-4">
                                             <dt className="clay-meta">
-                                                Network fee (paid by you)
+                                                {receipt.simulated
+                                                    ? 'Network fee (not charged)'
+                                                    : 'Network fee (paid by you)'}
                                             </dt>
                                             <dd className="clay-title tabular-nums">
                                                 {receipt.network_fee}
@@ -366,10 +409,36 @@ export default function StudentDashboard({
                                         </div>
                                         <div className="flex items-baseline justify-between gap-4">
                                             <dt className="clay-meta">
+                                                Applied to this account
+                                            </dt>
+                                            <dd className="clay-title tabular-nums">
+                                                {formatBaseUnits(
+                                                    receipt.applied_base_units,
+                                                )}{' '}
+                                                USDC
+                                            </dd>
+                                        </div>
+                                        {receipt.overpayment_base_units > 0 && (
+                                            <div className="flex items-baseline justify-between gap-4">
+                                                <dt className="clay-meta">
+                                                    Larger than what was owed
+                                                </dt>
+                                                <dd className="clay-title tabular-nums text-[var(--status-pending)]">
+                                                    {formatBaseUnits(
+                                                        receipt.overpayment_base_units,
+                                                    )}{' '}
+                                                    USDC
+                                                </dd>
+                                            </div>
+                                        )}
+                                        <div className="flex items-baseline justify-between gap-4">
+                                            <dt className="clay-meta">
                                                 Still owed
                                             </dt>
                                             <dd className="clay-title tabular-nums">
-                                                {receipt.remaining.toFixed(2)}{' '}
+                                                {formatBaseUnits(
+                                                    receipt.remaining_base_units,
+                                                )}{' '}
                                                 USDC
                                             </dd>
                                         </div>
@@ -383,10 +452,18 @@ export default function StudentDashboard({
                                         </div>
                                     </dl>
                                     <p className="clay-meta">
-                                        The network fee goes to the Arc network,
-                                        not to the school, and is not
-                                        refundable.
+                                        {receipt.simulated
+                                            ? 'No USDC moved on any network, and no fee was charged.'
+                                            : 'The network fee goes to the Arc network, not to the school, and is not refundable.'}
                                     </p>
+                                    {receipt.overpayment_base_units > 0 && (
+                                        <p className="clay-meta">
+                                            You paid more than this account
+                                            owed, so the excess is recorded
+                                            against your account rather than
+                                            absorbed into the school's budget.
+                                        </p>
+                                    )}
                                     <Button
                                         type="button"
                                         className="clay-focus rounded-full bg-[var(--clay-primary)] font-semibold text-[var(--clay-primary-foreground)]"

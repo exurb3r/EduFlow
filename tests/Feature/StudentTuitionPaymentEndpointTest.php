@@ -12,6 +12,7 @@ use App\Models\Wallet;
 use App\Services\CircleAgentWalletCli;
 use App\Services\StudentWalletGenerationService;
 use Illuminate\Support\Facades\Cache;
+use Illuminate\Support\Str;
 use Spatie\Permission\Models\Role;
 use Yukazakiri\Lepton\Contracts\WalletGateway;
 use Yukazakiri\Lepton\DTOs\BalanceResult;
@@ -100,16 +101,49 @@ test('a student can quote and pay their own tuition', function (): void {
 
     $quote->assertOk()->assertJsonPath('amount_base_units', 5_000000);
 
+    // The identity the quote mints is the identity the payment reuses, so the
+    // payer is never one confirmation away from a second transfer.
+    $requestKey = (string) $quote->json('request_key');
+
     $paid = $this->postJson(route('student.tuition.pay'), [
         'tuition_account_id' => $account->id,
         'amount_base_units' => 5_000000,
+        'request_key' => $requestKey,
     ]);
 
-    $paid->assertOk()
-        ->assertJsonPath('amount', '5.0 USDC')
-        ->assertJsonPath('remaining', 295);
+    $paid->assertOk()->assertJsonPath('request_key', $requestKey);
 
-    expect($account->fresh()->remainingAmount())->toBe(295_000000);
+    // Without a provider configured this is a rehearsal, and a rehearsal
+    // records a receipt but never claims the debt was settled.
+    $payment = StudentTuitionPayment::query()->where('request_key', $requestKey)->first();
+
+    expect($payment)->not->toBeNull()
+        ->and($payment->simulated)->toBeTrue()
+        ->and($payment->tx_verified_on_chain)->toBeFalse()
+        ->and($payment->applied_base_units)->toBe(0)
+        ->and($account->fresh()->remainingAmount())->toBe(300_000000);
+});
+
+test('the quote returns the request key the payment must echo back', function (): void {
+    [$student, $account] = payEndpointStudent();
+
+    $this->actingAs($student->user->assignRole('student'));
+
+    $requestKey = (string) Str::uuid();
+
+    $this->postJson(route('student.tuition.quote'), [
+        'tuition_account_id' => $account->id,
+        'amount_base_units' => 5_000000,
+        'request_key' => $requestKey,
+    ])->assertOk()->assertJsonPath('request_key', $requestKey);
+
+    // A key the client did not mint is refused, so a crafted form cannot pick
+    // the identity its payment is posted under.
+    $this->postJson(route('student.tuition.pay'), [
+        'tuition_account_id' => $account->id,
+        'amount_base_units' => 5_000000,
+        'request_key' => 'not-a-uuid',
+    ])->assertUnprocessable();
 });
 
 test('a guest cannot pay tuition', function (): void {
@@ -178,11 +212,29 @@ test('a chain failure is reported, not recorded', function (): void {
 
     $this->actingAs($student->user->assignRole('student'));
 
+    $requestKey = (string) Str::uuid();
+
     $this->postJson(route('student.tuition.pay'), [
         'tuition_account_id' => $account->id,
         'amount_base_units' => 5_000000,
+        'request_key' => $requestKey,
     ])->assertStatus(500);
 
     expect(StudentTuitionPayment::query()->count())->toBe(0)
         ->and($account->fresh()->remainingAmount())->toBe(300_000000);
+});
+
+test('a payment request without a durable identity is refused', function (): void {
+    [$student, $account] = payEndpointStudent();
+
+    $this->actingAs($student->user->assignRole('student'));
+
+    // Without a key the payer could be one confirmation away from minting a
+    // second transfer, so the server refuses rather than inventing an identity.
+    $this->postJson(route('student.tuition.pay'), [
+        'tuition_account_id' => $account->id,
+        'amount_base_units' => 5_000000,
+    ])->assertUnprocessable()->assertJsonValidationErrors('request_key');
+
+    expect(StudentTuitionPayment::query()->count())->toBe(0);
 });

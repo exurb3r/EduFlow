@@ -2490,8 +2490,10 @@ under §14.10; merge alone does not remove production/custody or institutional-c
 
 ### 14.7 Cashier Intake, Policy Decisions and Bounded Autonomy
 
-**Status:** cashier capture/review screens are delivered; merged portal payments remain
-disconnected from their evidence path and need the safety work in §14.10. Background outgoing
+**Status:** cashier capture/review screens are delivered; the merged portal lane now holds one
+durable attempt per payment, proves movement before posting and posts exactly once (§14.10 B0),
+but its receipts are still disconnected from the cashier evidence path and from planning. Background
+outgoing
 execution is not established by either intake screen. Tuition is the first example; intake can
 later cover laboratory/registration/examination fees, service charges, donations, grants,
 rentals and other approved receipts. Different receipt types must not be collapsed into
@@ -2740,6 +2742,31 @@ claims to recheck, not evidence to promote. Preserve any discrepancy and history
 delete records, reverse tuition balances or rewrite confirmations automatically. The product
 owner must explicitly authorize any pause/configuration change or financial correction.
 
+**B0 delivered 2026-10-12 (portal safety).** The correctness gates in the rows above are now
+closed in code. What remains open is the consent/UI half of the Student entry row and the whole
+of the custody row.
+
+| Merged defect | Closure |
+| --- | --- |
+| Posted even when verification returned false; fake verification returned true | `pay()` posts only on `verdict === 'verified'` from `ArcSettlementVerifier` — the same predicate the outgoing lane uses, not a weaker copy. `mismatched`, `reverted`, `not_found` and `unreadable` write no receipt, no `paid_amount` increment and no ledger row, and raise an error telling the payer not to send again |
+| Verified only transaction presence | Receipt `status === '0x1'`, committed `blockNumber`, and the USDC Transfer log's payer/recipient/exact amount at emitter-specific decimals |
+| Fresh provider UUID per pay call | `StudentTuitionPaymentAttempt` is written before the signer is reached, keyed on a server-minted `request_key` (`updateOrCreate`). The same key is the provider idempotency key and a unique index on `student_tuition_payments`, so a repeated confirmation returns the receipt already posted |
+| Failed/malformed fee quotes became zero | `quoteFee()` throws on an unreadable, malformed or zero `networkFee` rather than falling back to `'0.000000'` |
+| Fee affordability truncated | `feeBaseUnits($fee, roundUp: true)` for affordability, so a wallet holding exactly the quoted total is not short by a sub-unit remainder |
+| Exact ledger crosses and float formatting | Balances and owed amounts format through `Amounts::toDecimalString`, not `%.2f` |
+| Fake-driver payments settled tuition and told the student "Payment sent" | `pay()` short-circuits to `rehearse()` on the fake driver: the receipt is written with `simulated = true`, `tx_verified_on_chain = false`, zero allocation and no ledger row. `isReal()` is false for it, and the portal reads "Rehearsal — nothing was sent" |
+
+Overpayment is now derived rather than dropped. `allocateToTuition()` re-reads the account
+`lockForUpdate()` and applies `min(amount, remaining)`, recording the excess as
+`overpayment_base_units`. The pay form still refuses an over-limit amount; the bucket covers the
+race where the debt shrinks after the payer confirmed.
+
+**Still open in B0:** asynchronous provider-handle resolution as a background worker (the
+attempt's `accepted`/`unknown` states exist and are readable, but no worker observes them yet),
+and student-facing attempt history/status. Live settlement still requires explicit owner
+authorization; nothing in this section moved USDC, created or funded a wallet, or enabled a
+runtime flag.
+
 #### 14.10.2 One receipt lifecycle, three separate status dimensions
 
 For direct payments, adapt the existing payment transport, exact-money and settlement
@@ -2845,6 +2872,12 @@ merely to demonstrate the UI.
 | B5 — standing automation | Independently approved recurring mandate, due occurrence identity, cumulative caps and isolated scheduled execution. Design in **§18**; dependency chain in §18.7 | Scheduler pays one eligible approved occurrence automatically on testnet without chat/per-item click; over-limit valid bill routes to staff and hard failure stays blocked |
 | B6 — college evaluation | Permissioned staff demo, background/approval/autonomy evidence and agreed value metrics | Staff confirms usefulness; record baseline, corrections, delays and unresolved cases without claiming bank settlement or production readiness |
 
+**Status.** B0 is delivered on the correctness path: durable attempt identity, `ArcSettlementVerifier`
+movement proof, exactly-once posting, exact fee policy, derived overpayment, and a rehearsal that
+never claims money moved (see the B0 table in §14.10.1). B0's asynchronous provider-handle
+observation and student-facing attempt history remain open and roll into B2/B3. B1–B6 are
+unstarted.
+
 Do B0 before promoting merged digital records; then B1–B3 connect intake to the existing
 supervised flow. B4's unresolved outbound attempt/package/fee issues may be investigated
 read-only in parallel, but inbound UI cannot bypass them. Existing historical payment records
@@ -2947,7 +2980,7 @@ does not establish independent control by the student or a separate custodian ac
 | Leg | Current state | Why |
 | --- | --- | --- |
 | Institution **outbound** (agent pays a vendor) | Structurally designed, deliberately simulated | `VendorDestinationVersion` binds a reviewed address, but §14.3.5 requires that address to be an **operator-controlled testnet recipient** mapped to a vendor *alias*. The real vendor holds nothing and receives nothing. |
-| Institution **inbound** (a payer funds the institution) | Partial student tuition path merged | `StudentTuitionPayment` binds a student/account and attempted transfer, but durable intent, strong movement verification, safe posting and Collections/planning integration remain §14.10 work. Generic §12.5 collection intents/suspense and legal payer identity remain unbuilt. |
+| Institution **inbound** (a payer funds the institution) | Student tuition path hardened under §14.10 B0 | `StudentTuitionPayment` binds a student/account and attempted transfer; as of 2026-10-12 a durable `StudentTuitionPaymentAttempt` precedes the send, posting requires `ArcSettlementVerifier` movement proof, the receipt posts exactly once under a request key, overpayment is derived separately, and a fake-driver run is recorded as a rehearsal that settles nothing. Async handle observation, student attempt history, and Collections/planning integration remain §14.10 work. Generic §12.5 collection intents/suspense and legal payer identity remain unbuilt. |
 | Student | Wallet/balance page and operator-generated Circle address available | `Student.payout_address` now drives common reads and can match a generated `StudentWallet`. It is still not proof that the student independently controls signing. |
 | Vendor | A free-text alias plus a reviewed address | `Vendor.wallet_address` is legacy master data. The reviewed path is `VendorDestinationVersion`, whose address is operator-controlled during the pilot. |
 
