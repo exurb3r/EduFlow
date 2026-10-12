@@ -5,16 +5,20 @@ declare(strict_types=1);
 namespace App\Http\Controllers;
 
 use App\Actions\PreviewStudentEligibility;
+use App\DTOs\Money;
+use App\DTOs\StudentWalletSnapshot;
 use App\Enums\AgentDecisionType;
 use App\Enums\CurrencyCode;
 use App\Models\AgentDecision;
 use App\Models\AssistanceRequest;
 use App\Models\Transaction;
 use App\Services\CurrencyConverter;
+use App\Services\StudentWalletService;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Inertia\Inertia;
 use Inertia\Response;
+use InvalidArgumentException;
 
 class StudentDashboardController extends Controller
 {
@@ -49,6 +53,7 @@ class StudentDashboardController extends Controller
             $remainingBase = (int) $account->remainingAmount();
 
             $tuitionAccountData = [
+                'id' => $account->getKey(),
                 'term' => $account->academicTerm->name,
                 'total_amount' => (string) $account->total_amount,
                 'paid_amount' => (string) $account->paid_amount,
@@ -80,8 +85,11 @@ class StudentDashboardController extends Controller
             ];
         });
 
+        $walletAddress = app(StudentWalletService::class)->addressFor($student);
+        $walletSnapshot = app(StudentWalletService::class)->snapshot($student);
+
         $recentTransactions = Transaction::query()
-            ->where('recipient_address', $request->user()->wallet_address ?? '')
+            ->paidTo($walletAddress)
             ->whereIn('type', ['student_assistance', 'refund'])
             ->latest('executed_at')
             ->limit(5)
@@ -101,14 +109,16 @@ class StudentDashboardController extends Controller
             ->values();
 
         $confirmedTotal = (float) Transaction::query()
-            ->where('recipient_address', $request->user()->wallet_address ?? '')
+            ->paidTo($walletAddress)
             ->whereIn('type', ['student_assistance', 'refund'])
             ->where('status', 'confirmed')
             ->sum('amount');
 
         return Inertia::render('student/dashboard', [
             'wallet' => [
-                'address' => $request->user()->wallet_address,
+                'address' => $walletAddress,
+                'snapshot' => $walletSnapshot->toArray(),
+                'balance_fiat' => $this->walletBalanceFiat($walletSnapshot, $converter, $displayCurrency),
             ],
             'totals' => [
                 'confirmed' => $confirmedTotal,
@@ -137,5 +147,57 @@ class StudentDashboardController extends Controller
                 'How does currency rate locking work?',
             ],
         ]);
+    }
+
+    /**
+     * The wallet balance as a local-currency figure, for a wallet card that
+     * reads like the payment apps a student already uses.
+     *
+     * The on-chain balance is read at Arc's 18 decimals, so it is truncated to
+     * USDC's 6 before the quote is applied: a fiat equivalent of sub-cent
+     * precision is noise, and Amounts::fromDecimalString() rejects any more.
+     */
+    private function walletBalanceFiat(StudentWalletSnapshot $snapshot, CurrencyConverter $converter, CurrencyCode $displayCurrency): ?string
+    {
+        if (! $snapshot->isReadable() || ! is_string($snapshot->balance)) {
+            return null;
+        }
+
+        $baseUnits = $this->usdcBaseUnitsFrom($snapshot->balance);
+
+        if ($baseUnits === null) {
+            return null;
+        }
+
+        try {
+            $fiat = new Money($converter->usdcToFiat($baseUnits, $displayCurrency), $displayCurrency);
+        } catch (InvalidArgumentException) {
+            return null;
+        }
+
+        return $displayCurrency->symbol().$fiat->format().' '.$displayCurrency->value;
+    }
+
+    /**
+     * Truncate a decimal string to USDC's 6 decimals and convert to base units
+     * with string arithmetic, so an 18-decimal chain value never round-trips
+     * through a float. Returns null rather than guessing at an absurd figure.
+     */
+    private function usdcBaseUnitsFrom(string $decimal): ?int
+    {
+        if (! preg_match('/^\d+(\.\d+)?$/', $decimal)) {
+            return null;
+        }
+
+        [$whole, $fraction] = array_pad(explode('.', $decimal, 2), 2, '');
+        $whole = ltrim($whole, '0') ?: '0';
+
+        if (strlen($whole) > 12) {
+            return null;
+        }
+
+        $fraction = str_pad(substr($fraction, 0, 6), 6, '0');
+
+        return ((int) $whole) * 1_000_000 + (int) $fraction;
     }
 }

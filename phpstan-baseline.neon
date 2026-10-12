@@ -559,12 +559,6 @@ parameters:
 			path: app/Filament/Pages/AdminAiChat.php
 
 		-
-			rawMessage: 'Parameter #1 $boolean of function abort_unless expects bool, App\Models\Organization|null given.'
-			identifier: argument.type
-			count: 1
-			path: app/Filament/Pages/AdminAiChat.php
-
-		-
 			rawMessage: 'Parameter #1 $callback of method Illuminate\Support\Collection<int,stdClass>::first() expects (callable(stdClass, int): bool)|null, Closure(App\Models\ChatSession): bool given.'
 			identifier: argument.type
 			count: 1
@@ -973,6 +967,12 @@ parameters:
 			path: app/Models/Organization.php
 
 		-
+			rawMessage: Type Database\Factories\StudentTuitionPaymentFactory in generic type Illuminate\Database\Eloquent\Factories\HasFactory<Database\Factories\StudentTuitionPaymentFactory> in PHPDoc tag @use is not subtype of template type TFactory of Illuminate\Database\Eloquent\Factories\Factory of trait Illuminate\Database\Eloquent\Factories\HasFactory.
+			identifier: generics.notSubtype
+			count: 1
+			path: app/Models/StudentTuitionPayment.php
+
+		-
 			rawMessage: 'Method App\Models\User::chatSessions() should return Illuminate\Database\Eloquent\Relations\HasMany<App\Models\ChatSession, $this(App\Models\User)> but returns Illuminate\Database\Eloquent\Builder<App\Models\ChatSession>.'
 			identifier: return.type
 			count: 1
@@ -1121,6 +1121,42 @@ parameters:
 			identifier: staticMethod.notFound
 			count: 1
 			path: app/Services/PolicyEngineService.php
+
+		-
+			rawMessage: 'Call to an undefined static method App\Models\StudentTuitionPayment::create().'
+			identifier: staticMethod.notFound
+			count: 1
+			path: app/Services/StudentTuitionPaymentService.php
+
+		-
+			rawMessage: 'Call to an undefined static method App\Models\Transaction::create().'
+			identifier: staticMethod.notFound
+			count: 1
+			path: app/Services/StudentTuitionPaymentService.php
+
+		-
+			rawMessage: 'Call to function is_string() with string will always evaluate to true.'
+			identifier: function.alreadyNarrowedType
+			count: 1
+			path: app/Services/StudentTuitionPaymentService.php
+
+		-
+			rawMessage: 'Call to protected method increment() of class Illuminate\Database\Eloquent\Model.'
+			identifier: method.protected
+			count: 2
+			path: app/Services/StudentTuitionPaymentService.php
+
+		-
+			rawMessage: 'Call to an undefined static method App\Models\StudentWallet::create().'
+			identifier: staticMethod.notFound
+			count: 1
+			path: app/Services/StudentWalletGenerationService.php
+
+		-
+			rawMessage: 'Call to an undefined static method App\Models\StudentWalletFunding::create().'
+			identifier: staticMethod.notFound
+			count: 1
+			path: app/Services/StudentWalletGenerationService.php
 
 		-
 			rawMessage: 'Call to an undefined static method App\Models\Invoice::where().'
@@ -2887,6 +2923,12 @@ parameters:
 			path: tests/Feature/Filament/SocialLoginSettingsPageTest.php
 
 		-
+			rawMessage: 'Call to an undefined method Livewire\Features\SupportTesting\Testable::callAction().'
+			identifier: method.notFound
+			count: 2
+			path: tests/Feature/Filament/StudentResourceTest.php
+
+		-
 			rawMessage: 'Call to an undefined method Livewire\Features\SupportTesting\Testable::fillForm().'
 			identifier: method.notFound
 			count: 6
@@ -2895,7 +2937,7 @@ parameters:
 		-
 			rawMessage: 'Call to an undefined method Pest\PendingCalls\TestCall::actingAs().'
 			identifier: method.notFound
-			count: 9
+			count: 11
 			path: tests/Feature/Filament/StudentResourceTest.php
 
 		-
@@ -2909,6 +2951,18 @@ parameters:
 			identifier: staticMethod.notFound
 			count: 1
 			path: tests/Feature/Filament/StudentResourceTest.php
+
+		-
+			rawMessage: 'Call to an undefined method Illuminate\Testing\TestResponse::assertSet().'
+			identifier: method.notFound
+			count: 7
+			path: tests/Feature/Filament/StudentWalletWidgetTest.php
+
+		-
+			rawMessage: 'Call to an undefined method Pest\PendingCalls\TestCall::actingAs().'
+			identifier: method.notFound
+			count: 11
+			path: tests/Feature/Filament/StudentWalletWidgetTest.php
 
 		-
 			rawMessage: Access to an undefined property Pest\PendingCalls\TestCall::$term.
@@ -3477,14 +3531,26 @@ parameters:
 		-
 			rawMessage: 'Access to an undefined property Illuminate\Database\Eloquent\Collection<int, Illuminate\Database\Eloquent\Model>|Illuminate\Database\Eloquent\Model::$id.'
 			identifier: property.notFound
+			count: 7
+			path: tests/Feature/StudentAssistanceFlowTest.php
+
+		-
+			rawMessage: 'Call to an undefined method Pest\PendingCalls\TestCall::actingAs().'
+			identifier: method.notFound
 			count: 6
 			path: tests/Feature/StudentAssistanceFlowTest.php
 
 		-
 			rawMessage: 'Call to an undefined method Pest\PendingCalls\TestCall::actingAs().'
 			identifier: method.notFound
-			count: 5
-			path: tests/Feature/StudentAssistanceFlowTest.php
+			count: 6
+			path: tests/Feature/StudentDashboardWalletTest.php
+
+		-
+			rawMessage: 'Call to an undefined method Pest\PendingCalls\TestCall::get().'
+			identifier: method.notFound
+			count: 8
+			path: tests/Feature/StudentDashboardWalletTest.php
 
 		-
 			rawMessage: Access to an undefined property Pest\PendingCalls\TestCall::$fund.
@@ -3527,6 +3593,126 @@ parameters:
 			identifier: staticMethod.notFound
 			count: 1
 			path: tests/Feature/StudentEligibilityPreviewTest.php
+
+		-
+			rawMessage: 'Access to an undefined property Illuminate\Database\Eloquent\Collection<int, Illuminate\Database\Eloquent\Model>|Illuminate\Database\Eloquent\Model::$id.'
+			identifier: property.notFound
+			count: 1
+			path: tests/Feature/StudentTuitionPaymentEndpointTest.php
+
+		-
+			rawMessage: 'Call to an undefined method Pest\PendingCalls\TestCall::actingAs().'
+			identifier: method.notFound
+			count: 4
+			path: tests/Feature/StudentTuitionPaymentEndpointTest.php
+
+		-
+			rawMessage: 'Call to an undefined method Pest\PendingCalls\TestCall::postJson().'
+			identifier: method.notFound
+			count: 6
+			path: tests/Feature/StudentTuitionPaymentEndpointTest.php
+
+		-
+			rawMessage: 'Access to an undefined property Illuminate\Database\Eloquent\Collection<int, Illuminate\Database\Eloquent\Model>|Illuminate\Database\Eloquent\Model::$id.'
+			identifier: property.notFound
+			count: 1
+			path: tests/Feature/StudentTuitionPaymentTest.php
+
+		-
+			rawMessage: Access to an undefined property Pest\PendingCalls\TestCall::$organization.
+			identifier: property.notFound
+			count: 1
+			path: tests/Feature/StudentTuitionPaymentTest.php
+
+		-
+			rawMessage: Access to an undefined property Pest\PendingCalls\TestCall::$treasury.
+			identifier: property.notFound
+			count: 2
+			path: tests/Feature/StudentTuitionPaymentTest.php
+
+		-
+			rawMessage: Access to an undefined property Pest\PendingCalls\TestCall::$wallets.
+			identifier: property.notFound
+			count: 1
+			path: tests/Feature/StudentTuitionPaymentTest.php
+
+		-
+			rawMessage: 'Property App\Services\CircleAgentWalletCli@anonymous/tests/Feature/StudentTuitionPaymentTest.php:33::$failure is never read, only written.'
+			identifier: property.onlyWritten
+			count: 1
+			path: tests/Feature/StudentTuitionPaymentTest.php
+
+		-
+			rawMessage: Access to an undefined property Pest\PendingCalls\TestCall::$wallets.
+			identifier: property.notFound
+			count: 4
+			path: tests/Feature/StudentWalletCommandsTest.php
+
+		-
+			rawMessage: 'Call to an undefined method Pest\PendingCalls\TestCall::artisan().'
+			identifier: method.notFound
+			count: 9
+			path: tests/Feature/StudentWalletCommandsTest.php
+
+		-
+			rawMessage: Access to an undefined property Pest\PendingCalls\TestCall::$wallets.
+			identifier: property.notFound
+			count: 8
+			path: tests/Feature/StudentWalletGenerationTest.php
+
+		-
+			rawMessage: Access to an undefined property Pest\PendingCalls\TestCall::$fake.
+			identifier: property.notFound
+			count: 4
+			path: tests/Feature/StudentWalletPageTest.php
+
+		-
+			rawMessage: 'Call to an undefined method Pest\PendingCalls\TestCall::actingAs().'
+			identifier: method.notFound
+			count: 2
+			path: tests/Feature/StudentWalletPageTest.php
+
+		-
+			rawMessage: 'Call to an undefined method Pest\PendingCalls\TestCall::get().'
+			identifier: method.notFound
+			count: 7
+			path: tests/Feature/StudentWalletPageTest.php
+
+		-
+			rawMessage: 'Call to an undefined method Pest\PendingCalls\TestCall::patch().'
+			identifier: method.notFound
+			count: 3
+			path: tests/Feature/StudentWalletPageTest.php
+
+		-
+			rawMessage: 'Call to an undefined method Pest\PendingCalls\TestCall::post().'
+			identifier: method.notFound
+			count: 2
+			path: tests/Feature/StudentWalletPageTest.php
+
+		-
+			rawMessage: 'Call to an undefined method Pest\PendingCalls\TestCall|Pest\Support\HigherOrderTapProxy::actingAs().'
+			identifier: method.notFound
+			count: 1
+			path: tests/Feature/StudentWalletPageTest.php
+
+		-
+			rawMessage: Access to an undefined property Pest\PendingCalls\TestCall::$fake.
+			identifier: property.notFound
+			count: 6
+			path: tests/Feature/StudentWalletServiceTest.php
+
+		-
+			rawMessage: Access to an undefined property Pest\PendingCalls\TestCall::$service.
+			identifier: property.notFound
+			count: 16
+			path: tests/Feature/StudentWalletServiceTest.php
+
+		-
+			rawMessage: Anonymous function should return null but returns bool.
+			identifier: return.type
+			count: 1
+			path: tests/Feature/StudentWalletServiceTest.php
 
 		-
 			rawMessage: Access to an undefined property Pest\PendingCalls\TestCall::$forecastService.

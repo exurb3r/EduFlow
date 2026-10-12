@@ -4,33 +4,80 @@ declare(strict_types=1);
 
 namespace App\Http\Controllers;
 
+use App\Models\Student;
+use App\Services\StudentWalletService;
+use Illuminate\Http\JsonResponse;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Validation\Rule;
+use Inertia\Inertia;
+use Inertia\Response;
 
 class StudentWalletController extends Controller
 {
+    public function __construct(
+        private readonly StudentWalletService $wallets,
+    ) {}
+
+    /**
+     * The student's own wallet screen: live balance, receive details, and the
+     * chain state the number came from.
+     */
+    public function show(Request $request): Response
+    {
+        $student = $this->studentFor($request);
+
+        return Inertia::render('student/wallet', [
+            'snapshot' => $this->wallets->snapshot($student)->toArray(),
+        ]);
+    }
+
+    /**
+     * Re-read the chain, bypassing the short cache, so the refresh action shows
+     * current state rather than the copy cached moments ago.
+     */
+    public function refresh(Request $request): JsonResponse
+    {
+        $student = $this->studentFor($request);
+
+        $this->wallets->forget($student);
+
+        return response()->json([
+            'snapshot' => $this->wallets->snapshot($student)->toArray(),
+        ]);
+    }
+
     public function update(Request $request): RedirectResponse
     {
+        $student = $this->studentFor($request);
+
         $validated = $request->validate([
-            // Placeholder shape validation until a real chain validator
-            // (e.g. web3 address checksum) is wired in.
+            // Same pattern the disbursement path enforces. A wallet address is
+            // a destination money is sent to, so a shape that Circle would
+            // reject must not be accepted here.
             'wallet_address' => [
                 'required',
                 'string',
-                'min:16',
-                'max:64',
-                'regex:/^0x[a-fA-F0-9]{16,62}$/',
-                Rule::unique('users', 'wallet_address')->ignore($request->user()->id),
+                'regex:'.Student::PAYOUT_ADDRESS_PATTERN,
+                Rule::unique('students', 'payout_address')->ignore($student->id),
             ],
         ], [
-            'wallet_address.regex' => 'Enter a valid wallet address (0x followed by hexadecimal characters).',
+            'wallet_address.regex' => 'Enter a wallet address: 0x followed by exactly 40 hexadecimal characters.',
         ]);
 
-        $request->user()->update([
-            'wallet_address' => strtolower((string) $validated['wallet_address']),
-        ]);
+        $this->wallets->setAddress($student, (string) $validated['wallet_address']);
 
         return back()->with('status', 'wallet-updated');
+    }
+
+    /**
+     * The wallet belongs to the authenticated student's own record. No student
+     * id is ever taken from the request, so there is no id to forge.
+     */
+    private function studentFor(Request $request): Student
+    {
+        abort_unless($request->user()?->hasRole('student'), 403);
+
+        return $request->user()->student()->firstOrFail();
     }
 }

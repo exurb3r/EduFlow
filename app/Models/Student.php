@@ -10,6 +10,10 @@ use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
+use Illuminate\Database\Eloquent\Relations\HasManyThrough;
+use Illuminate\Database\Eloquent\Relations\HasOne;
+use Spatie\Activitylog\LogOptions;
+use Spatie\Activitylog\Traits\LogsActivity;
 
 /**
  * @property int $id
@@ -24,11 +28,15 @@ use Illuminate\Database\Eloquent\Relations\HasMany;
  * @property-read User $user
  * @property-read Collection<int, TuitionAccount> $tuitionAccounts
  * @property-read Collection<int, AssistanceRequest> $assistanceRequests
+ * @property-read StudentWallet|null $wallet
+ * @property-read Collection<int, StudentWalletFunding> $walletFundings
  */
 class Student extends Model
 {
     /** @use HasFactory<StudentFactory> */
     use HasFactory;
+
+    use LogsActivity;
 
     /**
      * 0x followed by exactly 40 hex characters. Circle rejects anything else
@@ -76,6 +84,23 @@ class Student extends Model
         return $this->hasMany(AssistanceRequest::class);
     }
 
+    /** @return HasOne<StudentWallet, $this> */
+    public function wallet(): HasOne
+    {
+        return $this->hasOne(StudentWallet::class);
+    }
+
+    /**
+     * The wallet is minted once per student, so this reads through it rather
+     * than keeping a second address on the student row.
+     *
+     * @return HasManyThrough<StudentWalletFunding, StudentWallet, $this>
+     */
+    public function walletFundings(): HasManyThrough
+    {
+        return $this->hasManyThrough(StudentWalletFunding::class, StudentWallet::class);
+    }
+
     /**
      * Whether this student can actually receive an assistance payment.
      *
@@ -86,5 +111,50 @@ class Student extends Model
     {
         return is_string($this->payout_address)
             && preg_match(self::PAYOUT_ADDRESS_PATTERN, $this->payout_address) === 1;
+    }
+
+    /**
+     * The payout address decides where money goes, so every change to it is
+     * logged with who made it. A re-pointed destination is the one edit this
+     * application must always be able to explain after the fact.
+     */
+    public function getActivitylogOptions(): LogOptions
+    {
+        return LogOptions::defaults()
+            ->logOnly(['payout_address'])
+            ->logOnlyDirty()
+            ->dontSubmitEmptyLogs()
+            ->setDescriptionForEvent(fn (string $eventName): string => "Student {$this->student_number} payout address {$eventName}");
+    }
+
+    /**
+     * Why this student cannot be deleted, or null when they can be.
+     *
+     * Tuition accounts and assistance requests hold financial history and are
+     * linked without a cascade, so the database refuses the delete. That is the
+     * correct outcome — the history must not disappear silently — but a raw
+     * foreign-key error is not an explanation, so the reason is spelled out
+     * before anything is attempted.
+     */
+    public function deletionBlockedReason(): ?string
+    {
+        $tuition = $this->tuitionAccounts()->count();
+        $assistance = $this->assistanceRequests()->count();
+
+        $parts = [];
+
+        if ($tuition > 0) {
+            $parts[] = $tuition === 1 ? '1 tuition account' : "{$tuition} tuition accounts";
+        }
+
+        if ($assistance > 0) {
+            $parts[] = $assistance === 1 ? '1 assistance request' : "{$assistance} assistance requests";
+        }
+
+        if ($parts === []) {
+            return null;
+        }
+
+        return 'This student has '.implode(' and ', $parts).' on file. Delete those records first — deleting a student must not erase financial history.';
     }
 }

@@ -67,6 +67,7 @@ export type StudentDashboardProps = {
         year_level: string | number;
     };
     tuitionAccount: {
+        id: number;
         term: string;
         total_amount: string;
         paid_amount: string;
@@ -85,6 +86,18 @@ export type StudentDashboardProps = {
     suggestedQuestions?: string[];
     wallet?: {
         address: string | null;
+        snapshot?: {
+            address: string | null;
+            balance: string | null;
+            chain: string;
+            explorer_url: string | null;
+            is_fake: boolean;
+            is_available: boolean;
+            state: 'ok' | 'missing' | 'invalid' | 'unavailable';
+            reason: string | null;
+            cached_at: string | null;
+        };
+        balance_fiat?: string | null;
     };
     totals?: {
         confirmed: number;

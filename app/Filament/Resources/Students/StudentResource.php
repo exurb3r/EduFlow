@@ -17,9 +17,11 @@ use Filament\Actions\EditAction;
 use Filament\Actions\ViewAction;
 use Filament\Forms\Components\Select;
 use Filament\Forms\Components\TextInput;
+use Filament\Notifications\Notification;
 use Filament\Resources\Resource;
 use Filament\Schemas\Components\Section;
 use Filament\Schemas\Schema;
+use Filament\Support\Exceptions\Halt;
 use Filament\Support\Icons\Heroicon;
 use Filament\Tables\Columns\TextColumn;
 use Filament\Tables\Table;
@@ -142,6 +144,18 @@ class StudentResource extends Resource
                 TextColumn::make('academic_status')
                     ->badge()
                     ->sortable(),
+                TextColumn::make('payout_address')
+                    ->label('Wallet')
+                    ->fontFamily('mono')
+                    ->copyable()
+                    ->toggleable()
+                    ->limit(24)
+                    ->placeholder('Not set')
+                    ->tooltip(fn (?string $state): string => match (true) {
+                        $state === null || $state === '' => 'No payout wallet: this student cannot receive assistance.',
+                        preg_match(Student::PAYOUT_ADDRESS_PATTERN, $state) !== 1 => 'Stored address is malformed: payments to this student are blocked.',
+                        default => $state,
+                    }),
                 TextColumn::make('tuitionAccounts_count')
                     ->label('Accounts')
                     ->counts('tuitionAccounts')
@@ -153,7 +167,25 @@ class StudentResource extends Resource
             ])
             ->toolbarActions([
                 BulkActionGroup::make([
-                    DeleteBulkAction::make(),
+                    DeleteBulkAction::make()
+                        ->before(function (DeleteBulkAction $action): void {
+                            $blocked = $action->getSelectedRecords()
+                                ->filter(fn (Student $student): bool => $student->deletionBlockedReason() !== null);
+
+                            if ($blocked->isEmpty()) {
+                                return;
+                            }
+
+                            $names = $blocked->pluck('student_number')->join(', ');
+
+                            Notification::make()
+                                ->title('Cannot delete these students')
+                                ->body("They have financial history on file: {$names}. Deselect them and try again — deleting a student must not erase tuition or assistance records.")
+                                ->danger()
+                                ->send();
+
+                            throw new Halt;
+                        }),
                 ]),
             ]);
     }

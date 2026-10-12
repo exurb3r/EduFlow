@@ -4,6 +4,7 @@ namespace App\Providers;
 
 use App\Features\FeatureRegistry;
 use App\Policies\SettlementApprovalPolicy;
+use App\Services\CircleAgentWalletCli;
 use Carbon\CarbonImmutable;
 use Filament\Panel;
 use Illuminate\Support\Facades\Date;
@@ -16,6 +17,7 @@ use Laravel\Ai\Contracts\ResolvesPendingApprovals;
 use Laravel\Ai\Contracts\VerifiesConversationOwnership;
 use Laravel\Pennant\FeatureManager;
 use Nwidart\Modules\Facades\Module;
+use Yukazakiri\Lepton\Support\CliRunner;
 
 class AppServiceProvider extends ServiceProvider
 {
@@ -28,6 +30,7 @@ class AppServiceProvider extends ServiceProvider
         $this->registerFilamentPlugins();
         $this->registerAiContracts();
         $this->registerApprovalPolicy();
+        $this->registerCircleWalletCli();
     }
 
     /**
@@ -106,6 +109,21 @@ class AppServiceProvider extends ServiceProvider
             'approveSettlementProposals',
             [SettlementApprovalPolicy::class, 'approveSettlementProposals'],
         );
+    }
+
+    protected function registerCircleWalletCli(): void
+    {
+        // `circle wallet create` and `circle wallet fund` are the two verbs
+        // Lepton does not wrap, so the app runs them itself through the same
+        // argv runner the package uses. Scoped, and swapped for a fake in tests.
+        $this->app->scoped(CircleAgentWalletCli::class, function ($app): CircleAgentWalletCli {
+            return new CircleAgentWalletCli(
+                new CliRunner(
+                    (string) config('lepton.circle.bin', 'circle'),
+                    (int) config('lepton.circle.timeout', 60),
+                ),
+            );
+        });
     }
 
     protected function registerFilamentPlugins(): void

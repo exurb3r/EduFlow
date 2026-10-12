@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Services;
 
 use App\Models\Organization;
+use App\Models\Student;
 use App\Models\StudentAssistanceRequest;
 use App\Models\Transaction;
 use App\Models\User;
@@ -27,6 +28,21 @@ final class PaymentService
             return null;
         }
 
+        // A recipient must come from a real record. The wallet address is the
+        // payout address on the student record, and without one there is no
+        // destination to record a payment to.
+        $studentRecord = $student->student()->first();
+
+        if (! $studentRecord instanceof Student) {
+            return null;
+        }
+
+        $recipientAddress = app(StudentWalletService::class)->addressFor($studentRecord);
+
+        if ($recipientAddress === null) {
+            return null;
+        }
+
         $wallet->balance = (float) $wallet->balance - $amount;
         $wallet->save();
 
@@ -38,7 +54,7 @@ final class PaymentService
             'organization_id' => $organization->id,
             'wallet_id' => $wallet->id,
             'type' => 'student_assistance',
-            'recipient_address' => $student->wallet_address ?? 'unlinked-wallet',
+            'recipient_address' => $recipientAddress,
             'amount' => $amount,
             'currency' => $organization->currency,
             'status' => 'confirmed',

@@ -1,19 +1,35 @@
-import { Head, Link } from '@inertiajs/react';
+import { Head, Link, router } from '@inertiajs/react';
 import {
     ArrowDownLeft,
     ArrowRight,
+    ArrowUpRight,
     BadgeCheck,
+    Copy,
     Eye,
     EyeOff,
+    Loader2,
     ReceiptText,
     Sparkles,
+    TriangleAlert,
     Wallet,
 } from 'lucide-react';
 import { useRef, useState } from 'react';
+import { toast } from 'sonner';
 
 import { AskEduFlow } from '@/components/ask-eduflow';
 import { RequestStatus } from '@/components/financial-aid';
 import { Badge } from '@/components/ui/badge';
+import { Button } from '@/components/ui/button';
+import {
+    Dialog,
+    DialogContent,
+    DialogDescription,
+    DialogHeader,
+    DialogTitle,
+} from '@/components/ui/dialog';
+import { Input } from '@/components/ui/input';
+import InputError from '@/components/input-error';
+import { Label } from '@/components/ui/label';
 import {
     formatAidLabel,
     formatSubmittedAt,
@@ -23,6 +39,11 @@ import { show } from '@/routes/assistance';
 import { index as financialAssistanceIndex } from '@/routes/financial-assistance';
 import { index as paymentsIndex } from '@/routes/payments';
 import { dashboard } from '@/routes/student';
+import {
+    quote as tuitionPayQuote,
+    pay as tuitionPayStore,
+} from '@/routes/student/tuition';
+import { show as walletShow } from '@/routes/student/wallet';
 import type { StudentDashboardProps } from '@/types/financial-aid';
 
 function statusPillClass(status: string): string {
@@ -36,6 +57,27 @@ function statusPillClass(status: string): string {
         default:
             return 'bg-[var(--clay-surface-soft)] text-[var(--clay-text-muted)]';
     }
+}
+
+function shortAddress(address: string): string {
+    return `${address.slice(0, 6)}…${address.slice(-4)}`;
+}
+
+/**
+ * An on-chain balance arrives as an exact decimal string at Arc's 18
+ * decimals, so it is grouped with BigInt and never passes through a float.
+ */
+function formatBalance(balance: string): string {
+    const [whole = '0', fraction = ''] = balance.split('.');
+
+    if (!/^\d+$/.test(whole)) {
+        return `${balance} USDC`;
+    }
+
+    const grouped = BigInt(whole).toLocaleString('en-US');
+    const cents = fraction.replace(/0+$/, '').slice(0, 2).padEnd(2, '0');
+
+    return `${grouped}.${cents} USDC`;
 }
 
 export default function StudentDashboard({
@@ -54,6 +96,157 @@ export default function StudentDashboard({
     const eligibilityRef = useRef<HTMLElement | null>(null);
     const firstName = student.name.split(' ')[0];
     const transactions = recentTransactions ?? [];
+    const snapshot = wallet?.snapshot;
+    const hasWallet = Boolean(wallet?.address);
+
+    // Pay Now needs a wallet with a balance and tuition that is still owed.
+    const remainingBase = Number(tuitionAccount?.remaining_amount ?? 0);
+    const remainingUsdc = remainingBase / 1_000_000;
+    const canPay = hasWallet && remainingBase > 0;
+    const [payOpen, setPayOpen] = useState(false);
+    const [payAmount, setPayAmount] = useState('');
+    const [payQuote, setPayQuote] = useState<{
+        network_fee: string;
+        total: string;
+        max_amount_base_units: number;
+        balance: string | null;
+        chain: string;
+    } | null>(null);
+    const [payError, setPayError] = useState<string | null>(null);
+    const [quoting, setQuoting] = useState(false);
+    const [paying, setPaying] = useState(false);
+    const [receipt, setReceipt] = useState<{
+        amount: string;
+        network_fee: string;
+        tx_hash: string;
+        remaining: number;
+    } | null>(null);
+
+    const defaultPayBaseUnits = Math.min(
+        remainingBase,
+        Number(snapshot?.balance ? Math.floor(Number(snapshot.balance) * 1_000_000) : 0),
+    );
+
+    const openPay = () => {
+        setPayAmount((defaultPayBaseUnits / 1_000_000).toFixed(2));
+        setPayQuote(null);
+        setPayError(null);
+        setReceipt(null);
+        setPayOpen(true);
+    };
+
+    const requestQuote = async (baseUnits: number) => {
+        setQuoting(true);
+        setPayError(null);
+
+        try {
+            const response = await fetch(tuitionPayQuote.url(), {
+                method: 'POST',
+                credentials: 'same-origin',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'X-CSRF-TOKEN': document.querySelector<HTMLMetaElement>(
+                        'meta[name="csrf-token"]',
+                    )?.content ?? '',
+                    Accept: 'application/json',
+                },
+                body: JSON.stringify({
+                    tuition_account_id: tuitionAccount?.id,
+                    amount_base_units: baseUnits,
+                }),
+            });
+
+            const payload = await response.json();
+
+            if (!response.ok) {
+                setPayError(
+                    payload?.message ??
+                        'Could not quote this payment on the chain.',
+                );
+                setPayQuote(null);
+
+                return;
+            }
+
+            setPayQuote(payload);
+        } catch {
+            setPayError('Could not reach the payment network.');
+        } finally {
+            setQuoting(false);
+        }
+    };
+
+    const submitPay = async () => {
+        const baseUnits = Math.round(Number(payAmount) * 1_000_000);
+
+        if (!Number.isFinite(baseUnits) || baseUnits <= 0) {
+            setPayError('Enter an amount greater than zero.');
+
+            return;
+        }
+
+        if (!payQuote) {
+            await requestQuote(baseUnits);
+
+            return;
+        }
+
+        setPaying(true);
+        setPayError(null);
+
+        try {
+            const response = await fetch(tuitionPayStore.url(), {
+                method: 'POST',
+                credentials: 'same-origin',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'X-CSRF-TOKEN': document.querySelector<HTMLMetaElement>(
+                        'meta[name="csrf-token"]',
+                    )?.content ?? '',
+                    Accept: 'application/json',
+                },
+                body: JSON.stringify({
+                    tuition_account_id: tuitionAccount?.id,
+                    amount_base_units: baseUnits,
+                }),
+            });
+
+            const payload = await response.json();
+
+            if (!response.ok) {
+                setPayError(
+                    payload?.message ?? 'The transfer could not be sent.',
+                );
+
+                return;
+            }
+
+            setReceipt({
+                amount: payload.amount,
+                network_fee: payload.network_fee,
+                tx_hash: payload.tx_hash,
+                remaining: payload.remaining,
+            });
+
+            // The wallet balance and paid figures both changed on-chain.
+            router.reload({ only: ['wallet', 'tuitionAccount', 'totals'] });
+        } catch {
+            setPayError('Could not reach the payment network.');
+        } finally {
+            setPaying(false);
+        }
+    };
+
+    const copyAddress = () => {
+        if (!wallet?.address) {
+            return;
+        }
+
+        navigator.clipboard.writeText(wallet.address);
+        toast.success('Wallet address copied', {
+            description: 'Share it to receive USDC on Arc.',
+        });
+    };
 
     const openEligibility = () => {
         setEligibilityVisible(true);
@@ -93,61 +286,411 @@ export default function StudentDashboard({
 
                         <button
                             type="button"
-                            onClick={openEligibility}
-                            className="clay-focus h-11 shrink-0 gap-2 rounded-full bg-[var(--clay-primary)] px-6 text-sm font-semibold text-[var(--clay-primary-foreground)] transition-all hover:-translate-y-0.5 hover:bg-[var(--clay-primary-bright)] active:translate-y-0 active:scale-[0.98]"
+                            onClick={openPay}
+                            disabled={!canPay}
+                            title={
+                                canPay
+                                    ? undefined
+                                    : hasWallet
+                                      ? 'Nothing is owed on this account.'
+                                      : 'Link a payout wallet first.'
+                            }
+                            className="clay-focus inline-flex h-11 shrink-0 items-center gap-2 rounded-full bg-[var(--clay-primary)] px-6 text-sm font-semibold text-[var(--clay-primary-foreground)] transition-all hover:-translate-y-0.5 hover:bg-[var(--clay-primary-bright)] active:translate-y-0 active:scale-[0.98] disabled:pointer-events-none disabled:opacity-60"
                         >
                             <span className="inline-flex items-center gap-2">
-                                <BadgeCheck
+                                <ArrowUpRight
                                     aria-hidden="true"
                                     className="size-4"
                                 />
-                                Check eligibility
+                                Pay Now
                             </span>
                         </button>
                     </header>
 
-                    {/* -- Balance hero -- */}
+                    {/* -- Pay tuition -- */}
+                    <Dialog
+                        open={payOpen}
+                        onOpenChange={(open) => {
+                            if (paying) {
+                                return;
+                            }
+
+                            setPayOpen(open);
+                        }}
+                    >
+                        <DialogContent className="bulletin clay-card border-[var(--clay-border)] sm:max-w-md">
+                            <DialogHeader>
+                                <DialogTitle className="clay-h2 flex items-center gap-3">
+                                    <span className="clay-icon-chip size-9 shrink-0">
+                                        <ArrowUpRight className="size-4" />
+                                    </span>
+                                    Pay tuition
+                                </DialogTitle>
+                                <DialogDescription className="clay-body">
+                                    Moves USDC from your wallet on{' '}
+                                    {snapshot?.chain ?? 'Arc'} to the
+                                    institution treasury. This cannot be undone.
+                                </DialogDescription>
+                            </DialogHeader>
+
+                            {receipt ? (
+                                <div className="grid gap-4">
+                                    <p className="clay-title text-[var(--status-resolved)]">
+                                        Payment sent.
+                                    </p>
+                                    <dl className="grid gap-3 text-sm">
+                                        <div className="flex items-baseline justify-between gap-4">
+                                            <dt className="clay-meta">
+                                                Paid to the institution
+                                            </dt>
+                                            <dd className="clay-title tabular-nums">
+                                                {receipt.amount}
+                                            </dd>
+                                        </div>
+                                        <div className="flex items-baseline justify-between gap-4">
+                                            <dt className="clay-meta">
+                                                Network fee (paid by you)
+                                            </dt>
+                                            <dd className="clay-title tabular-nums">
+                                                {receipt.network_fee}
+                                            </dd>
+                                        </div>
+                                        <div className="flex items-baseline justify-between gap-4">
+                                            <dt className="clay-meta">
+                                                Still owed
+                                            </dt>
+                                            <dd className="clay-title tabular-nums">
+                                                {receipt.remaining.toFixed(2)}{' '}
+                                                USDC
+                                            </dd>
+                                        </div>
+                                        <div className="min-w-0">
+                                            <dt className="clay-meta">
+                                                Transaction
+                                            </dt>
+                                            <dd className="clay-meta mt-1 break-all">
+                                                {receipt.tx_hash}
+                                            </dd>
+                                        </div>
+                                    </dl>
+                                    <p className="clay-meta">
+                                        The network fee goes to the Arc
+                                        network, not to the school, and is not
+                                        refundable.
+                                    </p>
+                                    <Button
+                                        type="button"
+                                        className="clay-focus rounded-full bg-[var(--clay-primary)] font-semibold text-[var(--clay-primary-foreground)]"
+                                        onClick={() => setPayOpen(false)}
+                                    >
+                                        Done
+                                    </Button>
+                                </div>
+                            ) : (
+                                <form
+                                    className="grid gap-4"
+                                    onSubmit={(event) => {
+                                        event.preventDefault();
+                                        void submitPay();
+                                    }}
+                                >
+                                    <dl className="grid gap-3 text-sm">
+                                        <div className="flex items-baseline justify-between gap-4">
+                                            <dt className="clay-meta">
+                                                Outstanding
+                                            </dt>
+                                            <dd className="clay-title tabular-nums">
+                                                {remainingUsdc.toFixed(2)} USDC
+                                            </dd>
+                                        </div>
+                                        <div className="flex items-baseline justify-between gap-4">
+                                            <dt className="clay-meta">
+                                                Wallet balance
+                                            </dt>
+                                            <dd className="clay-title tabular-nums">
+                                                {snapshot?.balance
+                                                    ? `${snapshot.balance} USDC`
+                                                    : '—'}
+                                            </dd>
+                                        </div>
+                                    </dl>
+
+                                    <div className="space-y-1.5">
+                                        <Label
+                                            htmlFor="pay_amount"
+                                            className="bulletin-eyebrow"
+                                        >
+                                            Amount (USDC)
+                                        </Label>
+                                        <Input
+                                            id="pay_amount"
+                                            type="number"
+                                            min="0.01"
+                                            step="0.01"
+                                            max={remainingUsdc}
+                                            value={payAmount}
+                                            onChange={(event) => {
+                                                setPayAmount(event.target.value);
+                                                setPayQuote(null);
+                                            }}
+                                            className="clay-field clay-focus tabular-nums shadow-none"
+                                            required
+                                        />
+                                        <InputError message={payError} />
+                                        <p className="clay-meta">
+                                            Your wallet pays the amount plus the
+                                            network fee, which comes out of the
+                                            same balance.
+                                        </p>
+                                    </div>
+
+                                    {payQuote && (
+                                        <dl className="clay-inset grid gap-2 p-3 text-sm">
+                                            <div className="flex items-baseline justify-between gap-4">
+                                                <dt className="clay-meta">
+                                                    Network fee
+                                                </dt>
+                                                <dd className="clay-title tabular-nums">
+                                                    {payQuote.network_fee} USDC
+                                                </dd>
+                                            </div>
+                                            <div className="flex items-baseline justify-between gap-4">
+                                                <dt className="clay-meta">
+                                                    Total leaving your wallet
+                                                </dt>
+                                                <dd className="clay-title tabular-nums">
+                                                    {payQuote.total} USDC
+                                                </dd>
+                                            </div>
+                                        </dl>
+                                    )}
+
+                                    <div className="flex flex-wrap items-center gap-3">
+                                        <Button
+                                            type="submit"
+                                            disabled={paying || quoting}
+                                            data-loading={paying || quoting}
+                                            className="clay-focus rounded-full bg-[var(--clay-primary)] font-semibold text-[var(--clay-primary-foreground)]"
+                                        >
+                                            {paying || quoting ? (
+                                                <Loader2 className="size-4 animate-spin" />
+                                            ) : (
+                                                <ArrowUpRight className="size-4" />
+                                            )}
+                                            {payQuote
+                                                ? 'Confirm and pay'
+                                                : quoting
+                                                  ? 'Reading the fee…'
+                                                  : 'Pay Now'}
+                                        </Button>
+                                        <Button
+                                            type="button"
+                                            variant="ghost"
+                                            className="clay-focus rounded-full text-xs font-semibold"
+                                            onClick={() => setPayOpen(false)}
+                                            disabled={paying}
+                                        >
+                                            Cancel
+                                        </Button>
+                                    </div>
+
+                                    <p className="clay-meta flex items-start gap-2 text-[var(--status-pending)]">
+                                        <TriangleAlert className="mt-0.5 size-3.5 shrink-0" />
+                                        USDC transfers are final. Confirm the
+                                        amount before you send.
+                                    </p>
+                                </form>
+                            )}
+                        </DialogContent>
+                    </Dialog>
+
+                    {/* -- Wallet hero -- */}
                     <section
-                        aria-labelledby="balance-heading"
+                        aria-labelledby="wallet-heading"
                         className="grid gap-4 lg:grid-cols-3"
                     >
                         <div className="clay-card p-5 sm:p-8 lg:col-span-2">
                             <div className="flex items-start justify-between gap-4">
-                                <div>
-                                    <p
-                                        id="balance-heading"
-                                        className="bulletin-eyebrow"
-                                    >
-                                        Outstanding tuition balance
-                                    </p>
-                                    <p className="clay-meta mt-1">
-                                        {tuitionAccount?.term ??
-                                            'No active term'}
-                                    </p>
+                                <div className="flex min-w-0 items-center gap-3">
+                                    <span className="clay-icon-chip size-10 shrink-0">
+                                        <Wallet className="size-4" />
+                                    </span>
+                                    <div className="min-w-0">
+                                        <p
+                                            id="wallet-heading"
+                                            className="bulletin-eyebrow"
+                                        >
+                                            My wallet
+                                        </p>
+                                        <p className="clay-meta mt-0.5">
+                                            {snapshot?.chain
+                                                ? `Available balance on ${snapshot.chain}`
+                                                : 'USDC on Arc'}
+                                        </p>
+                                    </div>
                                 </div>
-                                <button
-                                    type="button"
-                                    onClick={() =>
-                                        setBalanceVisible((value) => !value)
-                                    }
-                                    className="clay-focus inline-flex size-9 items-center justify-center rounded-full text-[var(--clay-text-muted)] transition-colors hover:bg-[var(--clay-surface-soft)] hover:text-[var(--clay-text)]"
-                                    aria-label={
-                                        balanceVisible
-                                            ? 'Hide balance'
-                                            : 'Show balance'
-                                    }
-                                >
-                                    {balanceVisible ? (
-                                        <Eye className="size-4" />
-                                    ) : (
-                                        <EyeOff className="size-4" />
+
+                                <div className="flex shrink-0 items-center gap-2">
+                                    {snapshot?.is_fake && (
+                                        <span className="rounded-full bg-[var(--clay-surface-soft)] px-2.5 py-1 text-[10px] font-semibold uppercase tracking-wider text-[var(--clay-text-muted)]">
+                                            Test ledger
+                                        </span>
                                     )}
-                                </button>
+                                    {hasWallet && (
+                                        <button
+                                            type="button"
+                                            onClick={() =>
+                                                setBalanceVisible(
+                                                    (value) => !value,
+                                                )
+                                            }
+                                            className="clay-focus inline-flex size-9 items-center justify-center rounded-full text-[var(--clay-text-muted)] transition-colors hover:bg-[var(--clay-surface-soft)] hover:text-[var(--clay-text)]"
+                                            aria-label={
+                                                balanceVisible
+                                                    ? 'Hide balance'
+                                                    : 'Show balance'
+                                            }
+                                        >
+                                            {balanceVisible ? (
+                                                <Eye className="size-4" />
+                                            ) : (
+                                                <EyeOff className="size-4" />
+                                            )}
+                                        </button>
+                                    )}
+                                </div>
                             </div>
+
+                            {!hasWallet ? (
+                                <div className="mt-6 space-y-3">
+                                    <p className="clay-h2">
+                                        {snapshot?.state === 'invalid'
+                                            ? 'Wallet address not usable.'
+                                            : 'No wallet linked.'}
+                                    </p>
+                                    <p className="clay-body max-w-sm">
+                                        {snapshot?.state === 'invalid'
+                                            ? 'The address on file is not a valid Arc destination, so payments are blocked. Replace it to receive assistance and hold USDC.'
+                                            : 'Link a payout wallet to receive assistance and to hold USDC on Arc.'}
+                                    </p>
+                                    <Link
+                                        href={walletShow()}
+                                        className="clay-focus inline-flex h-10 items-center gap-2 rounded-full bg-[var(--clay-primary)] px-5 text-sm font-semibold text-[var(--clay-primary-foreground)] transition-all hover:-translate-y-0.5 hover:bg-[var(--clay-primary-bright)] active:translate-y-0"
+                                    >
+                                        <Wallet className="size-4" />
+                                        {snapshot?.state === 'invalid'
+                                            ? 'Replace wallet'
+                                            : 'Link a wallet'}
+                                    </Link>
+                                </div>
+                            ) : (
+                                <>
+                                    <p className="bulletin-figure mt-5 text-4xl sm:text-5xl">
+                                        {balanceVisible
+                                            ? snapshot?.is_available &&
+                                              snapshot.balance
+                                                ? formatBalance(
+                                                      snapshot.balance,
+                                                  )
+                                                : 'Not available'
+                                            : '••••••••'}
+                                    </p>
+                                    <p className="clay-meta mt-2 text-[var(--clay-text-muted)]">
+                                        {balanceVisible
+                                            ? wallet?.balance_fiat
+                                                ? `≈ ${wallet.balance_fiat}`
+                                                : snapshot?.chain
+                                            : '••••'}
+                                    </p>
+
+                                    {snapshot && !snapshot.is_available && (
+                                        <p className="clay-meta mt-3 flex items-start gap-2 text-[var(--status-pending)]">
+                                            <TriangleAlert className="mt-0.5 size-3.5 shrink-0" />
+                                            {snapshot.reason ??
+                                                'Balance unavailable.'}
+                                        </p>
+                                    )}
+
+                                    <dl className="mt-6 grid gap-4 border-t border-[var(--clay-border)] pt-5 sm:grid-cols-2">
+                                        <div className="min-w-0">
+                                            <dt className="bulletin-eyebrow">
+                                                Payout address
+                                            </dt>
+                                            <dd className="mt-1.5 flex items-center gap-2">
+                                                <span className="clay-meta min-w-0 truncate">
+                                                    {shortAddress(
+                                                        wallet.address as string,
+                                                    )}
+                                                </span>
+                                                <button
+                                                    type="button"
+                                                    onClick={copyAddress}
+                                                    className="clay-focus inline-flex size-7 shrink-0 items-center justify-center rounded-full text-[var(--clay-text-muted)] transition-colors hover:bg-[var(--clay-surface-soft)] hover:text-[var(--clay-text)]"
+                                                    aria-label="Copy wallet address"
+                                                    title="Copy wallet address"
+                                                >
+                                                    <Copy className="size-3.5" />
+                                                </button>
+                                            </dd>
+                                        </div>
+                                        <div>
+                                            <dt className="bulletin-eyebrow">
+                                                Received to date
+                                            </dt>
+                                            <dd className="clay-title mt-1.5 tabular-nums">
+                                                {formatUsdc(
+                                                    String(
+                                                        Math.round(
+                                                            (totals?.confirmed ??
+                                                                0) * 1_000_000,
+                                                        ),
+                                                    ),
+                                                )}
+                                            </dd>
+                                        </div>
+                                    </dl>
+
+                                    <div className="mt-6 flex flex-wrap gap-2">
+                                        <button
+                                            type="button"
+                                            onClick={copyAddress}                                            className="clay-focus inline-flex h-9 items-center gap-2 rounded-full bg-[var(--clay-primary)] px-4 text-xs font-semibold text-[var(--clay-primary-foreground)] transition-all hover:-translate-y-0.5 hover:bg-[var(--clay-primary-bright)] active:translate-y-0"
+                                        >
+                                            <ArrowDownLeft className="size-3.5" />
+                                            Receive
+                                        </button>
+                                        <Link
+                                            href={paymentsIndex()}
+                                            className="clay-focus inline-flex h-9 items-center gap-2 rounded-full border border-[var(--clay-border)] px-4 text-xs font-semibold transition-colors hover:bg-[var(--clay-surface-soft)]"
+                                        >
+                                            <ReceiptText className="size-3.5" />
+                                            Payments
+                                        </Link>
+                                        <Link
+                                            href={walletShow()}
+                                            className="clay-focus inline-flex h-9 items-center gap-1 rounded-full px-3 text-xs font-semibold text-[var(--clay-text-muted)] transition-colors hover:bg-[var(--clay-surface-soft)] hover:text-[var(--clay-text)]"
+                                        >
+                                            Manage
+                                            <ArrowRight className="size-3.5" />
+                                        </Link>
+                                    </div>
+                                </>
+                            )}
+                        </div>
+
+                        {/* -- Tuition balance, now the supporting card -- */}
+                        <div className="clay-card p-5 sm:p-6">
+                            <p className="bulletin-eyebrow">
+                                Outstanding tuition
+                            </p>
+                            {tuitionAccount?.term && (
+                                <p className="clay-meta mt-1">
+                                    {tuitionAccount.term}
+                                </p>
+                            )}
 
                             {tuitionAccount ? (
                                 <>
-                                    <p className="bulletin-figure mt-4 text-4xl sm:text-5xl">
+                                    <p className="bulletin-figure mt-4 text-3xl">
                                         {balanceVisible
                                             ? formatUsdc(
                                                   tuitionAccount.remaining_amount,
@@ -156,10 +699,9 @@ export default function StudentDashboard({
                                     </p>
                                     {tuitionAccount.remaining_amount_fiat && (
                                         <p className="clay-meta mt-2 text-[var(--clay-text-muted)]">
-                                            ≈{' '}
-                                            {
-                                                tuitionAccount.remaining_amount_fiat
-                                            }
+                                            {balanceVisible
+                                                ? `≈ ${tuitionAccount.remaining_amount_fiat}`
+                                                : '••••'}
                                         </p>
                                     )}
 
@@ -201,40 +743,6 @@ export default function StudentDashboard({
                                     </p>
                                 </div>
                             )}
-                        </div>
-
-                        {/* -- Wallet / payouts card -- */}
-                        <div className="clay-card flex flex-col p-5 sm:p-6">
-                            <p className="bulletin-eyebrow">Total received</p>
-                            <p className="bulletin-figure mt-3 text-3xl">
-                                {totals?.confirmed ?? 0}{' '}
-                                <span className="text-sm font-semibold text-[var(--clay-text-muted)]">
-                                    {totals?.currency ?? 'USDC'}
-                                </span>
-                            </p>
-
-                            <div className="mt-auto pt-6">
-                                {wallet?.address ? (
-                                    <Link
-                                        href={paymentsIndex()}
-                                        className="clay-focus flex items-center gap-2.5 rounded-full border border-[var(--clay-border)] px-4 py-2.5 text-xs transition-colors hover:bg-[var(--clay-surface-soft)]"
-                                    >
-                                        <Wallet className="size-4 text-[var(--clay-text-muted)]" />
-                                        <span className="clay-meta truncate">
-                                            {wallet.address.slice(0, 6)}…
-                                            {wallet.address.slice(-4)}
-                                        </span>
-                                    </Link>
-                                ) : (
-                                    <Link
-                                        href={financialAssistanceIndex()}
-                                        className="clay-focus flex items-center gap-2.5 rounded-full border border-dashed border-[var(--clay-border)] px-4 py-2.5 text-xs text-[var(--clay-text-muted)] transition-colors hover:bg-[var(--clay-surface-soft)]"
-                                    >
-                                        <Wallet className="size-4" />
-                                        Link a payout wallet
-                                    </Link>
-                                )}
-                            </div>
                         </div>
                     </section>
 
@@ -337,6 +845,17 @@ export default function StudentDashboard({
                         aria-label="Quick actions"
                         className="grid grid-cols-2 gap-3 sm:grid-cols-3"
                     >
+                        <button
+                            type="button"
+                            onClick={openEligibility}
+                            className="clay-card clay-press flex flex-col items-start gap-3 p-4 text-left text-sm font-medium transition-transform hover:-translate-y-0.5"
+                        >
+                            <span className="clay-icon-chip size-9">
+                                <BadgeCheck className="size-4" />
+                            </span>
+                            Check eligibility
+                        </button>
+
                         {[
                             {
                                 href: paymentsIndex().url,

@@ -91,8 +91,8 @@ test('dashboard keeps the generic page for users without a privileged role', fun
 
 test('dashboard shows the tuition balance and recent payouts for a linked student record', function (): void {
     $wallet = '0x'.str_repeat('a', 40);
-    $user = User::factory()->create(['wallet_address' => $wallet])->assignRole('user');
-    $student = Student::factory()->for($user)->create();
+    $user = User::factory()->create()->assignRole('user');
+    $student = Student::factory()->for($user)->create(['payout_address' => $wallet]);
     TuitionAccount::factory()->for($student)->for($this->term)->create([
         'total_amount' => 300000000,
         'paid_amount' => 25000000,
