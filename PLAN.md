@@ -2,9 +2,44 @@
 
 **Tagline:** Open-source institutional finance agent and payment orchestration, powered by Circle Agent Stack and USDC settlement on Arc.
 
-**Document scope:** Parts 1–5 describe the existing implementation and developer demos. Sections 5–11 define the institution-ready OSS release track; Section 12 records Circle/Arc research and the institution-first architecture; Section 13 catalogs wider operational events. **Section 14 is the authoritative current hackathon pilot scope, delivery order and acceptance contract.** It supersedes older demo priorities, not financial safety or production release gates. **Section 15 answers who holds a student or vendor wallet and why the two counterparty legs are unmodelled; it constrains Section 6.1's capability claims but does not expand the Section 14 pilot.** **Sections 16–18 record current delivery state: the rebuilt admin and finance dashboards (§16), the end-to-end fee-to-vendor trace with per-step build status (§17), and the bounded autonomous lane design and its blockers (§18).** Proposed capabilities are not shipped features; a completed demo milestone is not a production-readiness claim.
+**Document scope:** Parts 1–5 describe the existing implementation and developer demos. Sections 5–11 define the institution-ready OSS release track; Section 12 records Circle/Arc research and the institution-first architecture; Section 13 catalogs wider operational events. **Section 14 is the authoritative current hackathon pilot scope, delivery order and acceptance contract, including the post-merge student-payment integration in §14.10.** It supersedes older demo priorities, not financial safety or production release gates. **Section 15 separates the merged operator-provisioned student-wallet demo from a production payer/custody design and reviewed vendor destinations.** **Sections 16–18 record current delivery state: admin and finance screens (§16), the two-source fee-to-vendor trace (§17), and the bounded autonomous lane (§18).** Proposed capabilities are not shipped features; a completed demo milestone is not a production-readiness claim.
 
 ## Where Things Stand — Start Here in a New Session
+
+**Post-merge planning update (2026-10-12):** [PR #14](https://github.com/koamishin/EduFlow/pull/14),
+merged as `207fe89`, adds a student wallet page, live balance reads, staff wallet generation
+and **Pay Now** on `/student/dashboard`. The backend quotes a transfer, attempts to send
+from a generated student wallet to the configured treasury, writes `StudentTuitionPayment`,
+increments tuition `paid_amount`, and can write a `tuition_revenue` transaction. These
+records are **not connected to Collections, reviewed receipt bindings, or the budget planner**.
+The student `/payments` page still lists assistance/refunds, not tuition receipt history.
+
+**Current release blockers, confirmed from code rather than the PR description:**
+`StudentTuitionPaymentService::pay()` posts the tuition/treasury updates even when
+`verifyOnChain()` returns false. That verifier checks only transaction presence and returns
+true for the fake driver; it does not prove successful, matching USDC movement. Each call
+generates a fresh provider UUID; there is no durable pre-send intent/attempt, unique receipt
+identity or unknown-outcome recovery. Fee-read failure becomes a zero quote, fee affordability
+truncates to six decimals, and treasury posting crosses through floats. The synchronous
+gateway path also needs the same agent-wallet acceptance/handle audit as outbound payments.
+Merged tests do not establish a genuine end-to-end settled tuition transfer. The PR reports
+live wallet creation/faucet funding, not proof of the complete tuition-to-vendor workflow.
+
+**Revised direction:** retain two intake lanes—cashier-recorded cash/bank evidence and direct
+student-wallet payments—but converge them into **one source-linked Collections workspace**.
+Digital receipts are imported from verified settlement, never retyped as a second manual
+receipt. Pending, unknown, unmatched, restricted and simulated amounts stay outside usable
+cash. Separate tuition allocation, collection reconciliation, plan review, exact outgoing
+payment approval and settlement; a student's payment never authorizes Jev to spend it.
+For the current college pilot, direct Arc testnet payments remain clearly labelled pilot
+USDC, not real local-currency tuition clearance or college revenue. Generated wallets belong
+to the operator's Circle signing context; student key ownership is not proven by a DB link.
+See **§14.10** for delivery order, screen behavior, custody decisions and acceptance tests.
+This update changes the plan only: no wallet created, payment sent, evidence rewritten or
+runtime switch changed.
+Planning validation: **62 existing collection and student-tuition feature tests pass
+(194 assertions)** using isolated fake/stub gateways. This preserves current regression
+behavior, not the stronger verification/recovery acceptance gates proposed in §14.10.
 
 **Admin UI audit and approval redesign (2026-10-11):** Payment Approvals now puts exact
 review counts, a short safety notice and the review queue ahead of setup guidance. The shared
@@ -183,7 +218,9 @@ vendor and assistance branches now require the authorized workflow. **1400 Pest 
    explicit service authority, **not** a fabricated human actor passed to a staff action.
 3. **The standing mandate** (§18.4) — delivered; its initial allowance is zero by construction, so
    the lane releases nothing until a reviewer raises a ceiling and the installation flag allows it.
-4. **Inbound collection** (§12.5, §15.6) — entirely unmodelled; no payer identity exists.
+4. **Inbound collection integration** (§12.5, §14.10, §15.6) — PR #14 now supplies student
+   wallet/payment records and entry UI. Durable attempts, strong settlement proof, explicit
+   payer/custody identity and source-linked Collections/planning integration remain open.
 
 **Ordering corrections (2026-10-10, reaffirmed 2026-10-11):** an earlier revision listed
 rollover first. That was wrong. Rollover is an unattended-operation blocker; the §14.4 Step 4/5
@@ -303,7 +340,7 @@ the hold is released. `can_execute` remains false throughout.
 
 **Operating model clarified by the owner:** cashier is the institution's receipt/transaction intake hub; finance/accounting staff supervises event-driven background work and receives approval notifications. Approved recurring bills may run automatically on testnet within a separately reviewed standing mandate. Background activity must not depend on an open browser or a human chat prompt. Sections 14.7–14.10 define this target; no scheduler, supervisor UI or payment authority is enabled by documenting it.
 
-**Current hackathon focus:** Answer **what should the institution do with student fees already collected?** Review realized aggregate fee receipts and propose their use within an existing approved allocation; this is not an assistance-request workflow or a new student payment portal. Fee collections and budget planning run in shadow/parallel mode, starting with **one college department, its approved budget and approved bills due over the next couple of weeks**. Use staff-verified aggregate realized receipts or approved opening funds, not a new student payment portal. The college keeps collecting and paying in local currency through its existing process. Each eligible admin-approved bill must produce a linked, verified USDC mirror payment on Arc testnet; read-only analysis plus an unrelated transfer is not completion. Add a separately approved, small capped testnet-only lane for existing recurring obligations after the human-approved path is safe. Confirm the selected problem with college staff before expanding. See [Section 14](#14-college-shadow-pilot--hackathon-execution-contract).
+**Current hackathon focus:** Answer **what should the institution do with student fees already collected?** Review realized receipts and propose their permitted use within an existing approved allocation, starting with **one college department, its approved budget and approved bills due over the next couple of weeks**. Cashier-reviewed aggregates/opening funds remain sufficient; no student or assistance record becomes a startup prerequisite. The student payment UI merged in PR #14 is an optional intake lane to harden and connect under §14.10, not a replacement for the college's real local-currency process. Do not count testnet tuition payments as real college revenue or update official tuition obligations from pilot USDC. Each eligible admin-approved bill must produce a linked, verified USDC mirror payment on Arc testnet; read-only analysis plus an unrelated transfer is not completion. Add a separately approved, small capped recurring lane after human-approved payment and recovery paths are safe. See [Section 14](#14-college-shadow-pilot--hackathon-execution-contract).
 
 ---
 
@@ -2128,10 +2165,13 @@ parallel finance domain. Testnet execution is separately configured and authoriz
 
 ### 14.2 One Workflow, One Department
 
-**Product wedge:** cashier-confirmed fees already collected, then background proposals for
-their permitted use under finance supervision. Students continue paying through the college's
-current process and keeping official receipts. Cashier records/reconciles intake; separate staff
-verifies aggregate received funds; a student-uploaded receipt or expected payment is not cash.
+**Product wedge:** reconciled fees already collected, then background proposals for their
+permitted use under finance supervision. **Two intake lanes now exist in scope:** the college's
+current cash/bank process with cashier-reviewed records, and the optional direct student-wallet
+UI merged in PR #14. The latter is not yet a safe source of planning cash; §14.10 gates its
+integration on durable intent, matching settlement proof and reconciled attribution. College
+staff still decides which real channels are approved; a demo UI does not authorize real tuition
+collection. A student-uploaded receipt, pending transfer or expected payment is not cash.
 Agent proposes which existing approved obligations fit available cash and allocation, not
 new percentage splits, fee policies or interdepartmental transfers. Assistance stays deferred;
 no student record or assistance request starts this loop.
@@ -2148,7 +2188,9 @@ Minimum inputs, supplied or confirmed by authorized staff:
   evidence. Aggregate source stream/reference, nonoverlapping collection interval, source-document
   digest, exact original currency/received amount, restrictions and independent review bind
   receipts to a plan. Opening funds must exclude the same receipts. Expected tuition, promised
-  grants and forecast revenue are not available funds.
+  grants and forecast revenue are not available funds. An optional portal receipt must bind
+  its payer/account, network/asset, exact transfer movement and allocation/restrictions before
+  entering the same reviewed evidence path. This digital binding is not delivered yet.
 - Anonymized approved bills: stable source reference, original amount/currency, due date,
   budget category, vendor alias, business approval and recurring-obligation evidence if relevant.
 - Current approved finance policy, authorized reviewers, exact mirror-rate/rounding rule,
@@ -2159,10 +2201,10 @@ budget conflicts, reserve holds, due dates and missing evidence; it cannot reall
 between departments, change restricted-fund uses or approve new business obligations.
 A finance administrator must authorize those business decisions separately.
 
-**No student dependency:** staff-verified aggregate inputs suffice for the first slice.
-Do not build a student fee portal, individual payer matching, grade/attendance imports or
-new SIS/bank integration before proving this department's bill lifecycle. A manual/import
-input and staff review UI are delivery work, not existing capabilities assumed by this plan.
+**No student dependency:** staff-verified aggregate inputs still suffice. Keep the merged
+portal optional and harden its existing tuition use case rather than building another payment
+portal or expanding to grades/attendance/new SIS/bank integrations. Source-linked digital
+intake must not block an institution with zero student rows from planning approved bills.
 
 ### 14.3 Parallel Operation and Exact Testnet Mirroring
 
@@ -2189,7 +2231,13 @@ input and staff review UI are delivery work, not existing capabilities assumed b
 6. Keep **local actual-payment state separate from testnet mirror state**. A verified mirror
    may consume its pilot reservation, but must not settle the real local payable, create
    college income or replace its accounting/bank evidence. The same separation applies to
-   imported collections and budgets; a mirrored allocation is not new cash.
+    imported collections and budgets; a mirrored allocation is not new cash.
+7. Apply the same boundary to **student Pay Now**: faucet-funded Arc testnet USDC may fund
+   approved pilot USDC capacity after verification, but cannot clear real local tuition or
+   become actual college income. A balance observation already containing these funds must
+   not have the receipts added to it again. The portal must identify network/simulation mode
+   before confirmation, and use only explicitly designated pilot tuition accounts until a
+   separately reviewed real-payment release exists.
 
 **Funding feasibility:** preflight the actual USDC total plus fees before selecting bills.
 Faucet amounts/rate limits may block full-value mirroring; do not loop faucet requests,
@@ -2432,16 +2480,19 @@ user/payment/metric evidence collected. It does **not** mean real college bills 
 by EduFlow, student fees were collected onchain, production/mainnet readiness, measured
 adoption beyond the observed pilot, or a guaranteed Arc/Circle shoutout.
 
-**Deferred scope:** all-institution autonomous treasury; full student payment intake and
+**Deferred scope:** all-institution autonomous treasury; production student payment intake and
 bank/FX adapters; payroll execution/tax calculations; assistance eligibility, discounts,
 installments and student employment; grades/attendance/hardship assessment; Developer-Controlled
 Wallet migration; Gateway/x402/escrow/Earn/Borrow. Preserve existing modules and revisit them
 only after college validation, not because the broad architecture makes them possible.
+The narrow student tuition UI already merged is retained as a testnet integration target
+under §14.10; merge alone does not remove production/custody or institutional-consent gates.
 
 ### 14.7 Cashier Intake, Policy Decisions and Bounded Autonomy
 
-**Status: operating contract and implementation targets, not delivered cashier screens or
-background payment execution.** Tuition is the first example; the institution's intake can
+**Status:** cashier capture/review screens are delivered; merged portal payments remain
+disconnected from their evidence path and need the safety work in §14.10. Background outgoing
+execution is not established by either intake screen. Tuition is the first example; intake can
 later cover laboratory/registration/examination fees, service charges, donations, grants,
 rentals and other approved receipts. Different receipt types must not be collapsed into
 unrestricted tuition revenue. Refundable deposits, overpayments, restricted gifts and
@@ -2457,7 +2508,7 @@ Do not force supplier payments, payroll or every source system through a new cas
 
 | Owner | Permitted responsibility | Prohibited shortcut |
 | --- | --- | --- |
-| Student/payer | Pay through approved college channels; retain official receipt/reference | Uploading a receipt cannot declare funds reconciled or approve spending |
+| Student/payer | Pay through approved channels; optional portal confirmation binds the exact payer/account/amount/network/fee limit | Paying, uploading proof or owning a login cannot declare funds reconciled, prove key custody or approve institutional spending |
 | Cashier/intake staff | Record/import received money, classify against approved categories, flag unmatched or reversed items and prepare reconciled collection batches | Cannot independently verify their own batch, alter budget policy or grant payment authority merely by entering money |
 | Accounting/reconciliation reviewer | Independently verify collections, restrictions, opening-fund exclusions, receipt matching and source consistency | Does not infer bank balance from an upload or treat a testnet transfer as real tuition revenue |
 | Finance officer/supervisor | Review proposals, funding and exceptions; authorize permitted payments or submit policy/mandate changes for independent review | Dashboard access is not universal payment approval; no approval overrides a hard rule |
@@ -2468,12 +2519,15 @@ Do not force supplier payments, payroll or every source system through a new cas
 Cashier/accountant are business responsibilities above, **not newly shipped role enum values**.
 Initial staff can receive explicit capabilities under existing roles; add dedicated roles
 only with policies, scoped queries and separation tests. A read-only accountant/auditor may
-supervise without release permission. Optional later individual student matching must be
-institution-owned and must not make the zero-student aggregate pilot depend on a student row.
+supervise without release permission. Individual portal matching now has student/account
+records, but strong receipt attribution and planning integration remain targets. Preserve the
+zero-student aggregate lane and a separately scoped read-only accountant/auditor capability.
 
 Target lifecycle for receipts:
 1. Record a received or reported receipt against its authoritative source. Expected fees,
    pending bank transfers and uploaded claims remain unverified; do not count them as cash.
+   Direct portal attempts enter a durable receipt-status queue, not a second manual upload.
+   Provider acceptance and a transaction hash are intermediate states, never receipt approval.
 2. Cashier reconciles sources and prepares aggregate batches. Independent reviewer approves,
    holds or rejects source evidence; unresolved items remain outside available funds.
 3. Committed review triggers background re-evaluation of affected approved departmental plans.
@@ -2483,7 +2537,9 @@ Target lifecycle for receipts:
 5. Classify each existing approved obligation as hard-blocked, eligible for human review,
    or eligible under a previously authorized recurring mandate. Store rule results/reasons.
 6. Submit only after payment/mapping/funding/identity gates exist and pass. Pilot receipts
-   remain local; a separately funded Circle wallet pays approved USDC mirrors on Arc testnet.
+   from bank/cash stay local. Verified portal testnet inflows may contribute to the observed
+   pilot treasury, separately from real receipts; its current balance is counted once and a
+   fresh reviewed funding window is still required before approved mirror outflows.
 7. Reconcile outcomes and notify owners. Receipt corrections/reversals create new evidence,
    re-evaluate dependent proposals and freeze unsafe new releases; do not rewrite history or
    undo a settled transfer. Current collection correction/revocation remains implementation work.
@@ -2529,7 +2585,7 @@ technology: deterministic workers can perform most finance tasks without an AI p
 
 | Logical worker/task | Wake condition | Result / authority |
 | --- | --- | --- |
-| Collections observer | Cashier capture/review, approved import, receipt reversal or reconciliation event | Identify missing evidence, summarize reviewed totals; never verify itself |
+| Collections observer | Cashier capture/review, approved import, strongly verified portal receipt, reversal or reconciliation event | Source-linked receipt intake and duplicate checks; no self-approval of restrictions or spending |
 | Budget planner | Reviewed collection, approved bill/budget/policy change, scheduled due-date scan | Exact pay/hold/review proposals and cash-impact evidence; no allocation change |
 | Approval coordinator | New review-required proposal, reviewer decision, deadline/reminder | Durable approval work item and role-scoped notification; silence never means consent |
 | Recurring payment operator | Approved mandate occurrence becomes due or an eligible hold is explicitly re-evaluated | Deterministic automatic authorization within mandate after all release gates; no model-only authority |
@@ -2657,20 +2713,151 @@ merely whoever clicked the last UI button.
   time. Preserve in-flight reconciliation, evidence and read access; do not erase unknowns or
   assume stopping a worker reverses a submitted transfer.
 
-### 14.10 Delivery Order, Example and Acceptance Tests
+### 14.10 Post-Merge Intake Integration, Delivery Order and Acceptance Tests
 
-**Priority now:** cashier handoff and background read-only planning with supervised approval
-routing, while completing the C1/C2 safety gates. Do not implement an autonomous execution
-shortcut to make a dashboard look active. Proposed delivery batches:
+**Revised 2026-10-12 after PR #14:** preserve the merged student dashboard/wallet experience
+and the delivered cashier screens. Close the direct-payment correctness gaps before letting
+portal receipts increase available cash or trigger outgoing execution. This is one finance
+workflow with two entry channels, not a second student treasury or a new autonomous agent.
+No implementation, wallet generation, funding or transfer is authorized by this plan update.
+
+#### 14.10.1 What the merge supplies, and what is still missing
+
+| Area | Merged capability | Integration/release gate still required |
+| --- | --- | --- |
+| Student entry | `/student/dashboard` has Pay Now; `/student/wallet` shows the linked address and observed balance | Clear testnet/fake labels, exact amount entry, payer consent and history/status for each tuition attempt |
+| Quote and send | Authenticated `student.tuition.quote` / `student.tuition.pay`; student-owned account lookup; server-selected treasury | Institution/chain/asset/wallet-status guards, purpose-specific payment enable/stop controls, accepted fee ceiling and expiring quote, durable pre-send identity |
+| Tuition receipt | `StudentTuitionPayment` stores student/account/wallet, amount, fee, addresses, chain, hash and a verification flag | Actual receipt/movement proof; async provider-handle resolution; unique verified receipt/allocation; immutable, recoverable posting |
+| Current posting | `pay()` increments `TuitionAccount.paid_amount` and may credit the matching `Wallet` / create `CONFIRMED` `Transaction` | It currently posts even if verification is false, and fake verification returns true. This must not become trusted collection cash or real tuition clearance |
+| Retry and recovery | A random provider UUID is generated per pay call | Persist one request/intent before external I/O; reuse its identity across refresh/retry; observe uncertain attempts instead of sending again |
+| Fees and amounts | Exact principal stored at six decimals; fee retained as a string | Failed/malformed fee reads currently become zero; affordability truncates fee, and ledger writes use floats. Separate estimated/actual fee evidence and preserve exact totals |
+| Staff wallet view | Admin student detail has balance/provenance and Generate wallet; funding has explicit operator commands | Generation currently reuses student-view permission. Mutations need dedicated manage authority, consent, signer/owner evidence and serialized slot allocation; view permission is not signing authority |
+| Collections/planning | Cashier capture/review and closed-set budget workflows already exist | No caller imports `StudentTuitionPayment` into source-linked Collections or binds it into reviewed planning cash |
+
+**Gate before more live portal testing:** independently audit existing `StudentTuitionPayment`,
+related transactions and balances. Treat current `tx_verified_on_chain` / `CONFIRMED` labels as
+claims to recheck, not evidence to promote. Preserve any discrepancy and history. Do not resend,
+delete records, reverse tuition balances or rewrite confirmations automatically. The product
+owner must explicitly authorize any pause/configuration change or financial correction.
+
+#### 14.10.2 One receipt lifecycle, three separate status dimensions
+
+For direct payments, adapt the existing payment transport, exact-money and settlement
+primitives; do not create another weaker hash-only verifier. Keep inbound student consent
+separate from the outbound staff `PaymentAuthorization` contract.
+
+1. **Prepare and confirm.** Resolve the authenticated student and their payable account,
+   institution, payer identity, wallet/control type, treasury destination, `ARC-TESTNET` /
+   `5042002`, asset, exact principal and quote/fee ceiling. A pasted payout address proves
+   neither ownership nor permission to debit it. Persist the immutable intent and stable
+   request key before a signer can run. Student confirmation permits this inbound payment
+   only; a background service executes it as a scoped service, never as a fabricated admin.
+2. **Submit and observe.** Return the persisted receipt/status ID promptly. A Circle agent
+   transaction ID is `accepted`, not a hash; a hash is `awaiting_verification`, not paid.
+   Workers resolve handles and verify in the background. Timeout, lost HTTP response or a
+   crash after send stays `unknown` with an investigation owner and no new send on retry.
+3. **Verify exact movement.** Require successful committed receipt, configured chain/asset,
+   matching payer and treasury movement and exact amount, using emitter-specific decimals
+   and relayer-safe log evidence as in `ArcSettlementVerifier`. A present/reverted/unrelated
+   transaction or an unreadable RPC must not pass. Fake driver records remain simulation,
+   never chain-verified receipt or institutional revenue. Quoted fees are not actual fees;
+   prove the applicable sender/provider costs separately without assuming who received them.
+4. **Allocate/post once.** Under locked account/receipt identity, atomically record verified
+   receipt allocation and exact tuition posting. Enforce uniqueness by chain plus transaction
+   and movement identifier so two corroborating logs count once and distinct movements are
+   not collapsed. Persist recovery state for a successful send whose DB posting failed.
+   Concurrent payments cannot over-credit the debt; an excess actual arrival goes to an
+   explicit overpayment/liability queue, not a silently dropped transfer or new budget cash.
+5. **Reconcile use of funds.** Import the receipt into Collections with an internal source
+   link, not a cashier-typed second receipt. Match the payer/account and approved fee category,
+   restrictions and original currency. Initially require a separate accounting reviewer for
+   financial use of portal receipts; verification of chain movement does not identify legally
+   unrestricted tuition income. Unmatched, disputed or restricted items remain non-spendable.
+6. **Plan, review, authorize.** A committed eligible collection/review wakes background planning
+   once against the approved closed bill set. Jev may label/explain candidates as advice;
+   deterministic policy controls budget/cash, and a supervisor accepts or rejects the proposal.
+   An eligible exact outgoing reservation still requires independent staff payment approval
+   with direct permission and enrolled MFA, unless a separately approved standing mandate
+   supplies the required institution-scoped authority. The existing execution blockers remain.
+
+Record these status dimensions independently; one overloaded green “Paid” cannot express them:
+
+| Dimension | Examples | What it never implies |
+| --- | --- | --- |
+| Transfer | Prepared, awaiting payer confirmation, queued, accepted, awaiting verification, verified, unknown, failed, simulated | A budget allocation or institutional spending authorization |
+| Tuition allocation | Not posted, applied to designated pilot account, partially applied, overpayment/unallocated, disputed, separately corrected | Real local-currency tuition paid by testnet funds |
+| Finance use | Awaiting reconciliation, reviewed unrestricted in a named real/pilot plane, restricted, suspense, excluded/simulation | New budget, fresh funding approval, permission to change reserves or an outgoing payment |
+
+**Cash counted once:** a current treasury balance already includes received USDC. Never add
+the portal's `Transaction.amount`, `StudentTuitionPayment.amount_base_units`, a manual batch
+and the observed wallet balance as though they were four inflows. Use either a reviewed
+opening-balance-plus-unique-movements roll-forward with an as-of cut, or a current verified
+balance net of liabilities/restrictions/reserves/holds, and reconcile the two. Keep original
+local-currency collections separate from pilot USDC; no implied FX or duplicate mirror revenue.
+
+**Fees:** student pays only a consented principal plus bounded costs. Store exact six-decimal
+principal and exact native fee strings; compare affordability using safe decimal/big-integer
+arithmetic, with upward rounding only when required for a six-decimal bound. Unavailable or
+malformed fee quotes mean “fee unavailable; payment blocked”, never free. Quote/actual fee,
+fee payer, fee scope and any refund liability stay distinct. Sender-paid fees never reduce
+the amount credited to the institution or create extra income. A refund is a new, independently
+authorized outbound intent to a reviewed destination, not a negative receipt or automatic resend.
+
+#### 14.10.3 Screen behavior after integration
+
+- **Student dashboard / Wallet / Payments:** keep Pay Now and wallet balance. Confirmation
+  shows network/mode, institution, exact amount, estimated fee/ceiling and total. After confirm,
+  show persistent receipt/status and amount actually applied; unknown means “Checking existing
+  payment”, not “Try paying again”. Add tuition receipt history separately from assistance/refunds.
+- **Admin → Finance records → Collections:** one workspace with **Student payments** and
+  **Cash / bank records**, plus **Needs attention**. These are planned views, not current tabs.
+  Portal rows appear automatically with source, payer/account, principal/currency, chain/mode,
+  provider handle/hash, movement proof, allocation, restrictions and reviewer/owner. Staff uses
+  **Review receipt** for financial reconciliation, never **Approve agent payment** at intake.
+  Cashier **Record collection** keeps its three-step upload flow for offchain records only.
+- **Finance → Collections:** same institution-scoped receipt/review information and safe actions;
+  no navigation into `/admin`. Auditor sees evidence only; viewing cannot create wallets or send.
+- **Finance Supervisor:** linked “new receipts”, “what changed”, proposed approved bills,
+  deterministic checks and optional Jev advice. Accepting a plan authorizes no transfer.
+- **Payment Approvals / Payment Submissions:** preserve exact outgoing approval and read-only
+  attempt history. Incoming tuition must not masquerade as an approved vendor payout. A future
+  submission shortcut must recheck existing authority rather than grant it or bypass holds.
+
+**Custody decision before scaling:** current student-generated addresses are created under the
+operator's Circle CLI account. This demonstrates operator-controlled pilot wallets, not
+self-custodial student signing or one independent Circle session per student. Document consent,
+operator ability to sign, recovery owner, account deletion/retention and limits. Keep the
+reported five-agent-wallet cap/faucet rate limit as deployment constraints to verify with the
+provider, not campus-scale economics or a reason to share one payer wallet across students.
+Production payer wallets, parent/sponsor identity, lawful collection/custody and real-value
+settlement remain separately approved choices. Do not consume wallet slots or migrate custody
+merely to demonstrate the UI.
+
+#### 14.10.4 Revised delivery batches
 
 | Batch | Deliverable | Exit evidence |
 | --- | --- | --- |
-| B1 — cashier handoff | Role-scoped collection capture/review screens or approved import; source/category/reference and restrictions visible; approved bill/budget inputs | Tuition aggregate reaches reviewed local plan with zero student rows; duplicate/unverified/restricted money cannot increase spendable cash |
-| B2 — background coordination | Durable finance event/run records, after-commit dispatch with recovery sweep, bounded planning jobs and explicit service permissions | Reviewed receipt or scheduled due scan creates one non-executable proposal without chat/browser; crash/replay produces no duplicate work |
-| B3 — supervision | Finance dashboard, evidence timeline, assigned approval work and queued in-app notifications; safe pause/retry controls | Authorized supervisor sees active/waiting/failed work, gets one actionable notification and can review exact version; unauthorized actor cannot see/approve |
-| B4 — human execution | MFA-backed exact reserved-payment review/enrollment, reviewed release and funding rollover, durable outbox/attempts, isolated executor and Arc settlement verification all delivered; certified Arc evidence from a live testnet run and explicit local/mirror authority remain | One permitted staff authorization produces one matching verified testnet payment; rejection, drift, crash and unknowns cannot pay twice |
+| B0 — portal safety | Audit existing receipt/posting claims; settle testnet/custody scope; durable student consent/intents/attempts, exact fee policy, strong verification and safe recovery before posting | False/fake/pending/reverted/mismatched observations post no trusted tuition or cash; timeout/crash/replay observes one existing send |
+| B1 — unified Collections | Retain delivered cashier capture/review; import verified portal receipts with immutable source/allocation links; prevent overlapping manual/digital capture | One portal payment appears once, no manual re-entry; same receipts cannot inflate opening cash or batch totals; zero-student aggregate plan still works |
+| B2 — background coordination | Eligible receipt/review events, after-commit dispatch/recovery, bounded planning and explicit institution service permissions | Reviewed receipts trigger one non-executable closed-set proposal without chat; no receipt event itself creates payment authority |
+| B3 — supervision | Student tuition status/history; Collections source/attention views; Finance Supervisor evidence/Jev advice, owned work items and notifications | Student sees truthful transfer/allocation state; authorized staff sees source-to-proposal trace; no cross-student/institution leak or view-only mutation |
+| B4 — human execution | Complete source-to-reservation UI and existing async transport/recovery/package gates; preserve MFA-backed payment review and funding controls | One genuine staff approval produces one matching testnet outflow with source attribution; local obligations unchanged; unknown outcomes never resend blindly |
 | B5 — standing automation | Independently approved recurring mandate, due occurrence identity, cumulative caps and isolated scheduled execution. Design in **§18**; dependency chain in §18.7 | Scheduler pays one eligible approved occurrence automatically on testnet without chat/per-item click; over-limit valid bill routes to staff and hard failure stays blocked |
 | B6 — college evaluation | Permissioned staff demo, background/approval/autonomy evidence and agreed value metrics | Staff confirms usefulness; record baseline, corrections, delays and unresolved cases without claiming bank settlement or production readiness |
+
+Do B0 before promoting merged digital records; then B1–B3 connect intake to the existing
+supervised flow. B4's unresolved outbound attempt/package/fee issues may be investigated
+read-only in parallel, but inbound UI cannot bypass them. Existing historical payment records
+stay intact unless a separately authorized, append-only correction is reviewed.
+
+**Direct-payment example, separate from real PHP below:** a designated pilot student account
+pays `5.000000 USDC` plus a consented bounded fee. Provider accepts the intent; only matching
+verified movement creates its one digital receipt and allocation. Staff initially reviews
+category/restrictions; that receipt can then feed a USDC pilot plan within an existing approved
+allocation. If the treasury's latest balance already contains the 5 USDC, do not add it again.
+Jev does not divide that 5 USDC into new percentages or choose a new beneficiary. Actual
+outgoing bill payment still waits for its exact authorized workflow; the real PHP account
+and the student's official college receipt are unaffected by this testnet demonstration.
 
 **Hypothetical walkthrough; figures are not defaults:** cashier reconciles `PHP 50,000.00`
 of tuition receipts, including `PHP 10,000.00` restricted funds. Separate reviewer confirms
@@ -2691,6 +2878,30 @@ recipient or restricted use stays blocked regardless of bill size. Notify the re
 staff and retain the reason/evidence; do not make an urgent label bypass controls.
 
 Required additional acceptance tests:
+- Direct confirmation is scoped to one payer/student/account/institution and designated
+  pilot network; forged recipients, foreign accounts and unowned signing wallets are refused.
+  UI cannot show fake/testnet receipt as real tuition clearance or hide a failed verification.
+- Verify receipt success, chain/asset, sender/recipient and amount, including relayer envelopes,
+  emitter decimals and corroborating logs. Transaction presence, hash alone, null/pending RPC,
+  reverted receipts, mismatches and fake gateway cannot produce trusted paid/confirmed posting.
+- Stable request identity survives double-click, refreshed page, duplicated worker, lost HTTP
+  response, crash before/after send and DB failure after settlement. Resolve existing handle/hash;
+  never generate a new send merely because no final row exists. Concurrent partial payments
+  and overpayment arrivals preserve every receipt and cannot over-credit tuition.
+- Fee quote failure blocks rather than becomes zero. Exact six-decimal principal plus native
+  fees is affordable only within consented ceiling; precision/overflow, stale quote, fee drift,
+  cached balance drift and invalid currency/network cannot turn an estimate into actual cost.
+- Portal receipt, manual cashier report and opening/current balance cannot count the same
+  receipt twice. Unique source links survive event replay; restricted/suspense/simulated money
+  contributes zero eligible real planning cash. Verified testnet receipts can contribute only
+  to explicitly designated pilot USDC capacity, never local/production cash. Principal and
+  sender-paid fees are separate.
+- Rollback emits no planning event; committed digital receipt/review reaches Collections and
+  the correct supervisor once with no open browser. Notification dismissal never reviews a
+  receipt, accepts a plan, creates a mandate or approves payment.
+- Generated-wallet slot reservation and interrupted creation recover the correct provider
+  identity; view-only staff cannot provision/sign, and parent/sponsor payer is not inferred
+  from a student login. Existing generic aggregate planning still works with zero students.
 - Cashier maker cannot self-verify collections or authorize spending; accountant read access
   does not imply payment permission; institution/service identity survives queued execution.
 - Events after rollback produce no work; committed events survive broker failure through
@@ -2711,41 +2922,42 @@ Required additional acceptance tests:
 - Dashboard scopes financial data and fake/network labels correctly, reports stale/failed
   heartbeats honestly and distinguishes planning completion from verified settlement.
 
-These are proposed acceptance gates. Existing tests/legacy demo do not prove background
-execution, this dashboard, notification routing or the recurring lane. No payment path is
-enabled by this plan update.
+These remain acceptance targets, not a claim that the merged portal or legacy demo passes
+them. Existing fake-path and endpoint tests are useful regressions but not proof of matching
+live tuition settlement, digital-to-Collections integration, custody, or recurring execution.
+No payment path is enabled or disabled by this plan update.
 
 ---
 
-## 15. Counterparty Wallets — Who Holds What, and the Two Missing Legs
+## 15. Counterparty Wallets — Payer Control, Pilot Wallets and Missing Integration
 
-**Status: design section. Nothing here is implemented, and nothing here changes the Section 14
-pilot.** It answers a question the rest of this document leaves implicit: the installation
-provisions exactly one Circle wallet — the institution's — so what, if anything, does a
-student or a vendor hold, and how does money actually reach them?
+**Status revised 2026-10-12:** PR #14 implements operator-provisioned student wallet records,
+balance views and a tuition send/record path. It does **not** establish student self-custody,
+legally attributed third-party receipts, safe receipt reconciliation or production collection.
+The production roles below remain design targets; §14.10 now governs integration of the
+merged pilot wallet flow. Vendor recipients remain reviewed operator-controlled testnet aliases.
 
 ### 15.1 The honest answer to "what do counterparties hold today?"
 
-**Nothing.** Today the institution holds the only wallet the system controls, and the two
-counterparty legs of the flow are not merely unfinished — they are *unmodelled*.
+There are now both institution wallet records and `StudentWallet` records. The important
+distinction is **who can sign**, not which table contains an address. Student generation
+uses the installation operator's Circle CLI account; linking that address to a student
+does not establish independent control by the student or a separate custodian account.
 
 | Leg | Current state | Why |
 | --- | --- | --- |
 | Institution **outbound** (agent pays a vendor) | Structurally designed, deliberately simulated | `VendorDestinationVersion` binds a reviewed address, but §14.3.5 requires that address to be an **operator-controlled testnet recipient** mapped to a vendor *alias*. The real vendor holds nothing and receives nothing. |
-| Institution **inbound** (a payer funds the institution) | **Not modelled at all** | §12.5 — collection intents, payment links, inbound verification, allocation and suspense — is entirely proposed. There is no `CollectionIntent`, no receivable, no payer identity. |
-| Student | No on-chain presence by design | §14.2 forbids a student fee portal. `Student.payout_address` exists from the legacy aid module and is **not** evidence of a student-held wallet. |
+| Institution **inbound** (a payer funds the institution) | Partial student tuition path merged | `StudentTuitionPayment` binds a student/account and attempted transfer, but durable intent, strong movement verification, safe posting and Collections/planning integration remain §14.10 work. Generic §12.5 collection intents/suspense and legal payer identity remain unbuilt. |
+| Student | Wallet/balance page and operator-generated Circle address available | `Student.payout_address` now drives common reads and can match a generated `StudentWallet`. It is still not proof that the student independently controls signing. |
 | Vendor | A free-text alias plus a reviewed address | `Vendor.wallet_address` is legacy master data. The reviewed path is `VendorDestinationVersion`, whose address is operator-controlled during the pilot. |
 
-The consequence is the important part: **EduFlow today is a one-legged system.** It can
-prepare, reserve and (nominally) submit an outbound transfer to an address that a human
-operator controls. It cannot yet receive USDC from anyone, and it cannot attribute an
-inbound transfer to a payer. An institution adopting it as described would be able to *send*
-money to addresses it chose itself, while its actual collections continued through a bank
-channel it already had. That is not a payments product; it is a payment-mirroring
-observability tool — which is exactly what §14 asks for, and exactly what it must not be
-presented as beyond.
+EduFlow now has entry points for both legs, but **an inbound send UI is not a completed
+reconciled collection workflow**. Proving tuition intake requires matching settlement and
+one safe allocation, then separately making the receipt eligible for planning. Proving a
+vendor outflow still requires genuine staff authority and matching settlement. Neither leg
+proves production custody, fiat settlement or actual college/vendor receipt from testnet funds.
 
-### 15.2 Five wallet roles, and who holds the key
+### 15.2 Wallet roles, and who holds the key
 
 Every address the system touches has exactly one role and one custody answer. Conflating
 them is how an agent ends up signing for someone else's funds.
@@ -2757,18 +2969,22 @@ them is how an agent ends up signing for someone else's funds.
 | 3 | **Gateway deposit** | Circle Gateway contract | Delegates over deposited balance | Transfer id/spec hash, source/destination chain, fees, recovery state | **Never** (delegate scope is balance-wide, not a departmental cap) |
 | 4 | **Counterparty destination** | **The counterparty or its custodian — never the institution** | The counterparty | Reviewed, versioned destination with a *type* and its own verification predicate | Proposes an intent against it; cannot create, rotate or control it |
 | 5 | **Payer source** | **The payer (or their custodian) — never the institution** | The payer | Opaque reference + verified inbound observation, attribution evidence | **Never** |
+| 6 | **Operator-provisioned student pilot wallet** (merged) | Circle wallet is created in the operator's signing/account context; independent student key ownership is not established | Current web payment path requests the operator-held gateway to sign after authenticated student action | `StudentWallet`, payout address, generated/funding provenance and tuition-payment record | **Never**; cannot generate, fund, sign or authorize collection |
 
-Rules that follow directly and are non-negotiable:
+Roles 1–5 above describe intended production custody boundaries, not a claim of implemented
+independent wallets or exact Circle key topology. Role 6 is an explicit pilot exception and
+must not be presented as role 5 or silently converted into real-value custody.
 
-- **EduFlow never holds a student's or a vendor's funds.** Roles 4 and 5 are, by definition,
-  addresses the institution does not control. An institution-custodial product is a
-  different business (a remittance or stored-value institution) with different licensing;
-  it is not this codebase.
-- **EduFlow never creates a counterparty wallet.** §12.7 records that the installed
-  `WalletGateway` contract exposes `transfer`, `balance`, `transactions` and `limits` and
-  **no wallet provisioning**. Provisioning would require a separately reviewed adapter with
-  its own custody, consent and revocation duties. Inventing an address is forbidden by the
-  lepton rule and by §12.5.
+Rules that follow:
+
+- **Do not claim non-custody merely because a wallet is labelled “student”.** Production
+  roles 4/5 are controlled by the counterparty or approved custodian; current role 6 is not.
+  Real-value operator custody requires explicit product/legal/provider approval, consent,
+  safeguarding and recovery design before release, not a change to a button's label.
+- **Pilot wallet provisioning now exists outside `WalletGateway`.** `CircleAgentWalletCli`
+  wraps the package's argv runner for create/fund/list/estimate. Keep its audit, permissions,
+  consent, slot bounds and recovery duties explicit. Never synthesize an address or let an
+  LLM provision a wallet; do not describe operator-created addresses as third-party owners.
 - **An institution-operated address standing in for a vendor is role 4 only in appearance.**
   While a vendor alias maps to an operator-controlled testnet recipient, the system must
   label it as simulation on every surface — dashboard, export, screenshot and audit — and
@@ -2781,6 +2997,7 @@ flowchart LR
     subgraph Institution["Institution (EduFlow controls these)"]
         R[Reserve wallet<br/>role 1] -->|human, bounded + reviewed| O[Operational wallet<br/>role 2]
         G[Gateway deposit<br/>role 3] -.->|future, separate review| O
+        SP[Operator-provisioned student pilot wallet<br/>role 6] -->|merged Pay Now; receipt safety pending| O
     end
 
     subgraph Counterparties["Counterparties (EduFlow never holds these keys)"]
@@ -2792,11 +3009,12 @@ flowchart LR
     O -->|outbound intent: reserve → authorize → submit → verify| V
     P -->|inbound: collection intent → observe → verify → allocate| S
     V -.->|today: operator-controlled testnet alias| T[(Arc testnet)]
-    P -.->|not modelled: no collection intent exists| S
+    O -.->|digital receipt verification and allocation integration pending| S
 ```
 
-The two dotted edges are the gaps. The bottom-left edge is *simulated by design for the
-pilot*; the bottom-right edge is *absent by design for the pilot and unbuilt for later*.
+The operator-provisioned student leg is a testnet integration, not independent payer custody.
+Verified receipt/allocation integration into the institution's evidence ledger remains open;
+generic external payer collection is still proposed. Outgoing vendor aliases remain simulation.
 
 ### 15.4 Why a single institution wallet cannot substitute for counterparty wallets
 
@@ -2806,15 +3024,17 @@ Three independent reasons, each sufficient on its own:
    account. An institution-held address cannot receive it; the institution would be paying
    itself and then carrying a vendor payable as an internal balance — which is a different
    product with its own credit, liquidity and licensing consequences.
-2. **Attribution.** §12.5.2 already establishes that a sender address does not identify a
-   payer. If inbound funds arrive from addresses EduFlow itself provisioned, attribution
-   becomes circular and unprovable: the system would be matching its own outputs as though
-   they were third-party receipts.
+2. **Attribution.** §12.5.2 establishes that a sender address does not identify a legal payer.
+   Movement between operator-provisioned wallets can be proved onchain, but does not prove
+   independent student/parent ownership, consent or externally sourced college income.
+   Preserve pilot provenance rather than matching internal demo funding as third-party revenue.
 3. **Attestation.** Circle's 2-of-2 Agent Wallet means each counterparty address has a human
    and a device behind it. Per-student Agent Wallets (§15.6) are therefore operationally
    out of reach at enrolment scale, and the wallet-count limits and per-user cost are
    explicitly unverified (§12.2). An institution cannot enrol a department, let alone a
-   campus, on unverified per-person custody economics.
+   campus, on unverified per-person custody economics. PR #14 reports five agent wallets per
+   chain and uses one signing context; recheck provider limits and do not assume that design
+   supplies independent per-student signers or scales to college enrollment.
 
 ### 15.5 Outbound — how a vendor actually receives payment
 
@@ -2853,8 +3073,8 @@ separately reviewed integrations with their own jurisdiction gates (§8.5). Neve
 
 ### 15.6 Inbound — how a payer actually funds the institution
 
-The current `Student` model conflates two legally distinct parties, and the plan should say
-so before any collection work begins.
+The merged tuition path identifies a `Student`, their generated wallet and tuition account.
+This is useful application attribution but still conflates two legally distinct parties:
 
 - **`Student`** — the beneficiary of the education. Usually not a contracting party. In
   jurisdictions where minors cannot contract, a student's fee obligation is the *payer's*
@@ -2863,10 +3083,11 @@ so before any collection work begins.
   Frequently a parent, frequently a different person from the `Student` row, and sometimes a
   employer, sponsor or scholarship fund.
 
-`Student.payout_address` encodes a wallet on the wrong side of that relationship: it
-attributes funds to a beneficiary rather than to the party that can lawfully dispose of
-them. Any future inbound design must introduce an explicit `Payer` linked to a `Student`
-(and to an institution), and must never infer a payer from a student record.
+`Student.payout_address` alone cannot identify the person entitled to dispose of funds.
+Before production inbound collection, introduce explicit payer/control/consent evidence linked
+to student and institution. A parent/sponsor and a student are not interchangeable. For the
+current testnet slice, record the operator-controlled pilot source and authenticated student
+action truthfully instead of inventing a legal payer or claiming student self-custody.
 
 | Model | Who holds the address | Attribution | Blocker |
 | --- | --- | --- | --- |
@@ -2874,14 +3095,14 @@ them. Any future inbound design must introduce an explicit `Payer` linked to a `
 | **B. Institution-custodial credit** | Institution ledger only | Exact internal posting | Not a payment and not a rail (§6.1). Must never be labelled USDC settlement |
 | **C. Aggregated processor / Gateway collection** | One institution address | Per-payer reference inside a single verified inbound | Needs the §12.5 inbox, then a processor contract. **Lowest per-payer friction** |
 | **D. Payer self-custody** | Payer's own Agent Wallet / address | Payer-supplied opaque reference | 2-of-2 MPC per payer; enrolment, KYC, minors, devices, unverified wallet-count and cost limits |
-| **E. Individual matching to student accounts** | Institution | Per-student chain identity | §12.5 and §14.2 defer this; it must not be a prerequisite for any earlier option |
+| **E. Operator-generated student pilot wallet** (merged) | Operator's Circle context | Student/account FK and generated address | Hardening and financial reconciliation under §14.10; testnet only, no proof of independent payer custody or campus scalability |
 
 **Recommendation, in order:** A (already proven for the pilot) → C, because it gives each
 payer a real USDC receipt while the institution operates exactly one address and one
 counterparty relationship → B, which is useful and cheap but must never be called
-settlement → D only where a payer already holds USDC and asks for it. **E is explicitly not
-recommended** until A–C are stable, because per-student chain identity is the highest-cost,
-highest-privacy-risk option and the plan has already deferred it twice (§12.5, §14.2).
+settlement → D only where a payer already holds USDC and asks for it. Retain E as the merged
+bounded testnet demonstration and connect it safely; do not silently turn that implementation
+into the default production custody model. A remains fully supported without student records.
 
 Inbound invariants that must hold regardless of model:
 
@@ -2896,27 +3117,29 @@ Inbound invariants that must hold regardless of model:
 
 ### 15.7 Data model consequences
 
-The current schema cannot express any of this and would mislead an implementer who tried:
+Current records express part of the flow. Remaining gaps must stay visible:
 
 | Gap | Today | Required shape |
 | --- | --- | --- |
-| Wallet roles | `wallets` is organization-scoped only; no role, no custody, no counterparty linkage | Add `role`, `custody_mode`, `counterparty_type`, `counterparty_id`, `readiness_state`, `ownership_approved_by`. One table, discriminated — a second table invites the two-ledger confusion of §1 |
+| Wallet roles | Organization `Wallet` plus student-linked `StudentWallet` now exist; table linkage does not establish custody | Explicit role/custody/control/readiness and reviewed signer identity across existing records. Do not force a migration to one table or invent a second monetary balance to make schemas look uniform |
 | Counterparty identity | `Vendor` has a bare `wallet_address`; no legal-entity type | `Vendor` needs a legal-entity type; the address moves to a versioned destination record |
 | Destination type | `VendorDestinationVersion` records an address and chain only | Add a **destination type** and bind the type-specific evidence required by §15.5 |
 | Settlement evidence | Verdict is Arc-shaped (`verified`/`fabricated`/`unverifiable`/`ledger_only`) | The predicate must become type-specific; an Arc receipt cannot close a custodian or payout obligation |
 | Payer | No concept; `Student.payout_address` conflates payer and beneficiary | Explicit `Payer` linked to institution, with its own identity, consent and destination evidence |
-| Inbound | None | `CollectionIntent`, verified inbound observation, allocation/suspense record — §12.5, unbuilt |
+| Inbound | `StudentTuitionPayment` and direct API/UI, without durable pre-send intent or safe verified allocation | Stable incoming intent/attempt identity, strong receipt proof, exactly-once allocation and source-linked Collections/suspense. Generic §12.5 intake remains proposed |
 | Counterparty ownership | `Wallet` has `organization_id`; role 4/5 rows have no legitimate institution FK semantics | Counterparty destinations are **not** institution wallets. Referencing them through `wallets` would imply custody the institution does not have |
 
-None of these are hackathon work. They are the schema the institution release would need,
-and writing them down now prevents the migration from being discovered as an incident.
+The narrow integrity/receipt linkage in §14.10 is now integration work for the merged portal.
+Generic production custody, legal payer onboarding and broader rail integrations remain later
+institution-release work. Do not redesign unrelated tables before the safe tuition slice passes.
 
 ### 15.8 What this changes, and what it does not
 
-- **The Section 14 pilot is unchanged.** Students still pay through the college's existing
-  channel; the cashier still records aggregate receipts; vendors still map to an
-  operator-controlled testnet alias labelled as simulation. This section documents why that
-  is honest rather than expanding the pilot.
+- **Section 14 keeps its one-department spending scope but adds an optional intake path.**
+  Cashier-recorded local receipts and operator-provisioned testnet student payments remain
+  separate economic sources, reconciled in one workspace. Vendor recipients remain reviewed
+  testnet aliases. No production collection, mainnet signing or unrestricted treasury authority
+  follows from the portal merge.
 - **No dashboard, screen or table claims a counterparty has been paid.** A verified mirror
   transfer settles an on-chain intent to a testnet alias; it is not a vendor receipt, not a
   collection, and not college income (§14.3.6).
@@ -3007,7 +3230,7 @@ vendorDestinationVersion, invoiceVersionReview}`, `CollectionBatch::preparer`,
 `BudgetSnapshot::budget`. Tests: `tests/Feature/Filament/FinanceSupervisorDashboardTest.php`
 and the reworked `EduFlowCommandCenterTest`.
 
-### 16.6 Current screen availability and remaining work (2026-10-11)
+### 16.6 Current screen availability and remaining work (2026-10-12)
 
 Backend records, visible screens and end-to-end payment acceptance are three separate delivery
 claims. Current routes and page actions establish the following, not universal admin availability:
@@ -3017,7 +3240,10 @@ claims. Current routes and page actions establish the following, not universal a
 | Installation/operations overview, identity, providers and staff | Available | Not the finance role | Readiness/configuration is not settlement proof |
 | Exact reserved-payment review and independent reviewer enrollment | **Automation → Payment Approvals** (`/admin/payment-reviews`) | **Payment Approvals** (`/finance/payment-reviews`) | Requires direct `AuthorizePayment:PaymentIntent`, verified eligible staff, independently enrolled current factor and maker/checker separation; review does not itself transfer |
 | Submission queue/history, provider detail and attempts | **Automation → Payment Submissions** (`/admin/payment-submissions`), read-only | No submission resource registered | Unknown outcomes need investigation; a hash or provider ID is not verified settlement |
-| Aggregate collection capture and independent source review | **Finance records → Collections** (`/admin/collections`) | **Collections** (`/finance/collections`) | Cashier-friendly three-step capture with private receipt/report upload and independent review; offchain evidence only, no individual payer matching or inbound USDC collection |
+| Aggregate collection capture and independent source review | **Finance records → Collections** (`/admin/collections`) | **Collections** (`/finance/collections`) | Cashier-friendly three-step capture with private receipt/report upload and independent review; direct portal receipts are not imported here yet |
+| Student wallet balance/provenance and wallet generation | **Student Services → Students → View student**, wallet widget | No corresponding wallet-management screen registered | Operator-generated Circle wallets; generation/control/consent permissions and slot recovery need §14.10 review. Balance is a read, not a tuition receipt |
+| Direct student tuition quote/pay | Generic **Transactions** may show `tuition_revenue`; **Tuition Accounts** may reflect its current posting; no dedicated tuition-attempt/reconciliation inbox | Not listed in Collections or approved planning cash | Student entry is `/student/dashboard` Pay Now plus `/student/wallet`. Current posting/verification/retry flaws block trusted financial use; generic confirmed status is not proof |
+| Student tuition receipt history and intake exceptions | No dedicated resource found | No dedicated queue found | `StudentTuitionPayment` records exist; `/payments` still lists assistance/refunds. Persistent student status/history and shared Collections source/attention views are planned, not shipped |
 | Closed-set budget capture, background run evidence and plan review | No dedicated admin screen | **Finance Supervisor** (`/finance/finance-supervisor`) | Accepting a plan never grants payment authority |
 | Invoice source review, beneficiary approval, draft preparation and funding/reservation | Legacy invoice CRUD is available, not the complete safe workflow | Several authenticated HTTP actions exist; complete operator wizard absent | Need linked source/destination/policy/budget/funding screens rather than scripts or fabricated reviewers |
 | Reviewed capacity release and funding rollover | No screen | No screen | Backend actions/tests exist; authorization/unknown outcomes cannot be discarded to free capacity |
@@ -3060,15 +3286,21 @@ in the admin dashboard's explicit widget list. Presence of a widget class is not
 
 Next work, in dependency order:
 
-1. Verify/adopt the async package safely, establish the Circle HTTP 400 cause, and resolve
-   existing attempts read-only. Fix duplicate unknown-attempt recording and any reconciliation
-   path that could resend a possibly accepted payment. Preserve holds and uncertainty.
-2. Complete the normal source-to-reservation operator flow, funding renewal/release controls,
+1. **B0 portal safety (§14.10):** audit existing tuition postings read-only, establish pilot
+   network/custody/consent scope, and require durable incoming identity, matching movement
+   verification, exact fee bounds and recoverable exactly-once allocation. Resolve async
+   transport/package behavior for both intake and outgoing paths. No blind retry or rewrite.
+2. **B1–B3 intake integration:** automatically import verified digital receipts into Collections
+   with allocation/source links and independent financial-use review; exclude duplicates,
+   restrictions and simulation from real cash. Add student history/attention queues and link
+   committed receipt/review events to existing bounded planning and supervisor advice.
+3. Complete the normal source-to-reservation operator flow, funding renewal/release controls,
    truthful dashboard bindings and investigation ownership. Prove one actual independent
    staff authorization reaches one matching verified Arc testnet transfer; never synthesize consent.
-3. Add standing-mandate and occurrence screens, reviewed ceilings/revocation, then explicit
+   Preserve unresolved outbox #3 while investigating transport errors and duplicate attempt risks.
+4. Add standing-mandate and occurrence screens, reviewed ceilings/revocation, then explicit
    institution-scoped service authority for release-to-submission. Initial allowance stays zero.
-4. Add advisory-ranking review and retrospective per-occurrence feedback, keeping feedback,
+5. Add advisory-ranking review and retrospective per-occurrence feedback, keeping feedback,
    proposal acceptance, payment authorization and verified settlement distinct. Finish fee-cost
    policy and college pilot evidence before claiming production readiness.
 
@@ -3084,28 +3316,33 @@ be able to see which arrow is live without reading the source.
 
 | # | Step | Actor | Status |
 | --- | --- | --- | --- |
-| 1 | Student pays fees | Student, through the college's **existing bank channel** | **Live — EduFlow is not involved** |
-| 2 | Cashier records receipts | `CaptureCollectionBatch` → `CollectionBatch` | ✅ Built |
-| 3 | Independent reviewer verifies source | Different person → `ReviewCollectionBatch` (`approve_receipts` / `hold` / `reject`) | ✅ Built |
+| 1A | Existing-channel collection | College's existing cash/bank channel; cashier captures source proof | Supported aggregate evidence lane; real bank settlement stays outside EduFlow |
+| 1B | Optional direct portal attempt | Student Pay Now → quote/pay API → generated wallet → configured treasury | **Merged, safety incomplete**: synchronous send/hash lookup and unconditional posting; no durable incoming attempt/recovery |
+| 2A | Record manual receipts | `CaptureCollectionBatch` → `CollectionBatch` | Built; private upload and three-step entry in both panels |
+| 2B | Verify, allocate and import digital receipt | Incoming intent/handle → matching movement proof → one account allocation → source-linked Collections | **Not connected**; `StudentTuitionPayment` is current record, not trusted receipt proof or planning binding |
+| 3 | Independent financial reconciliation | Separate reviewer checks manual sources or digital receipt attribution/category/restrictions | Manual batch review built; digital receipt/review adapter remains §14.10 work |
 | 4 | Staff selects the bill set and allocation | Human → `CaptureBudgetSnapshot` with `bill_ids`, `allocation` | ✅ Built |
 | 5 | Bill source evidence captured and reviewed | Maker → `InvoiceVersion`; separate checker → `approve_evidence` | ✅ Built |
-| 6 | Budget snapshot binds reviewed receipts | Human → `BudgetSnapshot` schema v2 with collection review ids | ✅ Built |
+| 6 | Budget snapshot binds reviewed receipts | Human → `BudgetSnapshot` schema v2 with collection review ids | Built for current reviewed batch inputs; no automatic student-payment binding yet |
 | 7 | **Planner walks the closed set** | **Deterministic PHP**, no model | ✅ Built |
 | 8 | Supervisor records the plan decision | Human → `FinancePlanReview` (`accept_plan` / `reject_plan` / `request_correction`) | ✅ Built |
 | 9 | Draft payment intent | Maker → `PaymentIntent` (`draft`, `can_execute=false`) | ✅ Built |
 | 10 | Funding window and capacity hold | `FundingWindow` (15-min, block-bound) → `PaymentReservation` | ✅ Built |
 | 11 | Payment authorization | Enrolled reviewer + fresh MFA/TOTP, 5-minute expiry | ✅ Built |
-| 12 | **Submit to Arc** | `IsolatedPaymentExecutor` behind the runtime opt-in, then `ArcSettlementVerifier` | ✅ Built and tested — **not yet run against live testnet** |
+| 12 | **Submit to Arc** | `IsolatedPaymentExecutor` behind runtime opt-in; provider observation; `ArcSettlementVerifier` | Foundation built; genuine independently authorized current-workflow settlement **not demonstrated**; transport/recovery/package/fee gaps remain |
 | 13 | **Vendor receives USDC** | Verified Arc settlement, optionally mirrored to `transactions` | ⚠️ **Proves movement, not receipt** — vendor aliases map to operator-controlled testnet recipients (§15.5) |
 
-Steps 2–12 are real and tested. Step 12 has never submitted to a live network: it is gated
-behind `EDUFLOW_SUBMISSION_ENABLED`, defaults off, and refuses anything but Arc testnet. Closing
-§14.4 Step 4 needs an operator decision on real testnet submission authority plus one live run.
-Step 13 is only as good as the recipient — a verified settlement proves the treasury paid the
-bound address, not that a vendor received anything. `can_execute` remains hardcoded `false` in
-every `evidence()` array by design; nothing in this build may authorise itself.
+The manual lane remains usable without a student row. The portal lane now exists but needs
+§14.10's pre-send identity, proof, posting and source/review integration before it can supply
+trusted planning cash. Incoming student consent, receipt reconciliation, plan acceptance,
+payment authorization and settlement are different events. No genuine current-workflow staff
+approval-to-settlement run has been established; prior synthetic-reviewer records and historical
+chain payments do not satisfy it. The outbound runtime remains separately opt-in and testnet-only;
+the new direct-payment service must gain its own explicit purpose/chain/stop guard rather than
+assuming it inherits outbound flags. Step 13 proves movement to the bound pilot recipient, not
+that a real vendor received the college's payment.
 
-### 17.2 Three corrections this trace makes explicit
+### 17.2 Four corrections this trace makes explicit
 
 1. **The planner cannot choose bills.** `DepartmentBudgetPlanner::build()` iterates the
    closed set a human supplied when capturing the snapshot, sorts by due date, applies four
@@ -3118,13 +3355,17 @@ every `evidence()` array by design; nothing in this build may authorise itself.
 3. **An authorised payment still does not settle the local payable.** A verified testnet
    mirror consumes its pilot reservation and nothing else (§14.3.6). It is not college
    income, not an accounting posting and not a vendor receipt.
+4. **An incoming payment still does not approve use of funds.** Portal confirmation authorizes
+   the student's bounded inbound transfer only. It creates no budget allocation, policy,
+   standing mandate or outgoing approval. Fake/testnet principal is not real tuition revenue;
+   the current generic `CONFIRMED` transaction or changed account balance is not proof of receipt.
 
 ### 17.3 What remains before step 12 can be closed end to end
 
 §14.4 Step 4 requires each eligible approved item to reach verified mirror settlement once.
-Steps 1–12 are now built and tested: one isolated worker loads an authorized intent, rechecks
-stop switch/fees/policy/balance, submits with a stable provider identity, and verifies matching
-chain/asset/sender/recipient/amount plus finality before recording anything as settled.
+An isolated outgoing worker and matching Arc predicate exist, but the full operator flow,
+safe async provider observation/recovery and genuine human-approved live acceptance remain open.
+The student portal merge supplies neither those gates nor its own equivalent receipt guarantees.
 
 Its prerequisites, in order:
 
@@ -3136,11 +3377,13 @@ Its prerequisites, in order:
    **Delivered.**
 3. **The executor itself, plus the settlement predicate.** **Delivered.**
 
-What is genuinely left is not code: the executor has never touched a live network. It is gated
-behind `EDUFLOW_SUBMISSION_ENABLED`, defaults off, and refuses anything but Arc testnet. Closing
-step 12 requires an operator decision on real testnet submission authority and one live run, and
-then step 13 — which proves movement to a bound address, not that a vendor received anything
-(§15.5).
+**Remaining code and operator work:** adopt/verify async gateway compatibility, resolve the
+existing unknown attempt without resending, fix duplicate-attempt/recovery hazards, finish
+source-to-reservation controls and honest total-cost bounds, and establish explicit genuine
+operator authority. For the digital intake branch, first complete B0–B3 in §14.10. Only then
+demonstrate a source-linked, independently authorized exact pilot outflow and matching proof.
+Keep outbound runtime off until its separate opt-in decision; no mainnet or fiat authority
+is implied by an incoming testnet balance.
 
 Until that run happens, any "the agent pays the vendor" claim is false regardless of how
 complete the authorization chain looks.
