@@ -366,6 +366,16 @@ test('headroom chart plots allocation and cash separately and skips corrupt evid
         ->and($data['datasets'][1]['data'])->toBe([25000.0]);
 });
 
+test('schema v3 budget capacity is displayed as reviewed evidence, not legacy', function (): void {
+    $c = financeDashboardContext();
+    Filament::setCurrentPanel(Filament::getPanel('finance'));
+    actingAs($c['reviewer']);
+
+    expect(BudgetSnapshot::query()->firstOrFail()->snapshot['schema_version'])->toBe(3);
+    Livewire::actingAs($c['reviewer'])->test(BudgetCapacityWidget::class)
+        ->assertSuccessful()->assertSee('Reviewed collections')->assertDontSee('Legacy attestation');
+});
+
 test('charts report an honest empty state instead of a flat zero graph', function (): void {
     $c = financeDashboardContext();
     Filament::setCurrentPanel(Filament::getPanel('finance'));

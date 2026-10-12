@@ -123,14 +123,36 @@ test('stale source blocks background planning and cannot generate an approvable 
         ->and(Gate::forUser($c['reviewer'])->allows('review', $run->fresh()))->toBeFalse();
 });
 
-test('scheduler sweep dispatches durable work once per lease and never uses a synchronous queue', function (): void {
+test('scheduler sweep recovers undispatched work once per lease and never uses a synchronous queue', function (): void {
+    $c = workflowContext();
+    $dispatcher = app(FinanceWorkflowDispatcher::class);
+
+    // Capturing evidence dispatches its own work after commit, so the sweep
+    // normally has nothing to do. Its job is recovery: a run whose dispatch was
+    // lost to a crash between commit and enqueue must still be picked up.
+    Bus::fake();
+    FinanceWorkflowRun::query()->update(['dispatched_at' => null]);
+    expect(FinanceWorkflowRun::query()->count())->toBe(2)
+        ->and($dispatcher->dispatch())->toBe(2)
+        ->and($dispatcher->dispatch())->toBe(0);
+    Bus::assertDispatchedTimes(ProcessFinanceWorkflow::class, 2);
+
+    // A synchronous queue would run financial work inside the request that
+    // merely recorded it, so it is refused outright rather than tolerated.
+    config(['eduflow.background_finance.queue_connection' => 'sync']);
+    expect(fn () => $dispatcher->dispatch())->toThrow(ValidationException::class);
+    expect($c['snapshot']->hasValidSnapshot())->toBeTrue();
+});
+
+test('work dispatched after commit is not enqueued twice by the sweep', function (): void {
     workflowContext();
     Bus::fake();
     $dispatcher = app(FinanceWorkflowDispatcher::class);
-    expect($dispatcher->dispatch())->toBe(2)->and($dispatcher->dispatch())->toBe(0);
-    Bus::assertDispatchedTimes(ProcessFinanceWorkflow::class, 2);
-    config(['eduflow.background_finance.queue_connection' => 'sync']);
-    expect(fn () => $dispatcher->dispatch())->toThrow(ValidationException::class);
+
+    // The runs were claimed when their evidence committed, so a sweep finds
+    // nothing and must not re-enqueue them.
+    expect($dispatcher->dispatch())->toBe(0);
+    Bus::assertNothingDispatched();
 });
 
 test('workflow source transaction rollback leaves no phantom work and sweeper recovers undispatched evidence', function (): void {

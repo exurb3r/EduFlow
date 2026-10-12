@@ -77,11 +77,11 @@ class BudgetCapacityWidget extends TableWidget
                     ->searchable(),
                 TextColumn::make('evidence_mode')->label('Evidence')
                     ->badge()
-                    ->state(fn (BudgetSnapshot $record): string => ($record->snapshot['schema_version'] ?? null) === 2
+                    ->state(fn (BudgetSnapshot $record): string => in_array($record->snapshot['schema_version'] ?? null, [2, 3], true)
                         ? 'Reviewed collections'
                         : 'Legacy attestation')
-                    ->color(fn (BudgetSnapshot $record): string => ($record->snapshot['schema_version'] ?? null) === 2 ? 'success' : 'warning')
-                    ->tooltip(fn (BudgetSnapshot $record): string => ($record->snapshot['schema_version'] ?? null) === 2
+                    ->color(fn (BudgetSnapshot $record): string => in_array($record->snapshot['schema_version'] ?? null, [2, 3], true) ? 'success' : 'warning')
+                    ->tooltip(fn (BudgetSnapshot $record): string => in_array($record->snapshot['schema_version'] ?? null, [2, 3], true)
                         ? 'Bound to independently reviewed collection batches.'
                         : 'Schema v1 staff attestation. Readable, but cannot open a funding window.'),
                 TextColumn::make('validity')->label('Evidence window')

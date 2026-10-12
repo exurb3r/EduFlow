@@ -195,6 +195,14 @@ class CollectionBatch extends Model
 
         return $payment instanceof StudentTuitionPayment
             && $payment->isReal()
+            && $this->currency === CurrencyCode::USDC->value
+            && $this->source_stream === self::TUITION_PORTAL_STREAM
+            && $this->received_minor_units === $payment->amount_base_units
+            && $this->restricted_minor_units === $payment->overpayment_base_units
+            && ($snapshot['movement']['applied_base_units'] ?? null) === $payment->applied_base_units
+            && ($snapshot['movement']['overpayment_base_units'] ?? null) === $payment->overpayment_base_units
+            && ($snapshot['movement']['payer_address'] ?? null) === $payment->payer_address
+            && ($snapshot['movement']['recipient_address'] ?? null) === $payment->recipient_address
             && ($snapshot['movement']['request_key'] ?? null) === $payment->request_key
             && ($snapshot['movement']['tx_hash'] ?? null) === $payment->tx_hash
             && ($snapshot['movement']['amount_base_units'] ?? null) === $payment->amount_base_units

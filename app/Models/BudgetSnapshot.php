@@ -66,7 +66,7 @@ class BudgetSnapshot extends Model
                 || ! is_array($content['department'] ?? null) || ! is_array($content['evidence'] ?? null)) {
                 return false;
             }
-            if (! in_array($content['schema_version'] ?? null, [1, 2], true) || ($content['purpose'] ?? null) !== 'department_budget_planning'
+            if (! in_array($content['schema_version'] ?? null, [1, 2, 3], true) || ($content['purpose'] ?? null) !== 'department_budget_planning'
                 || ($content['capture_key'] ?? null) !== $this->capture_key || ! Str::isUuid($this->capture_key)
                 || $this->capture_key !== strtolower($this->capture_key)
                 || ($content['institution_id'] ?? null) !== $this->organization_id || $this->organization_id < 1
@@ -117,6 +117,53 @@ class BudgetSnapshot extends Model
         }
     }
 
+    /**
+     * Whether the opening balance provably excludes the cash the receipts count.
+     *
+     * `opening_funds_exclude_collections` is a checkbox, and a checkbox is a
+     * promise rather than a proof. For the receipts where the proof can be had,
+     * it is had: `movement_receipts_minor_units` is the total this plan counts
+     * from receipts whose money is **already in the treasury balance** because
+     * a chain transfer settled it. A typed opening balance cannot be decomposed
+     * to prove it excludes them, so when that total is non-zero the opening
+     * balance must be zero and the plan starts from its receipts instead.
+     *
+     * Other opening balances retain their existing staff-attestation contract;
+     * this does not claim to reconcile arbitrary bank statements or FX.
+     *
+     * Enforced from v3 only. A v2 snapshot predates the field and is read under
+     * its own rule rather than being retroactively invalidated.
+     *
+     * @param  array<string, mixed>  $content
+     */
+    private function openingFundsAreMachineDisjoint(array $content): bool
+    {
+        if (($content['schema_version'] ?? null) !== 3) {
+            return true;
+        }
+
+        $movement = $content['movement_receipts_minor_units'] ?? null;
+
+        if (! is_string($movement) || preg_match('/^(?:0|[1-9][0-9]*)$/D', $movement) !== 1
+            || BigInteger::of($movement)->isGreaterThan(PHP_INT_MAX)) {
+            return false;
+        }
+
+        $received = BigInteger::of($movement);
+
+        // It may not exceed the receipts the plan actually counts, or the
+        // recorded movement total is a figure no bound evidence supports.
+        if ($received->isGreaterThan(BigInteger::of($content['amounts']['realized_receipts'] ?? '0'))) {
+            return false;
+        }
+
+        if ($received->isZero()) {
+            return true;
+        }
+
+        return BigInteger::of($content['amounts']['opening_funds'])->isZero();
+    }
+
     /** @param array<string, mixed> $content */
     private function hasValidCollectionBindings(array $content): bool
     {
@@ -127,8 +174,12 @@ class BudgetSnapshot extends Model
             || ($content['opening_funds_exclude_collections'] ?? null) !== true) {
             return false;
         }
+        if (! $this->openingFundsAreMachineDisjoint($content)) {
+            return false;
+        }
         $received = BigInteger::zero();
         $restricted = BigInteger::zero();
+        $movementTotal = BigInteger::zero();
         $lastReviewId = 0;
         $batchIds = [];
         foreach ($content['collections'] as $entry) {
@@ -154,6 +205,20 @@ class BudgetSnapshot extends Model
             $batchIds[] = $entry['batch_id'];
             $received = $received->plus($entry['received_minor_units']);
             $restricted = $restricted->plus($entry['restricted_minor_units']);
+
+            $movement = $content['schema_version'] === 3 ? $entry['movement_receipt_minor_units'] ?? null : 0;
+
+            if (! is_int($movement) || ($movement !== 0 && (string) $movement !== $entry['received_minor_units'])) {
+                return false;
+            }
+
+            $movementTotal = $movementTotal->plus($movement);
+        }
+
+        // The recorded movement total must be the sum of what the entries claim,
+        // not an independently typed figure the exclusion rule then trusts.
+        if ($content['schema_version'] === 3 && (string) $movementTotal !== $content['movement_receipts_minor_units']) {
+            return false;
         }
 
         return (string) $received === $content['amounts']['realized_receipts'] && $restricted->isLessThanOrEqualTo($content['amounts']['restricted_cash']);

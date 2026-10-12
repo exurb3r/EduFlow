@@ -29,6 +29,27 @@ final readonly class FinanceWorkflows
         $this->record($batch->organization_id, 'collection_review', null, $batch->id, $batch->snapshot_digest, 'collection:'.$batch->id);
     }
 
+    /** Requeue a receipt run once its independent review exists; this creates no plan. */
+    public function collectionReviewed(CollectionBatchReview $review): void
+    {
+        if (! config('eduflow.background_finance.enabled', false)) {
+            return;
+        }
+        $institution = $this->institutions->require();
+        $batch = CollectionBatch::query()->where('organization_id', $institution->id)->whereKey($review->collection_batch_id)->firstOrFail();
+        if (! $review->hasValidEvidence($batch)) {
+            throw ValidationException::withMessages(['collection' => 'Collection review failed integrity checks.']);
+        }
+        $this->collectionCaptured($batch);
+        /** @var FinanceWorkflowRun|null $run */
+        $run = FinanceWorkflowRun::query()
+            ->where('organization_id', $institution->id)->where('trigger_key', 'collection:'.$batch->id)
+            ->lockForUpdate()->first();
+        if ($run !== null && $run->state === 'waiting_for_review' && $run->hasValidSource()) {
+            $run->update(['state' => 'queued', 'dispatched_at' => null, 'next_attempt_at' => null]);
+        }
+    }
+
     private function record(int $institutionId, string $kind, ?int $budgetId, ?int $collectionId, string $digest, string $key): void
     {
         if (! config('eduflow.background_finance.enabled', false)) {
@@ -71,7 +92,8 @@ final readonly class FinanceWorkflows
 
                 return;
             }
-            if (! in_array($run->state, ['queued', 'running'], true)) {
+            if (! in_array($run->state, ['queued', 'running'], true)
+                && ($run->kind !== 'collection_review' || $run->state !== 'waiting_for_review')) {
                 return;
             }
             $run->state = 'running';
@@ -92,6 +114,17 @@ final readonly class FinanceWorkflows
                         throw ValidationException::withMessages(['collection' => 'Collection review changed; investigation required.']);
                     }
                     $run->state = $review === null ? 'waiting_for_review' : 'completed';
+                    if ($run->result_digest !== null) {
+                        if (! $run->hasValidResult()) {
+                            throw ValidationException::withMessages(['collection' => 'Recorded collection result failed integrity checks.']);
+                        }
+                        $run->heartbeat_at = Carbon::now();
+                        $run->next_attempt_at = null;
+                        $run->last_error = null;
+                        $run->save();
+
+                        return;
+                    }
                     $result = ['collection_batch_id' => $batch->id, 'source_digest' => $batch->snapshot_digest,
                         'received_minor_units' => (string) $batch->received_minor_units, 'currency' => $batch->currency,
                         'review_required' => $run->state === 'waiting_for_review', 'can_execute' => false];

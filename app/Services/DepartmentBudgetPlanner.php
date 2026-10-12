@@ -38,7 +38,7 @@ final readonly class DepartmentBudgetPlanner
     public function forBackground(BudgetSnapshot $evidence): array
     {
         if (! config('eduflow.background_finance.enabled', false) || $evidence->organization_id !== $this->institutions->require()->id
-            || ($evidence->snapshot['schema_version'] ?? null) !== 2) {
+            || ! in_array($evidence->snapshot['schema_version'] ?? null, [2, 3], true)) {
             throw ValidationException::withMessages(['background' => 'Background planning requires explicit enablement and current institution reviewed evidence.']);
         }
 
@@ -111,7 +111,7 @@ final readonly class DepartmentBudgetPlanner
 
         return ['snapshot_id' => $stored->id, 'snapshot_digest' => $stored->snapshot_digest, 'currency' => $stored->currency,
             'department' => $stored->snapshot['department'], 'as_of' => $stored->snapshot['as_of'], 'valid_until' => $stored->snapshot['valid_until'],
-            'collection_evidence' => ['mode' => ($stored->snapshot['schema_version'] ?? null) === 2 ? 'reviewed_batches' : 'legacy_staff_attestation',
+            'collection_evidence' => ['mode' => in_array($stored->snapshot['schema_version'] ?? null, [2, 3], true) ? 'reviewed_batches' : 'legacy_staff_attestation',
                 'review_ids' => array_column($stored->snapshot['collections'] ?? [], 'review_id'),
                 'received_minor_units' => $stored->snapshot['amounts']['realized_receipts'], 'bank_balance_verified' => false,
                 'opening_funds_exclude_collections' => $stored->snapshot['opening_funds_exclude_collections'] ?? null],

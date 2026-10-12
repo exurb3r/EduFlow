@@ -2490,13 +2490,13 @@ under §14.10; merge alone does not remove production/custody or institutional-c
 
 ### 14.7 Cashier Intake, Policy Decisions and Bounded Autonomy
 
-**Status:** cashier capture/review screens are delivered; the merged portal lane now holds one
-durable attempt per payment, proves movement before posting and posts exactly once (§14.10 B0), and a
-verified movement can be reconciled into a source-linked Collections receipt exactly once (§14.10
-B1). Reconciled receipts are still not bound into planning cash, and the portal receipts are still
-disconnected from the cashier evidence path. Background
-outgoing
-execution is not established by either intake screen. Tuition is the first example; intake can
+**Status (2026-10-13):** cashier capture/review screens are delivered. Portal movement checks and
+attempt/receipt records exist; full consent, async observation and no-resend recovery remain B0
+gates. B1 supports manual reconciliation into a source-linked Collections receipt. B2 now binds
+approved, matching-attempt digital receipts into a staff-captured schema v3 plan, excludes typed
+opening funds when counting those receipts, and wakes its planning run after commit. Automatic
+import/receipt-to-budget selection remain unbuilt. Neither intake screen establishes outgoing
+execution or real tuition clearance. Tuition is the first example; intake can
 later cover laboratory/registration/examination fees, service charges, donations, grants,
 rentals and other approved receipts. Different receipt types must not be collapsed into
 unrestricted tuition revenue. Refundable deposits, overpayments, restricted gifts and
@@ -2736,7 +2736,7 @@ No implementation, wallet generation, funding or transfer is authorized by this 
 | Retry and recovery | A random provider UUID is generated per pay call | Persist one request/intent before external I/O; reuse its identity across refresh/retry; observe uncertain attempts instead of sending again |
 | Fees and amounts | Exact principal stored at six decimals; fee retained as a string | Failed/malformed fee reads currently become zero; affordability truncates fee, and ledger writes use floats. Separate estimated/actual fee evidence and preserve exact totals |
 | Staff wallet view | Admin student detail has balance/provenance and Generate wallet; funding has explicit operator commands | Generation currently reuses student-view permission. Mutations need dedicated manage authority, consent, signer/owner evidence and serialized slot allocation; view permission is not signing authority |
-| Collections/planning | Cashier capture/review and closed-set budget workflows already exist | **B1 delivered:** `ImportTuitionPaymentAsCollection` imports a verified payment as a source-linked, immutable receipt with a unique link to the movement, and the manual capture path refuses the reconciliation channel and any settled movement hash used as a receipt number. **Still open:** nothing binds a reconciled receipt into reviewed planning cash |
+| Collections/planning | Cashier capture/review and closed-set budget workflows already exist | B1 supplies manual reconciliation of an eligible payment into a source-linked receipt. B2 now binds independently approved receipts into a staff-captured schema v3 plan with movement/opening-funds exclusion and an after-commit queue wake. Automatic import and receipt-triggered successor-plan preparation remain open |
 
 **Gate before more live portal testing:** independently audit existing `StudentTuitionPayment`,
 related transactions and balances. Treat current `tx_verified_on_chain` / `CONFIRMED` labels as
@@ -2744,9 +2744,12 @@ claims to recheck, not evidence to promote. Preserve any discrepancy and history
 delete records, reverse tuition balances or rewrite confirmations automatically. The product
 owner must explicitly authorize any pause/configuration change or financial correction.
 
-**B0 delivered 2026-10-12 (portal safety).** The correctness gates in the rows above are now
-closed in code. What remains open is the consent/UI half of the Student entry row and the whole
-of the custody row.
+**B0 safety changes shipped 2026-10-12; acceptance incomplete.** Movement verification before
+posting, fake-driver exclusion and a unique receipt request key exist. This is not closure of
+all §14.10 B0 gates: immutable pre-send consent, expiring quote/accepted fee ceiling, chain/purpose/
+stop guards, no-resend recovery and async provider observation still require work. A unique
+posting key alone does not prove a retry cannot submit again. Existing flags and balances remain
+claims requiring the audit above; no automatic financial correction is authorized.
 
 | Merged defect | Closure |
 | --- | --- |
@@ -2874,10 +2877,11 @@ merely to demonstrate the UI.
 | B5 — standing automation | Independently approved recurring mandate, due occurrence identity, cumulative caps and isolated scheduled execution. Design in **§18**; dependency chain in §18.7 | Scheduler pays one eligible approved occurrence automatically on testnet without chat/per-item click; over-limit valid bill routes to staff and hard failure stays blocked |
 | B6 — college evaluation | Permissioned staff demo, background/approval/autonomy evidence and agreed value metrics | Staff confirms usefulness; record baseline, corrections, delays and unresolved cases without claiming bank settlement or production readiness |
 
-**Status.** B0 is delivered on the correctness path: durable attempt identity, `ArcSettlementVerifier`
-movement proof, exactly-once posting, exact fee policy, derived overpayment, and a rehearsal that
-never claims money moved (see the B0 table in §14.10.1). B0's asynchronous provider-handle
-observation and student-facing attempt history remain open and roll into B2/B3.
+**Status as of 2026-10-13.** B0/B1 safety foundations are shipped but their full exit criteria
+remain open. The attempt model and movement predicate do not yet supply the full consent,
+no-resend recovery or provider-handle worker contract. B1 provides explicit staff reconciliation,
+not automatic import. B2's reviewed-source binding and committed-work dispatch slice is now
+implemented; the automatic coordination target is not yet complete.
 
 **B1 delivered 2026-10-12 (unified Collections).** `ImportTuitionPaymentAsCollection` reconciles a
 verified movement into an immutable `CollectionBatch`. It reconciles rather than records: the money
@@ -2889,7 +2893,7 @@ payment's overpayment.
 | Import verified portal receipts with an immutable source link | `collection_batches.student_tuition_payment_id`, nullable and **unique** — one payment reconciles at most once, and a receipt with no link cannot claim movement evidence. `hasValidSnapshot()` re-derives the movement digest and the recorded hash/amount/request key from the live payment, so a snapshot claiming one movement while linking another fails |
 | Prevent overlapping manual/digital capture | Three independent guards: the unique movement digest occupying the existing `source_document_digest` slot; `CaptureCollectionBatch` refusing `CollectionBatch::TUITION_PORTAL_STREAM` as a manual channel; and refusing any `source_reference` that is a settled payment's `tx_hash` — the realistic double-count, where a cashier holding the Arc explorer hash types it as the receipt number |
 | One portal payment appears once | Replay under the same `capture_key` returns the existing receipt; a fresh identity is refused as already reconciled; the unique index holds even if a future caller reaches past the action |
-| Same receipts cannot inflate opening cash or batch totals | Reconciling never credits a balance or writes a `Transaction`; the overpayment is `restricted_minor_units`, not spendable receipts. **Residual, stated plainly:** `opening_funds` remains a staff-typed figure with a checkbox attestation, so a staff member could still count the same USDC in opening funds as well as in a reconciled receipt. Closing that needs a machine-derived exclusion in `CaptureBudgetSnapshot`, which is B2 work |
+| Same receipts cannot inflate opening cash or batch totals | Reconciling never credits a balance or writes a `Transaction`; overpayment is restricted. B2 schema v3 derives the total of selected movement receipts and requires `opening_funds = 0` whenever it is nonzero. Other opening funds retain their staff-attestation contract; arbitrary manual receipt overlap or a bank reconciliation is not thereby proven |
 | Zero-student aggregate plan still works | A cashier receipt with no students, no wallets and no gateways is unaffected; the manual path and its attestations are unchanged |
 | Separate accounting reviewer | Unchanged and required. Reconciling creates no authority: `evidence()` reports `receipts_reviewed => false` and `can_execute => false`, and the existing policy, model hook and unique review row keep maker-checker separation |
 
@@ -2897,8 +2901,49 @@ Scoping note: an installation is single-organization by construction (`Installat
 returns null unless exactly one organization exists), so the boundary for "is this our money" is
 `recipient_address` matching `config('lepton.arc.treasury')` — not a per-student organization filter.
 
-**Still open in B1:** binding reconciled receipts into planning cash (`CaptureBudgetSnapshot` /
-`ReviewedCollections`), which is B2; and the Collections source/attention views, which is B3.
+**B2 slice delivered 2026-10-13 — reviewed-source planning and queue wake.**
+
+- `ReviewedCollections` derives each bound entry's `movement_receipt_minor_units` from its
+  actual `CollectionBatch` origin. `CaptureBudgetSnapshot` writes schema v3 and an exact
+  `movement_receipts_minor_units` sum using `BigInteger`, never `array_sum()`/floats. The
+  snapshot validates that sum, and planning re-derives the entries from source and review.
+- Conservative overlap policy: any plan counting a movement receipt must use zero typed
+  opening funds. This is a deliberately restrictive exclusion, not a computed opening balance
+  or a reconciled roll-forward for pre-existing cash. Staff-attested PHP/other non-movement
+  plans, including USDC plans using only opening funds, retain their existing behavior.
+- Source and liability bindings remain live: changing imported allocation/restrictions makes
+  the receipt fail integrity checks. Unreviewed, held, rejected, mismatched-currency or future
+  receipts remain ineligible; a selected overpayment remains deducted as restricted cash.
+- Planning requires a matching verified attempt (request, student/account/wallet, hash,
+  sender/recipient, exact principal, verification time and `ARC-TESTNET`/`5042002`) and a
+  complete applied/overpayment split. Historical `tx_verified_on_chain` alone is refused.
+  This prevents automatic promotion of pre-hardening records; it does not replace B0's
+  remaining independent chain audit, immutable proof storage or no-resend recovery gates.
+- `DepartmentBudgetPlanner`, recovery sweeper, funding-window context and dashboard evidence
+  labels accept schema v3. Funding capacity remains the **minimum**, never the sum, of reviewed
+  planning cash and observed balance net of protected funds. No wallet/transaction is credited.
+- New staff-bound budget capture wakes its unique `budget:<snapshot id>` run **after commit**.
+  Review wakes/completes the receipt's own `collection:<batch id>` work item, preserving any
+  earlier immutable result. Capture/review replay and sweeper share a two-minute dispatch lease.
+  Queue delivery can retry; this is one logical proposal identity, not exactly-once transport.
+- Direct wake and sweep both refuse sync/non-durable queues and `retry_after <= 30`. A wake
+  failure cannot undo committed evidence: it is reported, retains durable work/error state,
+  and scheduler can recover after the lease. Rollback discards both work and after-commit wake.
+- Legacy v2 staff-attested snapshots replay without rewriting their digest. Legacy v2 plans
+  binding digital movements remain readable history but must be freshly captured as v3 before
+  financial use, because they lack the new overlap evidence. No records are migrated or corrected.
+
+**Still open in B2/B3:** automatic portal receipt import; an explicit institution-scoped,
+approved planning context mapping incoming receipts to an existing allocation/closed bill set;
+receipt/review-triggered successor-plan capture; async student provider observation and safe
+recovery; student history, Collections source/attention views, investigation ownership and Jev
+advice. A receipt review cannot refresh an already bound plan here: snapshots bind reviews only
+after approval, and both snapshots and reviews are immutable. Automatically selecting a budget
+or widening its bill set would invent authority. This slice therefore wakes the plan on its
+staff-authorized capture and does not claim receipt approval alone produces a new proposal.
+
+All verification uses isolated factories/stubs. Runtime flags, live funds, wallet provisioning,
+official tuition records and existing operational financial history are not modified by this slice.
 
 Do B0 before promoting merged digital records; then B1–B3 connect intake to the existing
 supervised flow. B4's unresolved outbound attempt/package/fee issues may be investigated
@@ -3002,7 +3047,7 @@ does not establish independent control by the student or a separate custodian ac
 | Leg | Current state | Why |
 | --- | --- | --- |
 | Institution **outbound** (agent pays a vendor) | Structurally designed, deliberately simulated | `VendorDestinationVersion` binds a reviewed address, but §14.3.5 requires that address to be an **operator-controlled testnet recipient** mapped to a vendor *alias*. The real vendor holds nothing and receives nothing. |
-| Institution **inbound** (a payer funds the institution) | Student tuition path hardened under §14.10 B0 | `StudentTuitionPayment` binds a student/account and attempted transfer; as of 2026-10-12 a durable `StudentTuitionPaymentAttempt` precedes the send, posting requires `ArcSettlementVerifier` movement proof, the receipt posts exactly once under a request key, overpayment is derived separately, and a fake-driver run is recorded as a rehearsal that settles nothing. Async handle observation, student attempt history, and Collections/planning integration remain §14.10 work. Generic §12.5 collection intents/suspense and legal payer identity remain unbuilt. |
+| Institution **inbound** (a payer funds the institution) | Student tuition safety foundations under §14.10 | Movement checks, attempt/receipt records and fake-driver exclusion exist. B1 provides explicit staff reconciliation; B2 binds approved matching-attempt pilot receipts into a staff-selected schema v3 plan with opening-funds exclusion. Immutable consent/proof, async handle observation, no-resend recovery, automatic import/routing and student history remain open. Generic §12.5 collection intents/suspense and legal payer identity remain unbuilt. |
 | Student | Wallet/balance page and operator-generated Circle address available | `Student.payout_address` now drives common reads and can match a generated `StudentWallet`. It is still not proof that the student independently controls signing. |
 | Vendor | A free-text alias plus a reviewed address | `Vendor.wallet_address` is legacy master data. The reviewed path is `VendorDestinationVersion`, whose address is operator-controlled during the pilot. |
 
@@ -3285,7 +3330,7 @@ vendorDestinationVersion, invoiceVersionReview}`, `CollectionBatch::preparer`,
 `BudgetSnapshot::budget`. Tests: `tests/Feature/Filament/FinanceSupervisorDashboardTest.php`
 and the reworked `EduFlowCommandCenterTest`.
 
-### 16.6 Current screen availability and remaining work (2026-10-12)
+### 16.6 Current screen availability and remaining work (2026-10-13)
 
 Backend records, visible screens and end-to-end payment acceptance are three separate delivery
 claims. Current routes and page actions establish the following, not universal admin availability:
@@ -3297,9 +3342,9 @@ claims. Current routes and page actions establish the following, not universal a
 | Submission queue/history, provider detail and attempts | **Automation → Payment Submissions** (`/admin/payment-submissions`), read-only | No submission resource registered | Unknown outcomes need investigation; a hash or provider ID is not verified settlement |
 | Aggregate collection capture and independent source review | **Finance records → Collections** (`/admin/collections`) | **Collections** (`/finance/collections`) | Cashier-friendly three-step capture with private receipt/report upload and independent review; `Reconcile student payment` imports a verified movement as a source-linked receipt exactly once (B1) |
 | Student wallet balance/provenance and wallet generation | **Student Services → Students → View student**, wallet widget | No corresponding wallet-management screen registered | Operator-generated Circle wallets; generation/control/consent permissions and slot recovery need §14.10 review. Balance is a read, not a tuition receipt |
-| Direct student tuition quote/pay | Generic **Transactions** may show `tuition_revenue`; **Tuition Accounts** may reflect its current posting; no dedicated tuition-attempt/reconciliation inbox | Not listed in Collections or approved planning cash | Student entry is `/student/dashboard` Pay Now plus `/student/wallet`. B0 closed the posting/verification/retry flaws; async handle observation and attempt history remain open, and generic confirmed status is not proof |
+| Direct student tuition quote/pay | Generic **Transactions** may show `tuition_revenue`; **Tuition Accounts** may reflect its current posting; no dedicated tuition-attempt/reconciliation inbox | Eligible posted payments can be manually reconciled in Collections; approved receipt reviews can be selected in Finance Supervisor budget capture | Student entry is `/student/dashboard` Pay Now plus `/student/wallet`. Movement/fake guards exist; full consent, quote, no-resend and async recovery gates remain open. Generic confirmed status is not proof |
 | Student tuition receipt history and intake exceptions | No dedicated resource found | No dedicated queue found | `StudentTuitionPayment` records exist; `/payments` still lists assistance/refunds. Persistent student status/history and shared Collections source/attention views are planned, not shipped |
-| Closed-set budget capture, background run evidence and plan review | No dedicated admin screen | **Finance Supervisor** (`/finance/finance-supervisor`) | Accepting a plan never grants payment authority |
+| Closed-set budget capture, background run evidence and plan review | No dedicated admin screen | **Finance Supervisor** (`/finance/finance-supervisor`) | Schema v3 supports selected independently reviewed movement receipts, zero typed opening funds when counting them, and after-commit planning wake. Staff still captures the closed set; no automatic receipt-to-budget routing. Accepting a plan never grants payment authority |
 | Invoice source review, beneficiary approval, draft preparation and funding/reservation | Legacy invoice CRUD is available, not the complete safe workflow | Several authenticated HTTP actions exist; complete operator wizard absent | Need linked source/destination/policy/budget/funding screens rather than scripts or fabricated reviewers |
 | Reviewed capacity release and funding rollover | No screen | No screen | Backend actions/tests exist; authorization/unknown outcomes cannot be discarded to free capacity |
 | Recurring mandate create/review/suspend, ceilings and occurrence inspection | No management screen | Aggregate metrics only | Records, evaluator and scanner exist; service authority and automatic payment handoff remain absent |
@@ -3372,13 +3417,13 @@ be able to see which arrow is live without reading the source.
 | # | Step | Actor | Status |
 | --- | --- | --- | --- |
 | 1A | Existing-channel collection | College's existing cash/bank channel; cashier captures source proof | Supported aggregate evidence lane; real bank settlement stays outside EduFlow |
-| 1B | Optional direct portal attempt | Student Pay Now → quote/pay API → generated wallet → configured treasury | **Merged, safety incomplete**: synchronous send/hash lookup and unconditional posting; no durable incoming attempt/recovery |
+| 1B | Optional direct portal attempt | Student Pay Now → quote/pay API → generated wallet → configured treasury | Movement/fake-posting guards and attempt row exist; consent/quote bounds, no-resend async provider observation and recovery acceptance remain incomplete |
 | 2A | Record manual receipts | `CaptureCollectionBatch` → `CollectionBatch` | Built; private upload and three-step entry in both panels |
-| 2B | Verify, allocate and import digital receipt | Incoming intent/handle → matching movement proof → one account allocation → source-linked Collections | **Not connected**; `StudentTuitionPayment` is current record, not trusted receipt proof or planning binding |
-| 3 | Independent financial reconciliation | Separate reviewer checks manual sources or digital receipt attribution/category/restrictions | Manual batch review built; digital receipt/review adapter remains §14.10 work |
+| 2B | Verify, allocate and import digital receipt | Matching movement predicate → posted payment → staff reconciliation into source-linked Collections | Partial: verified-path posting and explicit B1 reconciliation exist; automatic import, immutable consent/settlement provenance and full async recovery remain open |
+| 3 | Independent financial reconciliation | Separate reviewer checks manual sources or digital receipt attribution/category/restrictions | Existing independent batch review covers imported receipts; category/ownership/attention workflows remain incomplete |
 | 4 | Staff selects the bill set and allocation | Human → `CaptureBudgetSnapshot` with `bill_ids`, `allocation` | ✅ Built |
 | 5 | Bill source evidence captured and reviewed | Maker → `InvoiceVersion`; separate checker → `approve_evidence` | ✅ Built |
-| 6 | Budget snapshot binds reviewed receipts | Human → `BudgetSnapshot` schema v2 with collection review ids | Built for current reviewed batch inputs; no automatic student-payment binding yet |
+| 6 | Budget snapshot binds reviewed receipts | Human → `BudgetSnapshot` schema v3 with selected collection review ids and derived movement total | Built for staff-selected manual/digital reviewed batches; typed opening funds excluded when counting movement receipts. No automatic source-to-budget routing |
 | 7 | **Planner walks the closed set** | **Deterministic PHP**, no model | ✅ Built |
 | 8 | Supervisor records the plan decision | Human → `FinancePlanReview` (`accept_plan` / `reject_plan` / `request_correction`) | ✅ Built |
 | 9 | Draft payment intent | Maker → `PaymentIntent` (`draft`, `can_execute=false`) | ✅ Built |
@@ -3387,9 +3432,10 @@ be able to see which arrow is live without reading the source.
 | 12 | **Submit to Arc** | `IsolatedPaymentExecutor` behind runtime opt-in; provider observation; `ArcSettlementVerifier` | Foundation built; genuine independently authorized current-workflow settlement **not demonstrated**; transport/recovery/package/fee gaps remain |
 | 13 | **Vendor receives USDC** | Verified Arc settlement, optionally mirrored to `transactions` | ⚠️ **Proves movement, not receipt** — vendor aliases map to operator-controlled testnet recipients (§15.5) |
 
-The manual lane remains usable without a student row. The portal lane now exists but needs
-§14.10's pre-send identity, proof, posting and source/review integration before it can supply
-trusted planning cash. Incoming student consent, receipt reconciliation, plan acceptance,
+The manual lane remains usable without a student row. Reviewed imported pilot receipts can
+now be bound into a staff-captured plan with movement/opening exclusion. This does not close
+the portal's consent, no-resend recovery and provenance gates in §14.10, authorize a live run,
+or promote testnet money into real college revenue. Incoming student consent, receipt reconciliation, plan acceptance,
 payment authorization and settlement are different events. No genuine current-workflow staff
 approval-to-settlement run has been established; prior synthetic-reviewer records and historical
 chain payments do not satisfy it. The outbound runtime remains separately opt-in and testnet-only;

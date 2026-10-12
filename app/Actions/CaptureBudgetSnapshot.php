@@ -13,9 +13,11 @@ use App\Models\InvoiceVersionReview;
 use App\Models\Organization;
 use App\Models\PaymentIntent;
 use App\Models\User;
+use App\Services\FinanceWorkflowDispatcher;
 use App\Services\FinanceWorkflows;
 use App\Services\InstallationInstitution;
 use App\Services\ReviewedCollections;
+use Brick\Math\BigInteger;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Gate;
 use Illuminate\Support\Facades\Validator;
@@ -26,7 +28,12 @@ use Throwable;
 
 final readonly class CaptureBudgetSnapshot
 {
-    public function __construct(private InstallationInstitution $institutions, private ReviewedCollections $collections, private FinanceWorkflows $workflows) {}
+    public function __construct(
+        private InstallationInstitution $institutions,
+        private ReviewedCollections $collections,
+        private FinanceWorkflows $workflows,
+        private FinanceWorkflowDispatcher $dispatcher,
+    ) {}
 
     /** @param array<string, mixed> $data */
     public function handle(User $actor, Budget $budget, array $data): BudgetSnapshot
@@ -59,6 +66,15 @@ final readonly class CaptureBudgetSnapshot
             $reviewIds = array_map(intval(...), $data['collection_review_ids'] ?? []);
             $collections = $this->collections->capture($institution->id, $currency->value, $reviewIds, $data['as_of'],
                 $amounts['realized_receipts'], $amounts['restricted_cash']);
+
+            $movementReceipts = BigInteger::zero();
+            foreach ($collections as $entry) {
+                $movementReceipts = $movementReceipts->plus($entry['movement_receipt_minor_units']);
+            }
+
+            if (! $movementReceipts->isZero() && $amounts['opening_funds'] !== '0') {
+                throw ValidationException::withMessages(['opening_funds' => 'This plan already counts receipts whose money is in the treasury balance, so a typed opening balance could count it a second time. Start from receipts, or exclude those receipts from this plan.']);
+            }
             $ids = array_map(intval(...), $data['bill_ids']);
             sort($ids, SORT_NUMERIC);
             $bills = [];
@@ -76,18 +92,28 @@ final readonly class CaptureBudgetSnapshot
                 $bills[] = ['id' => $bill->id, 'digest' => $bill->snapshot_digest, 'review_id' => $review->id, 'review_digest' => $review->review_digest];
             }
             $snapshot = [
-                'schema_version' => 2, 'purpose' => 'department_budget_planning', 'capture_key' => Str::lower($data['capture_key']),
+                'schema_version' => 3, 'purpose' => 'department_budget_planning', 'capture_key' => Str::lower($data['capture_key']),
                 'institution_id' => $institution->id, 'budget_id' => $storedBudget->id, 'prepared_by' => $actor->id,
                 'budget_fingerprint' => self::budgetFingerprint($storedBudget),
                 'currency' => $currency->value, 'department' => $department, 'as_of' => $data['as_of'], 'valid_until' => $data['valid_until'],
                 'amounts' => $amounts, 'bills' => $bills,
                 'evidence' => ['budget' => $data['budget_evidence'], 'cash' => $data['cash_evidence'], 'commitments' => $data['commitment_evidence']],
                 'commitments_exclude_selected_bills' => true, 'cash_buckets_disjoint' => true,
-                'opening_funds_exclude_collections' => true, 'collections' => $collections,
+                'opening_funds_exclude_collections' => true, 'movement_receipts_minor_units' => (string) $movementReceipts,
+                'collections' => $collections,
             ];
             /** @var BudgetSnapshot|null $existing */
             $existing = BudgetSnapshot::query()->where('capture_key', $snapshot['capture_key'])->first();
             if ($existing !== null) {
+                if (($existing->snapshot['schema_version'] ?? null) === 2 && $movementReceipts->isZero()) {
+                    $snapshot['schema_version'] = 2;
+                    unset($snapshot['movement_receipts_minor_units']);
+                    $snapshot['collections'] = array_map(static function (array $entry): array {
+                        unset($entry['movement_receipt_minor_units']);
+
+                        return $entry;
+                    }, $snapshot['collections']);
+                }
                 $snapshot['prepared_by'] = $existing->prepared_by;
                 if ($existing->organization_id !== $institution->id || ! $existing->hasValidSnapshot()
                     || ! hash_equals($existing->snapshot_digest, PaymentIntent::digest($snapshot))) {
@@ -95,6 +121,7 @@ final readonly class CaptureBudgetSnapshot
                 }
 
                 $this->collections->requireBound($existing);
+                $this->dispatcher->wakeAfterCommit('budget:'.$existing->id);
 
                 return $existing;
             }
@@ -105,6 +132,9 @@ final readonly class CaptureBudgetSnapshot
             $record->collectionReviews()->attach(array_column($collections, 'review_id'));
             $this->collections->requireBound($record);
             $this->workflows->budgetCaptured($record);
+
+            $this->dispatcher->wakeAfterCommit('budget:'.$record->id);
+
             activity('finance')->causedBy($actor)->performedOn($record)->event('budget_snapshot_captured')
                 ->withProperties(['budget_id' => $storedBudget->id, 'snapshot_digest' => $record->snapshot_digest, 'can_execute' => false])
                 ->log('Exact departmental allocation and realized local cash captured for closed-set department planning');

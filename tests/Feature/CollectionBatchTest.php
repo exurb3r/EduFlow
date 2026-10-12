@@ -119,7 +119,7 @@ test('reviewed fees fund local departmental suggestions but never become Arc cas
     $review = approveCollection($c, $batch);
     $snapshot = app(CaptureBudgetSnapshot::class)->handle($c['actor'], $c['budget'], collectionPlanInput($c, $review));
     $plan = app(DepartmentBudgetPlanner::class)->handle($c['actor'], $snapshot);
-    expect($snapshot->snapshot['schema_version'])->toBe(2)->and($snapshot->collectionReviews()->count())->toBe(1)
+    expect($snapshot->snapshot['schema_version'])->toBe(3)->and($snapshot->collectionReviews()->count())->toBe(1)
         ->and($plan['headroom']['cash_minor_units'])->toBe('6500')->and($plan['headroom']['budget_minor_units'])->toBe('20000')
         ->and($plan['bills'][0]['decision'])->toBe('propose_human_review')->and($plan['remaining_cash_minor_units'])->toBe('4000')
         ->and($plan['collection_evidence']['mode'])->toBe('reviewed_batches')->and($plan['collection_evidence']['review_ids'])->toBe([$review->id])

@@ -37,7 +37,7 @@ final readonly class FundingWindowContext
         $activation = FinancePolicyActivation::current($budget->organization_id);
         /** @var FinancePolicyVersion|null $policy */
         $policy = $activation instanceof FinancePolicyActivation ? FinancePolicyVersion::query()->find($activation->finance_policy_version_id) : null;
-        if (($budget->snapshot['schema_version'] ?? null) !== 2 || $budget->currency !== 'USDC' || $wallet->organization_id !== $budget->organization_id || ! $wallet->exists
+        if (! in_array($budget->snapshot['schema_version'] ?? null, [2, 3], true) || $budget->currency !== 'USDC' || $wallet->organization_id !== $budget->organization_id || ! $wallet->exists
             || $wallet->status !== 'active' || $wallet->provider !== 'circle'
             || ! in_array($wallet->network, ['arc', ($balance['chain'] ?? null) === 'ARC' ? 'arc-mainnet' : 'arc-testnet'], true)
             || ! $activation instanceof FinancePolicyActivation || $policy === null || ! $activation->hasValidEvidence($policy) || ! $activation->hasValidHistory()

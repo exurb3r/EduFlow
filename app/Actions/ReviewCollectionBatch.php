@@ -9,6 +9,8 @@ use App\Models\CollectionBatchReview;
 use App\Models\Organization;
 use App\Models\PaymentIntent;
 use App\Models\User;
+use App\Services\FinanceWorkflowDispatcher;
+use App\Services\FinanceWorkflows;
 use App\Services\InstallationInstitution;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Gate;
@@ -16,7 +18,11 @@ use Illuminate\Validation\ValidationException;
 
 final readonly class ReviewCollectionBatch
 {
-    public function __construct(private InstallationInstitution $institutions) {}
+    public function __construct(
+        private InstallationInstitution $institutions,
+        private FinanceWorkflows $workflows,
+        private FinanceWorkflowDispatcher $dispatcher,
+    ) {}
 
     public function handle(User $reviewer, CollectionBatch $batch, string $expectedDigest, string $decision, string $reference, string $reason): CollectionBatchReview
     {
@@ -43,12 +49,19 @@ final readonly class ReviewCollectionBatch
                     throw ValidationException::withMessages(['decision' => 'Collection review already recorded with different evidence or feedback.']);
                 }
 
+                $this->workflows->collectionReviewed($existing);
+                $this->dispatcher->wakeAfterCommit('collection:'.$stored->id);
+
                 return $existing;
             }
             $review = new CollectionBatchReview(['organization_id' => $institution->id, 'collection_batch_id' => $stored->id,
                 'reviewed_by' => $reviewer->id, 'decision' => $decision, 'verification_reference' => $reference, 'reason' => $reason, 'batch_digest' => $stored->snapshot_digest]);
             $review->review_digest = PaymentIntent::digest($review->content());
             $review->save();
+
+            $this->workflows->collectionReviewed($review);
+            $this->dispatcher->wakeAfterCommit('collection:'.$stored->id);
+
             activity('finance')->causedBy($reviewer)->performedOn($review)->event('collection_batch_reviewed')
                 ->withProperties(['batch_id' => $stored->id, 'decision' => $decision, 'review_digest' => $review->review_digest, 'can_execute' => false])
                 ->log('Collection source and restrictions reviewed; no posting, conversion or payment authority');
