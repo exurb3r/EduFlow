@@ -111,7 +111,7 @@ test('setAddress stores a valid address and drops the cached reading', function 
 test('setAddress rejects a malformed address without touching the record', function (string $address): void {
     $student = Student::factory()->create(['payout_address' => '0x'.str_repeat('a', 40)]);
 
-    expect(fn (): null => $this->service->setAddress($student, $address) === null)
+    expect(fn () => $this->service->setAddress($student, $address))
         ->toThrow(InvalidArgumentException::class);
 
     expect($student->fresh()->payout_address)->toBe('0x'.str_repeat('a', 40));
