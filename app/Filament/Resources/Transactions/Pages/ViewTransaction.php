@@ -7,6 +7,7 @@ namespace App\Filament\Resources\Transactions\Pages;
 use App\Filament\Resources\Transactions\Tables\TransactionsTable;
 use App\Filament\Resources\Transactions\TransactionResource;
 use App\Models\Transaction;
+use App\Services\ChainQuantity;
 use Filament\Actions\Action;
 use Filament\Infolists\Components\KeyValueEntry;
 use Filament\Infolists\Components\Section;
@@ -15,7 +16,6 @@ use Filament\Resources\Pages\ViewRecord;
 use Filament\Schemas\Schema;
 use Throwable;
 use Yukazakiri\Lepton\Contracts\ArcNetworkGateway;
-use Yukazakiri\Lepton\Support\Amounts;
 
 class ViewTransaction extends ViewRecord
 {
@@ -85,9 +85,9 @@ class ViewTransaction extends ViewRecord
                         ->label('Current block')
                         ->state(function (): string {
                             try {
-                                $block = app(ArcNetworkGateway::class)->blockNumber();
+                                $block = ChainQuantity::toInt(app(ArcNetworkGateway::class)->blockNumber());
 
-                                return is_string($block) ? number_format((int) Amounts::fromHexQuantity($block, 0)) : 'unavailable';
+                                return $block === null ? 'unavailable' : number_format($block);
                             } catch (Throwable) {
                                 return 'unavailable';
                             }

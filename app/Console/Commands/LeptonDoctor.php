@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Console\Commands;
 
+use App\Services\ChainQuantity;
 use App\Services\InstallationInstitution;
 use App\Services\LeptonTreasuryService;
 use Illuminate\Console\Attributes\Description;
@@ -217,10 +218,10 @@ class LeptonDoctor extends Command
             $arc = app(ArcNetworkGateway::class);
             $this->kv('chain', $arc->chainCode().' (id '.$arc->chainId().')');
 
-            $block = $arc->blockNumber();
-            $this->kv('block', is_string($block) && $block !== ''
-                ? number_format((int) Amounts::fromHexQuantity($block, 0))
-                : '<fg=red>unavailable</>');
+            $block = ChainQuantity::toInt($arc->blockNumber());
+            $this->kv('block', $block === null
+                ? '<fg=red>unavailable</>'
+                : number_format($block));
 
             $rpc = $arc->rpcUrl();
             $this->kv('rpc', parse_url($rpc, PHP_URL_HOST) ?: '<fg=yellow>unavailable</>');

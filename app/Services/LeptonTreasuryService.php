@@ -8,7 +8,6 @@ use App\Models\Wallet;
 use Throwable;
 use Yukazakiri\Lepton\Contracts\ArcNetworkGateway;
 use Yukazakiri\Lepton\Gateways\FakeLeptonGateway;
-use Yukazakiri\Lepton\Support\Amounts;
 
 /**
  * Live on-chain truth for the organization treasury.
@@ -68,12 +67,11 @@ class LeptonTreasuryService
 
         $base['address_url'] = $this->safe(fn (): string => $this->arc->addressExplorerUrl($address));
 
-        $block = $this->safe(fn (): string => $this->arc->blockNumber());
-        // hexdec() degrades to float past PHP_INT_MAX, so an (int) cast there
-        // silently corrupts. String arithmetic, like the balance below.
-        $base['block'] = is_string($block)
-            ? (int) Amounts::fromHexQuantity($block, 0)
-            : null;
+        // String arithmetic, not hexdec(), which degrades to float past
+        // PHP_INT_MAX and silently corrupts. ChainQuantity also strips the
+        // CLI's ANSI colour and returns null for an unreadable quantity: this
+        // method reports health, so it must never throw and 500 the panel.
+        $base['block'] = ChainQuantity::toInt($this->safe(fn (): string => $this->arc->blockNumber()));
 
         $rpc = $this->safe(fn (): string => $this->arc->rpcUrl());
         if (is_string($rpc) && $rpc !== '') {
@@ -82,26 +80,26 @@ class LeptonTreasuryService
 
         $wei = $this->safe(fn (): mixed => $this->arc->rpc('eth_getBalance', [$address, 'latest']));
 
-        if (! is_string($wei) || ! str_starts_with($wei, '0x')) {
-            $base['error'] ??= 'Live balance unavailable on '.strtoupper($base['chain']).'. Run: circle wallet login <email> --testnet --init';
-
-            return $base;
-        }
-
         // Native Arc USDC is 18 decimals, unlike the 6-decimal Circle USDC.
         // String arithmetic: 20 USDC is 2e19 wei, which overflows a 64-bit int.
-        try {
-            $native = (float) Amounts::fromHexQuantity($wei, 18);
-        } catch (\InvalidArgumentException) {
-            $base['error'] ??= 'Unreadable balance quantity from the RPC endpoint.';
+        $native = ChainQuantity::toDecimalString($wei, 18);
+
+        if ($native === null) {
+            // A `0x` we could see but not parse is a formatting fault; its
+            // absence means the RPC never gave us a balance at all.
+            $base['error'] ??= str_contains(strtolower((string) $wei), '0x')
+                ? 'Unreadable balance quantity from the RPC endpoint.'
+                : 'Live balance unavailable on '.strtoupper($base['chain']).'. Run: circle wallet login <email> --testnet --init';
 
             return $base;
         }
 
+        $balance = (float) $native;
+
         $base['live_available'] = true;
-        $base['onchain_balance'] = $native;
-        $base['drift'] = $ledger - $native;
-        $base['in_sync'] = abs($ledger - $native) < 0.01;
+        $base['onchain_balance'] = $balance;
+        $base['drift'] = $ledger - $balance;
+        $base['in_sync'] = abs($ledger - $balance) < 0.01;
 
         return $base;
     }

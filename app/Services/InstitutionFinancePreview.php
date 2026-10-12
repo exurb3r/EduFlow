@@ -18,7 +18,6 @@ use RuntimeException;
 use Throwable;
 use Yukazakiri\Lepton\Contracts\ArcNetworkGateway;
 use Yukazakiri\Lepton\Gateways\FakeLeptonGateway;
-use Yukazakiri\Lepton\Support\Amounts;
 
 /**
  * Read-only institution review. No reservation, approval or settlement authority.
@@ -185,22 +184,25 @@ final readonly class InstitutionFinancePreview
             }
 
             $rpcChainId = $this->arc->rpc('eth_chainId');
-            if ($expectedChainId === null || $this->arc->chainId() !== $expectedChainId || ! is_string($rpcChainId)
-                || Amounts::fromHexQuantity($rpcChainId, 0) !== (string) $expectedChainId) {
+            if ($expectedChainId === null || $this->arc->chainId() !== $expectedChainId
+                || ChainQuantity::toInt($rpcChainId) !== $expectedChainId) {
                 return array_merge($unavailable, ['error' => 'Arc RPC chain identity does not match the configured network.']);
             }
 
-            $block = $this->arc->blockNumber();
-            $blockNumber = Amounts::fromHexQuantity($block, 0);
-            $balance = $this->arc->rpc('eth_getBalance', [$address, $block]);
+            // Normalised before it is echoed back as an RPC block tag, so a
+            // colourised CLI reply can never be handed to eth_getBalance.
+            $block = ChainQuantity::normalize($this->arc->blockNumber());
+            $blockNumber = ChainQuantity::toDecimalString($block, 0);
+            $balance = $this->arc->rpc('eth_getBalance', [$address, $block ?? 'latest']);
 
-            if (! is_string($balance)) {
+            $nativeUnits = ChainQuantity::toDecimalString($balance, 0);
+
+            if ($blockNumber === null || $nativeUnits === null) {
                 return array_merge($unavailable, ['error' => 'Arc balance observation is unavailable.']);
             }
-
-            $nativeUnits = BigInteger::of(Amounts::fromHexQuantity($balance, 0));
-            [$paymentUnits, $residual] = $nativeUnits->quotientAndRemainder('1000000000000');
-            $drift = BigInteger::of($ledgerBalance->minorUnits)->multipliedBy('1000000000000')->minus($nativeUnits);
+            $observedUnits = BigInteger::of($nativeUnits);
+            [$paymentUnits, $residual] = $observedUnits->quotientAndRemainder('1000000000000');
+            $drift = BigInteger::of($ledgerBalance->minorUnits)->multipliedBy('1000000000000')->minus($observedUnits);
 
             return [
                 'state' => $isSimulated ? 'simulated' : 'observed',
@@ -210,9 +212,9 @@ final readonly class InstitutionFinancePreview
                 'block_number' => $blockNumber,
                 'observed_at' => now()->toIso8601String(),
                 'currency' => CurrencyCode::USDC->value,
-                'native_units' => (string) $nativeUnits,
+                'native_units' => $nativeUnits,
                 'native_decimals' => 18,
-                'decimal' => (string) BigDecimal::ofUnscaledValue($nativeUnits, 18),
+                'decimal' => (string) BigDecimal::ofUnscaledValue($observedUnits, 18),
                 'payment_minor_units' => (string) $paymentUnits,
                 'payment_decimals' => 6,
                 'residual_native_units' => (string) $residual,

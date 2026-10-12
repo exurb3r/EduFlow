@@ -114,6 +114,8 @@ it('has no hexdec cast left in the chain-reading code paths', function (): void 
     $paths = [
         'app/Services/LeptonTreasuryService.php',
         'app/Services/LeptonReconciliationService.php',
+        'app/Services/InstitutionFinancePreview.php',
+        'app/Services/ChainQuantity.php',
         'app/Console/Commands/LeptonDoctor.php',
         'app/Filament/Resources/Transactions/Pages/ViewTransaction.php',
     ];
