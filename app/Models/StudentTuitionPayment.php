@@ -17,6 +17,8 @@ use Yukazakiri\Lepton\Support\Amounts;
  *
  * @property int $id
  * @property string|null $request_key
+ * @property int|null $student_tuition_payment_attempt_id
+ * @property string|null $movement_key
  * @property int $student_id
  * @property int $tuition_account_id
  * @property int $student_wallet_id

@@ -36,6 +36,7 @@ final readonly class StudentTuitionPaymentProcessor
         private AuthGateway $auth,
         private StudentWalletService $balances,
         private ArcSettlementVerifier $verifier,
+        private TuitionReceiptIntake $intake,
     ) {}
 
     public function process(int $attemptId): void
@@ -226,13 +227,13 @@ final readonly class StudentTuitionPaymentProcessor
         if (! $attempt->hasValidSettlement() || $attempt->state !== 'verified') {
             throw ValidationException::withMessages(['settlement' => 'Intact consent and exact verified movement proof required for posting.']);
         }
-        DB::transaction(function () use ($attempt): void {
+        $paymentId = DB::transaction(function () use ($attempt): ?int {
             $intent = StudentTuitionPaymentIntent::query()->findOrFail($attempt->student_tuition_payment_intent_id);
             Organization::query()->whereKey($intent->organization_id)->lockForUpdate()->firstOrFail();
             $account = TuitionAccount::query()->whereKey($attempt->tuition_account_id)->lockForUpdate()->firstOrFail();
             $stored = StudentTuitionPaymentAttempt::query()->whereKey($attempt->id)->lockForUpdate()->firstOrFail();
             if ($stored->posted_at !== null) {
-                return;
+                return null;
             }
             if (! $stored->hasValidSettlement()) {
                 throw ValidationException::withMessages(['settlement' => 'Movement proof changed before posting.']);
@@ -243,7 +244,7 @@ final readonly class StudentTuitionPaymentProcessor
                 throw ValidationException::withMessages(['movement' => 'Movement already posted under an identity. Investigate without altering history.']);
             }
             $applied = min($stored->amount_base_units, max(0, $account->remainingAmount()));
-            StudentTuitionPayment::query()->create(['student_tuition_payment_attempt_id' => $stored->id, 'movement_key' => $movementKey,
+            $payment = StudentTuitionPayment::query()->create(['student_tuition_payment_attempt_id' => $stored->id, 'movement_key' => $movementKey,
                 'request_key' => $stored->request_key, 'student_id' => $stored->student_id, 'tuition_account_id' => $stored->tuition_account_id,
                 'student_wallet_id' => $stored->student_wallet_id, 'amount_base_units' => $stored->amount_base_units,
                 'applied_base_units' => $applied, 'overpayment_base_units' => $stored->amount_base_units - $applied,
@@ -255,7 +256,41 @@ final readonly class StudentTuitionPaymentProcessor
             }
             $stored->update(['posted_at' => now(), 'stage' => 'pilot_allocation_posted', 'next_attempt_at' => null]);
             // Pilot receipt is not official revenue and never credits the legacy float treasury ledger.
+            // Intake is woken only once this commit lands, and only when an operator enabled it.
+            $this->intake->wakeAfterCommit((int) $payment->getKey());
+
+            return (int) $payment->getKey();
         }, 3);
+
+        if ($paymentId === null) {
+            return;
+        }
+
+        $this->reconcileNow($paymentId);
+    }
+
+    /**
+     * Reconcile a payment this process just posted, without waiting for a worker.
+     *
+     * The after-commit wake is what makes the work durable, so it has already
+     * been registered. Running it inline as well keeps the receipt available to
+     * staff promptly instead of up to a queue round-trip later, and it is the
+     * same idempotent call either way: the capture key is derived from the
+     * movement, so whichever route wins, the loser replays it.
+     *
+     * A refusal is contained. Posting has already committed, so a missing flag,
+     * an unnamed owner or a broker outage must not surface as a failed payment.
+     */
+    private function reconcileNow(int $paymentId): void
+    {
+        try {
+            $payment = StudentTuitionPayment::query()->find($paymentId);
+            if ($payment !== null && ! $payment->collections()->exists()) {
+                $this->intake->reconcile($payment);
+            }
+        } catch (Throwable $exception) {
+            report($exception);
+        }
     }
 
     private function assertRail(StudentTuitionPaymentAttempt $attempt, bool $observation = false): void

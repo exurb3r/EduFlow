@@ -101,6 +101,13 @@ return [
         'enabled' => env('EDUFLOW_TUITION_SUBMISSION_ENABLED', false),
         'observe_enabled' => env('EDUFLOW_TUITION_OBSERVATION_ENABLED', false),
         'stop_switch' => env('EDUFLOW_TUITION_SUBMISSION_STOP', false),
+        // Unattended reconciliation of a settled movement into Collections.
+        // Off by default and stricter than the staff button: it requires
+        // immutable consent plus verified settlement proof, attributes the
+        // receipt to a named verified finance owner, and derives one
+        // deterministic capture identity per movement.
+        'auto_intake' => env('EDUFLOW_TUITION_AUTO_INTAKE', false),
+        'intake_owner_id' => env('EDUFLOW_TUITION_INTAKE_OWNER_ID'),
         'pilot_account_ids' => [],
         'queue_connection' => env('EDUFLOW_TUITION_QUEUE_CONNECTION', 'database'),
         'queue' => 'student-tuition',

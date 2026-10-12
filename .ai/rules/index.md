@@ -9,7 +9,7 @@ Before planning or editing, find the row whose globs match the file's path and r
 | app/Ai/**/*.php, tests/Feature/Ai/**/*.php, config/ai.php | .ai/rules/ai-agents.md |
 | app/**/*.php | .ai/rules/app.md |
 | app/Http/Controllers/** | .ai/rules/controllers.md |
-| app/Actions/CaptureBudgetSnapshot.php, app/Actions/CaptureCollectionBatch.php, app/Actions/ImportTuitionPaymentAsCollection.php, app/Models/CollectionBatch.php, app/Services/ReviewedCollections.php | .ai/rules/collections.md |
+| app/Actions/CaptureBudgetSnapshot.php, app/Actions/CaptureCollectionBatch.php, app/Actions/ImportTuitionPaymentAsCollection.php, app/Models/CollectionBatch.php, app/Services/ReviewedCollections.php, app/Services/TuitionReceiptIntake.php, app/Jobs/ReconcileTuitionReceipt.php, app/Console/Commands/ReconcileTuitionReceipts.php | .ai/rules/collections.md |
 | resources/css/**/*.css, resources/css/bulletin.css | .ai/rules/css.md |
 | app/Services/StudentTuitionPaymentService.php, app/Services/StudentTuitionPaymentProcessor.php, app/Services/StudentTuitionPaymentDispatcher.php, app/Services/Payments/*Transport.php, app/Models/StudentTuitionPayment*.php, app/Enums/StudentTuitionPaymentState.php, app/Jobs/ProcessStudentTuitionPayment.php, app/Console/Commands/DispatchStudentTuitionPayments.php, app/Http/Controllers/StudentTuitionPaymentController.php, database/migrations/*student_tuition_payment*.php, tests/Feature/StudentTuition*.php | .ai/rules/feature.md |
 | postcss.config.js, composer.json | .ai/rules/general.md |

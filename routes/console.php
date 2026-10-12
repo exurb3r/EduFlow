@@ -14,6 +14,12 @@ Schedule::command('eduflow:dispatch-finance-workflows')->everyMinute()->withoutO
 Schedule::command('eduflow:dispatch-student-tuition')->everyMinute()->withoutOverlapping(5)->onOneServer()
     ->when(fn (): bool => (bool) config('eduflow.student_tuition.enabled', false) || (bool) config('eduflow.student_tuition.observe_enabled', false));
 
+// Recovery for settled tuition movements no receipt covers yet. The wake inside
+// the posting commit is the normal path; this sweep only redelivers what a
+// broker outage or a flag that was off at posting time left behind.
+Schedule::command('eduflow:reconcile-tuition-receipts')->everyFiveMinutes()->withoutOverlapping(5)->onOneServer()
+    ->when(fn (): bool => (bool) config('eduflow.student_tuition.auto_intake', false));
+
 // Durably owed submissions are handed to a worker only when the submission
 // runtime is explicitly enabled. Overlap control matters here: two ticks
 // racing on the same row would be the difference between one owed payment and

@@ -3,6 +3,9 @@ paths:
   - app/Actions/CaptureCollectionBatch.php
   - app/Actions/ImportTuitionPaymentAsCollection.php
   - app/Models/CollectionBatch.php
+  - app/Services/TuitionReceiptIntake.php
+  - app/Jobs/ReconcileTuitionReceipt.php
+  - app/Console/Commands/ReconcileTuitionReceipts.php
 ---
 
 # Collections receipts
@@ -46,6 +49,23 @@ organization filter to student queries; it cannot be written.
 A movement's `overpayment_base_units` becomes `restricted_minor_units`, so the portion owed back to a
 student is never offered as unrestricted receipts. The form still refuses an over-limit amount; the
 bucket covers the race where the debt shrank after the payer confirmed.
+
+## Unattended intake is stricter than the staff button, never looser
+`TuitionReceiptIntake` reconciles a settled payment with nobody watching, so it adds three
+requirements the staff path does not: `eduflow.student_tuition.auto_intake` must be on, the payment
+must carry a **verified attempt** (`student_tuition_payment_attempt_id` whose `hasValidSettlement()`
+passes) rather than the legacy `tx_verified_on_chain` flag alone, and `intake_owner_id` must name a
+verified-email finance account that is **not the payer**. Do not "simplify" those away to match the
+manual action: the planner refuses a receipt with no verified attempt, so unattended intake without
+the check would manufacture rows that can never be used.
+
+`prepared_by` records that configured owner, so maker/checker separation still applies in full —
+the owner cannot review the reconciliation it caused. The capture identity is a **UUIDv5 of
+`payment.movement_key`**, not a generated UUID, which is what makes a replay reproduce the identical
+receipt and stops any sweep from minting a second identity for one movement. Delivery is an
+after-commit wake plus `eduflow:reconcile-tuition-receipts` as recovery; a wake that cannot be
+delivered is reported and re-swept, and a disabled flag leaves the payment committed, unreconciled
+and visible as owed work.
 
 ## Adding a referenced column on SQLite drops this table's triggers
 Adding a FK column to `collection_batches` forces a SQLite table rebuild, and the rebuild **silently

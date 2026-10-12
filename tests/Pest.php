@@ -47,6 +47,8 @@ expect()->extend('toBeOne', fn () => $this->toBe(1));
 |
 */
 
+require_once __DIR__.'/Helpers/TuitionConsent.php';
+
 if (! function_exists('mockExpectation')) {
     /**
      * Narrow a Mockery expectation to the concrete class.
