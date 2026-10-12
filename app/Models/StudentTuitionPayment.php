@@ -46,6 +46,7 @@ class StudentTuitionPayment extends Model
         'amount_base_units', 'applied_base_units', 'overpayment_base_units', 'network_fee',
         'simulated', 'payer_address', 'recipient_address', 'chain', 'tx_verified_on_chain',
         'executed_at',
+        'student_tuition_payment_attempt_id', 'movement_key',
     ];
 
     /** @return array<string, string> */

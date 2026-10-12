@@ -6,6 +6,17 @@
 
 ## Where Things Stand — Start Here in a New Session
 
+**B0 consent and recovery slice (2026-10-13):** the inbound lane now separates quoting from
+signing. `StudentTuitionPaymentIntent` is an immutable, digest-bound quote that pins
+organisation, student, account, wallet, payer, recipient, principal, fee ceiling, `ARC-TESTNET`/
+`5042002`, pilot purpose and expiry; confirmation requires the client to echo the digest and
+explicitly accept a bounded fee. `StudentTuitionPaymentProcessor` is the only component that may
+ask a signer, only from a `prepared` attempt behind a write-once `submission_started_at` fence, and
+every other path observes the existing provider handle or posts from persisted proof. **A live run
+is still unproven and deliberately refused:** the installed `circle wallet transfer` has no
+enforceable fee ceiling, so `FeeBoundedPaymentTransport` fails closed before invoking the signer,
+and both tuition flags default off. See **§14.10.4**.
+
 **Post-merge planning update (2026-10-12):** [PR #14](https://github.com/koamishin/EduFlow/pull/14),
 merged as `207fe89`, adds a student wallet page, live balance reads, staff wallet generation
 and **Pay Now** on `/student/dashboard`. The backend quotes a transfer, attempts to send
@@ -2491,8 +2502,11 @@ under §14.10; merge alone does not remove production/custody or institutional-c
 ### 14.7 Cashier Intake, Policy Decisions and Bounded Autonomy
 
 **Status (2026-10-13):** cashier capture/review screens are delivered. Portal movement checks and
-attempt/receipt records exist; full consent, async observation and no-resend recovery remain B0
-gates. B1 supports manual reconciliation into a source-linked Collections receipt. B2 now binds
+attempt/receipt records exist, and the B0 slice now supplies immutable quote/consent, an expiring
+accepted fee ceiling, chain/purpose/stop guards, a named recovery owner, provider-handle async
+observation and no-resend recovery. A live run remains unproven: submission is off by default and
+the installed rail cannot enforce a fee ceiling, so it refuses before signing. B1 supports manual
+reconciliation into a source-linked Collections receipt. B2 now binds
 approved, matching-attempt digital receipts into a staff-captured schema v3 plan, excludes typed
 opening funds when counting those receipts, and wakes its planning run after commit. Automatic
 import/receipt-to-budget selection remain unbuilt. Neither intake screen establishes outgoing
@@ -2745,10 +2759,10 @@ delete records, reverse tuition balances or rewrite confirmations automatically.
 owner must explicitly authorize any pause/configuration change or financial correction.
 
 **B0 safety changes shipped 2026-10-12; acceptance incomplete.** Movement verification before
-posting, fake-driver exclusion and a unique receipt request key exist. This is not closure of
-all §14.10 B0 gates: immutable pre-send consent, expiring quote/accepted fee ceiling, chain/purpose/
-stop guards, no-resend recovery and async provider observation still require work. A unique
-posting key alone does not prove a retry cannot submit again. Existing flags and balances remain
+posting, fake-driver exclusion and a unique receipt request key exist. The follow-up slice of
+2026-10-13 adds immutable pre-send consent, an expiring quote/accepted fee ceiling, chain/purpose/
+stop guards and provider-handle no-resend recovery (§14.10.4). What is still not closed is a live
+end-to-end run on a rail that can enforce that ceiling. Existing flags and balances remain
 claims requiring the audit above; no automatic financial correction is authorized.
 
 | Merged defect | Closure |
@@ -2878,10 +2892,32 @@ merely to demonstrate the UI.
 | B6 — college evaluation | Permissioned staff demo, background/approval/autonomy evidence and agreed value metrics | Staff confirms usefulness; record baseline, corrections, delays and unresolved cases without claiming bank settlement or production readiness |
 
 **Status as of 2026-10-13.** B0/B1 safety foundations are shipped but their full exit criteria
-remain open. The attempt model and movement predicate do not yet supply the full consent,
-no-resend recovery or provider-handle worker contract. B1 provides explicit staff reconciliation,
+remain open. The consent snapshot, expiring fee ceiling, chain/purpose/stop guards and
+provider-handle no-resend recovery contracts now exist; the outstanding B0 gate is a live
+end-to-end run, and on the currently installed Circle CLI the lane **refuses** to sign because
+that CLI cannot enforce an accepted sender-fee ceiling. B1 provides explicit staff reconciliation,
 not automatic import. B2's reviewed-source binding and committed-work dispatch slice is now
 implemented; the automatic coordination target is not yet complete.
+
+**B0 slice delivered 2026-10-13 — immutable consent, bounded fee, no-resend recovery.**
+
+| B0 gate | Closure |
+| --- | --- |
+| Immutable pre-send consent | `StudentTuitionPaymentIntent` stores a server-minted `request_key` with a `snapshot` + `snapshot_digest` captured before any signer is reachable. `hasValidSnapshot()` re-derives organisation, student, account, wallet, payer, recipient, amount, fee ceiling, total, `ARC-TESTNET`/`5042002`, `USDC`, `plane = pilot`, `purpose = student_tuition_testnet_demo` and expiry-after-quote. Model events refuse updates and deletes. `pay()` requires the client to echo `request_digest` and send an explicit `consent` acceptance bound to fixed `CONSENT_TEXT`; the attempt copies the digest into `consent_snapshot`, and `hasValidConsent()` refuses any drift |
+| Expiring quote and accepted fee ceiling | Expiry is re-checked at confirmation **and** inside the submit claim transaction. `fee_ceiling_base_units` is the accepted maximum; preflight re-reads the rail's current fee and refuses a quote above the ceiling, plus a fresh (uncached) balance check against the accepted total. The ceiling rounds UP, so a wallet holding exactly the quoted total is not short |
+| Fee ceiling enforced by the signer | `FeeBoundedPaymentTransport::supportsFeeCeiling()` gates submission, and `CircleAgentWalletTransport::submit()` throws when `max_fee_base_units` is present because the installed `circle wallet transfer` exposes no enforceable cap. A `--estimate` is a prediction, not a spending limit, so the lane fails closed before invoking the signer rather than signing unbounded |
+| Chain, purpose and stop guards | `assertRail()` refuses a non-testnet chain, a chain-id mismatch, the fake driver, or an installation institution that differs from the intent's. Submission additionally requires `enabled`, an unset `stop_switch`, and `investigation_owner_id` naming a verified-email finance owner who is **not** the payer. Nothing in this lane calls `beginLogin()`/`completeLogin()` |
+| No-resend async observation | `submission_started_at` is a write-once fence set inside the claim transaction, and model events forbid a started attempt returning to a dispatchable `prepared`. `provider_handle` (Circle transaction id) and `provider_reference` (chain hash) are separate columns. Only `prepared` may submit; `submitting`/`accepted`/`awaiting_verification`/`unknown` observe the existing handle through `resolve()`, bounded by `max_observations`; a lost handle parks the attempt for operator review. A queue retry re-reads the stored row instead of trusting the job payload |
+| Safe recovery | Scheduler recovery (`eduflow:dispatch-student-tuition`) redispatches committed consent and observes existing attempts. Observation fails closed when observation is disabled. Posting is idempotent under a row lock with a unique `movement_key`/`request_key`, and a committed consent survives queue failure. Verified evidence, the fee, the verification time and `posted_at` are write-once |
+| Truthful student view | Transfer state, chain hash and fee are shown separately from allocation; the dashboard and `GET student/tuition/attempts` read persisted attempts only, and no GET, reload or poll can submit. Testnet is labelled as a pilot that does not pay official college tuition, and a lost response tells the payer to inspect existing attempts rather than create a new payment |
+| Pilot receipt is not official revenue | The inbound path writes **no** `Transaction` row and credits no float treasury. Verified movement produces only a pilot allocation against a designated testnet-designated account |
+
+**Still open in B0.** A live end-to-end verified run needs a rail that can enforce the accepted
+fee ceiling — the installed CLI cannot, so the transport refuses and no testnet money has been
+moved by this slice. That capability, a provider-configured wallet, an independent audit of
+pre-hardening records and any real student consent all require explicit owner authorization.
+`EDUFLOW_TUITION_SUBMISSION_ENABLED` and `EDUFLOW_TUITION_OBSERVATION_ENABLED` both default off,
+so nothing dispatches until an operator turns them on.
 
 **B1 delivered 2026-10-12 (unified Collections).** `ImportTuitionPaymentAsCollection` reconciles a
 verified movement into an immutable `CollectionBatch`. It reconciles rather than records: the money
@@ -2918,7 +2954,8 @@ returns null unless exactly one organization exists), so the boundary for "is th
   sender/recipient, exact principal, verification time and `ARC-TESTNET`/`5042002`) and a
   complete applied/overpayment split. Historical `tx_verified_on_chain` alone is refused.
   This prevents automatic promotion of pre-hardening records; it does not replace B0's
-  remaining independent chain audit, immutable proof storage or no-resend recovery gates.
+  remaining independent chain audit of historical records or a live verified run. Immutable
+  proof storage and no-resend recovery are supplied by the B0 slice above.
 - `DepartmentBudgetPlanner`, recovery sweeper, funding-window context and dashboard evidence
   labels accept schema v3. Funding capacity remains the **minimum**, never the sum, of reviewed
   planning cash and observed balance net of protected funds. No wallet/transaction is credited.
@@ -2935,12 +2972,14 @@ returns null unless exactly one organization exists), so the boundary for "is th
 
 **Still open in B2/B3:** automatic portal receipt import; an explicit institution-scoped,
 approved planning context mapping incoming receipts to an existing allocation/closed bill set;
-receipt/review-triggered successor-plan capture; async student provider observation and safe
-recovery; student history, Collections source/attention views, investigation ownership and Jev
-advice. A receipt review cannot refresh an already bound plan here: snapshots bind reviews only
-after approval, and both snapshots and reviews are immutable. Automatically selecting a budget
-or widening its bill set would invent authority. This slice therefore wakes the plan on its
-staff-authorized capture and does not claim receipt approval alone produces a new proposal.
+receipt/review-triggered successor-plan capture; supervisor-side Collections source/attention
+views, investigation ownership surfaces and Jev advice. A receipt review cannot refresh an
+already bound plan here: snapshots bind reviews only after approval, and both snapshots and
+reviews are immutable. Automatically selecting a budget or widening its bill set would invent
+authority. This slice therefore wakes the plan on its staff-authorized capture and does not
+claim receipt approval alone produces a new proposal. Async provider observation and no-resend
+recovery moved to the B0 slice above; the student-side history view exists, the staff-side one
+does not.
 
 All verification uses isolated factories/stubs. Runtime flags, live funds, wallet provisioning,
 official tuition records and existing operational financial history are not modified by this slice.
@@ -3047,7 +3086,7 @@ does not establish independent control by the student or a separate custodian ac
 | Leg | Current state | Why |
 | --- | --- | --- |
 | Institution **outbound** (agent pays a vendor) | Structurally designed, deliberately simulated | `VendorDestinationVersion` binds a reviewed address, but §14.3.5 requires that address to be an **operator-controlled testnet recipient** mapped to a vendor *alias*. The real vendor holds nothing and receives nothing. |
-| Institution **inbound** (a payer funds the institution) | Student tuition safety foundations under §14.10 | Movement checks, attempt/receipt records and fake-driver exclusion exist. B1 provides explicit staff reconciliation; B2 binds approved matching-attempt pilot receipts into a staff-selected schema v3 plan with opening-funds exclusion. Immutable consent/proof, async handle observation, no-resend recovery, automatic import/routing and student history remain open. Generic §12.5 collection intents/suspense and legal payer identity remain unbuilt. |
+| Institution **inbound** (a payer funds the institution) | Student tuition safety foundations under §14.10 | Movement checks, attempt/receipt records, fake-driver exclusion, immutable quote/consent, write-once settlement proof, async handle observation and no-resend recovery exist. B1 provides explicit staff reconciliation; B2 binds approved matching-attempt pilot receipts into a staff-selected schema v3 plan with opening-funds exclusion. Automatic import/routing, staff-side attention views, an independent audit of historical records and a live verified run remain open. Generic §12.5 collection intents/suspense and legal payer identity remain unbuilt. |
 | Student | Wallet/balance page and operator-generated Circle address available | `Student.payout_address` now drives common reads and can match a generated `StudentWallet`. It is still not proof that the student independently controls signing. |
 | Vendor | A free-text alias plus a reviewed address | `Vendor.wallet_address` is legacy master data. The reviewed path is `VendorDestinationVersion`, whose address is operator-controlled during the pilot. |
 
@@ -3342,8 +3381,8 @@ claims. Current routes and page actions establish the following, not universal a
 | Submission queue/history, provider detail and attempts | **Automation → Payment Submissions** (`/admin/payment-submissions`), read-only | No submission resource registered | Unknown outcomes need investigation; a hash or provider ID is not verified settlement |
 | Aggregate collection capture and independent source review | **Finance records → Collections** (`/admin/collections`) | **Collections** (`/finance/collections`) | Cashier-friendly three-step capture with private receipt/report upload and independent review; `Reconcile student payment` imports a verified movement as a source-linked receipt exactly once (B1) |
 | Student wallet balance/provenance and wallet generation | **Student Services → Students → View student**, wallet widget | No corresponding wallet-management screen registered | Operator-generated Circle wallets; generation/control/consent permissions and slot recovery need §14.10 review. Balance is a read, not a tuition receipt |
-| Direct student tuition quote/pay | Generic **Transactions** may show `tuition_revenue`; **Tuition Accounts** may reflect its current posting; no dedicated tuition-attempt/reconciliation inbox | Eligible posted payments can be manually reconciled in Collections; approved receipt reviews can be selected in Finance Supervisor budget capture | Student entry is `/student/dashboard` Pay Now plus `/student/wallet`. Movement/fake guards exist; full consent, quote, no-resend and async recovery gates remain open. Generic confirmed status is not proof |
-| Student tuition receipt history and intake exceptions | No dedicated resource found | No dedicated queue found | `StudentTuitionPayment` records exist; `/payments` still lists assistance/refunds. Persistent student status/history and shared Collections source/attention views are planned, not shipped |
+| Direct student tuition quote/pay | Generic **Transactions** may show `tuition_revenue`; **Tuition Accounts** may reflect its current posting; no dedicated tuition-attempt/reconciliation inbox | Eligible posted payments can be manually reconciled in Collections; approved receipt reviews can be selected in Finance Supervisor budget capture | Student entry is `/student/dashboard` Pay Now plus `/student/wallet`. Immutable quote/consent, expiring fee ceiling, chain/purpose/stop guards and provider-handle no-resend recovery exist (B0 slice). Submission stays off by default and the installed Circle CLI cannot enforce a fee ceiling, so the rail refuses before invoking a signer. Generic confirmed status is not proof |
+| Student tuition receipt history and intake exceptions | No dedicated resource found | No dedicated queue found | `StudentTuitionPayment` records exist; `/payments` still lists assistance/refunds. Student-side attempt history now exists on the student dashboard and at `GET student/tuition/attempts`; staff-side shared Collections source/attention views are planned, not shipped |
 | Closed-set budget capture, background run evidence and plan review | No dedicated admin screen | **Finance Supervisor** (`/finance/finance-supervisor`) | Schema v3 supports selected independently reviewed movement receipts, zero typed opening funds when counting them, and after-commit planning wake. Staff still captures the closed set; no automatic receipt-to-budget routing. Accepting a plan never grants payment authority |
 | Invoice source review, beneficiary approval, draft preparation and funding/reservation | Legacy invoice CRUD is available, not the complete safe workflow | Several authenticated HTTP actions exist; complete operator wizard absent | Need linked source/destination/policy/budget/funding screens rather than scripts or fabricated reviewers |
 | Reviewed capacity release and funding rollover | No screen | No screen | Backend actions/tests exist; authorization/unknown outcomes cannot be discarded to free capacity |
@@ -3386,10 +3425,12 @@ in the admin dashboard's explicit widget list. Presence of a widget class is not
 
 Next work, in dependency order:
 
-1. **B0 portal safety (§14.10):** audit existing tuition postings read-only, establish pilot
-   network/custody/consent scope, and require durable incoming identity, matching movement
-   verification, exact fee bounds and recoverable exactly-once allocation. Resolve async
-   transport/package behavior for both intake and outgoing paths. No blind retry or rewrite.
+1. **B0 portal safety (§14.10):** audit existing tuition postings read-only and finish the live
+   gap — obtain a rail that can enforce the accepted fee ceiling (the installed Circle CLI
+   refuses), configure a provider wallet, and prove one consented transfer end to end before any
+   operator enables submission. The consent, fee-bound, stop-guard and no-resend contracts are in
+   place; resolve async transport/package behavior for the outgoing path too. No blind retry or
+   rewrite.
 2. **B1–B3 intake integration:** automatically import verified digital receipts into Collections
    with allocation/source links and independent financial-use review; exclude duplicates,
    restrictions and simulation from real cash. Add student history/attention queues and link
@@ -3417,9 +3458,9 @@ be able to see which arrow is live without reading the source.
 | # | Step | Actor | Status |
 | --- | --- | --- | --- |
 | 1A | Existing-channel collection | College's existing cash/bank channel; cashier captures source proof | Supported aggregate evidence lane; real bank settlement stays outside EduFlow |
-| 1B | Optional direct portal attempt | Student Pay Now → quote/pay API → generated wallet → configured treasury | Movement/fake-posting guards and attempt row exist; consent/quote bounds, no-resend async provider observation and recovery acceptance remain incomplete |
+| 1B | Optional direct portal attempt | Student Pay Now → quote/pay API → generated wallet → configured treasury | Immutable quote/consent, expiring fee ceiling, chain/purpose/stop guards, provider-handle observation and no-resend recovery exist (B0 slice); a live run is unproven because the installed rail cannot enforce the accepted fee ceiling and refuses to sign |
 | 2A | Record manual receipts | `CaptureCollectionBatch` → `CollectionBatch` | Built; private upload and three-step entry in both panels |
-| 2B | Verify, allocate and import digital receipt | Matching movement predicate → posted payment → staff reconciliation into source-linked Collections | Partial: verified-path posting and explicit B1 reconciliation exist; automatic import, immutable consent/settlement provenance and full async recovery remain open |
+| 2B | Verify, allocate and import digital receipt | Matching movement predicate → posted payment → staff reconciliation into source-linked Collections | Partial: verified-path posting, immutable consent/settlement provenance and explicit B1 reconciliation exist; automatic import and staff-side attention views remain open |
 | 3 | Independent financial reconciliation | Separate reviewer checks manual sources or digital receipt attribution/category/restrictions | Existing independent batch review covers imported receipts; category/ownership/attention workflows remain incomplete |
 | 4 | Staff selects the bill set and allocation | Human → `CaptureBudgetSnapshot` with `bill_ids`, `allocation` | ✅ Built |
 | 5 | Bill source evidence captured and reviewed | Maker → `InvoiceVersion`; separate checker → `approve_evidence` | ✅ Built |
@@ -3433,15 +3474,17 @@ be able to see which arrow is live without reading the source.
 | 13 | **Vendor receives USDC** | Verified Arc settlement, optionally mirrored to `transactions` | ⚠️ **Proves movement, not receipt** — vendor aliases map to operator-controlled testnet recipients (§15.5) |
 
 The manual lane remains usable without a student row. Reviewed imported pilot receipts can
-now be bound into a staff-captured plan with movement/opening exclusion. This does not close
-the portal's consent, no-resend recovery and provenance gates in §14.10, authorize a live run,
-or promote testnet money into real college revenue. Incoming student consent, receipt reconciliation, plan acceptance,
+now be bound into a staff-captured plan with movement/opening exclusion. The portal's consent,
+provenance and no-resend recovery gates now exist (§14.10.4 B0 slice), but no live run is
+authorized and testnet money is still not promoted into real college revenue. Incoming student
+consent, receipt reconciliation, plan acceptance,
 payment authorization and settlement are different events. No genuine current-workflow staff
 approval-to-settlement run has been established; prior synthetic-reviewer records and historical
-chain payments do not satisfy it. The outbound runtime remains separately opt-in and testnet-only;
-the new direct-payment service must gain its own explicit purpose/chain/stop guard rather than
-assuming it inherits outbound flags. Step 13 proves movement to the bound pilot recipient, not
-that a real vendor received the college's payment.
+chain payments do not satisfy it. The outbound runtime remains separately opt-in and testnet-only,
+and the incoming direct-payment service carries its own explicit purpose/chain/stop guard,
+fee-ceiling gate and recovery-owner requirement rather than inheriting outbound flags. Step 13
+proves movement to the bound pilot recipient, not that a real vendor received the college's
+payment.
 
 ### 17.2 Four corrections this trace makes explicit
 

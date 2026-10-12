@@ -1,4 +1,4 @@
-import { Head, Link, router } from '@inertiajs/react';
+import { Head, Link, router, useRemember, usePoll } from '@inertiajs/react';
 import {
     ArrowDownLeft,
     ArrowRight,
@@ -44,7 +44,10 @@ import {
     pay as tuitionPayStore,
 } from '@/routes/student/tuition';
 import { show as walletShow } from '@/routes/student/wallet';
-import type { StudentDashboardProps } from '@/types/financial-aid';
+import type {
+    StudentDashboardProps,
+    TuitionAttempt,
+} from '@/types/financial-aid';
 
 function statusPillClass(status: string): string {
     switch (status) {
@@ -68,14 +71,9 @@ function shortAddress(address: string): string {
  * exact base units from the server, so a value this large cannot be rounded
  * into the wrong receipt.
  */
-function formatBaseUnits(baseUnits: number): string {
-    const whole = Math.floor(baseUnits / 1_000_000);
-    const cents = String(Math.round((baseUnits % 1_000_000) / 10_000)).padStart(
-        2,
-        '0',
-    );
-
-    return `${whole.toLocaleString('en-US')}.${cents}`;
+function formatBaseUnits(baseUnits: string | number): string {
+    const units = BigInt(baseUnits);
+    return `${(units / 1_000_000n).toLocaleString('en-US')}.${(units % 1_000_000n).toString().padStart(6, '0')}`;
 }
 
 /**
@@ -105,6 +103,7 @@ export default function StudentDashboard({
     totals,
     recentTransactions,
     eligibility,
+    tuitionAttempts = [],
 }: StudentDashboardProps) {
     const [balanceVisible, setBalanceVisible] = useState(true);
     const [eligibilityVisible, setEligibilityVisible] = useState(false);
@@ -129,6 +128,10 @@ export default function StudentDashboard({
         max_amount_base_units: number;
         balance: string | null;
         chain: string;
+        request_digest: string;
+        consent_text: string;
+        expires_at: string;
+        fee_ceiling_base_units: number;
     } | null>(null);
     const [payError, setPayError] = useState<string | null>(null);
     const [quoting, setQuoting] = useState(false);
@@ -138,16 +141,13 @@ export default function StudentDashboard({
      * is requested and echoed back by both endpoints. Holding it in state is
      * what stops a retry from becoming a second transfer.
      */
-    const [requestKey, setRequestKey] = useState<string | null>(null);
-    const [receipt, setReceipt] = useState<{
-        amount: string;
-        network_fee: string;
-        tx_hash: string;
-        simulated: boolean;
-        applied_base_units: number;
-        overpayment_base_units: number;
-        remaining_base_units: number;
-    } | null>(null);
+    const [requestKey, setRequestKey] = useRemember<string | null>(
+        null,
+        `tuition-request:${tuitionAccount?.id}`,
+    );
+    const [consent, setConsent] = useState(false);
+    const [receipt, setReceipt] = useState<TuitionAttempt | null>(null);
+    usePoll(10000, { only: ['tuitionAttempts', 'tuitionAccount'] });
 
     const defaultPayBaseUnits = Math.min(
         remainingBase,
@@ -161,8 +161,14 @@ export default function StudentDashboard({
     const openPay = () => {
         setPayAmount((defaultPayBaseUnits / 1_000_000).toFixed(2));
         setPayQuote(null);
+        setConsent(false);
+        setRequestKey(null);
         setPayError(null);
-        setReceipt(null);
+        setReceipt(
+            tuitionAttempts.find(
+                (a) => !['simulated', 'failed'].includes(a.state) && !a.posted,
+            ) ?? null,
+        );
         setPayOpen(true);
     };
 
@@ -211,9 +217,16 @@ export default function StudentDashboard({
     };
 
     const submitPay = async () => {
-        const baseUnits = Math.round(Number(payAmount) * 1_000_000);
+        if (!/^(?:0|[1-9][0-9]*)(?:\.[0-9]{1,6})?$/.test(payAmount)) {
+            setPayError('Enter exact USDC with at most six decimal places.');
+            return;
+        }
+        const [whole, fraction = ''] = payAmount.split('.');
+        const exact =
+            BigInt(whole) * 1_000_000n + BigInt(fraction.padEnd(6, '0'));
+        const baseUnits = Number(exact);
 
-        if (!Number.isFinite(baseUnits) || baseUnits <= 0) {
+        if (!Number.isSafeInteger(baseUnits) || baseUnits <= 0) {
             setPayError('Enter an amount greater than zero.');
 
             return;
@@ -223,6 +236,10 @@ export default function StudentDashboard({
             setPayError('Get a fresh fee quote before sending this payment.');
             await requestQuote(baseUnits);
 
+            return;
+        }
+        if (!consent) {
+            setPayError('Accept this exact pilot quote before confirming.');
             return;
         }
 
@@ -245,6 +262,8 @@ export default function StudentDashboard({
                     tuition_account_id: tuitionAccount?.id,
                     amount_base_units: baseUnits,
                     request_key: requestKey,
+                    request_digest: payQuote.request_digest,
+                    consent: true,
                 }),
             });
 
@@ -258,20 +277,15 @@ export default function StudentDashboard({
                 return;
             }
 
-            setReceipt({
-                amount: payload.amount,
-                network_fee: payload.network_fee,
-                tx_hash: payload.tx_hash,
-                simulated: payload.simulated,
-                applied_base_units: payload.applied_base_units,
-                overpayment_base_units: payload.overpayment_base_units,
-                remaining_base_units: payload.remaining_base_units,
-            });
+            setReceipt(payload);
 
             // The wallet balance and paid figures both changed on-chain.
-            router.reload({ only: ['wallet', 'tuitionAccount', 'totals'] });
+            router.reload({ only: ['tuitionAttempts', 'tuitionAccount'] });
         } catch {
-            setPayError('Could not reach the payment network.');
+            setPayError(
+                'Response lost. Check existing attempt history before doing anything else; do not create a new payment.',
+            );
+            router.reload({ only: ['tuitionAttempts'] });
         } finally {
             setPaying(false);
         }
@@ -367,9 +381,10 @@ export default function StudentDashboard({
                                     Pay tuition
                                 </DialogTitle>
                                 <DialogDescription className="clay-body">
-                                    Moves USDC from your wallet on{' '}
-                                    {snapshot?.chain ?? 'Arc'} to the
-                                    institution treasury. This cannot be undone.
+                                    Operator-controlled Arc testnet pilot only.
+                                    This does not pay official college tuition.
+                                    Confirmation binds this one amount and fee
+                                    ceiling.
                                 </DialogDescription>
                             </DialogHeader>
 
@@ -384,27 +399,31 @@ export default function StudentDashboard({
                                     >
                                         {receipt.simulated
                                             ? 'Rehearsal — nothing was sent.'
-                                            : 'Payment sent.'}
+                                            : receipt.state_label}
                                     </p>
                                     <dl className="grid gap-3 text-sm">
                                         <div className="flex items-baseline justify-between gap-4">
                                             <dt className="clay-meta">
                                                 {receipt.simulated
                                                     ? 'Would be sent to the institution'
-                                                    : 'Paid to the institution'}
+                                                    : 'Requested principal (not a settlement claim)'}
                                             </dt>
                                             <dd className="clay-title tabular-nums">
-                                                {receipt.amount}
+                                                {formatBaseUnits(
+                                                    receipt.amount_base_units,
+                                                )}{' '}
+                                                USDC
                                             </dd>
                                         </div>
                                         <div className="flex items-baseline justify-between gap-4">
                                             <dt className="clay-meta">
                                                 {receipt.simulated
                                                     ? 'Network fee (not charged)'
-                                                    : 'Network fee (paid by you)'}
+                                                    : 'Proven network fee'}
                                             </dt>
                                             <dd className="clay-title tabular-nums">
-                                                {receipt.network_fee}
+                                                {receipt.actual_network_fee ??
+                                                    'Not yet proven'}
                                             </dd>
                                         </div>
                                         <div className="flex items-baseline justify-between gap-4">
@@ -418,7 +437,9 @@ export default function StudentDashboard({
                                                 USDC
                                             </dd>
                                         </div>
-                                        {receipt.overpayment_base_units > 0 && (
+                                        {BigInt(
+                                            receipt.overpayment_base_units,
+                                        ) > 0n && (
                                             <div className="flex items-baseline justify-between gap-4">
                                                 <dt className="clay-meta">
                                                     Larger than what was owed
@@ -437,7 +458,8 @@ export default function StudentDashboard({
                                             </dt>
                                             <dd className="clay-title tabular-nums">
                                                 {formatBaseUnits(
-                                                    receipt.remaining_base_units,
+                                                    tuitionAccount?.remaining_amount ??
+                                                        '0',
                                                 )}{' '}
                                                 USDC
                                             </dd>
@@ -454,9 +476,17 @@ export default function StudentDashboard({
                                     <p className="clay-meta">
                                         {receipt.simulated
                                             ? 'No USDC moved on any network, and no fee was charged.'
-                                            : 'The network fee goes to the Arc network, not to the school, and is not refundable.'}
+                                            : 'Fees are shown only when proven. Receipt status, allocation and official tuition are different claims.'}
                                     </p>
-                                    {receipt.overpayment_base_units > 0 && (
+                                    <p className="clay-meta">
+                                        {receipt.guidance} Allocation:{' '}
+                                        {receipt.posted
+                                            ? 'Posted to designated pilot account'
+                                            : 'Not posted'}
+                                        .
+                                    </p>
+                                    {BigInt(receipt.overpayment_base_units) >
+                                        0n && (
                                         <p className="clay-meta">
                                             You paid more than this account
                                             owed, so the excess is recorded
@@ -510,9 +540,8 @@ export default function StudentDashboard({
                                         </Label>
                                         <Input
                                             id="pay_amount"
-                                            type="number"
-                                            min="0.01"
-                                            step="0.01"
+                                            type="text"
+                                            inputMode="decimal"
                                             max={remainingUsdc}
                                             value={payAmount}
                                             onChange={(event) => {
@@ -520,6 +549,8 @@ export default function StudentDashboard({
                                                     event.target.value,
                                                 );
                                                 setPayQuote(null);
+                                                setRequestKey(null);
+                                                setConsent(false);
                                             }}
                                             className="clay-field clay-focus tabular-nums shadow-none"
                                             required
@@ -555,10 +586,35 @@ export default function StudentDashboard({
                                         </dl>
                                     )}
 
+                                    {payQuote && (
+                                        <label className="flex items-start gap-3 text-sm">
+                                            <input
+                                                type="checkbox"
+                                                checked={consent}
+                                                onChange={(e) =>
+                                                    setConsent(e.target.checked)
+                                                }
+                                            />
+                                            <span>
+                                                {payQuote.consent_text} Fee
+                                                ceiling:{' '}
+                                                {formatBaseUnits(
+                                                    payQuote.fee_ceiling_base_units,
+                                                )}{' '}
+                                                USDC. Quote expires:{' '}
+                                                {payQuote.expires_at}.
+                                            </span>
+                                        </label>
+                                    )}
+
                                     <div className="flex flex-wrap items-center gap-3">
                                         <Button
                                             type="submit"
-                                            disabled={paying || quoting}
+                                            disabled={
+                                                paying ||
+                                                quoting ||
+                                                (!!payQuote && !consent)
+                                            }
                                             data-loading={paying || quoting}
                                             className="clay-focus rounded-full bg-[var(--clay-primary)] font-semibold text-[var(--clay-primary-foreground)]"
                                         >
@@ -568,7 +624,7 @@ export default function StudentDashboard({
                                                 <ArrowUpRight className="size-4" />
                                             )}
                                             {payQuote
-                                                ? 'Confirm and pay'
+                                                ? 'Confirm pilot consent'
                                                 : quoting
                                                   ? 'Reading the fee…'
                                                   : 'Pay Now'}
@@ -593,6 +649,58 @@ export default function StudentDashboard({
                             )}
                         </DialogContent>
                     </Dialog>
+
+                    <section
+                        className="clay-card grid gap-4 p-5"
+                        aria-labelledby="tuition-attempts-heading"
+                    >
+                        <h2 id="tuition-attempts-heading" className="clay-h2">
+                            Pilot tuition attempts
+                        </h2>
+                        <p className="clay-meta">
+                            Transfer and allocation are separate. Unknown means
+                            investigate the existing payment, never send again.
+                        </p>
+                        {tuitionAttempts.length === 0 ? (
+                            <p className="clay-body">
+                                No pilot tuition attempt recorded.
+                            </p>
+                        ) : (
+                            tuitionAttempts.map((a) => (
+                                <div key={a.id} className="grid gap-2 text-sm">
+                                    <p className="font-semibold">
+                                        #{a.id} — {a.state_label} —{' '}
+                                        {formatBaseUnits(a.amount_base_units)}{' '}
+                                        USDC
+                                    </p>
+                                    <p>
+                                        {a.guidance} Allocation:{' '}
+                                        {a.posted
+                                            ? `${formatBaseUnits(a.applied_base_units)} USDC applied to pilot account`
+                                            : 'Not posted'}
+                                        .
+                                    </p>
+                                    <p className="break-all text-xs">
+                                        Request: {a.request_key}{' '}
+                                        {a.tx_hash
+                                            ? `· Transaction: ${a.tx_hash}`
+                                            : '· No chain hash yet'}
+                                    </p>
+                                </div>
+                            ))
+                        )}
+                        <Button
+                            type="button"
+                            variant="ghost"
+                            onClick={() =>
+                                router.reload({
+                                    only: ['tuitionAttempts', 'tuitionAccount'],
+                                })
+                            }
+                        >
+                            Refresh attempt status
+                        </Button>
+                    </section>
 
                     {/* -- Wallet hero -- */}
                     <section

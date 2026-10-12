@@ -5,11 +5,12 @@ declare(strict_types=1);
 namespace App\Http\Controllers;
 
 use App\Models\Student;
+use App\Models\StudentTuitionPayment;
+use App\Models\StudentTuitionPaymentAttempt;
 use App\Models\TuitionAccount;
 use App\Services\StudentTuitionPaymentService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
-use Illuminate\Support\Str;
 
 /**
  * Tuition paid from the student's own wallet into the institution treasury.
@@ -34,14 +35,10 @@ class StudentTuitionPaymentController extends Controller
 
         $validated = $request->validate([
             'amount_base_units' => ['required', 'integer', 'min:1'],
+            'request_key' => ['sometimes', 'nullable', 'uuid'],
         ]);
 
-        $quote = $this->payments->quote($student, $account, (int) $validated['amount_base_units']);
-
-        return response()->json([
-            ...$quote,
-            'request_key' => $this->requestKey($request),
-        ]);
+        return response()->json($this->payments->quote($student, $account, (int) $validated['amount_base_units'], $validated['request_key'] ?? null));
     }
 
     public function store(Request $request): JsonResponse
@@ -53,27 +50,15 @@ class StudentTuitionPaymentController extends Controller
             // Echoed back from the quote, so the same identity is used for the
             // transfer and for the posting that consumes its verification.
             'request_key' => ['required', 'uuid'],
+            'request_digest' => ['required', 'string', 'regex:/^[0-9a-f]{64}$/D'],
+            'consent' => ['required', 'accepted'],
         ]);
 
         $requestKey = (string) $validated['request_key'];
 
-        $payment = $this->payments->pay($student, $account, (int) $validated['amount_base_units'], $requestKey);
+        $attempt = $this->payments->pay($student, $account, (int) $validated['amount_base_units'], $requestKey, $validated['request_digest'], true);
 
-        return response()->json([
-            'request_key' => $requestKey,
-            'tx_hash' => $payment->tx_hash,
-            'amount' => $payment->amount(),
-            'network_fee' => $payment->fee(),
-            'recipient' => $payment->recipient_address,
-            'chain' => $payment->chain,
-            'verified' => $payment->tx_verified_on_chain,
-            // A rehearsal says so, rather than presenting a receipt the payer
-            // could mistake for a settled payment.
-            'simulated' => $payment->simulated,
-            'applied_base_units' => $payment->applied_base_units,
-            'overpayment_base_units' => $payment->overpayment_base_units,
-            'remaining_base_units' => $account->fresh()->remainingAmount(),
-        ]);
+        return response()->json(self::statusData($attempt->refresh()), 202);
     }
 
     /**
@@ -83,15 +68,29 @@ class StudentTuitionPaymentController extends Controller
      * the server mints one. Either way the key is not derived from anything the
      * client can influence about the transfer itself.
      */
-    private function requestKey(Request $request): string
+    public function index(Request $request): JsonResponse
     {
-        $provided = $request->input('request_key');
+        abort_unless($request->user()?->hasRole('student'), 403);
+        $student = $request->user()->student()->firstOrFail();
 
-        if (is_string($provided) && Str::isUuid($provided)) {
-            return $provided;
-        }
+        return response()->json(['data' => StudentTuitionPaymentAttempt::query()->where('student_id', $student->id)
+            ->latest('id')->limit(50)->get()->map(fn (StudentTuitionPaymentAttempt $a): array => self::statusData($a))]);
+    }
 
-        return Str::uuid()->toString();
+    /** @return array<string, mixed> */
+    public static function statusData(StudentTuitionPaymentAttempt $attempt): array
+    {
+        $payment = StudentTuitionPayment::query()->where('request_key', $attempt->request_key)->first();
+
+        return ['id' => $attempt->id, 'request_key' => $attempt->request_key, 'state' => $attempt->state,
+            'state_label' => $attempt->state()->label(), 'guidance' => $attempt->state()->guidance(), 'stage' => $attempt->stage,
+            'amount_base_units' => (string) $attempt->amount_base_units, 'quoted_network_fee' => $attempt->quoted_network_fee,
+            'fee_ceiling_base_units' => (string) $attempt->fee_ceiling_base_units, 'actual_network_fee' => $attempt->actual_network_fee,
+            'tx_hash' => $attempt->provider_reference, 'provider_handle' => $attempt->provider_handle,
+            'simulated' => $attempt->state === 'simulated', 'verified' => $attempt->isVerified() && $attempt->hasValidSettlement(),
+            'posted' => $attempt->posted_at !== null, 'applied_base_units' => (string) ($payment instanceof StudentTuitionPayment ? $payment->applied_base_units : 0),
+            'overpayment_base_units' => (string) ($payment instanceof StudentTuitionPayment ? $payment->overpayment_base_units : 0),
+            'requires_investigation' => $attempt->stage === 'needs_operator_review', 'created_at' => $attempt->created_at->toIso8601String()];
     }
 
     /**

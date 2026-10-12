@@ -49,6 +49,7 @@ Route::middleware(['auth', 'verified'])->group(function (): void {
     Route::post('student/wallet/refresh', [StudentWalletController::class, 'refresh'])->middleware('throttle:10,1')->name('student.wallet.refresh');
     Route::post('student/tuition/quote', [StudentTuitionPaymentController::class, 'quote'])->middleware('throttle:20,1')->name('student.tuition.quote');
     Route::post('student/tuition/pay', [StudentTuitionPaymentController::class, 'store'])->middleware('throttle:5,1')->name('student.tuition.pay');
+    Route::get('student/tuition/attempts', [StudentTuitionPaymentController::class, 'index'])->middleware('throttle:60,1')->name('student.tuition.attempts');
     Route::patch('wallet', [StudentWalletController::class, 'update'])->name('wallet.update');
 });
 

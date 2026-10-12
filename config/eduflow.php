@@ -97,6 +97,18 @@ return [
     */
     'wallet_balance_cache_seconds' => env('EDUFLOW_WALLET_BALANCE_CACHE_SECONDS', 30),
 
+    'student_tuition' => [
+        'enabled' => env('EDUFLOW_TUITION_SUBMISSION_ENABLED', false),
+        'observe_enabled' => env('EDUFLOW_TUITION_OBSERVATION_ENABLED', false),
+        'stop_switch' => env('EDUFLOW_TUITION_SUBMISSION_STOP', false),
+        'pilot_account_ids' => [],
+        'queue_connection' => env('EDUFLOW_TUITION_QUEUE_CONNECTION', 'database'),
+        'queue' => 'student-tuition',
+        'quote_seconds' => 120,
+        'max_observations' => 10,
+        'investigation_owner_id' => null,
+    ],
+
     /*
     |--------------------------------------------------------------------------
     | Campus Quick Resources

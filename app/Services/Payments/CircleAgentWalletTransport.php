@@ -27,7 +27,7 @@ use Yukazakiri\Lepton\Support\Amounts;
  * So `submit()` must pass `--quiet` and must never invent a hash, and
  * `resolve()` is the only place a hash may enter the system.
  */
-final readonly class CircleAgentWalletTransport implements AsyncPaymentTransport
+final readonly class CircleAgentWalletTransport implements FeeBoundedPaymentTransport
 {
     public function __construct(
         private string $binary,
@@ -46,6 +46,9 @@ final readonly class CircleAgentWalletTransport implements AsyncPaymentTransport
 
     public function submit(array $request): TransportAcceptance
     {
+        if (array_key_exists('max_fee_base_units', $request)) {
+            throw new RuntimeException('Installed Circle CLI cannot enforce a sender-fee ceiling. Bounded tuition submission is blocked before invoking the signer.');
+        }
         $handle = $this->run([
             'wallet', 'transfer', $request['to'],
             '--amount', Amounts::toCliAmount((int) $request['amount_base_units'], $this->usdcDecimals),
@@ -71,6 +74,11 @@ final readonly class CircleAgentWalletTransport implements AsyncPaymentTransport
         }
 
         return new TransportAcceptance(handle: strtolower($candidate), raw: ['raw' => $handle]);
+    }
+
+    public function supportsFeeCeiling(): bool
+    {
+        return false;
     }
 
     /**

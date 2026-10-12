@@ -6,13 +6,13 @@ use App\Models\AcademicTerm;
 use App\Models\Organization;
 use App\Models\Student;
 use App\Models\StudentTuitionPayment;
+use App\Models\StudentTuitionPaymentAttempt;
 use App\Models\TuitionAccount;
 use App\Models\User;
 use App\Models\Wallet;
 use App\Services\CircleAgentWalletCli;
 use App\Services\StudentWalletGenerationService;
 use Illuminate\Support\Facades\Cache;
-use Illuminate\Support\Str;
 use Spatie\Permission\Models\Role;
 use Yukazakiri\Lepton\Contracts\WalletGateway;
 use Yukazakiri\Lepton\DTOs\BalanceResult;
@@ -109,18 +109,18 @@ test('a student can quote and pay their own tuition', function (): void {
         'tuition_account_id' => $account->id,
         'amount_base_units' => 5_000000,
         'request_key' => $requestKey,
+        'request_digest' => $quote->json('request_digest'), 'consent' => true,
     ]);
 
-    $paid->assertOk()->assertJsonPath('request_key', $requestKey);
+    $paid->assertAccepted()->assertJsonPath('request_key', $requestKey)->assertJsonPath('state', 'simulated');
 
     // Without a provider configured this is a rehearsal, and a rehearsal
     // records a receipt but never claims the debt was settled.
-    $payment = StudentTuitionPayment::query()->where('request_key', $requestKey)->first();
+    $payment = StudentTuitionPaymentAttempt::query()->where('request_key', $requestKey)->first();
 
     expect($payment)->not->toBeNull()
-        ->and($payment->simulated)->toBeTrue()
-        ->and($payment->tx_verified_on_chain)->toBeFalse()
-        ->and($payment->applied_base_units)->toBe(0)
+        ->and($payment->state)->toBe('simulated')
+        ->and(StudentTuitionPayment::query()->count())->toBe(0)
         ->and($account->fresh()->remainingAmount())->toBe(300_000000);
 });
 
@@ -129,7 +129,8 @@ test('the quote returns the request key the payment must echo back', function ()
 
     $this->actingAs($student->user->assignRole('student'));
 
-    $requestKey = (string) Str::uuid();
+    $quote = $this->postJson(route('student.tuition.quote'), ['tuition_account_id' => $account->id, 'amount_base_units' => 5_000000]);
+    $requestKey = $quote->json('request_key');
 
     $this->postJson(route('student.tuition.quote'), [
         'tuition_account_id' => $account->id,
@@ -212,13 +213,9 @@ test('a chain failure is reported, not recorded', function (): void {
 
     $this->actingAs($student->user->assignRole('student'));
 
-    $requestKey = (string) Str::uuid();
-
-    $this->postJson(route('student.tuition.pay'), [
-        'tuition_account_id' => $account->id,
-        'amount_base_units' => 5_000000,
-        'request_key' => $requestKey,
-    ])->assertStatus(500);
+    $this->postJson(route('student.tuition.quote'), [
+        'tuition_account_id' => $account->id, 'amount_base_units' => 5_000000,
+    ])->assertUnprocessable();
 
     expect(StudentTuitionPayment::query()->count())->toBe(0)
         ->and($account->fresh()->remainingAmount())->toBe(300_000000);

@@ -11,6 +11,7 @@ use App\Enums\AgentDecisionType;
 use App\Enums\CurrencyCode;
 use App\Models\AgentDecision;
 use App\Models\AssistanceRequest;
+use App\Models\StudentTuitionPaymentAttempt;
 use App\Models\Transaction;
 use App\Services\CurrencyConverter;
 use App\Services\StudentWalletService;
@@ -133,6 +134,8 @@ class StudentDashboardController extends Controller
                 'year_level' => $student->year_level,
             ],
             'tuitionAccount' => $tuitionAccountData,
+            'tuitionAttempts' => StudentTuitionPaymentAttempt::query()->where('student_id', $student->id)->latest('id')->limit(20)->get()
+                ->map(fn (StudentTuitionPaymentAttempt $attempt): array => StudentTuitionPaymentController::statusData($attempt)),
             'canRequest' => $account !== null,
             'requests' => $requests,
             'currency' => [

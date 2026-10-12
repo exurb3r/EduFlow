@@ -60,6 +60,7 @@ export type AssistanceRequest = AssistanceRequestSummary & {
 };
 
 export type StudentDashboardProps = {
+    tuitionAttempts?: TuitionAttempt[];
     student: {
         name: string;
         student_number: string;
@@ -115,6 +116,24 @@ export type StudentDashboardProps = {
         }>;
         evaluated_at: string;
     };
+};
+
+export type TuitionAttempt = {
+    id: number;
+    request_key: string;
+    state: string;
+    state_label: string;
+    guidance: string;
+    stage: string | null;
+    amount_base_units: string;
+    fee_ceiling_base_units: string;
+    quoted_network_fee: string;
+    actual_network_fee: string | null;
+    tx_hash: string | null;
+    simulated: boolean;
+    posted: boolean;
+    applied_base_units: string;
+    overpayment_base_units: string;
 };
 
 export type PaymentTransaction = {

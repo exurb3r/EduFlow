@@ -17,6 +17,8 @@ enum StudentTuitionPaymentState: string
     /** Recorded before a signer could be reached; nothing has been asked of the rail. */
     case PREPARED = 'prepared';
 
+    case SUBMITTING = 'submitting';
+
     /** The rail accepted the submission and issued its own handle. No hash exists yet. */
     case ACCEPTED = 'accepted';
 
@@ -39,6 +41,7 @@ enum StudentTuitionPaymentState: string
     {
         return match ($this) {
             self::PREPARED => 'Recorded, not yet sent',
+            self::SUBMITTING => 'Submission started — do not send again',
             self::ACCEPTED => 'Accepted by the network, not yet on chain',
             self::AWAITING_VERIFICATION => 'On chain, awaiting movement proof',
             self::VERIFIED => 'Verified on chain',
@@ -53,9 +56,10 @@ enum StudentTuitionPaymentState: string
     {
         return match ($this) {
             self::PREPARED => 'This payment has not been sent yet. Keep this page open; do not record it again.',
+            self::SUBMITTING => 'Submission started. A lost response must be investigated without sending again.',
             self::ACCEPTED => 'The network accepted your payment. We are waiting for the chain to publish it; this takes a moment and needs no action.',
             self::AWAITING_VERIFICATION => 'The chain has a record. We are checking it moved the exact amount before this counts.',
-            self::VERIFIED => 'This amount moved on chain and is recorded on your tuition account.',
+            self::VERIFIED => 'Exact movement verified. Allocation to the designated pilot account is recorded separately.',
             self::UNKNOWN => 'We could not confirm whether this payment moved. The existing attempt is being checked instead of sending again.',
             self::FAILED => 'This attempt did not complete. A replacement payment is a separate action, reviewed before it is recorded.',
             self::SIMULATED => 'Simulated payment. No USDC moved on any network.',
@@ -71,7 +75,7 @@ enum StudentTuitionPaymentState: string
     {
         return array_map(
             static fn (self $state): string => $state->value,
-            [self::PREPARED, self::ACCEPTED, self::AWAITING_VERIFICATION, self::UNKNOWN],
+            [self::PREPARED, self::SUBMITTING, self::ACCEPTED, self::AWAITING_VERIFICATION, self::UNKNOWN],
         );
     }
 }
