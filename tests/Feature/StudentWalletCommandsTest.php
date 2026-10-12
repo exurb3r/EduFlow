@@ -17,7 +17,7 @@ function fundTestCli(array &$wallets, ?Throwable $failure = null): CircleAgentWa
 {
     return new class($wallets, $failure) extends CircleAgentWalletCli
     {
-        public function __construct(private array &$wallets, private ?Throwable $failure)
+        public function __construct(private array &$wallets, private readonly ?Throwable $failure)
         {
             parent::__construct(new CliRunner('true', 5));
         }

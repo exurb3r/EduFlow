@@ -123,14 +123,12 @@ class AppServiceProvider extends ServiceProvider
         // `circle wallet create` and `circle wallet fund` are the two verbs
         // Lepton does not wrap, so the app runs them itself through the same
         // argv runner the package uses. Scoped, and swapped for a fake in tests.
-        $this->app->scoped(CircleAgentWalletCli::class, function ($app): CircleAgentWalletCli {
-            return new CircleAgentWalletCli(
-                new CliRunner(
-                    (string) config('lepton.circle.bin', 'circle'),
-                    (int) config('lepton.circle.timeout', 60),
-                ),
-            );
-        });
+        $this->app->scoped(CircleAgentWalletCli::class, fn ($app): CircleAgentWalletCli => new CircleAgentWalletCli(
+            new CliRunner(
+                (string) config('lepton.circle.bin', 'circle'),
+                (int) config('lepton.circle.timeout', 60),
+            ),
+        ));
     }
 
     protected function registerFilamentPlugins(): void

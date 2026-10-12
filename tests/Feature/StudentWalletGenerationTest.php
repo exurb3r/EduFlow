@@ -21,7 +21,7 @@ function fakeCircleCli(array &$wallets, ?Throwable $fundFailure = null): CircleA
 {
     return new class($wallets, $fundFailure) extends CircleAgentWalletCli
     {
-        public function __construct(private array &$wallets, private ?Throwable $fundFailure)
+        public function __construct(private array &$wallets, private readonly ?Throwable $fundFailure)
         {
             parent::__construct(new CliRunner('true', 5));
         }
@@ -121,7 +121,7 @@ test('a wallet the CLI fails to report is never recorded', function (): void {
 
     $cli = new class($existing) extends CircleAgentWalletCli
     {
-        public function __construct(private array $wallets)
+        public function __construct(private readonly array $wallets)
         {
             parent::__construct(new CliRunner('true', 5));
         }
@@ -225,7 +225,6 @@ test('the remaining slot count reflects the wallets Circle already holds', funct
 
 test('the idempotency key is a valid uuid v5 derived from the student', function (): void {
     $method = new ReflectionMethod(StudentWalletGenerationService::class, 'idempotencyKeyFor');
-    $method->setAccessible(true);
     $service = app(StudentWalletGenerationService::class);
 
     $key = $method->invoke($service, Student::factory()->create());
@@ -237,7 +236,6 @@ test('the idempotency key is a valid uuid v5 derived from the student', function
 
 test('the idempotency key is stable, so a retry cannot mint a second wallet', function (): void {
     $method = new ReflectionMethod(StudentWalletGenerationService::class, 'idempotencyKeyFor');
-    $method->setAccessible(true);
     $service = app(StudentWalletGenerationService::class);
 
     $student = Student::factory()->create();
@@ -247,7 +245,6 @@ test('the idempotency key is stable, so a retry cannot mint a second wallet', fu
 
 test('each student gets a distinct idempotency key', function (): void {
     $method = new ReflectionMethod(StudentWalletGenerationService::class, 'idempotencyKeyFor');
-    $method->setAccessible(true);
     $service = app(StudentWalletGenerationService::class);
 
     $first = Student::factory()->create();

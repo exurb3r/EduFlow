@@ -82,7 +82,7 @@ class StudentWalletWidget extends Widget
     {
         $student = $this->authorizedStudent();
 
-        if ($student === null) {
+        if (! $student instanceof Student) {
             $this->readSnapshot();
 
             return;
@@ -119,7 +119,7 @@ class StudentWalletWidget extends Widget
         $student = $this->authorizedStudent();
         $service = app(StudentWalletService::class);
 
-        if ($student !== null) {
+        if ($student instanceof Student) {
             $service->forget($student);
         }
 
@@ -133,6 +133,7 @@ class StudentWalletWidget extends Widget
      *
      * @return array<string, mixed>
      */
+    #[\Override]
     protected function getViewData(): array
     {
         return [
@@ -159,7 +160,7 @@ class StudentWalletWidget extends Widget
     {
         $student = $this->authorizedStudent();
 
-        if ($student === null) {
+        if (! $student instanceof Student) {
             $this->resetTo('missing', 'This wallet could not be loaded. You may not have access to this student.');
 
             return;
@@ -183,7 +184,7 @@ class StudentWalletWidget extends Widget
     {
         $student = $this->authorizedStudent();
 
-        if ($student === null) {
+        if (! $student instanceof Student) {
             return;
         }
 

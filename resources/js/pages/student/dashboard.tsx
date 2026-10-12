@@ -97,7 +97,10 @@ export default function StudentDashboard({
     const firstName = student.name.split(' ')[0];
     const transactions = recentTransactions ?? [];
     const snapshot = wallet?.snapshot;
-    const hasWallet = Boolean(wallet?.address);
+    // `address` is the same value in both props; narrowing it once here keeps the
+    // wallet branch free of `wallet` possibly-undefined casts.
+    const walletAddress = wallet?.address ?? null;
+    const hasWallet = Boolean(walletAddress);
 
     // Pay Now needs a wallet with a balance and tuition that is still owed.
     const remainingBase = Number(tuitionAccount?.remaining_amount ?? 0);
@@ -124,7 +127,11 @@ export default function StudentDashboard({
 
     const defaultPayBaseUnits = Math.min(
         remainingBase,
-        Number(snapshot?.balance ? Math.floor(Number(snapshot.balance) * 1_000_000) : 0),
+        Number(
+            snapshot?.balance
+                ? Math.floor(Number(snapshot.balance) * 1_000_000)
+                : 0,
+        ),
     );
 
     const openPay = () => {
@@ -145,9 +152,10 @@ export default function StudentDashboard({
                 credentials: 'same-origin',
                 headers: {
                     'Content-Type': 'application/json',
-                    'X-CSRF-TOKEN': document.querySelector<HTMLMetaElement>(
-                        'meta[name="csrf-token"]',
-                    )?.content ?? '',
+                    'X-CSRF-TOKEN':
+                        document.querySelector<HTMLMetaElement>(
+                            'meta[name="csrf-token"]',
+                        )?.content ?? '',
                     Accept: 'application/json',
                 },
                 body: JSON.stringify({
@@ -200,9 +208,10 @@ export default function StudentDashboard({
                 credentials: 'same-origin',
                 headers: {
                     'Content-Type': 'application/json',
-                    'X-CSRF-TOKEN': document.querySelector<HTMLMetaElement>(
-                        'meta[name="csrf-token"]',
-                    )?.content ?? '',
+                    'X-CSRF-TOKEN':
+                        document.querySelector<HTMLMetaElement>(
+                            'meta[name="csrf-token"]',
+                        )?.content ?? '',
                     Accept: 'application/json',
                 },
                 body: JSON.stringify({
@@ -238,11 +247,11 @@ export default function StudentDashboard({
     };
 
     const copyAddress = () => {
-        if (!wallet?.address) {
+        if (!walletAddress) {
             return;
         }
 
-        navigator.clipboard.writeText(wallet.address);
+        navigator.clipboard.writeText(walletAddress);
         toast.success('Wallet address copied', {
             description: 'Share it to receive USDC on Arc.',
         });
@@ -374,8 +383,8 @@ export default function StudentDashboard({
                                         </div>
                                     </dl>
                                     <p className="clay-meta">
-                                        The network fee goes to the Arc
-                                        network, not to the school, and is not
+                                        The network fee goes to the Arc network,
+                                        not to the school, and is not
                                         refundable.
                                     </p>
                                     <Button
@@ -430,13 +439,17 @@ export default function StudentDashboard({
                                             max={remainingUsdc}
                                             value={payAmount}
                                             onChange={(event) => {
-                                                setPayAmount(event.target.value);
+                                                setPayAmount(
+                                                    event.target.value,
+                                                );
                                                 setPayQuote(null);
                                             }}
                                             className="clay-field clay-focus tabular-nums shadow-none"
                                             required
                                         />
-                                        <InputError message={payError} />
+                                        <InputError
+                                            message={payError ?? undefined}
+                                        />
                                         <p className="clay-meta">
                                             Your wallet pays the amount plus the
                                             network fee, which comes out of the
@@ -619,7 +632,7 @@ export default function StudentDashboard({
                                             <dd className="mt-1.5 flex items-center gap-2">
                                                 <span className="clay-meta min-w-0 truncate">
                                                     {shortAddress(
-                                                        wallet.address as string,
+                                                        walletAddress ?? '',
                                                     )}
                                                 </span>
                                                 <button
@@ -653,7 +666,8 @@ export default function StudentDashboard({
                                     <div className="mt-6 flex flex-wrap gap-2">
                                         <button
                                             type="button"
-                                            onClick={copyAddress}                                            className="clay-focus inline-flex h-9 items-center gap-2 rounded-full bg-[var(--clay-primary)] px-4 text-xs font-semibold text-[var(--clay-primary-foreground)] transition-all hover:-translate-y-0.5 hover:bg-[var(--clay-primary-bright)] active:translate-y-0"
+                                            onClick={copyAddress}
+                                            className="clay-focus inline-flex h-9 items-center gap-2 rounded-full bg-[var(--clay-primary)] px-4 text-xs font-semibold text-[var(--clay-primary-foreground)] transition-all hover:-translate-y-0.5 hover:bg-[var(--clay-primary-bright)] active:translate-y-0"
                                         >
                                             <ArrowDownLeft className="size-3.5" />
                                             Receive

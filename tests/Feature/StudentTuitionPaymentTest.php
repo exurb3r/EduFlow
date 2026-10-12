@@ -16,7 +16,6 @@ use App\Services\StudentWalletGenerationService;
 use Illuminate\Support\Facades\Cache;
 use RuntimeException;
 use Spatie\Permission\Models\Role;
-use Throwable;
 use Yukazakiri\Lepton\Contracts\WalletGateway;
 use Yukazakiri\Lepton\DTOs\BalanceResult;
 use Yukazakiri\Lepton\DTOs\TransferResult;
@@ -28,11 +27,11 @@ use Yukazakiri\Lepton\Support\LeptonCliException;
  * A Circle CLI stand-in. The transfer returns a hash and the fee the chain
  * charged; the estimate returns the fee a transfer would cost.
  */
-function payTestCli(array &$wallets, ?Throwable $transferFailure = null): CircleAgentWalletCli
+function payTestCli(array &$wallets): CircleAgentWalletCli
 {
-    return new class($wallets, $transferFailure) extends CircleAgentWalletCli
+    return new class($wallets) extends CircleAgentWalletCli
     {
-        public function __construct(private array &$wallets, private ?Throwable $failure)
+        public function __construct(private array &$wallets)
         {
             parent::__construct(new CliRunner('true', 5));
         }

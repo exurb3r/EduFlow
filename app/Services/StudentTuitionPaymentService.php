@@ -110,7 +110,7 @@ class StudentTuitionPaymentService
                 ],
             );
         } catch (LeptonCliException $e) {
-            throw new RuntimeException($this->readableFailure($e), previous: $e);
+            throw new RuntimeException($this->readableFailure($e), $e->getCode(), previous: $e);
         }
 
         // A hash on its own is not a settlement: read the transaction back.

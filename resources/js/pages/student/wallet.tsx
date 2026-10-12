@@ -250,10 +250,7 @@ export default function StudentWallet({ snapshot }: WalletProps) {
                             be recovered.
                         </p>
 
-                        <form
-                            onSubmit={saveWallet}
-                            className="mt-4 grid gap-4"
-                        >
+                        <form onSubmit={saveWallet} className="mt-4 grid gap-4">
                             <div className="space-y-1.5">
                                 <Label
                                     htmlFor="wallet_address"
@@ -276,9 +273,7 @@ export default function StudentWallet({ snapshot }: WalletProps) {
                                     className="clay-field clay-focus font-mono shadow-none"
                                     required
                                 />
-                                <InputError
-                                    message={errors.wallet_address}
-                                />
+                                <InputError message={errors.wallet_address} />
                                 <p className="clay-meta">
                                     Starts with 0x, followed by exactly 40
                                     hexadecimal characters.
@@ -304,9 +299,7 @@ export default function StudentWallet({ snapshot }: WalletProps) {
                                         variant="ghost"
                                         size="sm"
                                         className="clay-focus h-9 rounded-full text-xs font-semibold"
-                                        onClick={() =>
-                                            reset('wallet_address')
-                                        }
+                                        onClick={() => reset('wallet_address')}
                                     >
                                         Undo
                                     </Button>
@@ -316,7 +309,9 @@ export default function StudentWallet({ snapshot }: WalletProps) {
                                     variant="link"
                                     size="sm"
                                     className="clay-focus h-9 rounded-full text-xs font-semibold text-[var(--clay-text-muted)]"
-                                    onClick={() => router.visit(paymentsIndex())}
+                                    onClick={() =>
+                                        router.visit(paymentsIndex())
+                                    }
                                 >
                                     View payments
                                 </Button>

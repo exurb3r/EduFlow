@@ -74,7 +74,7 @@ class StudentWalletGenerationService
         try {
             $this->cli->createAgentWallet($this->idempotencyKeyFor($student));
         } catch (LeptonCliException $e) {
-            throw new RuntimeException($this->readableCliFailure($e, 'generate a wallet'), previous: $e);
+            throw new RuntimeException($this->readableCliFailure($e, 'generate a wallet'), $e->getCode(), previous: $e);
         }
 
         $after = $this->cli->agentWalletAddresses($chain);

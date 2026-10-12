@@ -19,6 +19,7 @@ class ViewStudent extends ViewRecord
      *
      * @return array<int, class-string>
      */
+    #[\Override]
     protected function getFooterWidgets(): array
     {
         return [

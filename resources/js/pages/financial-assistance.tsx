@@ -382,7 +382,6 @@ export default function FinancialAssistance({
                     </section>
                 </div>
             </div>
-
-            </>
-        );
+        </>
+    );
 }

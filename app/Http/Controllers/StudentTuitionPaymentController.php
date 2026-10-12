@@ -9,7 +9,6 @@ use App\Models\TuitionAccount;
 use App\Services\StudentTuitionPaymentService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
-use Illuminate\Validation\ValidationException;
 
 /**
  * Tuition paid from the student's own wallet into the institution treasury.
@@ -32,11 +31,7 @@ class StudentTuitionPaymentController extends Controller
             'amount_base_units' => ['required', 'integer', 'min:1'],
         ]);
 
-        try {
-            $quote = $this->payments->quote($student, $account, (int) $validated['amount_base_units']);
-        } catch (ValidationException $e) {
-            throw $e;
-        }
+        $quote = $this->payments->quote($student, $account, (int) $validated['amount_base_units']);
 
         return response()->json($quote);
     }
