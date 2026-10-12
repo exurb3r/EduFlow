@@ -12,9 +12,16 @@ use Livewire\Livewire;
 use Spatie\Permission\Models\Role;
 use Yukazakiri\Lepton\Gateways\FakeLeptonGateway;
 use Yukazakiri\Lepton\Support\CliRunner;
+use Yukazakiri\Lepton\Support\LeptonCliException;
 
 beforeEach(function (): void {
     config(['lepton.default' => 'fake']);
+
+    // Every widget render asks Circle how many agent-wallet slots are left. Bind a
+    // stand-in for the whole file so no test silently depends on whether the real
+    // `circle` binary happens to be installed on the machine running it.
+    $wallets = [];
+    app()->instance(CircleAgentWalletCli::class, generationCli($wallets));
 
     foreach (['super_admin', 'admin', 'finance_officer', 'student', 'user'] as $role) {
         Role::findOrCreate($role, 'web');
@@ -136,6 +143,53 @@ function generationCli(array &$wallets): CircleAgentWalletCli
         }
     };
 }
+
+/**
+ * A Circle CLI that cannot run at all, the way CI sees it: the binary is absent.
+ */
+function unavailableCli(): CircleAgentWalletCli
+{
+    return new class extends CircleAgentWalletCli
+    {
+        public function __construct()
+        {
+            parent::__construct(new CliRunner('true', 5));
+        }
+
+        public function agentWalletAddresses(string $chain): array
+        {
+            throw new LeptonCliException(['circle', 'wallet', 'list', '--type', 'agent', '--chain', $chain], 127, 'sh: 1: exec: circle: not found');
+        }
+    };
+}
+
+/**
+ * The slot count only decorates the mint button, so a CLI that cannot be reached
+ * must cost the admin their wallet panel -- and must never be reported as zero.
+ *
+ * Reporting 0 would read as "the cap is reached" and hide the real fault; the
+ * mint itself still has to refuse rather than claim it worked.
+ */
+test('an unreachable Circle CLI degrades the panel instead of breaking the student page', function (): void {
+    app()->instance(CircleAgentWalletCli::class, unavailableCli());
+
+    $student = Student::factory()->withoutPayoutAddress()->create();
+
+    $this->actingAs(User::factory()->create()->assignRole('admin'));
+    filament()->setCurrentPanel('finance');
+
+    Livewire::test(StudentWalletWidget::class, ['record' => $student])
+        ->assertOk()
+        ->assertSet('remainingSlots', null)
+        ->assertSee('Circle could not report')
+        ->assertDontSee('0 of 5')
+        ->call('generateWallet')
+        ->assertHasNoErrors()
+        ->assertNotified()
+        ->assertSet('hasGeneratedWallet', false);
+
+    expect($student->fresh()->payout_address)->toBeNull();
+});
 
 test('the panel shows the generated wallet provenance and funding history', function (): void {
     $wallets = [];

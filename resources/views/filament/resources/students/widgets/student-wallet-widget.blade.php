@@ -18,7 +18,7 @@
                         color="warning"
                         size="sm"
                         x-on:click.prevent="
-                            if (window.confirm('Mint a Circle agent wallet for this student and make it the payout address? Circle allows only {{ $walletLimit }} agent wallets per blockchain and there is no way to release one, so this permanently uses one of {{ $remainingSlots }} remaining slots.')) {
+                            if (window.confirm('Mint a Circle agent wallet for this student and make it the payout address? Circle allows only {{ $walletLimit }} agent wallets per blockchain and there is no way to release one, so this permanently uses one of {{ $remainingSlotsPhrase }}.')) {
                                 \$wire.generateWallet()
                             }
                         "
@@ -33,7 +33,7 @@
                         color="primary"
                         size="sm"
                         x-on:click.prevent="
-                            if (window.confirm('Mint a Circle agent wallet for this student and make it the payout address? Circle allows only {{ $walletLimit }} agent wallets per blockchain and there is no way to release one, so this permanently uses one of {{ $remainingSlots }} remaining slots.')) {
+                            if (window.confirm('Mint a Circle agent wallet for this student and make it the payout address? Circle allows only {{ $walletLimit }} agent wallets per blockchain and there is no way to release one, so this permanently uses one of {{ $remainingSlotsPhrase }}.')) {
                                 \$wire.generateWallet()
                             }
                         "
@@ -90,8 +90,7 @@
                         @endif
                     </p>
                     <p class="mt-2 text-sm text-gray-500 dark:text-gray-400">
-                        {{ $remainingSlots }} of {{ $walletLimit }} Circle agent-wallet slots
-                        remain on {{ strtoupper($chain) }}.
+                        {{ $slotSummary }}
                     </p>
                 </div>
             </div>

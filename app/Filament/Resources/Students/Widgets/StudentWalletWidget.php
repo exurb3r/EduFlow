@@ -63,7 +63,13 @@ class StudentWalletWidget extends Widget
 
     public ?string $lastFunding = null;
 
-    public int $remainingSlots = 0;
+    /**
+     * Slots left on the chain, or null when Circle could not be asked.
+     *
+     * The count is decoration on a button, so an unreadable chain is not worth
+     * failing the whole admin page over -- the mint itself still refuses.
+     */
+    public ?int $remainingSlots = null;
 
     public function mount(?Model $record = null): void
     {
@@ -152,8 +158,41 @@ class StudentWalletWidget extends Widget
             'fundingCount' => $this->fundingCount,
             'lastFunding' => $this->lastFunding,
             'remainingSlots' => $this->remainingSlots,
+            'remainingSlotsPhrase' => $this->remainingSlotsPhrase(),
+            'slotSummary' => $this->slotSummary(),
             'walletLimit' => CircleAgentWalletCli::AGENT_WALLET_LIMIT,
         ];
+    }
+
+    /**
+     * Wording for the irreversible-mint confirmation, which must stay truthful
+     * even when the slot count could not be read.
+     */
+    private function remainingSlotsPhrase(): string
+    {
+        if ($this->remainingSlots === null) {
+            return 'the remaining Circle agent-wallet slots';
+        }
+
+        return $this->remainingSlots.' remaining slots';
+    }
+
+    private function slotSummary(): string
+    {
+        if ($this->remainingSlots === null) {
+            return sprintf(
+                'Circle could not report how many of the %d agent-wallet slots remain on %s.',
+                CircleAgentWalletCli::AGENT_WALLET_LIMIT,
+                strtoupper($this->chain),
+            );
+        }
+
+        return sprintf(
+            '%d of %d Circle agent-wallet slots remain on %s.',
+            $this->remainingSlots,
+            CircleAgentWalletCli::AGENT_WALLET_LIMIT,
+            strtoupper($this->chain),
+        );
     }
 
     private function readSnapshot(): void
@@ -196,10 +235,28 @@ class StudentWalletWidget extends Widget
         $this->generatedAt = $wallet?->generated_at->toDayDateTimeString();
         $this->fundingCount = $student->walletFundings()->count();
         $this->lastFunding = $student->walletFundings()->latest('funded_at')->first()?->funded_at->toDayDateTimeString();
-        $this->remainingSlots = app(StudentWalletGenerationService::class)->remainingSlots();
+        $this->remainingSlots = $this->readRemainingSlots();
 
         if ($wallet !== null) {
             $this->chain = $wallet->chain;
+        }
+    }
+
+    /**
+     * Ask Circle how many agent-wallet slots are left, or null if it cannot say.
+     *
+     * A missing CLI binary or an expired session is a real deployment state, and
+     * it must not turn an admin's student page into a 500. The count is only
+     * used to describe the button, and generate() re-reads it before minting.
+     */
+    private function readRemainingSlots(): ?int
+    {
+        try {
+            return app(StudentWalletGenerationService::class)->remainingSlots();
+        } catch (Throwable $e) {
+            report($e);
+
+            return null;
         }
     }
 

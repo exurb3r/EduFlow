@@ -1917,7 +1917,7 @@ parameters:
 		-
 			rawMessage: 'Call to an undefined method Illuminate\Testing\TestResponse::assertSet().'
 			identifier: method.notFound
-			count: 7
+			count: 8
 			path: tests/Feature/Filament/StudentWalletWidgetTest.php
 
 		-
