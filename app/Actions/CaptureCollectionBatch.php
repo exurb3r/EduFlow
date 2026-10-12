@@ -9,6 +9,7 @@ use App\Enums\CurrencyCode;
 use App\Models\CollectionBatch;
 use App\Models\Organization;
 use App\Models\PaymentIntent;
+use App\Models\StudentTuitionPayment;
 use App\Models\User;
 use App\Services\FinanceWorkflows;
 use App\Services\InstallationInstitution;
@@ -28,12 +29,38 @@ use OverflowException;
 
 final readonly class CaptureCollectionBatch
 {
+    /**
+     * Movements already settled into this installation's treasury.
+     *
+     * The boundary is the destination, not a student record: an installation is
+     * single-organization by construction — `InstallationInstitution::current()`
+     * returns null unless exactly one organization exists — so "whose money is
+     * this" is answered by where it was sent. A payment addressed to this
+     * installation's treasury arrived here; one addressed elsewhere did not.
+     *
+     * A cashier holding the Arc explorer hash will type it into the
+     * receipt/reference field. That is the realistic way one settled movement
+     * gets counted twice — once as a digital receipt and once as a manual bank
+     * credit — so the hash is refused as a reference here and the cashier is
+     * pointed at the reconciliation instead.
+     *
+     * @return Builder<StudentTuitionPayment>
+     */
+    private function settledMovements(string $treasuryAddress): Builder
+    {
+        return StudentTuitionPayment::query()
+            ->where('simulated', false)
+            ->where('tx_verified_on_chain', true)
+            ->where('recipient_address', $treasuryAddress);
+    }
+
     public function __construct(private InstallationInstitution $institutions, private FinanceWorkflows $workflows) {}
 
     /** @param array<string, mixed> $data */
     public function handle(User $actor, array $data, ?UploadedFile $sourceDocument = null): CollectionBatch
     {
         Gate::forUser($actor)->authorize('create', CollectionBatch::class);
+        $this->assertNotADigitalMovement($data);
         $contents = null;
         if ($sourceDocument instanceof UploadedFile) {
             Validator::make(['source_document' => $sourceDocument], ['source_document' => self::documentRules()])->validate();
@@ -123,6 +150,36 @@ final readonly class CaptureCollectionBatch
 
             return $batch;
         }, 3);
+    }
+
+    /**
+     * Refuse a hand-typed receipt for money that already arrived by chain.
+     *
+     * Two shapes are refused: the channel reserved for reconciled movements,
+     * and any receipt/reference number that is a settled movement's hash. Both
+     * are attempts to record the same cash a second time — once as a digital
+     * receipt and once as a manual bank credit — which is the one double-count
+     * a duplicate check on document hashes alone cannot see.
+     *
+     * @param  array<string, mixed>  $data
+     */
+    private function assertNotADigitalMovement(array $data): void
+    {
+        if (($data['source_stream'] ?? null) === CollectionBatch::TUITION_PORTAL_STREAM) {
+            throw ValidationException::withMessages(['source_stream' => 'This channel records payments already settled on chain. Reconcile them from Student payments so the same money is not counted twice.']);
+        }
+
+        $reference = strtolower(trim((string) ($data['source_reference'] ?? '')));
+
+        if ($reference === '' || preg_match('/^0x[0-9a-f]{64}$/D', $reference) !== 1) {
+            return;
+        }
+
+        $treasury = (string) config('lepton.arc.treasury');
+
+        if ($this->settledMovements($treasury)->where('tx_hash', $reference)->exists()) {
+            throw ValidationException::withMessages(['source_reference' => 'This reference is a settled student payment, not a new cash arrival. Reconcile it from Student payments so the same money is not counted twice.']);
+        }
     }
 
     /** @return array<string, mixed> */

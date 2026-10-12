@@ -9,6 +9,7 @@ use Database\Factories\StudentTuitionPaymentFactory;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
+use Illuminate\Database\Eloquent\Relations\HasMany;
 use Yukazakiri\Lepton\Support\Amounts;
 
 /**
@@ -87,6 +88,20 @@ class StudentTuitionPayment extends Model
     public function attempt(): BelongsTo
     {
         return $this->belongsTo(StudentTuitionPaymentAttempt::class, 'request_key', 'request_key');
+    }
+
+    /**
+     * The Collections receipts that reconcile this payment.
+     *
+     * At most one, enforced by a unique index on the receipt's link. The money
+     * arrived when the transfer settled, so a second receipt would be the same
+     * cash counted twice rather than a new arrival.
+     *
+     * @return HasMany<CollectionBatch, $this>
+     */
+    public function collections(): HasMany
+    {
+        return $this->hasMany(CollectionBatch::class);
     }
 
     /**

@@ -5,11 +5,13 @@ declare(strict_types=1);
 namespace App\Filament\Pages;
 
 use App\Actions\CaptureCollectionBatch;
+use App\Actions\ImportTuitionPaymentAsCollection;
 use App\Actions\ReviewCollectionBatch;
 use App\DTOs\Money;
 use App\Enums\CurrencyCode;
 use App\Models\CollectionBatch;
 use App\Models\CollectionBatchReview;
+use App\Models\StudentTuitionPayment;
 use App\Models\User;
 use App\Services\InstallationInstitution;
 use BackedEnum;
@@ -232,7 +234,114 @@ class Collections extends Page implements HasTable
                     }
                     Notification::make()->title('Collection recorded')->body('Collection #'.$batch->id.' awaits a different authorized reviewer. No accounts changed.')->success()->send();
                 }),
+            $this->reconcileTuitionPaymentAction(),
         ];
+    }
+
+    /**
+     * Reconcile a verified student payment into a receipt.
+     *
+     * Only settled movements are offered, so the screen cannot present something
+     * the action would refuse. The wording says "reconcile" rather than
+     * "record" on purpose: the amount arrived when the transfer settled, and
+     * what this does is bring it into the reviewed ledger — not count it twice.
+     */
+    private function reconcileTuitionPaymentAction(): Action
+    {
+        return Action::make('reconcileTuitionPayment')
+            ->label('Reconcile student payment')
+            ->icon(Heroicon::ArrowsRightLeft)
+            ->color('gray')
+            ->visible(fn (): bool => Gate::forUser(Auth::user())->allows('create', CollectionBatch::class))
+            ->modalHeading('Reconcile a student payment')
+            ->modalWidth('3xl')
+            ->modalDescription('Student payments that already settled into this treasury. Reconciling records them for review; it does not receive new money.')
+            ->modalSubmitActionLabel('Reconcile for review')
+            ->form([
+                Select::make('payment_id')
+                    ->label('Verified student payment')
+                    ->options(fn (): array => $this->reconcilablePaymentOptions())
+                    ->required()
+                    ->live(),
+                TextEntry::make('movement_detail')
+                    ->label('What this records')
+                    ->state(fn (Get $get): string => $this->paymentReconciliationDetail($get('payment_id')))
+                    ->wrap(),
+            ])
+            ->action(function (array $data, Schema $schema, ImportTuitionPaymentAsCollection $import): void {
+                Gate::forUser(Auth::user())->authorize('create', CollectionBatch::class);
+
+                $payment = StudentTuitionPayment::query()->find($data['payment_id'] ?? null);
+
+                if (! $payment instanceof StudentTuitionPayment) {
+                    Notification::make()->title('Nothing to reconcile')->body('That payment is no longer available to reconcile.')->danger()->send();
+
+                    return;
+                }
+
+                try {
+                    $batch = $import->handle($this->actor(), $payment, (string) Str::uuid());
+                } catch (ValidationException $exception) {
+                    $this->reportActionValidation($exception, $schema);
+                }
+
+                Notification::make()->title('Payment reconciled')
+                    ->body('Collection #'.$batch->id.' awaits a different authorized reviewer. The money was already in the treasury; nothing new arrived and no payment was authorized.')
+                    ->success()
+                    ->send();
+            });
+    }
+
+    /**
+     * Settled movements awaiting reconciliation, in the payer's terms.
+     *
+     * @return array<string, string>
+     */
+    private function reconcilablePaymentOptions(): array
+    {
+        $treasury = (string) config('lepton.arc.treasury');
+
+        return app(ImportTuitionPaymentAsCollection::class)
+            ->eligiblePayments($treasury)
+            ->limit(50)
+            ->get()
+            ->mapWithKeys(fn (StudentTuitionPayment $payment): array => [
+                (string) $payment->getKey() => sprintf(
+                    '%s — student %d, %s',
+                    $payment->amount(),
+                    $payment->student_id,
+                    $payment->executed_at->utc()->format('j M Y H:i').' UTC',
+                ),
+            ])
+            ->all();
+    }
+
+    /**
+     * What the reviewer is about to approve, in exact units.
+     *
+     * The held-back overpayment is shown separately rather than folded into the
+     * spendable figure, because the two are not the same promise: one is
+     * receipts, the other is money owed back to a student.
+     */
+    private function paymentReconciliationDetail(mixed $paymentId): string
+    {
+        if (! is_numeric($paymentId)) {
+            return 'Choose a payment to see its exact amounts.';
+        }
+
+        $payment = StudentTuitionPayment::query()->find((int) $paymentId);
+
+        if (! $payment instanceof StudentTuitionPayment) {
+            return 'Choose a payment to see its exact amounts.';
+        }
+
+        $held = $payment->overpayment_base_units > 0
+            ? ' Held back as a student overpayment: '.$payment->overpayment().'.'
+            : '';
+
+        return 'Received by the treasury: '.$payment->amount()
+            .'. Applied to tuition: '.$payment->applied().'.'.$held
+            .' Reconcile rather than recording it again.';
     }
 
     /** @return list<Step> */

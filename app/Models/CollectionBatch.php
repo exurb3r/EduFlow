@@ -20,6 +20,7 @@ use Throwable;
  * @property string $capture_key
  * @property int $organization_id
  * @property int $prepared_by
+ * @property int|null $student_tuition_payment_id
  * @property string $source_stream
  * @property string $source_reference
  * @property string $source_document_digest
@@ -32,13 +33,23 @@ use Throwable;
  * @property string $snapshot_digest
  * @property Carbon $created_at
  * @property-read User|null $preparer
+ * @property-read StudentTuitionPayment|null $tuitionPayment
  * @property-read Collection<int, CollectionBatchReview> $reviews
  * @property-read Collection<int, FinanceWorkflowRun> $workflowRuns
  */
 class CollectionBatch extends Model
 {
-    protected $fillable = ['capture_key', 'organization_id', 'prepared_by', 'source_stream', 'source_reference', 'source_document_digest',
-        'currency', 'received_minor_units', 'restricted_minor_units', 'collected_from', 'collected_until', 'snapshot', 'snapshot_digest'];
+    /**
+     * The channel reserved for receipts reconciled from a verified movement.
+     *
+     * Staff capture refuses it, so a cashier can never hand-type a digital
+     * receipt and present a chain settlement as an independent cash arrival.
+     */
+    public const string TUITION_PORTAL_STREAM = 'student-portal.tuition';
+
+    protected $fillable = ['capture_key', 'organization_id', 'prepared_by', 'student_tuition_payment_id', 'source_stream',
+        'source_reference', 'source_document_digest', 'currency', 'received_minor_units', 'restricted_minor_units',
+        'collected_from', 'collected_until', 'snapshot', 'snapshot_digest'];
 
     #[\Override]
     protected static function booted(): void
@@ -82,6 +93,35 @@ class CollectionBatch extends Model
         return $this->belongsTo(User::class, 'prepared_by');
     }
 
+    /**
+     * The verified movement this receipt reconciles, when there is one.
+     *
+     * The foreign key is named explicitly because `belongsTo` otherwise derives
+     * it from this method's name (`tuition_payment_id`), which is not the
+     * column — and the relation would silently resolve to null.
+     *
+     * @return BelongsTo<StudentTuitionPayment, $this>
+     */
+    public function tuitionPayment(): BelongsTo
+    {
+        return $this->belongsTo(StudentTuitionPayment::class, 'student_tuition_payment_id');
+    }
+
+    /**
+     * Whether this receipt's evidence came from a chain movement rather than a
+     * staff attestation.
+     *
+     * Reviewers read this to know which basis they are approving: a movement is
+     * machine evidence of settlement, while a cashier upload is an attestation.
+     * Neither is a bank balance confirmation.
+     */
+    public function isMovementSourced(): bool
+    {
+        // Parenthesised deliberately: `??` binds tighter than `===`, so an
+        // unparenthesised comparison here would silently answer false always.
+        return ($this->snapshot['evidence_origin'] ?? null) === 'verified_chain_movement';
+    }
+
     public function getCollectedFromAttribute(string $value): Carbon
     {
         return Carbon::parse($value, 'UTC');
@@ -121,10 +161,68 @@ class CollectionBatch extends Model
                 && ($s['collected_until'] ?? null) === $this->collected_until->utc()->toIso8601String()
                 && $this->collected_from->lt($this->collected_until)
                 && is_string($s['cash_evidence_reference'] ?? null) && trim($s['cash_evidence_reference']) !== ''
+                && $this->hasValidMovementLink($s)
                 && hash_equals($this->snapshot_digest, PaymentIntent::digest($s));
         } catch (Throwable) {
             return false;
         }
+    }
+
+    /**
+     * A receipt that claims chain evidence must still resolve to that movement.
+     *
+     * The digest is derived from the payment, so a snapshot claiming one
+     * movement while linking another cannot pass: the re-derived digest has to
+     * match both the stored one and the payment's own fields. A receipt with no
+     * movement claim needs no link, which is what keeps every cashier-typed
+     * receipt working exactly as it did.
+     *
+     * @param  array<string, mixed>  $snapshot
+     */
+    private function hasValidMovementLink(array $snapshot): bool
+    {
+        $origin = $snapshot['evidence_origin'] ?? 'staff_attestation';
+
+        if ($origin === 'staff_attestation') {
+            return $this->student_tuition_payment_id === null;
+        }
+
+        if ($origin !== 'verified_chain_movement' || $this->student_tuition_payment_id === null) {
+            return false;
+        }
+
+        $payment = StudentTuitionPayment::query()->find($this->student_tuition_payment_id);
+
+        return $payment instanceof StudentTuitionPayment
+            && $payment->isReal()
+            && ($snapshot['movement']['request_key'] ?? null) === $payment->request_key
+            && ($snapshot['movement']['tx_hash'] ?? null) === $payment->tx_hash
+            && ($snapshot['movement']['amount_base_units'] ?? null) === $payment->amount_base_units
+            && ($snapshot['movement']['settlement_verified_at'] ?? null) === $payment->executed_at->utc()->toIso8601String()
+            && $this->source_document_digest === self::movementDigest($payment);
+    }
+
+    /**
+     * The evidence fingerprint for one verified movement.
+     *
+     * Derived rather than uploaded, and from the movement's own identifying
+     * fields, which makes it deterministic: re-importing the same payment
+     * produces the same fingerprint and is refused as a duplicate, while two
+     * different movements never collide. It also occupies the existing
+     * document-digest slot, so the capture-time duplicate check catches a
+     * second receipt for the same settlement without any new rule.
+     */
+    public static function movementDigest(StudentTuitionPayment $payment): string
+    {
+        return hash('sha256', implode("\x1f", [
+            'student_tuition_payment',
+            (string) $payment->getKey(),
+            strtolower((string) $payment->request_key),
+            strtolower((string) $payment->tx_hash),
+            (string) $payment->amount_base_units,
+            strtolower((string) $payment->payer_address),
+            strtolower((string) $payment->recipient_address),
+        ]));
     }
 
     /** @param array<string, mixed> $snapshot */
