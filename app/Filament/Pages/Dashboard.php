@@ -4,100 +4,94 @@ declare(strict_types=1);
 
 namespace App\Filament\Pages;
 
-use App\Services\CircleWalletService;
+use App\Filament\Widgets\AdoptionActivityChart;
+use App\Filament\Widgets\AgentActivityFeedWidget;
+use App\Filament\Widgets\InstallationReadinessWidget;
+use App\Filament\Widgets\LeptonNetworkWidget;
+use App\Filament\Widgets\TreasuryOverviewWidget;
 use App\Services\InstallationInstitution;
 use App\Services\LeptonTreasuryService;
-use Filament\Actions\Action;
-use Filament\Forms\Components\TextInput;
-use Filament\Notifications\Notification;
+use BackedEnum;
+use Filament\Facades\Filament;
 use Filament\Pages\Dashboard as BaseDashboard;
 use Filament\Support\Icons\Heroicon;
-use Illuminate\Support\Str;
+use Filament\Widgets\AccountWidget;
+use Filament\Widgets\Widget;
 
+/**
+ * Installation and operations console for the super administrator.
+ *
+ * This panel governs the instance — identity, rail binding, staff, providers,
+ * settings — and deliberately does not move money. The cashier, accounting
+ * and supervisor workflow lives in the finance panel, so the two never blur
+ * into one surface that looks equally safe to click from.
+ */
 class Dashboard extends BaseDashboard
 {
-    protected static string|\BackedEnum|null $navigationIcon = Heroicon::Home;
+    protected static string|BackedEnum|null $navigationIcon = Heroicon::OutlinedHome;
+
+    protected static ?string $navigationLabel = 'Overview';
+
+    protected static ?string $title = 'Installation & operations';
 
     #[\Override]
-    public function getTitle(): string
+    public function getSubheading(): ?string
     {
-        return 'EduFlow AI — Autonomous Financial Operator';
-    }
+        $institution = app(InstallationInstitution::class)->current();
 
-    #[\Override]
-    protected function getHeaderActions(): array
-    {
-        return [
-            Action::make('receiveRevenue')
-                ->label('Record Tuition Revenue (+10,000 USDC)')
-                ->icon('heroicon-m-arrow-down-tray')
-                ->color('success')
-                ->requiresConfirmation()
-                ->modalHeading('Record incoming tuition revenue')
-                ->modalDescription('Credits the EduFlow ledger for an incoming tuition batch. This is a ledger entry only: no on-chain transfer is made, so the transaction is stored without a tx hash.')
-                ->schema([
-                    TextInput::make('amount')
-                        ->label('Amount (USDC)')
-                        ->numeric()
-                        ->default(10000)
-                        ->required(),
-                ])
-                ->action(function (CircleWalletService $walletService, array $data): void {
-                    $wallet = app(InstallationInstitution::class)->current()?->primaryWallet();
+        if ($institution === null) {
+            return 'Institution context unavailable. Run php artisan eduflow:install; data is never selected by row order.';
+        }
 
-                    if (! $wallet) {
-                        Notification::make()->title('Organization wallet not found')->danger()->send();
+        $status = app(LeptonTreasuryService::class)->status($institution->primaryWallet());
 
-                        return;
-                    }
-
-                    $amount = (float) $data['amount'];
-                    $reference = 'inbound-'.Str::uuid();
-
-                    $tx = $walletService->receiveRevenue($wallet, $amount, $reference, 'Tuition Revenue Deposit');
-
-                    Notification::make()
-                        ->title('Revenue recorded in the EduFlow ledger')
-                        ->body('+'.number_format($amount, 2).' USDC credited locally. Ledger treasury: '.number_format($wallet->fresh()->balance, 2).' USDC. Reference: '.$reference.'. No on-chain transfer was made; sync from Arc to reconcile.')
-                        ->success()
-                        ->persistent()
-                        ->send();
-
-                    $this->reportChainDrift();
-                }),
-        ];
+        return sprintf(
+            '%s · %s driver on %s %s%s · finance supervision: %s',
+            $institution->name,
+            $status['driver'],
+            strtoupper((string) $status['chain']),
+            (string) $status['chain_id'],
+            $status['is_fake'] ? ' · FAKE DRIVER' : '',
+            Filament::getPanel('finance')->getUrl(),
+        );
     }
 
     /**
-     * Surface ledger-vs-chain divergence after any operation, so operations
-     * staff can never mistake a local credit for settled funds.
+     * Explicit rather than inherited: without this the panel renders every
+     * registered widget, so an unrelated plugin widget can appear beside
+     * settlement figures that operators will read as authoritative.
+     *
+     * @return array<class-string<Widget>>
      */
-    private function reportChainDrift(): void
+    #[\Override]
+    public function getWidgets(): array
     {
-        $wallet = app(InstallationInstitution::class)->current()?->primaryWallet();
+        return [
+            InstallationReadinessWidget::class,
+            AdoptionActivityChart::class,
+            LeptonNetworkWidget::class,
+            TreasuryOverviewWidget::class,
+            AgentActivityFeedWidget::class,
+            AccountWidget::class,
+        ];
+    }
 
-        if (! $wallet) {
-            return;
-        }
+    /** @return int|array<string, int|null> */
+    #[\Override]
+    public function getColumns(): int|array
+    {
+        return ['default' => 1, 'lg' => 2, 'xl' => 3];
+    }
 
-        $chain = app(LeptonTreasuryService::class)->status($wallet);
-
-        if (! $chain['live_available']) {
-            return;
-        }
-
-        if ($chain['in_sync'] === false) {
-            Notification::make()
-                ->title('Ledger and chain differ')
-                ->body(sprintf(
-                    'EduFlow ledger %s USDC vs live Arc %s USDC (drift %s USDC). Use "Sync from chain" on the Arc Settlement Network panel to reconcile.',
-                    number_format($chain['ledger_balance'], 2),
-                    number_format($chain['onchain_balance'], 2),
-                    number_format($chain['drift'], 2),
-                ))
-                ->warning()
-                ->persistent()
-                ->send();
-        }
+    /**
+     * The legacy autonomous cycle writes a ledger row without touching the
+     * chain, which is the fabricated-receipt pattern the pilot contract
+     * forbids. Recorded receipts belong in cashier collection batches, which
+     * require independent review before they can fund anything.
+     */
+    #[\Override]
+    protected function getHeaderActions(): array
+    {
+        return [];
     }
 }

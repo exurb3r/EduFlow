@@ -1,9 +1,13 @@
 ---
 paths:
   - 'app/Services/StudentWallet*.php, app/Services/CircleAgentWalletCli.php, app/Console/Commands/*StudentWallet*.php, database/migrations/*student_wallet*.php, app/Models/StudentWallet*.php'
+  - app/Models/PaymentSubmissionOutbox.php
 ---
 
 # Models
+
+## `submitted` is open but never re-dispatchable
+OPEN_STATES means 'work still owed'; DISPATCHABLE_STATES means 'a submission worker may pick this up'. `submitted` is deliberately in the first and not the second: settlement is unproven so capacity stays held, but the payment was already sent to the rail and handing the entry back to a worker is a double submission. Open does not mean unsent.
 
 ## Student wallet generation uses unwrapped Circle verbs and spends a capped slot
 `circle wallet create` and `circle wallet fund` are the two verbs Lepton does not wrap — run them through app/Services/CircleAgentWalletCli.php, which uses the package's CliRunner (argv, never a shell string) and is bound scoped in AppServiceProvider so tests substitute a fake.

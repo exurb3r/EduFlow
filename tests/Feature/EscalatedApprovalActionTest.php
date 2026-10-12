@@ -146,8 +146,10 @@ test('finance officer approves remainder through the panel action', function ():
     $this->actingAs($this->officer);
     $request = $request->fresh();
 
-    expect($this->wallet->fresh()->balance)->toBe(25320.00)
-        ->and($this->fund->fresh()->balance_base_units)->toBe(9900_000000);
+    // The agent proposed this payout but did not make it; only the officer's
+    // approval moves funds, and only the amount actually approved.
+    expect($this->wallet->fresh()->balance)->toBe(25420.00)
+        ->and($this->fund->fresh()->balance_base_units)->toBe(10000_000000);
 
     Livewire::test(ListAssistanceRequests::class)
         ->assertTableActionVisible('approve_escalated', record: $request)
@@ -158,9 +160,11 @@ test('finance officer approves remainder through the panel action', function ():
     $request = $request->fresh();
     $decision = $request->latestAgentDecision();
 
+    // The agent proposed 150 but paid none of it. Only the officer's approval
+    // moves funds, and only the escalated portion it actually covers.
     expect($request->status instanceof AssistanceStatus ? $request->status->value : $request->status)->toBe(AssistanceStatus::RESOLVED->value)
-        ->and($this->wallet->fresh()->balance)->toBe(25270.00)
-        ->and($this->fund->fresh()->balance_base_units)->toBe(9850_000000)
+        ->and($this->wallet->fresh()->balance)->toBe(25370.00)
+        ->and($this->fund->fresh()->balance_base_units)->toBe(9950_000000)
         ->and($decision->approved_amount)->toBe(150.00)
         ->and(Approval::where('agent_decision_id', $decision->id)->value('status'))->toBe('approved');
 
@@ -168,9 +172,11 @@ test('finance officer approves remainder through the panel action', function ():
         ->where('reference_id', $request->id)
         ->get();
 
-    expect($settlement)->toHaveCount(2)
-        ->and($settlement->sum('amount'))->toBe(150.00)
-        ->and($settlement->where('amount', 50.00)->first()->metadata['human_override'] ?? null)->toBeTrue();
+    // Exactly one settlement, the one the officer authorized. Before this
+    // change there were two: an automatic 100 and a human-approved 50.
+    expect($settlement)->toHaveCount(1)
+        ->and($settlement->sum('amount'))->toBe(50.00)
+        ->and($settlement->first()->metadata['human_override'] ?? null)->toBeTrue();
 });
 
 test('rejecting the remainder closes the request without moving more funds', function (): void {
@@ -188,9 +194,11 @@ test('rejecting the remainder closes the request without moving more funds', fun
     $request = $request->fresh();
     $decision = $request->latestAgentDecision();
 
+    // Rejecting moves nothing at all: the agent proposed a payout and neither
+    // the proposal nor the rejection touched the treasury.
     expect($request->status instanceof AssistanceStatus ? $request->status->value : $request->status)->toBe(AssistanceStatus::CLOSED->value)
-        ->and($this->wallet->fresh()->balance)->toBe(25320.00)
-        ->and($this->fund->fresh()->balance_base_units)->toBe(9900_000000)
+        ->and($this->wallet->fresh()->balance)->toBe(25420.00)
+        ->and($this->fund->fresh()->balance_base_units)->toBe(10000_000000)
         ->and($decision->status)->toBe('rejected')
         ->and(Approval::where('agent_decision_id', $decision->id)->value('status'))->toBe('rejected');
 });

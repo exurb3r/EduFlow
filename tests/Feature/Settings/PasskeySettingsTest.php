@@ -25,7 +25,7 @@ test('security page exposes the user passkeys to the front end', function (): vo
         ->get(route('security.edit'))
         ->assertOk();
 
-    $passkeys = $response->original->getData()['page']['props']['passkeys'];
+    $passkeys = $response->viewData('page')['props']['passkeys'];
 
     expect($passkeys)->toHaveCount(2);
 
@@ -45,7 +45,7 @@ test('security page returns an empty passkeys list when the user has none', func
         ->get(route('security.edit'))
         ->assertOk();
 
-    $passkeys = $response->original->getData()['page']['props']['passkeys'];
+    $passkeys = $response->viewData('page')['props']['passkeys'];
 
     expect($passkeys)->toBe([]);
 });
@@ -57,6 +57,6 @@ test('profile page does not expose passkeys', function (): void {
         ->get(route('profile.edit'))
         ->assertOk();
 
-    expect($response->original->getData()['page']['props'])
+    expect($response->viewData('page')['props'])
         ->not->toHaveKey('passkeys');
 });

@@ -1,0 +1,47 @@
+<?php
+
+/**
+ * The fluent setters a Mockery expectation exposes at runtime.
+ *
+ * `Mockery::mock()->shouldReceive()` returns a `CompositeExpectation`, which
+ * forwards every configuration call to the expectations it composes rather than
+ * declaring them, so static analysis sees `andReturnUsing()` and friends as
+ * undefined. They do exist at runtime -- `CompositeExpectation::__call()`
+ * dispatches them -- and this declares the set Mockery itself forwards,
+ * matching `Mockery\Expectation`'s public API exactly.
+ */
+
+namespace Mockery;
+
+use Closure;
+use Exception;
+use Throwable;
+
+/**
+ * @method $this andReturn(mixed ...$args)
+ * @method $this andReturnArg(int $index)
+ * @method $this andReturnFalse()
+ * @method $this andReturnNull()
+ * @method $this andReturns(mixed ...$args)
+ * @method $this andReturnSelf()
+ * @method $this andReturnTrue()
+ * @method $this andReturnUndefined()
+ * @method $this andReturnUsing(callable ...$args)
+ * @method $this andReturnValues(array<mixed> $values)
+ * @method $this andSet(string $name, mixed ...$values)
+ * @method $this andThrow(Throwable|string $exception, string $message = '', int $code = 0, ?Exception $previous = null)
+ * @method $this andThrowExceptions(array<Throwable> $exceptions)
+ * @method $this andThrows(Throwable|string $exception, string $message = '', int $code = 0, ?Exception $previous = null)
+ * @method $this andYield(mixed ...$args)
+ * @method $this never()
+ * @method $this once()
+ * @method $this times(?int $limit = null)
+ * @method $this with(mixed ...$args)
+ * @method $this withAnyArgs()
+ * @method $this withArgs(array<mixed>|Closure $argsOrClosure)
+ * @method $this withNoArgs()
+ * @method $this withSomeOfArgs(mixed ...$expectedArgs)
+ */
+class CompositeExpectation
+{
+}

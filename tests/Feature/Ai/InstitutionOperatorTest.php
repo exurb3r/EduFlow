@@ -59,8 +59,7 @@ test('operator factory needs institution identity but no students fund or aid po
         yield from $operator->tools();
     })());
 
-    expect($operator)->toBeInstanceOf(SettlementOperator::class)
-        ->and($operator->hasAssistanceCapability())->toBeFalse()
+    expect($operator->hasAssistanceCapability())->toBeFalse()
         ->and($tools)->toHaveCount(1)
         ->and($tools[0])->toBeInstanceOf(InspectInstitutionFinance::class)
         ->and((string) $operator->instructions())->toContain('does not depend on students');

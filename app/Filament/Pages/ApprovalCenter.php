@@ -25,11 +25,11 @@ class ApprovalCenter extends Page implements HasTable
 
     protected static string|BackedEnum|null $navigationIcon = Heroicon::CheckBadge;
 
-    protected static string|UnitEnum|null $navigationGroup = 'Financial Operations';
+    protected static string|UnitEnum|null $navigationGroup = 'Finance records';
 
-    protected static ?string $navigationLabel = 'Approval Center';
+    protected static ?string $navigationLabel = 'Legacy Approval Center';
 
-    protected static ?string $title = 'Approval Center';
+    protected static ?string $title = 'Legacy Approval Center';
 
     protected static ?int $navigationSort = 2;
 

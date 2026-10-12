@@ -19,10 +19,19 @@ final readonly class FundingWindowContext
 {
     public function __construct(private DepartmentBudgetPlanner $planner) {}
 
-    /** @param array<string, mixed> $balance
+    /**
+     * Rebuild a window's evidence from first principles.
+     *
+     * `requireCurrent` re-runs this against a stored window and compares
+     * digests, so this method must describe the snapshot *exactly* — including
+     * rollover lineage, which is why `$supersedes` is a parameter rather than
+     * something a caller appends afterwards. A field added outside here would
+     * silently invalidate every window that carried it.
+     *
+     * @param  array<string, mixed>  $balance
      * @return array<string, mixed>
      */
-    public function build(User $actor, BudgetSnapshot $budget, Wallet $wallet, array $balance, string $key, string $validUntil): array
+    public function build(User $actor, BudgetSnapshot $budget, Wallet $wallet, array $balance, string $key, string $validUntil, ?FundingWindow $supersedes = null): array
     {
         $this->planner->handle($actor, $budget);
         $activation = FinancePolicyActivation::current($budget->organization_id);
@@ -53,13 +62,25 @@ final readonly class FundingWindowContext
             throw ValidationException::withMessages(['funding' => 'Protected cash and approved allocation leave no non-negative bounded funding capacity.']);
         }
 
-        return ['schema_version' => 1, 'purpose' => 'department_funding_window', 'request_key' => $key,
+        $snapshot = ['schema_version' => 1, 'purpose' => 'department_funding_window', 'request_key' => $key,
             'institution_id' => $budget->organization_id, 'budget_snapshot_id' => $budget->id, 'budget_snapshot_digest' => $budget->snapshot_digest,
             'budget_id' => $budget->budget_id, 'wallet_id' => $wallet->id, 'wallet_fingerprint' => self::walletFingerprint($wallet),
             'prepared_by' => $actor->id, 'currency' => 'USDC', 'policy_activation_id' => $activation->id,
             'policy_activation_digest' => $activation->activation_digest, 'balance' => $balance, 'valid_until' => $validUntil,
             'capacity' => ['budget_base_units' => $headroom['budget_minor_units'], 'cash_base_units' => (string) $cash,
                 'protected_base_units' => (string) $protected], 'exclusive_treasury_attested' => true];
+
+        // A renewal names what it replaces. The block lives inside the digest
+        // rather than outside it, so a window that lies about its lineage is a
+        // window whose evidence does not verify.
+        if ($supersedes instanceof FundingWindow) {
+            $snapshot['supersedes'] = ['funding_window_id' => $supersedes->id,
+                'snapshot_digest' => $supersedes->snapshot_digest,
+                'valid_until' => $supersedes->snapshot['valid_until'] ?? null,
+                'rollover_reason' => 'Predecessor window expired; cash re-observed for the reviewed allocation. Reserved capacity is unchanged.'];
+        }
+
+        return $snapshot;
     }
 
     /** @param array<string, mixed> $balance
@@ -74,7 +95,7 @@ final readonly class FundingWindowContext
         $budget = BudgetSnapshot::query()->where('organization_id', $window->organization_id)->findOrFail($window->budget_snapshot_id);
         /** @var Wallet $wallet */
         $wallet = Wallet::query()->where('organization_id', $window->organization_id)->findOrFail($window->wallet_id);
-        $current = $this->build($actor, $budget, $wallet, $window->snapshot['balance'], $window->request_key, $window->snapshot['valid_until']);
+        $current = $this->build($actor, $budget, $wallet, $window->snapshot['balance'], $window->request_key, $window->snapshot['valid_until'], $window->supersedes);
         $current['prepared_by'] = $window->prepared_by;
         if (! hash_equals($window->snapshot_digest, PaymentIntent::digest($current))
             || ($balance['chain'] ?? null) !== $current['balance']['chain'] || ($balance['chain_id'] ?? null) !== $current['balance']['chain_id']

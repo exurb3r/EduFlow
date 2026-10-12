@@ -10,6 +10,7 @@ use Database\Factories\PaymentIntentFactory;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
+use Illuminate\Database\Eloquent\Relations\HasOne;
 use Illuminate\Support\Str;
 use JsonException;
 use LogicException;
@@ -45,6 +46,13 @@ use TypeError;
  * @property string $provider_idempotency_key
  * @property string $snapshot_digest
  * @property array<string, mixed> $snapshot
+ * @property-read Invoice|null $invoice
+ * @property-read User|null $preparer
+ * @property-read FinancePolicyVersion|null $financePolicyVersion
+ * @property-read VendorDestinationVersion|null $vendorDestinationVersion
+ * @property-read InvoiceVersionReview|null $invoiceVersionReview
+ * @property-read PaymentReservation|null $reservation
+ * @property-read PaymentAuthorization|null $authorization
  */
 class PaymentIntent extends Model
 {
@@ -376,5 +384,49 @@ class PaymentIntent extends Model
     public function preparer(): BelongsTo
     {
         return $this->belongsTo(User::class, 'prepared_by');
+    }
+
+    /** @return BelongsTo<FinancePolicyVersion, $this> */
+    public function financePolicyVersion(): BelongsTo
+    {
+        return $this->belongsTo(FinancePolicyVersion::class, 'finance_policy_version_id');
+    }
+
+    /** @return BelongsTo<VendorDestinationVersion, $this> */
+    public function vendorDestinationVersion(): BelongsTo
+    {
+        return $this->belongsTo(VendorDestinationVersion::class, 'vendor_destination_version_id');
+    }
+
+    /** @return BelongsTo<InvoiceVersionReview, $this> */
+    public function invoiceVersionReview(): BelongsTo
+    {
+        return $this->belongsTo(InvoiceVersionReview::class, 'invoice_version_review_id');
+    }
+
+    /**
+     * At most one hold may exist per intent, so this is the inverse of the
+     * reservation's belongsTo rather than a collection.
+     *
+     * @return HasOne<PaymentReservation, $this>
+     */
+    public function reservation(): HasOne
+    {
+        return $this->hasOne(PaymentReservation::class, 'payment_intent_id');
+    }
+
+    /**
+     * The authorization recorded for this intent, if any.
+     *
+     * Distinct from the reservation's own authorization relation: the approval
+     * a reviewer records names both the intent and the exact hold, and the
+     * dashboards read it from the intent so a superseded hold cannot imply its
+     * predecessor was ever approved.
+     *
+     * @return HasOne<PaymentAuthorization, $this>
+     */
+    public function authorization(): HasOne
+    {
+        return $this->hasOne(PaymentAuthorization::class, 'payment_intent_id');
     }
 }

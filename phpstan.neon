@@ -1,12 +1,27 @@
 includes:
     - ./vendor/phpstan/phpstan/conf/bleedingEdge.neon
+    - ./vendor/pestphp/pest-plugin-phpstan/extension.neon
     - phpstan-baseline.neon
+
+services:
+    # Eloquent\Builder forwards orderBy(), lockForUpdate() and friends to its
+    # query builder through __call(), which loses the model type on the chain.
+    -
+        class: App\Services\EloquentBuilderForwardingExtension
+        tags:
+            - phpstan.broker.dynamicMethodReturnTypeExtension
 
 parameters:
     level: 5
     # LeptonCliException is declared alongside CliRunner, outside its PSR-4 path.
     scanFiles:
         - vendor/yukazakiri/lepton-agent/src/Support/CliRunner.php
+    # Inertia's page assertions are runtime macros on the test response, and
+    # Mockery's expectation forwards its fluent setters at runtime. Neither has
+    # a method reflection, so their signatures have to be declared here.
+    stubFiles:
+        - stubs/inertia-test-response.stub
+        - stubs/mockery-composite-expectation.stub
     paths:
         - app
         - routes

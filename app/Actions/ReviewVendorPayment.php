@@ -22,12 +22,13 @@ use Illuminate\Support\Facades\Validator;
 use Illuminate\Support\Str;
 use Illuminate\Validation\Rule;
 use Illuminate\Validation\ValidationException;
+use Ramsey\Uuid\Uuid;
 use SensitiveParameter;
 
 final readonly class ReviewVendorPayment
 {
     public function __construct(private InstallationInstitution $institutions, private ReservedPaymentContext $reservations,
-        private PaymentReviewMfa $mfa) {}
+        private PaymentReviewMfa $mfa, private EnqueuePaymentSubmission $submissions) {}
 
     /** @return array<string, mixed> */
     public static function inputRules(): array
@@ -147,7 +148,32 @@ final readonly class ReviewVendorPayment
                     'can_execute' => false, 'payments_submitted' => 0])
                 ->log('Independent MFA-backed payment review recorded; no transfer or reservation release');
 
+            if ($data['decision'] === 'approve_payment' && ($authorization->evidence()['payment_approved'] ?? false) === true) {
+                /**
+                 * Written inside this same transaction on purpose. An approved
+                 * payment must never exist without a durable obligation to
+                 * submit it, so the commit-to-broker gap is closed by
+                 * construction rather than by a retry that might not come.
+                 *
+                 * A simulated approval is deliberately not queued: fake-driver
+                 * evidence is rehearsal, and rehearsal must never become work
+                 * a rail could act on.
+                 */
+                $this->submissions->handle($authorization, self::submissionKey($authorization));
+            }
+
             return $authorization;
         }, 3);
+    }
+
+    /**
+     * A deterministic submission identity derived from the authorization.
+     *
+     * Replaying the same review recomputes the same UUID, so a retry cannot
+     * mint a second owed payment for one authorization.
+     */
+    public static function submissionKey(PaymentAuthorization $authorization): string
+    {
+        return Uuid::uuid5(Uuid::NAMESPACE_URL, 'eduflow:payment-submission:'.$authorization->id.':'.$authorization->snapshot_digest)->toString();
     }
 }

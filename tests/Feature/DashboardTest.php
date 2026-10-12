@@ -3,42 +3,8 @@
 use App\Enums\AssistanceStatus;
 use App\Models\AssistanceRequest;
 use App\Models\User;
-use Illuminate\Notifications\Notification;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Collection;
-
-/**
- * Minimal database-channel notification so tests can seed real rows without
- * committing a notification class to app/.
- *
- * @param  array<string, mixed>  $data
- */
-function makeDatabaseNotification(array $data): Notification
-{
-    return new class($data) extends Notification
-    {
-        /**
-         * @param  array<string, mixed>  $data
-         */
-        public function __construct(private readonly array $data) {}
-
-        /**
-         * @return list<string>
-         */
-        public function via(object $notifiable): array
-        {
-            return ['database'];
-        }
-
-        /**
-         * @return array<string, mixed>
-         */
-        public function toArray(object $notifiable): array
-        {
-            return $this->data;
-        }
-    };
-}
 
 test('guests are redirected to the login page', function (): void {
     $response = $this->get(route('dashboard'));

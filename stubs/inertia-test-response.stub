@@ -1,0 +1,26 @@
+<?php
+
+/**
+ * Inertia's test-response assertions, declared for static analysis.
+ *
+ * Inertia registers these on `Illuminate\Testing\TestResponse` through
+ * `TestResponse::macro()` at boot, so no method reflection exists for them and
+ * every page assertion reads as a call to an undefined method. The signatures
+ * mirror `Inertia\Testing\TestResponseMacros` exactly, including that the
+ * page assertions return the response so an assertion chain still reads as one.
+ */
+
+namespace Illuminate\Testing;
+
+use Closure;
+
+/**
+ * @method $this assertInertia(?Closure $callback = null)
+ * @method $this assertInertiaFlash(string $key, mixed $expected = null)
+ * @method $this assertInertiaFlashMissing(string $key)
+ * @method array<string, mixed> inertiaPage()
+ * @method mixed inertiaProps(?string $propName = null)
+ */
+class TestResponse
+{
+}

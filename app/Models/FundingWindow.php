@@ -6,6 +6,7 @@ namespace App\Models;
 
 use Brick\Math\BigInteger;
 use Illuminate\Database\Eloquent\Model;
+use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Str;
 use LogicException;
@@ -20,13 +21,15 @@ use Throwable;
  * @property int $wallet_id
  * @property int $finance_policy_activation_id
  * @property int $prepared_by
+ * @property int|null $supersedes_funding_window_id
  * @property array<string, mixed> $snapshot
  * @property string $snapshot_digest
+ * @property-read FundingWindow|null $supersedes
  */
 class FundingWindow extends Model
 {
     protected $fillable = ['request_key', 'organization_id', 'budget_snapshot_id', 'budget_id', 'wallet_id',
-        'finance_policy_activation_id', 'prepared_by', 'snapshot', 'snapshot_digest'];
+        'finance_policy_activation_id', 'prepared_by', 'supersedes_funding_window_id', 'snapshot', 'snapshot_digest'];
 
     #[\Override]
     protected static function booted(): void
@@ -44,12 +47,30 @@ class FundingWindow extends Model
         });
     }
 
+    /** The window this one was rolled over from, if any. */
+    public function supersedes(): BelongsTo
+    {
+        return $this->belongsTo(self::class, 'supersedes_funding_window_id');
+    }
+
+    /** A window is usable only while its own recorded expiry is in the future. */
+    public function isExpired(): bool
+    {
+        try {
+            return Carbon::parse($this->snapshot['valid_until'])->lte(now());
+        } catch (Throwable) {
+            // Unreadable expiry is never treated as "still valid".
+            return true;
+        }
+    }
+
     /** @return array<string, string> */
     #[\Override]
     protected function casts(): array
     {
         return ['organization_id' => 'integer', 'budget_snapshot_id' => 'integer', 'budget_id' => 'integer', 'wallet_id' => 'integer',
-            'finance_policy_activation_id' => 'integer', 'prepared_by' => 'integer', 'snapshot' => 'array'];
+            'finance_policy_activation_id' => 'integer', 'prepared_by' => 'integer', 'supersedes_funding_window_id' => 'integer',
+            'snapshot' => 'array'];
     }
 
     public function hasValidSnapshot(): bool
@@ -85,7 +106,8 @@ class FundingWindow extends Model
             }
             $native = BigInteger::of($b['native_units']);
 
-            return in_array([$b['chain'] ?? null, $b['chain_id'] ?? null], [['ARC', 5042], ['ARC-TESTNET', 5042002]], true)
+            return $this->lineageIsSound($s)
+                && in_array([$b['chain'] ?? null, $b['chain_id'] ?? null], [['ARC', 5042], ['ARC-TESTNET', 5042002]], true)
                 && is_string($b['address'] ?? null) && preg_match('/^0x[0-9a-f]{40}$/D', $b['address']) === 1
                 && $b['address'] !== '0x'.str_repeat('0', 40)
                 && is_string($b['block_hash'] ?? null) && preg_match('/^0x[0-9a-f]{64}$/D', $b['block_hash']) === 1
@@ -99,6 +121,42 @@ class FundingWindow extends Model
         } catch (Throwable) {
             return false;
         }
+    }
+
+    /**
+     * Rollover lineage, bound into the same digest as the capacity it renews.
+     *
+     * A window either begins a chain or continues one, and it says which. The
+     * column and the snapshot block must agree: a mismatch means somebody
+     * edited one and not the other, which is what the digest exists to catch.
+     *
+     * Renewal is also not allowed to be a backdoor extension. The predecessor's
+     * recorded expiry must already be in the past, so a rollover can only
+     * replace a window that genuinely ended -- it can never prolong a live one.
+     * The 15-minute ceiling on the successor's own life is enforced separately,
+     * by the window context, against the fresh balance observation.
+     *
+     * @param  array<string, mixed>  $s
+     */
+    private function lineageIsSound(array $s): bool
+    {
+        $block = $s['supersedes'] ?? null;
+
+        if ($this->supersedes_funding_window_id === null) {
+            return $block === null;
+        }
+
+        if (! is_array($block)
+            || ($block['funding_window_id'] ?? null) !== $this->supersedes_funding_window_id
+            || $this->supersedes_funding_window_id <= 0
+            || $this->supersedes_funding_window_id === $this->id
+            || ! is_string($block['snapshot_digest'] ?? null)
+            || preg_match('/^[0-9a-f]{64}$/D', $block['snapshot_digest']) !== 1
+            || ! is_string($block['valid_until'] ?? null)) {
+            return false;
+        }
+
+        return Carbon::parse($block['valid_until'])->lte(now());
     }
 
     private function unsigned(mixed $value): bool

@@ -5,6 +5,8 @@ namespace App\Providers;
 use App\Features\FeatureRegistry;
 use App\Policies\SettlementApprovalPolicy;
 use App\Services\CircleAgentWalletCli;
+use App\Services\Payments\AsyncPaymentTransport;
+use App\Services\Payments\CircleAgentWalletTransport;
 use Carbon\CarbonImmutable;
 use Filament\Panel;
 use Illuminate\Support\Facades\Date;
@@ -31,6 +33,11 @@ class AppServiceProvider extends ServiceProvider
         $this->registerAiContracts();
         $this->registerApprovalPolicy();
         $this->registerCircleWalletCli();
+
+        // The asynchronous rail is resolved from the container so it can be
+        // substituted wholesale. Nothing about settlement should depend on
+        // shelling out to a real binary just to be exercised.
+        $this->app->scoped(AsyncPaymentTransport::class, fn (): AsyncPaymentTransport => CircleAgentWalletTransport::fromConfig());
     }
 
     /**

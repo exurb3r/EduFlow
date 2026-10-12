@@ -20,6 +20,8 @@ class DemoUsersSeeder extends Seeder
             throw new RuntimeException('Demo users may only be seeded in local or testing environments.');
         }
 
+        $this->call(RolesAndPermissionsSeeder::class);
+
         DB::transaction(function (): void {
             $adminRole = Role::query()->firstOrCreate(['name' => RoleEnums::SUPER_ADMIN->value, 'guard_name' => 'web']);
             $userRole = Role::query()->firstOrCreate(['name' => RoleEnums::USER->value, 'guard_name' => 'web']);

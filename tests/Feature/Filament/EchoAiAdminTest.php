@@ -376,15 +376,15 @@ test('provider failures return safe ARC errors and report server side', function
     $session = ChatSession::create(['user_id' => $this->admin->id]);
     $exception = new RuntimeException('sk-secret-provider-error');
     $resolver = Mockery::mock(new AiProviderResolver($settings));
-    $resolver->shouldReceive('resolve')->once()->andThrow($exception);
+    mockExpectation($resolver, 'resolve')->once()->andThrow($exception);
     $this->app->instance(AiProviderResolver::class, $resolver);
-    $this->mock(ExceptionHandler::class)->shouldReceive('report')->once()->with($exception);
+    mockExpectation($this->mock(ExceptionHandler::class), 'report')->once()->with($exception);
 
     $response = $this->postJson("/api/chats/{$session->uuid}/{$endpoint}", ['message' => 'Hello ARC']);
 
     if ($endpoint === 'messages') {
         $response->assertStatus(502)->assertJsonPath('message', AiSseResponse::ERROR_MESSAGE);
-        $content = $response->getContent();
+        $content = $response->baseResponse->getContent();
     } else {
         $response->assertSuccessful();
         $content = $response->streamedContent();
@@ -396,7 +396,7 @@ test('provider failures return safe ARC errors and report server side', function
 
 test('deferred stream failures hide exception details and report server side', function (): void {
     $exception = new RuntimeException('sk-secret-stream-error');
-    $this->mock(ExceptionHandler::class)->shouldReceive('report')->once()->with($exception);
+    mockExpectation($this->mock(ExceptionHandler::class), 'report')->once()->with($exception);
     $events = (function () use ($exception): Generator {
         yield 'Partial ARC response';
 

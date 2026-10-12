@@ -3,6 +3,9 @@
 declare(strict_types=1);
 
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Notifications\Notification;
+use Mockery\CompositeExpectation;
+use Mockery\MockInterface;
 use Tests\TestCase;
 
 /*
@@ -44,7 +47,59 @@ expect()->extend('toBeOne', fn () => $this->toBe(1));
 |
 */
 
-function something(): void
-{
-    // ..
+if (! function_exists('mockExpectation')) {
+    /**
+     * Narrow a Mockery expectation to the concrete class.
+     *
+     * `Mockery::mock()` reports `shouldReceive()` as `ExpectationInterface|
+     * HigherOrderMessage`, neither of which declares the fluent setters the
+     * tests actually use (`andReturnUsing()`, `andThrow()`, ...). Mockery
+     * always returns a `Mockery\CompositeExpectation` in practice, so this
+     * states it once instead of pretending the interface is richer than it is.
+     */
+    function mockExpectation(MockInterface $mock, string $method): CompositeExpectation
+    {
+        $expectation = $mock->shouldReceive($method);
+
+        if (! $expectation instanceof CompositeExpectation) {
+            throw new RuntimeException('Mockery returned an expectation that cannot be configured further.');
+        }
+
+        return $expectation;
+    }
+}
+
+if (! function_exists('makeDatabaseNotification')) {
+    /**
+     * Minimal database-channel notification so tests can seed real rows without
+     * committing a notification class to app/.
+     *
+     * @param  array<string, mixed>  $data
+     */
+    function makeDatabaseNotification(array $data): Notification
+    {
+        return new class($data) extends Notification
+        {
+            /**
+             * @param  array<string, mixed>  $data
+             */
+            public function __construct(private readonly array $data) {}
+
+            /**
+             * @return list<string>
+             */
+            public function via(object $notifiable): array
+            {
+                return ['database'];
+            }
+
+            /**
+             * @return array<string, mixed>
+             */
+            public function toArray(object $notifiable): array
+            {
+                return $this->data;
+            }
+        };
+    }
 }

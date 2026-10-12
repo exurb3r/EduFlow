@@ -12,8 +12,10 @@ use App\Actions\EnrollPaymentReviewer;
 use App\Actions\PrepareFundingWindow;
 use App\Actions\PrepareVendorDestination;
 use App\Actions\PrepareVendorPayment;
+use App\Actions\ReleaseReservedCapacity;
 use App\Actions\ReserveVendorPayment;
 use App\Actions\ReviewInvoiceVersion;
+use App\Actions\ReviewReservationRelease;
 use App\Actions\ReviewVendorPayment;
 use App\DTOs\Money;
 use App\Enums\CurrencyCode;
@@ -27,6 +29,7 @@ use App\Models\PaymentAuthorization;
 use App\Models\PaymentIntent;
 use App\Models\PaymentReservation;
 use App\Models\PaymentReviewerEnrollment;
+use App\Models\PaymentSubmissionOutbox;
 use App\Models\Student;
 use App\Models\Transaction;
 use App\Models\User;
@@ -43,6 +46,7 @@ use Illuminate\Support\Facades\Gate;
 use Illuminate\Support\Facades\RateLimiter;
 use Illuminate\Support\Str;
 use Illuminate\Validation\ValidationException;
+use Livewire\Features\SupportTesting\Testable;
 use Livewire\Livewire;
 use Mockery\Expectation;
 use PragmaRX\Google2FA\Google2FA;
@@ -59,6 +63,18 @@ use function Pest\Laravel\post;
 use function Pest\Laravel\postJson;
 use function Pest\Laravel\travel;
 use function Pest\Laravel\travelTo;
+
+/** Narrow a Livewire test handle to the page it booted, for computed-page access. */
+function paymentReviewsInstance(Testable $page): PaymentReviews
+{
+    $instance = $page->instance();
+
+    if (! $instance instanceof PaymentReviews) {
+        throw new RuntimeException('The Livewire test did not boot the payment review page.');
+    }
+
+    return $instance;
+}
 
 /** @return array<string, mixed> */
 function paymentAuthorizationContext(string $method = 'filament_app', bool $fake = false): array
@@ -196,6 +212,7 @@ test('independent MFA payment approval binds exact reserved amount without sendi
         ->and($authorization->evidence()['payment_approved'])->toBeTrue()->and($authorization->evidence()['can_execute'])->toBeFalse()
         ->and($authorization->evidence()['payments_submitted'])->toBe(0)->and($authorization->evidence()['current_execution_checks_required'])->toBeTrue()
         ->and($c['drafts'][0]->evidence()['approved'])->toBeTrue()->and($c['drafts'][0]->evidence()['can_execute'])->toBeFalse()
+        ->and($c['drafts'][0]->authorization?->id)->toBe($authorization->id)
         ->and(Gate::forUser($c['reviewer'])->allows('execute', $c['drafts'][0]))->toBeFalse()
         ->and($c['wallet']->fresh()->balance)->toBe(999999.0)->and($c['budget']->fresh()->remaining_amount)->toBe(999999.0)
         ->and(Invoice::query()->where('status', '!=', 'pending')->count())->toBe(0)
@@ -479,8 +496,8 @@ test('finance payment review page displays exact held evidence and records indep
     $c = paymentAuthorizationContext();
     Filament::setCurrentPanel(Filament::getPanel('finance'));
     actingAs($c['reviewer']);
-    get(PaymentReviews::getUrl(panel: 'finance'))->assertSuccessful()->assertSee('Payment review — execution disabled');
-    $page = Livewire::test(PaymentReviews::class)->assertSee('Reserved institution payments')->assertSee('25.000001 USDC');
+    get(PaymentReviews::getUrl(panel: 'finance'))->assertSuccessful()->assertSee('Approval is authority, not settlement.');
+    $page = Livewire::test(PaymentReviews::class)->assertSee('Payment review queue')->assertSee('25.000001 USDC');
     $page->__call('mountAction', [TestAction::make('viewPaymentEvidence')->table($c['hold'])]);
     $page->assertSet('mountedReservationDigest', $c['hold']->snapshot_digest)
         ->assertSet('mountedIntentDigest', $c['drafts'][0]->snapshot_digest);
@@ -534,4 +551,103 @@ test('failed HTML payment review never flashes password or MFA code into session
     actingAs($c['reviewer']);
     post(route('finance.payment-authorizations.store', $c['drafts'][0]), $input)->assertSessionHasErrors('reason')
         ->assertSessionMissing('_old_input.password')->assertSessionMissing('_old_input.mfa_code');
+});
+
+test('payment approval workspace reports historical decisions separately from awaiting review', function (string $decision, string $bucket): void {
+    $c = paymentAuthorizationContext();
+    $second = reserveSecondAuthorizationBill($c);
+    app(ReviewVendorPayment::class)->handle($c['reviewer'], $c['drafts'][0], paymentAuthorizationInput($c, $decision));
+    travel(4)->minutes();
+    $c['reviewer']->assignRole(Role::findOrCreate('super_admin', 'web'));
+    Filament::setCurrentPanel(Filament::getPanel('admin'));
+    actingAs($c['reviewer']);
+
+    $page = Livewire::test(PaymentReviews::class)
+        ->assertSee('Historical decisions, not current authority or settlement')
+        ->assertSee('Your reviewer setup')
+        ->assertSee('Account prerequisites met');
+    $overview = paymentReviewsInstance($page)->reviewOverview();
+    expect($overview['awaiting'])->toBe(1)->and($overview[$bucket])->toBe(1)->and($overview['released'])->toBe(0);
+    $page->__call('filterTable', ['review_status', 'awaiting']);
+    $page->__call('assertCanSeeTableRecords', [[$second]]);
+    $page->__call('assertCanNotSeeTableRecords', [[$c['hold']]]);
+    $page->__call('filterTable', ['review_status', $bucket]);
+    $page->__call('assertCanSeeTableRecords', [[$c['hold']]]);
+    $page->__call('assertCanNotSeeTableRecords', [[$second]]);
+    expect(Transaction::query()->count())->toBe(0);
+})->with([
+    ['approve_payment', 'approved'], ['hold_payment', 'held_or_rejected'], ['reject_payment', 'held_or_rejected'],
+]);
+
+test('payment approval workspace explains missing reviewer prerequisites without exposing a review action', function (string $case): void {
+    $c = paymentAuthorizationContext();
+    if ($case === 'permission') {
+        $c['reviewer']->revokePermissionTo('AuthorizePayment:PaymentIntent');
+    } elseif ($case === 'email') {
+        $c['reviewer']->forceFill(['email_verified_at' => null])->save();
+    } else {
+        $c['reviewer']->saveAppAuthenticationSecret(app(Google2FA::class)->generateSecretKey());
+    }
+    Filament::setCurrentPanel(Filament::getPanel('finance'));
+    actingAs($c['reviewer']);
+    $page = Livewire::test(PaymentReviews::class)->assertSee('Setup required')->assertSee('Reviewer setup required');
+    $page->__call('assertActionHidden', [TestAction::make('reviewReservedPayment')->table($c['hold'])]);
+    expect(paymentReviewsInstance($page)->reviewerReadiness()['ready'])->toBeFalse()
+        ->and(PaymentAuthorization::query()->count())->toBe(0)->and(Transaction::query()->count())->toBe(0);
+})->with(['permission', 'email', 'factor']);
+
+test('payment approval workspace excludes released capacity from awaiting reviews and preserves readable history', function (): void {
+    $c = paymentAuthorizationContext();
+    $proposer = User::factory()->create()->assignRole(Role::findOrCreate('admin', 'web'));
+    $proposal = app(ReleaseReservedCapacity::class)->handle($proposer, $c['hold'], (string) Str::uuid(), $c['hold']->snapshot_digest, 'Capacity no longer needed.');
+    app(ReviewReservationRelease::class)->handle($c['reviewer'], $proposal, $proposal->content_digest, 'approve_release', 'Capacity no longer needed.');
+    Filament::setCurrentPanel(Filament::getPanel('finance'));
+    actingAs($c['reviewer']);
+    $page = Livewire::test(PaymentReviews::class)->assertSee('Capacity released · history only');
+    expect(paymentReviewsInstance($page)->reviewOverview())->toBe(['awaiting' => 0, 'approved' => 0, 'held_or_rejected' => 0, 'released' => 1]);
+    $page->__call('assertActionHidden', [TestAction::make('reviewReservedPayment')->table($c['hold'])]);
+    $page->__call('mountAction', [TestAction::make('viewPaymentEvidence')->table($c['hold'])]);
+    $page->assertSet('mountedPaymentEvidence.reservation_state', 'Released — application capacity returned');
+    expect(PaymentAuthorization::query()->count())->toBe(0)->and(Transaction::query()->count())->toBe(0);
+});
+
+test('payment approval workspace fails closed when institution context becomes ambiguous', function (): void {
+    $c = paymentAuthorizationContext();
+    Organization::factory()->create();
+    config(['eduflow.institution_id' => $c['institution']->id]);
+    $c['reviewer']->assignRole(Role::findOrCreate('super_admin', 'web'));
+    Filament::setCurrentPanel(Filament::getPanel('admin'));
+    actingAs($c['reviewer']);
+    get(PaymentReviews::getUrl(panel: 'admin'))->assertForbidden();
+    expect(PaymentAuthorization::query()->count())->toBe(0);
+});
+
+test('payment approval workspace labels simulation approval as historical rather than network authority', function (): void {
+    $c = paymentAuthorizationContext(fake: true);
+    app(ReviewVendorPayment::class)->handle($c['reviewer'], $c['drafts'][0], paymentAuthorizationInput($c));
+    Filament::setCurrentPanel(Filament::getPanel('finance'));
+    actingAs($c['reviewer']);
+    $page = Livewire::test(PaymentReviews::class)->assertSee('Simulation only')
+        ->assertSee('Historical decisions, not current authority or settlement');
+    expect(paymentReviewsInstance($page)->reviewOverview()['approved'])->toBe(1)
+        ->and(PaymentAuthorization::query()->firstOrFail()->evidence()['payment_approved'])->toBeFalse()
+        ->and(PaymentSubmissionOutbox::query()->count())->toBe(0);
+});
+
+test('payment approval workspace explains maker checker separation even when account prerequisites are met', function (): void {
+    $c = paymentAuthorizationContext();
+    $c['maker']->givePermissionTo('AuthorizePayment:PaymentIntent');
+    $secret = app(Google2FA::class)->generateSecretKey();
+    $c['maker']->saveAppAuthenticationSecret($secret);
+    travel(31)->seconds();
+    app(EnrollPaymentReviewer::class)->handle($c['checker'], $c['maker'], [
+        'request_key' => (string) Str::uuid(), 'reviewer_mfa_method' => 'filament_app', 'verification_reference' => 'Synthetic independent maker factor verification.',
+        'password' => 'password', 'mfa_method' => 'filament_app',
+        'mfa_code' => app(Google2FA::class)->oathTotp($c['checkerSecret'], intdiv(now()->timestamp, 30)),
+    ]);
+    Filament::setCurrentPanel(Filament::getPanel('finance'));
+    actingAs($c['maker']);
+    $page = Livewire::test(PaymentReviews::class)->assertSee('Account prerequisites met')->assertSee('Another independent reviewer required');
+    $page->__call('assertActionHidden', [TestAction::make('reviewReservedPayment')->table($c['hold'])]);
+    expect(PaymentAuthorization::query()->count())->toBe(0);
 });

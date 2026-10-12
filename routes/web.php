@@ -66,6 +66,8 @@ Route::middleware(['auth', 'verified'])->group(function (): void {
         ->middleware('throttle:10,1')->name('finance.collection-batches.store');
     Route::get('finance/collection-batches/{collectionBatch}', [CollectionBatchController::class, 'show'])
         ->name('finance.collection-batches.show');
+    Route::get('finance/collection-batches/{collectionBatch}/document', [CollectionBatchController::class, 'document'])
+        ->name('finance.collection-batches.document');
     Route::post('finance/collection-batches/{collectionBatch}/review', [CollectionBatchController::class, 'review'])
         ->middleware('throttle:10,1')->name('finance.collection-batches.review');
 

@@ -61,7 +61,21 @@ final readonly class ReviewPaymentIntentChange
                 return $existing;
             }
             $this->lifecycle->requireActive($source);
-            if ($decision === 'approve_change' && PaymentReservation::query()->where('invoice_id', $source->invoice_id)->exists()) {
+
+            // A *released* hold holds no capacity -- that is what releasing it
+            // means -- and the release route exists precisely so a stale draft
+            // can be recovered. Testing row existence instead of live capacity
+            // made that unreachable: the proposal above correctly clears on a
+            // live-hold test, and this sibling then refused the approval it had
+            // just been cleared to obtain, leaving the bill permanently
+            // un-recoverable. The same predicate is used in both places.
+            $liveHold = PaymentReservation::query()
+                ->where('invoice_id', $source->invoice_id)
+                ->get()
+                ->reject(fn (PaymentReservation $hold): bool => $hold->isReleased())
+                ->isNotEmpty();
+
+            if ($decision === 'approve_change' && $liveHold) {
                 throw ValidationException::withMessages(['payment' => 'Bill has held capacity; reviewed reservation release is required before draft recovery.']);
             }
             if ($decision === 'approve_change' && $stored->kind === 'replace') {

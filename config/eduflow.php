@@ -12,6 +12,65 @@ return [
 
     /*
     |--------------------------------------------------------------------------
+    | Payment Submission Runtime
+    |--------------------------------------------------------------------------
+    |
+    | Durable submission work is recorded the moment a payment is authorized,
+    | but nothing is ever handed to a worker unless an operator turns this on.
+    | Enabling it is a separate, reviewed decision because it is the first step
+    | toward an executor that talks to a rail, and the release it points at.
+    |
+    | The isolated executor ships in this build but is gated behind this flag,
+    | and behind an explicit Arc *testnet* rail check with no fallback. A
+    | dispatched entry with the runtime off is inspected and concluded as
+    | blocked with a specific reason; it is never submitted.
+    |
+    | `stop_switch` holds new submissions without erasing evidence or
+    | releasing a hold.
+    |
+    | `transport` selects how the rail answers. `auto` treats a Circle driver as
+    | an asynchronous agent wallet, which is what it is: `circle wallet
+    | transfer` returns a Circle transaction id rather than an on-chain hash, so
+    | a synchronous submission would fail on every single payment. Setting
+    | `synchronous` forces the older contract, which is correct only for a rail
+    | that genuinely returns a hash from `transfer()`.
+    |
+    */
+
+    'submission' => [
+        'enabled' => env('EDUFLOW_SUBMISSION_ENABLED', false),
+        'queue_connection' => env('EDUFLOW_SUBMISSION_QUEUE_CONNECTION', 'database'),
+        'queue' => 'finance-submission',
+        'stop_switch' => env('EDUFLOW_SUBMISSION_STOP', false),
+        'transport' => env('EDUFLOW_SUBMISSION_TRANSPORT', 'auto'),
+    ],
+
+    /*
+    |--------------------------------------------------------------------------
+    | Standing Mandate Lane
+    |--------------------------------------------------------------------------
+    |
+    | A standing mandate authorizes a *class* of recurring payment; the
+    | deterministic evaluator admits each occurrence. Both default off, and the
+    | evaluator is a pure function of evidence with no model and no session in
+    | its path.
+    |
+    | `runtime_enabled` gates whether any automatic release may be recorded at
+    | all; `allow_nonzero_allowance` gates whether a reviewed mandate may carry
+    | a nonzero per-occurrence ceiling. Until the second is on, every mandate
+    | authorizes nothing, which is §18.4's "initial allowance is zero".
+    |
+    */
+
+    'mandate' => [
+        'runtime_enabled' => env('EDUFLOW_MANDATE_ENABLED', false),
+        'allow_nonzero_allowance' => env('EDUFLOW_MANDATE_ALLOWANCE', false),
+        'queue_connection' => env('EDUFLOW_MANDATE_QUEUE_CONNECTION', 'database'),
+        'queue' => 'finance-mandate',
+    ],
+
+    /*
+    |--------------------------------------------------------------------------
     | Dual-Currency Display
     |--------------------------------------------------------------------------
     |

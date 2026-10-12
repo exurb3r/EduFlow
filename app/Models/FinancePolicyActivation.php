@@ -7,6 +7,7 @@ namespace App\Models;
 use Illuminate\Database\Eloquent\Collection;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
+use Illuminate\Support\Carbon;
 use LogicException;
 
 /**
@@ -17,6 +18,7 @@ use LogicException;
  * @property int|null $previous_activation_id
  * @property string|null $previous_activation_digest
  * @property FinancePolicyVersion|null $policyVersion
+ * @property Carbon $created_at
  * @property string $policy_digest
  * @property string $activation_digest
  */

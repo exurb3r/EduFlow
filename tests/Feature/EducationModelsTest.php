@@ -27,7 +27,8 @@ test('education factories persist relationships and typed values', function (): 
         'requested_amount' => 5000000000,
     ]);
 
-    expect($student->user)->toBeInstanceOf(User::class)
+    expect($student->user->exists)->toBeTrue()
+        ->and($student->user->id)->toBe($student->user_id)
         ->and($student->year_level)->toBe(3)
         ->and($student->attendance_rate)->toBe('97.25')
         ->and($student->tuitionAccounts->sole()->is($account))->toBeTrue()

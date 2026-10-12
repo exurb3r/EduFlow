@@ -20,7 +20,7 @@ class TransactionResource extends Resource
 
     protected static string|BackedEnum|null $navigationIcon = Heroicon::ArrowsRightLeft;
 
-    protected static string|UnitEnum|null $navigationGroup = 'Financial Operations';
+    protected static string|UnitEnum|null $navigationGroup = 'Finance records';
 
     protected static ?int $navigationSort = 4;
 

@@ -1,23 +1,112 @@
 <x-filament-panels::page>
-    <x-filament::section icon="heroicon-o-shield-check">
-        <x-slot name="heading">Payment review — execution disabled</x-slot>
-        <x-slot name="description">
-            Review exact institution payment reservations with independent password and authenticator confirmation.
-            Approval records bounded authority, not a transfer. Simulation evidence grants simulation-only authority.
-        </x-slot>
-        <x-filament::badge color="warning">Executor disabled — can_execute=false</x-filament::badge>
-        <p>
-            No transfers are made and no local payment state is changed here. Reservations hold application capacity only;
-            external funds are not locked. Rejecting or holding a payment keeps its reservation held.
-            Recorded approval never enables execution from this page. Reviewed payments are evidence-only;
-            renewal requires a separate reviewed workflow.
-        </p>
-        <p>
-            Reviewer enrollment independently pins an existing authenticator to protect against account factor replacement.
-            Existing pins cannot be rotated here; changed factors require independent recovery.
-            Enrollment grants no payment permission, approves no payment and makes no transfer.
-        </p>
-    </x-filament::section>
+    @php
+        $overview = $this->reviewOverview;
+        $readiness = $this->reviewerReadiness;
+    @endphp
 
-    {{ $this->table }}
+    {{-- ReUI Frame / FramePanel composition adapted for Blade; interactions stay in Filament. --}}
+    <section class="fi-payment-workspace" aria-label="Payment approval workspace" wire:poll.10s>
+        <div class="fi-payment-frame" data-slot="frame">
+            <header class="fi-payment-frame-header" data-slot="frame-panel-header">
+                <div>
+                    <p class="fi-payment-eyebrow">Independent payment review</p>
+                    <h2 class="fi-payment-title">A clear decision. An exact payment.</h2>
+                    <p class="fi-payment-muted">Review reserved bills here. Track provider attempts separately in Payment Submissions.</p>
+                </div>
+                <x-filament::badge color="gray" icon="heroicon-m-shield-check">Review only · no transfer here</x-filament::badge>
+            </header>
+
+            <dl class="fi-payment-metrics" aria-label="Institution review counts">
+                <div class="fi-payment-metric fi-payment-metric-focus" data-slot="frame-panel">
+                    <dt>Awaiting review</dt>
+                    <dd class="fi-payment-metric-value">{{ $overview['awaiting'] }}</dd>
+                    <dd class="fi-payment-metric-caption">Reserved bills without a recorded decision</dd>
+                </div>
+                <div class="fi-payment-metric" data-slot="frame-panel">
+                    <dt>Approval recorded</dt>
+                    <dd class="fi-payment-metric-value">{{ $overview['approved'] }}</dd>
+                    <dd class="fi-payment-metric-caption">Historical decisions, not current authority or settlement</dd>
+                </div>
+                <div class="fi-payment-metric" data-slot="frame-panel">
+                    <dt>On hold or rejected</dt>
+                    <dd class="fi-payment-metric-value">{{ $overview['held_or_rejected'] }}</dd>
+                    <dd class="fi-payment-metric-caption">Decision does not release reserved capacity</dd>
+                </div>
+                <div class="fi-payment-metric" data-slot="frame-panel">
+                    <dt>Capacity released</dt>
+                    <dd class="fi-payment-metric-value">{{ $overview['released'] }}</dd>
+                    <dd class="fi-payment-metric-caption">Separate reviewed releases; history retained</dd>
+                </div>
+            </dl>
+        </div>
+
+        <aside class="fi-payment-notice" role="note" aria-label="Payment safety boundaries">
+            <x-filament::icon icon="heroicon-o-information-circle" class="fi-payment-notice-icon" />
+            <div>
+                <h3>Approval is authority, not settlement.</h3>
+                <p>Agent advice is not payment authority. This page sends nothing; a network approval may queue work for a separately enabled executor. Reject or hold keeps capacity reserved. Simulation evidence grants simulation-only authority.</p>
+            </div>
+        </aside>
+
+        {{ $this->table }}
+
+        <div class="fi-payment-guidance-grid">
+            <section class="fi-payment-card" aria-labelledby="payment-review-guide">
+                <div class="fi-payment-card-heading">
+                    <h3 id="payment-review-guide">How to review a payment</h3>
+                    <span class="fi-payment-muted">Three steps</span>
+                </div>
+                <ol class="fi-payment-steps">
+                    <li>
+                        <span class="fi-payment-step-number" aria-hidden="true">1</span>
+                        <div><h4>Inspect the evidence</h4><p>Check the bill, amount, recipient, network and reserved capacity.</p></div>
+                    </li>
+                    <li>
+                        <span class="fi-payment-step-number" aria-hidden="true">2</span>
+                        <div><h4>Choose a decision</h4><p>Open <strong>Review payment</strong>. Approve exact authority, reject, or hold with a reason.</p></div>
+                    </li>
+                    <li>
+                        <span class="fi-payment-step-number" aria-hidden="true">3</span>
+                        <div><h4>Confirm independently</h4><p>Use your password and enrolled authenticator. Approval never means paid.</p></div>
+                    </li>
+                </ol>
+            </section>
+
+            <section class="fi-payment-card" aria-labelledby="payment-reviewer-checklist">
+                <div class="fi-payment-card-heading">
+                    <h3 id="payment-reviewer-checklist">Your reviewer setup</h3>
+                    <x-filament::badge :color="$readiness['ready'] ? 'success' : 'warning'">
+                        {{ $readiness['ready'] ? 'Account prerequisites met' : 'Setup required' }}
+                    </x-filament::badge>
+                </div>
+                <ul class="fi-payment-checklist">
+                    @foreach ([
+                        'verified_staff' => ['Verified staff account', 'Verified email and eligible finance or admin role.'],
+                        'direct_permission' => ['Direct payment permission', 'AuthorizePayment:PaymentIntent must be assigned to you directly.'],
+                        'enrolled_factor' => ['Independently enrolled authenticator', 'An independent checker must pin your existing factor through Set up reviewer.'],
+                    ] as $key => [$label, $description])
+                        <li>
+                            <x-filament::icon
+                                :icon="$readiness[$key] ? 'heroicon-m-check-circle' : 'heroicon-m-minus-circle'"
+                                @class(['fi-payment-check-icon', 'fi-payment-check-met' => $readiness[$key]])
+                            />
+                            <div><h4>{{ $label }} <span class="fi-payment-sr-only">{{ $readiness[$key] ? '— met' : '— required' }}</span></h4><p>{{ $description }}</p></div>
+                        </li>
+                    @endforeach
+                </ul>
+                <p class="fi-payment-card-footer">Account setup is not payment approval. You cannot review a payment you prepared. Current evidence is checked again on submission.</p>
+            </section>
+        </div>
+
+    </section>
+
+    <x-filament::section collapsible collapsed icon="heroicon-o-lock-closed">
+        <x-slot name="heading">Review history and recovery rules</x-slot>
+        <div class="fi-payment-detail-notes">
+            <p>Review does not change local payment accounts or lock external wallet funds. Reservations hold application capacity only; rejecting or holding keeps it reserved.</p>
+            <p>Recorded decisions are append-only. Historical approval counts include expired approvals and simulation-only decisions; they are not available spending authority. Renewal requires a separate reviewed workflow.</p>
+            <p>Reviewer enrollment pins an existing authenticator to protect against account factor replacement. Enrollment grants no payment permission. Existing pins cannot be rotated here; changed factors require independent recovery.</p>
+            <p>No capacity release, funding rollover or payment retry is available on this page. Unresolved provider attempts must be investigated before any resend.</p>
+        </div>
+    </x-filament::section>
 </x-filament-panels::page>

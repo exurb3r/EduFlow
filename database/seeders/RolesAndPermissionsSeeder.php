@@ -3,6 +3,8 @@
 namespace Database\Seeders;
 
 use App\Enums\RoleEnums;
+use BezhanSalleh\FilamentShield\Facades\FilamentShield;
+use Filament\Facades\Filament;
 use Illuminate\Database\Seeder;
 use Illuminate\Support\Facades\File;
 use Spatie\Permission\Models\Permission;
@@ -17,23 +19,31 @@ class RolesAndPermissionsSeeder extends Seeder
         'create' => 'Create',
         'update' => 'Update',
         'delete' => 'Delete',
+        'deleteAny' => 'DeleteAny',
         'restore' => 'Restore',
         'forceDelete' => 'ForceDelete',
         'forceDeleteAny' => 'ForceDeleteAny',
         'restoreAny' => 'RestoreAny',
         'replicate' => 'Replicate',
         'reorder' => 'Reorder',
+        'authorizePayment' => 'AuthorizePayment',
     ];
 
     public function run(): void
     {
-        app()[PermissionRegistrar::class]->forgetCachedPermissions();
+        $permissionRegistrar = app(PermissionRegistrar::class);
+        $permissionRegistrar->forgetCachedPermissions();
 
-        $permissions = $this->discoverPermissionsFromPolicies();
+        $permissions = array_values(array_unique(array_merge(
+            $this->discoverPermissionsFromPolicies(),
+            $this->discoverPermissionsFromFilament(),
+        )));
         $this->createPermissions($permissions);
 
         $roles = $this->createRoles();
         $this->assignPermissionsToRoles($roles, $permissions);
+
+        $permissionRegistrar->forgetCachedPermissions();
     }
 
     protected function discoverPermissionsFromPolicies(): array
@@ -67,6 +77,20 @@ class RolesAndPermissionsSeeder extends Seeder
         return $permissions;
     }
 
+    /** @return list<string> */
+    protected function discoverPermissionsFromFilament(): array
+    {
+        $currentPanel = Filament::getCurrentPanel();
+
+        try {
+            Filament::setCurrentPanel(Filament::getDefaultPanel());
+
+            return FilamentShield::getEntitiesPermissions() ?? [];
+        } finally {
+            Filament::setCurrentPanel($currentPanel);
+        }
+    }
+
     protected function createPermissions(array $permissions): void
     {
         foreach ($permissions as $permission) {
@@ -91,7 +115,7 @@ class RolesAndPermissionsSeeder extends Seeder
 
     protected function assignPermissionsToRoles(array $roles, array $permissions): void
     {
-        $superAdminPermissions = Permission::all()->pluck('name')->toArray();
+        $superAdminPermissions = Permission::query()->where('guard_name', 'web')->pluck('name')->all();
         $adminPermissions = array_filter($permissions, fn ($p) => ! str_contains($p, 'Role:'));
         $userPermissions = array_filter($permissions, fn ($p) => str_starts_with($p, 'ViewAny:'));
 

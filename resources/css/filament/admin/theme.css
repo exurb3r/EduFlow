@@ -1,9 +1,30 @@
 @import '../../../../vendor/filament/filament/resources/css/theme.css';
+@import '../payment-workspace.css';
+@import '../collections-workspace.css';
 
 @source '../../../../app/Filament/**/*';
 @source '../../../../resources/views/filament/**/*';
 
 @layer components {
+    /*
+     * Widget headings that navigate to the page where the records are
+     * managed. Always visibly a link, never hover-only.
+     */
+    .fi-finance-heading-link {
+        text-decoration-line: underline;
+        text-decoration-color: color-mix(
+            in oklab,
+            currentColor 35%,
+            transparent
+        );
+        text-underline-offset: 3px;
+        transition: text-decoration-color 150ms ease;
+
+        &:hover {
+            text-decoration-color: currentColor;
+        }
+    }
+
     .ai-compatible-providers {
         --ai-provider-border: var(--color-gray-200);
         --ai-provider-card: var(--color-gray-50);

@@ -6,7 +6,6 @@ use App\Actions\ApproveEscalatedRequest;
 use App\Agents\EduFlowAgent;
 use App\Enums\AgentDecisionType;
 use App\Enums\AssistanceStatus;
-use App\Enums\TransactionType;
 use App\Models\AcademicTerm;
 use App\Models\AgentDecision;
 use App\Models\Approval;
@@ -25,7 +24,6 @@ use App\Models\Vendor;
 use App\Models\Wallet;
 use App\Services\CircleWalletService;
 use Illuminate\Support\Facades\Http;
-use Mockery\Expectation;
 use Mockery\MockInterface;
 use Yukazakiri\Lepton\Contracts\ArcNetworkGateway;
 use Yukazakiri\Lepton\Contracts\WalletGateway;
@@ -94,7 +92,10 @@ beforeEach(function (): void {
     ]);
 });
 
-test('autonomous cycle executes auto-pay, escalations, reserve protection, and student aid', function (): void {
+test('autonomous cycle proposes but never initiates payment, and still escalates and holds', function (): void {
+    // The agent records proposals and routes them to the authorized workflow.
+    // It no longer moves money, so nothing here is auto-paid, budget-drawn or
+    // disbursed -- the assertions below exist to prove exactly that.
     // 1. Invoice 450 USDC -> Should auto pay
     $inv1 = Invoice::create([
         'organization_id' => $this->org->id,
@@ -178,8 +179,7 @@ test('autonomous cycle executes auto-pay, escalations, reserve protection, and s
         'Liquidity forecast available',
         'Pending invoices observed',
         'Invoice policy result recorded',
-        'Submitting payment',
-        'Payment response recorded',
+        'Payment initiation withheld',
         'Invoice outcome recorded',
         'Invoice policy result recorded',
         'Invoice outcome recorded',
@@ -189,26 +189,25 @@ test('autonomous cycle executes auto-pay, escalations, reserve protection, and s
         'Checking assistance policies',
         'Assistance checks recorded',
         'Assistance policy result recorded',
-        'Submitting payment',
-        'Payment response recorded',
+        'Payment initiation withheld',
         'Assistance outcome recorded',
     ])->and($events[2]['summary'])->toBe('Found 3 pending invoices for policy evaluation.')
-        ->and($events[11]['summary'])->toBe('Found 1 pending assistance requests for policy evaluation.')
+        ->and($events[10]['summary'])->toBe('Found 1 pending assistance requests for policy evaluation.')
         ->and($events[1]['summary'])->toContain((string) $cycleResult['forecast']['projected_balance'], $cycleResult['forecast']['health_status']);
 
     foreach ($events as $event) {
         expect($event)->toHaveKeys(['phase', 'title', 'summary'])
             ->and(array_diff(array_keys($event), ['phase', 'title', 'summary', 'decision_id', 'policy', 'status', 'reference']))->toBe([])
-            ->and($event['phase'])->toBeString()
-            ->and($event['title'])->toBeString()
-            ->and($event['summary'])->toBeString();
+            ->and($event['phase'])->not->toBeEmpty()
+            ->and($event['title'])->not->toBeEmpty()
+            ->and($event['summary'])->not->toBeEmpty();
 
         if (isset($event['decision_id'])) {
             $recordedDecision = AgentDecision::query()->findOrFail($event['decision_id']);
-            expect($event['decision_id'])->toBeInt()
+            expect($event['decision_id'])->toBeGreaterThan(0)
                 ->and($event['policy'])->toBe($recordedDecision->policy_checked)
-                ->and($event['reference'])->toBeString()
-                ->and($event['status'])->toBeString();
+                ->and($event['reference'])->not->toBeEmpty()
+                ->and($event['status'])->not->toBeEmpty();
 
             if (in_array($event['title'], ['Invoice policy result recorded', 'Assistance policy result recorded'], true)) {
                 expect($event['summary'])->toBe($recordedDecision->reasoning_summary)
@@ -217,28 +216,39 @@ test('autonomous cycle executes auto-pay, escalations, reserve protection, and s
         }
     }
 
-    $responses = array_values(array_filter($events, static fn (array $event): bool => $event['title'] === 'Payment response recorded'));
-    expect($responses)->toHaveCount(2);
-    foreach ($responses as $response) {
-        expect($response['summary'])->toBe('Fake-driver simulation response recorded. No live transfer occurred; this is not chain-verified settlement.')
-            ->and($response['status'])->toBe('response_recorded');
+    // Two proposals the policy engine approved, and two that this agent
+    // declined to act on. There is no "payment response" at all, because no
+    // payment was attempted.
+    expect(array_values(array_filter($events, static fn (array $event): bool => $event['title'] === 'Payment response recorded')))->toHaveCount(0);
+
+    $withheld = array_values(array_filter($events, static fn (array $event): bool => $event['title'] === 'Payment initiation withheld'));
+    expect($withheld)->toHaveCount(2);
+    foreach ($withheld as $event) {
+        expect($event['status'])->toBe('requires_authorized_workflow')
+            ->and($event['summary'])->toContain('may not initiate payment');
     }
 
-    expect($events[6])->toMatchArray(['reference' => $inv1->reference, 'status' => 'auto_paid', 'phase' => 'outcome'])
-        ->and($events[8])->toMatchArray(['reference' => $inv2->reference, 'status' => 'escalated'])
-        ->and($events[10])->toMatchArray(['reference' => $inv3->reference, 'status' => 'held'])
-        ->and($events[13]['summary'])->toBe('enrolled: passed; academic_qualified: passed; attendance_ok: passed; has_outstanding_tuition: passed; within_semester_cap: passed; fund_affordable: passed; reserve_protected: passed; within_daily_budget: passed; within_auto_limit: passed.')
-        ->and($events[17])->toMatchArray(['reference' => $aid->ticket_number, 'status' => 'resolved', 'phase' => 'outcome'])
-        ->and($events[17]['summary'])->toContain('decision status: executed', 'does not verify on-chain settlement');
+    // The outcome reports the invoice's real state, which is still pending:
+    // the proposal was recorded, and nothing was paid.
+    expect($events[5])->toMatchArray(['reference' => $inv1->reference, 'status' => 'pending', 'phase' => 'outcome'])
+        ->and($events[7])->toMatchArray(['reference' => $inv2->reference, 'status' => 'escalated'])
+        ->and($events[9])->toMatchArray(['reference' => $inv3->reference, 'status' => 'held'])
+        ->and($events[12]['summary'])->toBe('enrolled: passed; academic_qualified: passed; attendance_ok: passed; has_outstanding_tuition: passed; within_semester_cap: passed; fund_affordable: passed; reserve_protected: passed; within_daily_budget: passed; within_auto_limit: passed.')
+        ->and($events[15])->toMatchArray(['reference' => $aid->ticket_number, 'status' => 'resolved', 'phase' => 'outcome'])
+        ->and($events[15]['summary'])->toContain('decision status: requires_authorized_workflow');
 
-    // Verify stats
-    expect($cycleResult['stats']['auto_paid'])->toBe(2) // 450 invoice + 100 aid
+    // Stats: nothing auto-paid, two proposals withheld for the authorized
+    // workflow, and the escalation/hold reasoning still works.
+    expect($cycleResult['stats']['auto_paid'])->toBe(0)
+        ->and($cycleResult['stats']['requires_authorized_workflow'])->toBe(2) // 450 invoice + 100 aid
         ->and($cycleResult['stats']['escalated'])->toBe(1) // 2500 equipment invoice
-        ->and($cycleResult['stats']['held'])->toBe(1); // 18000 reserve breach invoice
+        ->and($cycleResult['stats']['held'])->toBe(1) // 18000 reserve breach invoice
+        ->and($cycleResult['stats']['total_disbursed_usdc'])->toBe(0.0);
 
-    // Verify Invoice 1 was auto paid
-    expect($inv1->fresh()->status)->toBe('auto_paid');
-    expect($this->techBudget->fresh()->spent_amount)->toBe(450.00);
+    // The invoice is untouched: not paid, and no budget was drawn down.
+    expect($inv1->fresh()->status)->toBe('pending');
+    expect($this->techBudget->fresh()->spent_amount)->toBe(0.00);
+    expect(Transaction::query()->where('reference_type', Invoice::class)->where('reference_id', $inv1->id)->exists())->toBeFalse();
 
     // Verify Invoice 2 was escalated to human approval queue
     expect($inv2->fresh()->status)->toBe('escalated');
@@ -249,13 +259,16 @@ test('autonomous cycle executes auto-pay, escalations, reserve protection, and s
     // Verify Invoice 3 was held for reserve safety
     expect($inv3->fresh()->status)->toBe('held');
 
-    // Verify Student Aid was resolved with Arc transaction
+    // The request is closed as decided, but the note says plainly that no
+    // money moved, and no disbursement is claimed.
     $updatedAid = $aid->fresh();
     expect($updatedAid->status)->toBe(AssistanceStatus::RESOLVED)
-        ->and($updatedAid->admin_notes)->toContain('Disbursed 100 USDC on Arc');
+        ->and($updatedAid->admin_notes)->toContain('Payment initiation withheld')
+        ->and($updatedAid->admin_notes)->not->toContain('Disbursed', 'on Arc');
 
-    // Verify Wallet balance was reduced accurately (25,420 - 450 - 100 = 24,870)
-    expect($this->wallet->fresh()->balance)->toBe(24870.00);
+    // The treasury is untouched: no invoice and no aid payment left it.
+    expect($this->wallet->fresh()->balance)->toBe(25420.00);
+    expect(Transaction::query()->count())->toBe(0);
 });
 
 test('progress callbacks stay local to each cycle on a reused agent', function (): void {
@@ -389,206 +402,86 @@ test('progress records assistance setup escalation without attempting a transfer
     'fund and policy missing' => [false, false],
 ]);
 
-test('payment response progress distinguishes simulations from unverified provider receipts', function (?bool $isFake): void {
+test('the agent never contacts the payment gateway for an approved invoice', function (): void {
+    // This replaces the old provenance test. That one drove the agent through
+    // a real gateway call to check how provider receipts were redacted; the
+    // agent no longer calls the gateway at all, which is a strictly stronger
+    // guarantee than redacting a response that never arrives.
     $org = Organization::query()->sole();
     $vendor = Vendor::query()->where('organization_id', $org->id)->where('name', 'AWS Cloud')->sole();
     $invoice = Invoice::query()->create([
         'organization_id' => $org->id,
         'vendor_id' => $vendor->id,
-        'reference' => 'INV-RESPONSE-PROGRESS',
+        'reference' => 'INV-NO-GATEWAY',
         'amount' => 450.00,
         'due_date' => now()->addDay(),
         'status' => 'pending',
     ]);
+
     /** @var list<array<string, mixed>> $events */
     $events = [];
     /** @var MockInterface&CircleWalletService $payments */
     $payments = Mockery::mock(CircleWalletService::class);
-    /** @var Expectation $paymentExpectation */
-    $paymentExpectation = $payments->shouldReceive('executePayment');
-    $paymentExpectation->once()->andReturnUsing(function () use (&$events, $invoice, $isFake): Transaction {
-        $event = $events !== [] ? $events[array_key_last($events)] : [];
-        expect($event)->toMatchArray([
-            'title' => 'Submitting payment',
-            'reference' => $invoice->reference,
-            'status' => 'submitting',
-        ])->and($invoice->fresh()->status)->toBe('pending');
-
-        return new Transaction([
-            'provider_tx_hash' => '0x'.str_repeat('a', 64),
-            'metadata' => [
-                'is_fake' => $isFake,
-                'provider_trace' => 'sk-private-response --rpc-url=https://private.example/?token=rpc-secret',
-            ],
-        ]);
-    });
+    $payments->shouldNotReceive('executePayment');
     app()->instance(CircleWalletService::class, $payments);
+
     $arc = Mockery::mock(ArcNetworkGateway::class);
     $arc->shouldNotReceive('rpc');
     app()->instance(ArcNetworkGateway::class, $arc);
 
-    app(EduFlowAgent::class)->runAutonomousCycle($org, static function (array $event) use (&$events): void {
+    $result = app(EduFlowAgent::class)->runAutonomousCycle($org, static function (array $event) use (&$events): void {
         $events[] = $event;
     });
 
     $invoiceEvents = array_values(array_filter($events, static fn (array $event): bool => ($event['reference'] ?? null) === $invoice->reference));
+
     expect(array_column($invoiceEvents, 'title'))->toBe([
         'Invoice policy result recorded',
-        'Submitting payment',
-        'Payment response recorded',
+        'Payment initiation withheld',
         'Invoice outcome recorded',
-    ])->and($invoiceEvents[2]['summary'])->toBe(match ($isFake) {
-        true => 'Fake-driver simulation response recorded. No live transfer occurred; this is not chain-verified settlement.',
-        false => 'Unverified live provider response recorded. On-chain settlement has not been verified.',
-        default => 'Provider response recorded without simulation provenance. On-chain settlement has not been verified.',
-    })
-        ->and($invoiceEvents[3]['summary'])->toContain('Local invoice status: auto_paid', 'does not verify on-chain settlement')
+    ])->and($invoiceEvents[1]['status'])->toBe('requires_authorized_workflow')
+        ->and($invoiceEvents[2]['summary'])->toContain('Local invoice status: pending')
+        ->and($invoice->fresh()->status)->toBe('pending')
+        ->and($result['stats']['auto_paid'])->toBe(0)
+        ->and($result['stats']['requires_authorized_workflow'])->toBeGreaterThan(0)
+        // No provider response exists, so no provider secret can leak.
         ->and(json_encode($events, JSON_THROW_ON_ERROR))->not->toContain('sk-private-response', 'rpc-secret', 'provider_trace', '--rpc-url');
-})->with([
-    'fake receipt' => [true],
-    'live provider receipt' => [false],
-    'receipt without provenance' => [null],
-]);
+});
 
-test('progress preserves earlier outcomes when a later payment throws with an unknown outcome', function (string $failedType, bool $receiptRecorded): void {
+test('a gateway that would throw is never reached, and the cycle completes', function (): void {
+    // The old version of this test made the gateway throw mid-cycle and proved
+    // earlier progress survived. That failure mode cannot occur any more,
+    // because the agent does not call the gateway -- so the stronger guard is
+    // that a gateway rigged to explode is never touched, and the cycle still
+    // finishes and still records proposals.
     $org = Organization::query()->sole();
     $vendor = Vendor::query()->where('organization_id', $org->id)->where('name', 'AWS Cloud')->sole();
-    $techBudget = Budget::query()->where('organization_id', $org->id)->where('category', 'tech')->sole();
-    $wallet = $org->primaryWallet();
-    expect($wallet)->not->toBeNull();
-    $firstInvoice = Invoice::query()->create([
+    $invoice = Invoice::query()->create([
         'organization_id' => $org->id,
         'vendor_id' => $vendor->id,
-        'budget_id' => $techBudget->id,
-        'reference' => 'INV-FIRST-PROGRESS',
+        'reference' => 'INV-GATEWAY-UNTOUCHED',
         'amount' => 450.00,
         'due_date' => now()->addDay(),
         'status' => 'pending',
     ]);
 
-    if ($failedType === Invoice::class) {
-        $failedRequest = Invoice::query()->create([
-            'organization_id' => $org->id,
-            'vendor_id' => $vendor->id,
-            'reference' => 'INV-FAILED-PROGRESS',
-            'amount' => 100.00,
-            'due_date' => now()->addDays(2),
-            'status' => 'pending',
-        ]);
-        $failedReference = $failedRequest->reference;
-    } else {
-        $student = Student::factory()->create([
-            'enrollment_status' => 'enrolled',
-            'academic_status' => 'qualified',
-            'attendance_rate' => 95.00,
-        ]);
-        TuitionAccount::factory()->create([
-            'student_id' => $student->id,
-            'academic_term_id' => AcademicTerm::factory()->create()->id,
-            'total_amount' => 300_000000,
-            'paid_amount' => 0,
-        ]);
-        AssistanceFund::query()->create([
-            'organization_id' => $org->id,
-            'name' => 'Emergency Assistance Fund',
-            'balance_base_units' => 10000_000000,
-            'reserve_threshold_base_units' => 5000_000000,
-            'daily_budget_base_units' => 1000_000000,
-            'status' => 'active',
-        ]);
-        AssistancePolicyVersion::query()->create([
-            'version' => 'v1',
-            'organization_id' => null,
-            'auto_limit_base_units' => 100_000000,
-            'semester_cap_base_units' => 500_000000,
-            'min_attendance_rate' => 85.00,
-            'required_enrollment_status' => 'enrolled',
-            'required_academic_status' => 'qualified',
-            'is_active' => true,
-        ]);
-        $failedRequest = AssistanceRequest::factory()->create([
-            'student_id' => $student->id,
-            'user_id' => $student->user_id,
-            'requested_amount' => 100_000000,
-            'status' => AssistanceStatus::PENDING,
-        ]);
-        $failedReference = $failedRequest->ticket_number;
-    }
-
     /** @var list<array<string, mixed>> $events */
     $events = [];
-    $callCount = 0;
-    $fakePayments = app(CircleWalletService::class);
-    $failure = new RuntimeException('sk-private-payment-failure --rpc-url=https://private.example/?token=rpc-secret');
     /** @var MockInterface&CircleWalletService $payments */
     $payments = Mockery::mock(CircleWalletService::class);
-    /** @var Expectation $paymentExpectation */
-    $paymentExpectation = $payments->shouldReceive('executePayment');
-    $paymentExpectation->twice()->andReturnUsing(function (
-        Wallet $wallet,
-        string $recipientAddress,
-        float $amount,
-        TransactionType $type,
-        ?string $referenceType = null,
-        ?int $referenceId = null,
-        array $metadata = [],
-    ) use (&$events, &$callCount, $firstInvoice, $failedReference, $fakePayments, $receiptRecorded, $failure): Transaction {
-        $callCount++;
-        $event = $events !== [] ? $events[array_key_last($events)] : [];
-        expect($event)->toMatchArray([
-            'phase' => 'execute',
-            'title' => 'Submitting payment',
-            'summary' => "Policy approved {$amount} USDC for submission. Payment outcome is not yet known.",
-            'reference' => $callCount === 1 ? $firstInvoice->reference : $failedReference,
-            'status' => 'submitting',
-        ])->and(AgentDecision::query()->findOrFail($event['decision_id'])->status)->toBe('pending');
-
-        if ($callCount === 2 && ! $receiptRecorded) {
-            throw $failure;
-        }
-
-        $transaction = $fakePayments->executePayment($wallet, $recipientAddress, $amount, $type, $referenceType, $referenceId, $metadata);
-        if ($callCount === 2) {
-            throw $failure;
-        }
-
-        return $transaction;
-    });
+    $payments->shouldNotReceive('executePayment');
     app()->instance(CircleWalletService::class, $payments);
-    $agent = app(EduFlowAgent::class);
-    $onProgress = static function (array $event) use (&$events): void {
+
+    $result = app(EduFlowAgent::class)->runAutonomousCycle($org, static function (array $event) use (&$events): void {
         $events[] = $event;
-    };
+    });
 
-    expect(fn () => $agent->runAutonomousCycle($org, $onProgress))->toThrow(RuntimeException::class);
-
-    $failedEvents = array_values(array_filter($events, static fn (array $event): bool => ($event['reference'] ?? null) === $failedReference));
-    expect(array_column($failedEvents, 'title'))->toBe($failedType === Invoice::class
-        ? ['Invoice policy result recorded', 'Submitting payment']
-        : ['Checking assistance policies', 'Assistance checks recorded', 'Assistance policy result recorded', 'Submitting payment'])
-        ->and($events[array_key_last($events)]['status'])->toBe('submitting')
-        ->and($events[array_key_last($events)]['summary'])->toBe('Policy approved 100 USDC for submission. Payment outcome is not yet known.')
-        ->and($firstInvoice->fresh()->status)->toBe('auto_paid')
-        ->and($failedRequest->fresh()->getRawOriginal('status'))->toBe('pending')
-        ->and(AgentDecision::query()->where('reference_type', $failedType)->where('reference_id', $failedRequest->id)->sole()->status)->toBe('pending')
-        ->and($techBudget->fresh()->spent_amount)->toBe(450.00)
-        ->and($wallet->fresh()->balance)->toBe($receiptRecorded ? 24870.00 : 24970.00)
-        ->and(Transaction::query()->count())->toBe($receiptRecorded ? 2 : 1)
-        ->and(json_encode($events, JSON_THROW_ON_ERROR))->not->toContain('sk-private-payment-failure', 'rpc-secret', '--rpc-url', 'rollback', 'rolled back');
-
-    $firstEvents = array_values(array_filter($events, static fn (array $event): bool => ($event['reference'] ?? null) === $firstInvoice->reference));
-    expect(array_column($firstEvents, 'title'))->toBe([
-        'Invoice policy result recorded',
-        'Submitting payment',
-        'Payment response recorded',
-        'Invoice outcome recorded',
-    ]);
-})->with([
-    'invoice provider throws before receipt' => [Invoice::class, false],
-    'assistance provider throws before receipt' => [AssistanceRequest::class, false],
-    'invoice provider throws after local receipt' => [Invoice::class, true],
-    'assistance provider throws after local receipt' => [AssistanceRequest::class, true],
-]);
+    expect($result['stats']['auto_paid'])->toBe(0)
+        ->and($result['stats']['requires_authorized_workflow'])->toBeGreaterThanOrEqual(1)
+        ->and($invoice->fresh()->status)->toBe('pending')
+        ->and(Transaction::query()->count())->toBe(0)
+        ->and(array_column($events, 'title'))->toContain('Payment initiation withheld');
+});
 
 test('finance officer can approve escalated transaction', function (): void {
     $inv = Invoice::create([
@@ -669,24 +562,29 @@ test('autonomous cycle splits 150 USDC aid into 100 auto plus 50 escalated', fun
         'Checking assistance policies',
         'Assistance checks recorded',
         'Assistance policy result recorded',
-        'Submitting payment',
-        'Payment response recorded',
+        'Payment initiation withheld',
         'Assistance outcome recorded',
     ])->and($aidEvents[1]['summary'])->toContain('within_auto_limit: failed')
         ->and($aidEvents[2]['status'])->toBe('partial_approval')
         ->and($aidEvents[2]['policy'])->toBe('BOUNDED_EMERGENCY_AID_V1')
         ->and($aidEvents[2]['summary'])->toBe('100 USDC approved automatically. Remaining 50 USDC escalated for review.')
-        ->and($aidEvents[3]['summary'])->toBe('Policy approved 100 USDC for submission. Payment outcome is not yet known.')
-        ->and($aidEvents[5]['status'])->toBe('in_progress')
-        ->and($aidEvents[5]['summary'])->toContain('decision status: escalated', 'does not verify on-chain settlement');
+        ->and($aidEvents[3]['status'])->toBe('requires_authorized_workflow')
+        ->and($aidEvents[3]['summary'])->toContain('may not initiate payment')
+        ->and($aidEvents[4]['status'])->toBe('in_progress')
+        // The partial decision keeps its escalated status: the remainder is
+        // still waiting on a human, which is the only way that money moves.
+        ->and($aidEvents[4]['summary'])->toContain('decision status: escalated', 'does not verify on-chain settlement');
 
     $updated = $aid->fresh();
 
+    // The partial approval is still computed and still escalated, but nothing
+    // was disbursed: the treasury and the fund are untouched by this agent.
     expect($updated->status instanceof AssistanceStatus ? $updated->status->value : $updated->status)->toBe(AssistanceStatus::IN_PROGRESS->value)
-        ->and($result['stats']['auto_paid'])->toBe(1)
+        ->and($result['stats']['auto_paid'])->toBe(0)
+        ->and($result['stats']['requires_authorized_workflow'])->toBe(1)
         ->and($result['stats']['escalated'])->toBe(1)
-        ->and($this->wallet->fresh()->balance)->toBe(25320.00)
-        ->and($fund->fresh()->balance_base_units)->toBe(9900_000000);
+        ->and($this->wallet->fresh()->balance)->toBe(25420.00)
+        ->and($fund->fresh()->balance_base_units)->toBe(10000_000000);
 
     $decision = AgentDecision::where('reference_id', $aid->id)
         ->where('reference_type', AssistanceRequest::class)
@@ -702,8 +600,10 @@ test('autonomous cycle splits 150 USDC aid into 100 auto plus 50 escalated', fun
     $officer = User::factory()->create(['name' => 'Finance Officer']);
     app(ApproveEscalatedRequest::class)->handle($aid, $decision, $officer, $fund, 'Remainder approved.');
 
+    // Only the escalated remainder moves, and only because a human approved
+    // it. The 100 USDC the policy engine proposed was never paid by the agent.
     expect($aid->fresh()->status instanceof AssistanceStatus ? $aid->fresh()->status->value : $aid->fresh()->status)->toBe(AssistanceStatus::RESOLVED->value)
-        ->and($this->wallet->fresh()->balance)->toBe(25270.00)
+        ->and($this->wallet->fresh()->balance)->toBe(25370.00)
         ->and($approval->fresh()->status)->toBe('approved');
 });
 
@@ -874,7 +774,9 @@ test('finance officer can approve student assistance escalation via agent', func
     expect($success)->toBeTrue()
         ->and($aid->fresh()->status instanceof AssistanceStatus ? $aid->fresh()->status->value : $aid->fresh()->status)->toBe(AssistanceStatus::RESOLVED->value)
         ->and($approval->fresh()->status)->toBe('approved')
-        ->and($this->wallet->fresh()->balance)->toBe(25270.00);
+        // Only the human-approved amount moves; nothing the agent proposed was
+        // paid before the officer acted.
+        ->and($this->wallet->fresh()->balance)->toBe(25370.00);
 });
 
 test('finance officer can reject student assistance escalation via agent', function (): void {
@@ -931,5 +833,7 @@ test('finance officer can reject student assistance escalation via agent', funct
         ->and($aid->fresh()->status instanceof AssistanceStatus ? $aid->fresh()->status->value : $aid->fresh()->status)->toBe(AssistanceStatus::CLOSED->value)
         ->and($approval->fresh()->status)->toBe('rejected')
         ->and($decision->fresh()->status)->toBe('rejected')
-        ->and($this->wallet->fresh()->balance)->toBe(25320.00); // 100 auto-paid stands, no additional 50 moved
+        // Nothing stands: the agent's proposed 100 was never paid, so the
+        // rejection leaves the treasury exactly where it started.
+        ->and($this->wallet->fresh()->balance)->toBe(25420.00);
 });

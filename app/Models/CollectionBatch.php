@@ -6,7 +6,9 @@ namespace App\Models;
 
 use App\Enums\CurrencyCode;
 use Brick\Math\BigInteger;
+use Illuminate\Database\Eloquent\Collection;
 use Illuminate\Database\Eloquent\Model;
+use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Str;
@@ -28,6 +30,10 @@ use Throwable;
  * @property Carbon $collected_until
  * @property array<string, mixed> $snapshot
  * @property string $snapshot_digest
+ * @property Carbon $created_at
+ * @property-read User|null $preparer
+ * @property-read Collection<int, CollectionBatchReview> $reviews
+ * @property-read Collection<int, FinanceWorkflowRun> $workflowRuns
  */
 class CollectionBatch extends Model
 {
@@ -70,6 +76,12 @@ class CollectionBatch extends Model
         return $this->hasMany(CollectionBatchReview::class);
     }
 
+    /** @return BelongsTo<User, $this> */
+    public function preparer(): BelongsTo
+    {
+        return $this->belongsTo(User::class, 'prepared_by');
+    }
+
     public function getCollectedFromAttribute(string $value): Carbon
     {
         return Carbon::parse($value, 'UTC');
@@ -92,7 +104,8 @@ class CollectionBatch extends Model
                 || ($s['source_reference'] ?? null) !== $this->source_reference || trim($this->source_reference) === ''
                 || ($s['source_document_digest'] ?? null) !== $this->source_document_digest || preg_match('/^[0-9a-f]{64}$/D', $this->source_document_digest) !== 1
                 || ($s['currency'] ?? null) !== $this->currency || CurrencyCode::tryFrom($this->currency) === null
-                || ($s['source_stream_disjoint_attested'] ?? null) !== true || ($s['received_not_forecast_attested'] ?? null) !== true) {
+                || ($s['source_stream_disjoint_attested'] ?? null) !== true || ($s['received_not_forecast_attested'] ?? null) !== true
+                || ! $this->hasValidDocumentMetadata($s)) {
                 return false;
             }
             foreach (['received_minor_units', 'restricted_minor_units'] as $field) {
@@ -112,6 +125,23 @@ class CollectionBatch extends Model
         } catch (Throwable) {
             return false;
         }
+    }
+
+    /** @param array<string, mixed> $snapshot */
+    private function hasValidDocumentMetadata(array $snapshot): bool
+    {
+        if (! array_key_exists('source_document', $snapshot)) {
+            return true;
+        }
+
+        $document = $snapshot['source_document'];
+
+        return is_array($document) && ($document['disk'] ?? null) === 'local'
+            && ($document['path'] ?? null) === 'collection-evidence/'.$this->organization_id.'/'.$this->capture_key.'/'.$this->source_document_digest
+            && is_string($document['name'] ?? null) && trim($document['name']) !== '' && mb_strlen($document['name']) <= 255
+            && preg_match('/[\x00-\x1f\x7f\/\\\\]/', $document['name']) === 0
+            && in_array($document['mime_type'] ?? null, ['application/pdf', 'image/jpeg', 'image/png', 'text/csv', 'text/plain', 'application/csv'], true)
+            && is_int($document['size_bytes'] ?? null) && $document['size_bytes'] > 0 && $document['size_bytes'] <= 10 * 1024 * 1024;
     }
 
     /** @return array<string, mixed> */

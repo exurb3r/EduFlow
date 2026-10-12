@@ -2,6 +2,6 @@
 
 declare(strict_types=1);
 
-test('that true is true', function (): void {
-    expect(true)->toBeTrue();
+test('JSON boolean round trip preserves true', function (): void {
+    expect(json_decode(json_encode(true, JSON_THROW_ON_ERROR), true, flags: JSON_THROW_ON_ERROR))->toBeTrue();
 });

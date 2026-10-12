@@ -18,7 +18,6 @@ use App\Models\AssistanceRequest;
 use App\Models\Budget;
 use App\Models\Invoice;
 use App\Models\Organization;
-use App\Models\Transaction;
 use App\Models\User;
 use App\Services\CircleWalletService;
 use App\Services\DecisionExplainer;
@@ -67,6 +66,7 @@ class EduFlowAgent
         $processedAssistance = [];
         $totalDisbursed = 0.00;
         $autoPaidCount = 0;
+        $requiresWorkflowCount = 0;
         $escalatedCount = 0;
         $heldCount = 0;
         $rejectedCount = 0;
@@ -121,34 +121,22 @@ class EduFlowAgent
 
             switch ($policyResult->decision) {
                 case AgentDecisionType::AUTO_APPROVE:
-                    $this->reportProgress($onProgress, 'execute', 'Submitting payment',
-                        "Policy approved {$invoice->amount} USDC for submission. Payment outcome is not yet known.",
-                        $decision, $invoice->reference, 'submitting');
+                    // This agent may no longer move money. A policy engine
+                    // returning AUTO_APPROVE records a *proposal*; it is not an
+                    // instruction to pay. Execution belongs to the reviewed
+                    // chain — a standing mandate admits an occurrence, and a
+                    // human authorizes an individual payment — and this path
+                    // bypasses every one of those gates.
+                    $this->reportProgress($onProgress, 'execute', 'Payment initiation withheld',
+                        'This agent may not initiate payment. The bill is routed to the authorized workflow for independent review, or to a standing mandate if one covers it.',
+                        $decision, $invoice->reference, 'requires_authorized_workflow');
 
-                    // Execute USDC transfer on Arc
-                    $tx = $this->circleService->executePayment(
-                        wallet: $wallet,
-                        recipientAddress: $invoice->vendor->wallet_address,
-                        amount: $invoice->amount,
-                        type: TransactionType::VENDOR_PAYMENT,
-                        referenceType: Invoice::class,
-                        referenceId: $invoice->id,
-                        metadata: ['invoice_reference' => $invoice->reference]
-                    );
+                    $decision->update(['status' => 'requires_authorized_workflow']);
 
-                    $this->reportProgress($onProgress, 'execute', 'Payment response recorded',
-                        $this->paymentResponseSummary($tx), $decision, $invoice->reference, 'response_recorded');
+                    $processedInvoices[] = ['reference' => $invoice->reference, 'decision' => 'requires_authorized_workflow',
+                        'reason' => 'Payment initiation is withheld; the authorized workflow decides, not this agent.'];
 
-                    // Update budget if assigned
-                    if ($invoice->budget) {
-                        $invoice->budget->recordExpense($invoice->amount);
-                    }
-
-                    $invoice->update(['status' => 'auto_paid']);
-                    $decision->update(['status' => 'executed']);
-
-                    $totalDisbursed += $invoice->amount;
-                    $autoPaidCount++;
+                    $requiresWorkflowCount++;
                     break;
 
                 case AgentDecisionType::ESCALATE:
@@ -192,7 +180,7 @@ class EduFlowAgent
         // 3. OBSERVE & EVALUATE STUDENT ASSISTANCE
         // Deterministic integer policy with locked FX quote (PLAN Part 2):
         // request -> quote lock -> canonical USDC evaluation -> disburse or escalate.
-        $aidBudget = Budget::where('organization_id', $org->id)
+        Budget::where('organization_id', $org->id)
             ->where('category', 'assistance')
             ->first();
 
@@ -312,34 +300,21 @@ class EduFlowAgent
             }
 
             if ($aidResult->decision === AgentDecisionType::AUTO_APPROVE || $aidResult->decision === AgentDecisionType::PARTIAL_APPROVAL) {
-                $this->reportProgress($onProgress, 'execute', 'Submitting payment',
-                    "Policy approved {$aidResult->approvedAmount} USDC for submission. Payment outcome is not yet known.",
-                    $decision, $aidRequest->ticket_number, 'submitting');
+                // Same rule as the vendor path: this agent proposes, it does
+                // not pay. A payout auto-disbursed by a policy engine is money
+                // nobody authorized, sent to a wallet whose ownership this
+                // agent never verified.
+                $this->reportProgress($onProgress, 'execute', 'Payment initiation withheld',
+                    'This agent may not initiate payment. Assistance disbursement requires an independently authorized workflow.',
+                    $decision, $aidRequest->ticket_number, 'requires_authorized_workflow');
 
-                $tx = $this->circleService->executePayment(
-                    wallet: $wallet,
-                    recipientAddress: $recipient,
-                    amount: $aidResult->approvedAmount,
-                    type: TransactionType::STUDENT_ASSISTANCE,
-                    referenceType: AssistanceRequest::class,
-                    referenceId: $aidRequest->id,
-                    metadata: [
-                        'ticket' => $aidRequest->ticket_number,
-                        'policy' => $aidResult->policyCode,
-                        'quote_id' => $out['quote']['quote_id'] ?? null,
-                    ]
-                );
-
-                $this->reportProgress($onProgress, 'execute', 'Payment response recorded',
-                    $this->paymentResponseSummary($tx), $decision, $aidRequest->ticket_number, 'response_recorded');
-
-                $fund->recordDisbursement((int) round($aidResult->approvedAmount * 1000000));
-
-                if ($aidBudget) {
-                    $aidBudget->recordExpense($aidResult->approvedAmount);
-                }
+                $requiresWorkflowCount++;
 
                 if ($aidResult->decision === AgentDecisionType::PARTIAL_APPROVAL) {
+                    // A partial approval is genuinely escalated: the remainder
+                    // still needs a human. Its decision keeps the escalated
+                    // status so the approve/reject actions stay visible, which
+                    // is the only route by which this money can ever move.
                     Approval::create([
                         'organization_id' => $org->id,
                         'agent_decision_id' => $decision->id,
@@ -348,22 +323,19 @@ class EduFlowAgent
 
                     $aidRequest->update([
                         'status' => AssistanceStatus::IN_PROGRESS,
-                        'admin_notes' => "EduFlow AI: {$explanation} Auto-disbursed {$aidResult->approvedAmount} USDC on Arc. Tx: {$tx->provider_tx_hash}",
+                        'admin_notes' => "EduFlow AI: {$explanation}. Payment initiation withheld; the escalated remainder requires officer review.",
                     ]);
 
                     $escalatedCount++;
                 } else {
+                    $decision->update(['status' => 'requires_authorized_workflow']);
+
                     $aidRequest->update([
                         'status' => AssistanceStatus::RESOLVED,
-                        'admin_notes' => "EduFlow AI: {$aidResult->reasoning}. Disbursed {$aidResult->approvedAmount} USDC on Arc. Tx: {$tx->provider_tx_hash}",
+                        'admin_notes' => "EduFlow AI: {$aidResult->reasoning}. Payment initiation withheld; requires authorized workflow review.",
                         'resolved_at' => now(),
                     ]);
-
-                    $decision->update(['status' => 'executed']);
                 }
-
-                $totalDisbursed += $aidResult->approvedAmount;
-                $autoPaidCount++;
             } elseif ($aidResult->decision === AgentDecisionType::HOLD) {
                 $aidRequest->update([
                     'admin_notes' => "EduFlow AI: {$aidResult->reasoning}. Held to protect minimum reserve.",
@@ -411,7 +383,14 @@ class EduFlowAgent
             'processed_invoices' => $processedInvoices,
             'processed_assistance' => $processedAssistance,
             'stats' => [
+                // Always zero. This agent can no longer initiate a payment, so
+                // "auto_paid" is kept as a reported zero rather than quietly
+                // removed: a dashboard reading 0 here is a fact about the
+                // system, and its absence would be ambiguous.
                 'auto_paid' => $autoPaidCount,
+                // Proposals a policy engine approved that this agent refuses to
+                // act on. These are the ones the authorized workflow must take.
+                'requires_authorized_workflow' => $requiresWorkflowCount,
                 'escalated' => $escalatedCount,
                 'held' => $heldCount,
                 'rejected' => $rejectedCount,
@@ -453,15 +432,6 @@ class EduFlowAgent
         }
 
         $onProgress($event);
-    }
-
-    private function paymentResponseSummary(Transaction $transaction): string
-    {
-        return match ($transaction->metadata['is_fake'] ?? null) {
-            true => 'Fake-driver simulation response recorded. No live transfer occurred; this is not chain-verified settlement.',
-            false => 'Unverified live provider response recorded. On-chain settlement has not been verified.',
-            default => 'Provider response recorded without simulation provenance. On-chain settlement has not been verified.',
-        };
     }
 
     /**

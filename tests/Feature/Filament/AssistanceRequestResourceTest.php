@@ -3,7 +3,20 @@
 declare(strict_types=1);
 
 use App\Enums\AssistanceStatus;
+use App\Filament\Finance\Widgets\ApprovalInboxWidget;
+use App\Filament\Finance\Widgets\ArcSettlementWidget;
+use App\Filament\Finance\Widgets\AutonomyLaneWidget;
+use App\Filament\Finance\Widgets\BudgetCapacityWidget;
+use App\Filament\Finance\Widgets\BudgetHeadroomChart;
+use App\Filament\Finance\Widgets\CollectionsOverviewWidget;
+use App\Filament\Finance\Widgets\CollectionsTrendChart;
+use App\Filament\Finance\Widgets\EvidenceTimelineWidget;
+use App\Filament\Finance\Widgets\OperationsHealthWidget;
+use App\Filament\Finance\Widgets\PaymentDecisionChart;
+use App\Filament\Finance\Widgets\WorkflowRunStateChart;
+use App\Filament\Finance\Widgets\WorkflowRunWidget;
 use App\Filament\Pages\Collections;
+use App\Filament\Pages\FinanceDashboard;
 use App\Filament\Pages\FinanceSupervisor;
 use App\Filament\Pages\PaymentReviews;
 use App\Filament\Resources\AssistanceRequests\AssistanceRequestResource;
@@ -69,13 +82,26 @@ test('navigation badge reflects pending requests count', function (): void {
     expect(AssistanceRequestResource::getNavigationBadge())->toBe('2');
 });
 
-test('finance panel exposes student finance resources and workflow pages without plugins or settings resources', function (): void {
+test('finance panel exposes the supervisor dashboard, workflow pages and no plugins or clusters', function (): void {
     $panel = Filament::getPanel('finance');
 
     expect($panel->getResources())->toBe([StudentResource::class, TuitionAccountResource::class, AssistanceRequestResource::class])
-        ->and($panel->getPages())->toBe([FinanceSupervisor::class, Collections::class, PaymentReviews::class])
+        ->and($panel->getPages())->toBe([FinanceDashboard::class, FinanceSupervisor::class, Collections::class, PaymentReviews::class])
         ->and($panel->getClusters())->toBeEmpty()
-        ->and($panel->getWidgets())->toBeEmpty()
+        ->and($panel->getWidgets())->toEqualCanonicalizing([
+            ApprovalInboxWidget::class,
+            CollectionsOverviewWidget::class,
+            CollectionsTrendChart::class,
+            BudgetCapacityWidget::class,
+            BudgetHeadroomChart::class,
+            ArcSettlementWidget::class,
+            WorkflowRunWidget::class,
+            WorkflowRunStateChart::class,
+            AutonomyLaneWidget::class,
+            EvidenceTimelineWidget::class,
+            PaymentDecisionChart::class,
+            OperationsHealthWidget::class,
+        ])
         ->and($panel->getPlugins())->toBeEmpty();
 });
 

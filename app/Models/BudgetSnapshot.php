@@ -7,6 +7,7 @@ namespace App\Models;
 use App\Enums\CurrencyCode;
 use Brick\Math\BigInteger;
 use Illuminate\Database\Eloquent\Model;
+use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\BelongsToMany;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Support\Carbon;
@@ -156,6 +157,12 @@ class BudgetSnapshot extends Model
         }
 
         return (string) $received === $content['amounts']['realized_receipts'] && $restricted->isLessThanOrEqualTo($content['amounts']['restricted_cash']);
+    }
+
+    /** @return BelongsTo<Budget, $this> */
+    public function budget(): BelongsTo
+    {
+        return $this->belongsTo(Budget::class);
     }
 
     /** @return HasMany<FinanceWorkflowRun, $this> */

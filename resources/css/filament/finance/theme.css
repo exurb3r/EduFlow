@@ -1,0 +1,79 @@
+@import '../../../../vendor/filament/filament/resources/css/theme.css';
+@import '../payment-workspace.css';
+@import '../collections-workspace.css';
+
+@source '../../../../app/Filament/Finance/**/*';
+@source '../../../../resources/views/filament/finance/**/*';
+@source '../../../../app/Filament/Pages/PaymentReviews.php';
+@source '../../../../resources/views/filament/pages/payment-reviews.blade.php';
+@source '../../../../app/Filament/Pages/Collections.php';
+@source '../../../../resources/views/filament/pages/collections.blade.php';
+
+@layer components {
+    /*
+     * Finance screens are read as evidence, so a digest, a base address and a
+     * source reference must be visually distinct from an amount or a name.
+     * Monospace plus a muted tone keeps "this is an identifier" readable at a
+     * glance without anyone having to hover a tooltip.
+     */
+    .fi-finance-evidence {
+        font-family: var(
+            --fi-font-mono,
+            ui-monospace,
+            SFMono-Regular,
+            Menlo,
+            monospace
+        );
+        font-size: 0.75rem;
+        letter-spacing: -0.01em;
+        color: var(--color-gray-500);
+
+        &.dark {
+            color: var(--color-gray-400);
+        }
+    }
+
+    /*
+     * Exact money is the point of this panel. Tabular figures keep columns of
+     * base-unit amounts aligned so a reviewer can scan a column for a decimal
+     * place that should not be there.
+     */
+    .fi-finance-amount {
+        font-variant-numeric: tabular-nums;
+        font-feature-settings: 'tnum';
+    }
+
+    /*
+     * Panel and chart headings that lead to the page where the underlying
+     * records are managed. The affordance is always visible rather than
+     * hover-only: a supervisor who cannot tell a link from a label will not
+     * go looking for the queue behind the number.
+     */
+    .fi-finance-heading-link {
+        text-decoration-line: underline;
+        text-decoration-color: color-mix(
+            in oklab,
+            currentColor 35%,
+            transparent
+        );
+        text-underline-offset: 3px;
+        transition: text-decoration-color 150ms ease;
+
+        &:hover {
+            text-decoration-color: currentColor;
+        }
+    }
+
+    .fi-finance-inbox {
+        border-radius: 0.875rem;
+
+        &.fi-section {
+            border-radius: 1rem;
+            box-shadow: none;
+        }
+
+        & table {
+            font-variant-numeric: tabular-nums;
+        }
+    }
+}

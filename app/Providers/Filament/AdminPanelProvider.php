@@ -4,7 +4,9 @@ namespace App\Providers\Filament;
 
 use AlizHarb\ActivityLog\ActivityLogPlugin;
 use App\Filament\Pages\Auth\EditProfile;
+use App\Filament\Pages\Collections;
 use App\Filament\Pages\Dashboard;
+use App\Filament\Pages\PaymentReviews;
 use BezhanSalleh\FilamentShield\FilamentShieldPlugin;
 use Filament\Actions\Action;
 use Filament\Auth\MultiFactor\App\AppAuthentication;
@@ -13,6 +15,7 @@ use Filament\Http\Middleware\Authenticate;
 use Filament\Http\Middleware\AuthenticateSession;
 use Filament\Http\Middleware\DisableBladeIconComponents;
 use Filament\Http\Middleware\DispatchServingFilamentEvent;
+use Filament\Navigation\NavigationGroup;
 use Filament\Panel;
 use Filament\PanelProvider;
 use Filament\Support\Colors\Color;
@@ -46,6 +49,15 @@ class AdminPanelProvider extends PanelProvider
             ->colors([
                 'primary' => Color::Amber,
             ])
+            ->navigationGroups([
+                NavigationGroup::make('Finance records')
+                    ->collapsible(false),
+                NavigationGroup::make('Student Services'),
+                NavigationGroup::make('AI Intelligence')
+                    ->collapsed(),
+                NavigationGroup::make('Settings'),
+                NavigationGroup::make('System'),
+            ])
             ->profile(EditProfile::class, isSimple: false)
             ->userMenuItems([
                 'profile' => fn (Action $action): Action => $action
@@ -63,6 +75,8 @@ class AdminPanelProvider extends PanelProvider
             ->discoverClusters(in: app_path('Filament/Clusters'), for: 'App\Filament\Clusters')
             ->pages([
                 Dashboard::class,
+                Collections::class,
+                PaymentReviews::class,
             ])
             ->discoverWidgets(in: app_path('Filament/Widgets'), for: 'App\Filament\Widgets')
             ->widgets([

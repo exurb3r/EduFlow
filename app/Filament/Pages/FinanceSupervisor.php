@@ -17,9 +17,6 @@ use App\Models\PaymentIntent;
 use App\Models\User;
 use App\Services\InstallationInstitution;
 use BackedEnum;
-use Brick\Math\BigDecimal;
-use Brick\Math\BigInteger;
-use Brick\Math\Exception\IntegerOverflowException;
 use Filament\Actions\Action;
 use Filament\Forms\Components\Checkbox;
 use Filament\Forms\Components\DatePicker;
@@ -523,19 +520,6 @@ class FinanceSupervisor extends Page implements HasTable
 
     private function formatUnits(mixed $units, mixed $currency): string
     {
-        $code = is_string($currency) ? CurrencyCode::tryFrom($currency) : null;
-        if ($code === null || (! is_string($units) && ! is_int($units)) || preg_match('/^-?(?:0|[1-9][0-9]*)$/D', (string) $units) !== 1) {
-            return 'Exact amount unavailable';
-        }
-        $integer = BigInteger::of($units);
-        try {
-            return new Money($integer->toInt(), $code)->format().' '.$code->value;
-        } catch (IntegerOverflowException) {
-            /** Aggregate headroom and valuations may exceed one Money integer without losing precision. */
-            $decimal = (string) BigDecimal::ofUnscaledValue($integer, $code->decimals());
-            [$whole, $fraction] = explode('.', $decimal, 2);
-
-            return preg_replace('/\B(?=(\d{3})+(?!\d))/', ',', $whole).'.'.$fraction.' '.$code->value;
-        }
+        return Money::formatExact($units, $currency);
     }
 }

@@ -2,7 +2,302 @@
 
 **Tagline:** Open-source institutional finance agent and payment orchestration, powered by Circle Agent Stack and USDC settlement on Arc.
 
-**Document scope:** Parts 1–5 describe the existing implementation and developer demos. Sections 5–11 define the institution-ready OSS release track; Section 12 records Circle/Arc research and the institution-first architecture; Section 13 catalogs wider operational events. **Section 14 is the authoritative current hackathon pilot scope, delivery order and acceptance contract.** It supersedes older demo priorities, not financial safety or production release gates. Proposed capabilities are not shipped features; a completed demo milestone is not a production-readiness claim.
+**Document scope:** Parts 1–5 describe the existing implementation and developer demos. Sections 5–11 define the institution-ready OSS release track; Section 12 records Circle/Arc research and the institution-first architecture; Section 13 catalogs wider operational events. **Section 14 is the authoritative current hackathon pilot scope, delivery order and acceptance contract.** It supersedes older demo priorities, not financial safety or production release gates. **Section 15 answers who holds a student or vendor wallet and why the two counterparty legs are unmodelled; it constrains Section 6.1's capability claims but does not expand the Section 14 pilot.** **Sections 16–18 record current delivery state: the rebuilt admin and finance dashboards (§16), the end-to-end fee-to-vendor trace with per-step build status (§17), and the bounded autonomous lane design and its blockers (§18).** Proposed capabilities are not shipped features; a completed demo milestone is not a production-readiness claim.
+
+## Where Things Stand — Start Here in a New Session
+
+**Admin UI audit and approval redesign (2026-10-11):** Payment Approvals now puts exact
+review counts, a short safety notice and the review queue ahead of setup guidance. The shared
+admin/finance page uses a ReUI Frame/card/step composition adapted to Blade, not React ReUI
+components mounted inside Livewire. It provides a reviewer-prerequisite checklist, explicit
+next-step reasons, a visible review-history filter, a three-stage review drawer and expandable
+digest evidence. Mobile tables stack into cards. Payment Submissions has a readable navigation
+label, exact six-decimal USDC amounts and separate provider-ID/hash/settlement wording; missing
+handles never imply no transfer. No payment execution setting was changed. **222 affected
+Pest tests pass (925 assertions); the asset build passes.** Chromium browser checks exercised
+desktop, finance mobile, dark mode and opening the review drawer with isolated test fixtures,
+not live approvals. See **§16.6** for screen availability and remaining work.
+
+**Read this correction before older live-run notes below:** no genuine, independently
+human-approved payment has yet been proven through the current workflow. The earlier live
+runner used synthetic staff accounts, authenticator factors and purported review evidence;
+database records from that runner are not proof of human consent. Outbox #3 remains an
+unresolved investigation, with no established provider handle or chain hash. A balance
+snapshot, an empty provider-history observation or an HTTP 400 does **not** prove no payment
+was accepted. Earlier conclusions that `--quiet` caused the error, or that a fee-shaped response
+proved nothing broadcast, remain unestablished. Investigate existing attempts before resending.
+The package's published `v2.8.0` has not been adopted here: EduFlow still locks `v2.7.0`.
+
+**Payment approval navigation (2026-10-11):** `PaymentReviews` is now explicitly registered in the admin panel as **Automation → Payment Approvals**, with a shortcut from Payment Submissions. Previously only the finance route was registered. Both panels retain the existing review policy, independent reviewer/direct permission/MFA requirements, and exact reservation evidence. This UI records authority only; it does not itself submit a transfer. Submission history is read-only, and agent advice is not payment authority. Navigation/rendering and existing authorization/dashboard regressions pass (88 tests combined). Live payment transport and safe unresolved-attempt recovery remain separate blockers.
+
+**The rail is live as of 2026-10-11.** Circle CLI v1.2.1 is installed via npm global
+(`@circle-fin/cli`); PATH resolves a stale `mise` shim named `circle` first, so `LEPTON_CIRCLE_BIN`
+points at the real binary. The agent session is **authenticated for ARC-TESTNET and ARC** (valid,
+~15 days). `arc-canteen` serves `eth_blockNumber`, `eth_getBalance`, `eth_getTransactionReceipt`,
+`eth_getTransactionByHash` and `eth_getBlockByNumber` against chain `5042002`. The treasury holds
+**64.9 USDC**. `circle terms show` reports Terms **Accepted** — already done, nothing to accept.
+
+**Two real defects were found in the settlement predicate by reading the Arc docs and real receipts,
+and both are fixed (`bb99a69`, `23782fd`).** Neither was visible from tests alone, and either one
+would have made *every* real payment unreadable:
+
+1. **Transfer logs were read at 6 decimals regardless of emitter.** Arc emits two USDC streams — the
+   EIP-7708 native system emitter `0xffff…fffe` at **18** decimals, and NativeFiatToken
+   `0x3600…0000` at **6**. A real 30 USDC transfer logged `30000000000000000000`; read as 6 decimals
+   that is **30,000,000,000,000 USDC**. Matching is now keyed on emitter address, and an emitter of
+   unknown scale is skipped rather than guessed at.
+2. **The sender was read from the transaction envelope.** Circle agent wallets do not transact from
+   their own address: a real receipt has `from` = relayer `0x9ae75f…`, `to` = delegated account
+   `0x0000000071…`, and `value` = 0. The treasury appears **only** as the `from` topic of the system
+   Transfer log. Since every payment this system makes goes through an agent wallet, requiring
+   `tx.from == treasury` refused all of them as `mismatched`. The sender is now established from
+   whichever stream carries the movement; the log is stronger evidence anyway, since it binds the
+   sender to *this* movement and cannot be forged.
+
+Also corrected against the docs: **Arc has deterministic finality** — receipts are immediately
+authoritative, no reorgs, confirmation count 1. The block read had been *gating* settlement on a reorg
+risk that does not exist, so an RPC hiccup could strand a genuinely paid vendor as unresolved
+forever. It now supplies corroborating evidence (block hash, timestamp) and recorded
+`matched_interfaces`, and can no longer unsettle a payment the chain already made final.
+
+**Validated against three completed Circle transfers on ARC-TESTNET** (30, 45 and 0.01 USDC): all
+verify, fees read from receipts (0.006351 / 0.003811 / 0.003185 USDC). Negative controls still
+refuse — amount one base unit high, substituted recipient, and a never-broadcast hash all return
+`mismatched` / `not_found`, never settled.
+
+**Known gap in the fee ceiling (2026-10-11).** `ArcSettlementVerifier` bounds
+`max_fee_base_units` against `gasUsed × effectiveGasPrice` from the receipt, which is the only fee the
+receipt can prove. Real ARC-TESTNET transfers show that is *not* the whole cost. For the 30 USDC
+transfer, receipt gas was 0.006351 USDC, Circle reported `networkFee` 0.006834, and a further system
+transfer of 0.014456 USDC moved from the delegate account to the relayer. For the 45 USDC transfer,
+receipt gas was 0.003812 while Circle's `networkFee` and the delegate→relayer amount were both
+0.009717. So an authorised fee ceiling of, say, 0.01 USDC would pass while the wallet actually paid
+0.0208. The ceiling is sound for *on-chain gas* and silent about Circle's own charge and the relayer
+reimbursement. Either bound those explicitly or stop describing it as a total-cost ceiling.
+
+**The live run reached a durable, authorized submission, and stopped at the rail's asynchrony (2026-10-11).**
+The whole §14.4 Step 4 human lane ran end to end on the real chain: reviewed destination, reviewed
+invoice, closed budget snapshot, funding window, reservation, independent enrolment, MFA-backed
+authorization by a named reviewer, and a durable outbox entry. Then `eduflow:dispatch-payment-submissions`
+and the worker ran, and the transfer did **not** broadcast.
+
+`circle wallet transfer` without `--quiet` returns a fee preview — `gasLimit`, `networkFee`,
+`baseFee`, `priorityFee`, `maxFee` — and submits nothing. The response the executor received was
+byte-for-byte the same shape as an explicit `--estimate`, and `circle transaction list` afterwards
+showed no new transaction: the newest is still 2026-10-02. **No money moved.**
+
+**This is the remaining gap, and it is architectural.** Circle agent wallets are asynchronous.
+`circle wallet transfer --help` states that `--quiet` returns "transaction hash for local wallets,
+**transaction ID for agent wallets**". Our wallet is `"type": "agent"`, so even a successful quiet
+submit returns a UUID like `116c7ce7-8f2f-53ac-8b06-f18aac151ce3`, not a `0x…` hash.
+`CircleCliGateway::transfer()` requires `txHash` in the response and throws without it — correctly,
+because it must never record a fake reference — so **every** real agent-wallet payment currently ends
+`unknown` with no reference.
+
+The submission path needs three stages, not one: quiet submit → Circle transaction id → poll
+`circle transaction list` until the id reaches `COMPLETE` or `FAILED` → take `txHash` → verify on
+chain. That also forces a wording decision: after a successful submit but before inclusion the honest
+state is *accepted by Circle, not yet on chain*, which is not the same claim as `submitted`, and
+`submitted` is deliberately excluded from `DISPATCHABLE_STATES` for exactly this reason. The stop
+switch, the lease recovery and the `unknown` reconciliation path all already cope.
+
+**What went right when it stopped, and is worth keeping:** the executor recorded `unknown` with **no**
+`provider_reference`, wrote **zero** `transactions`, reported `payments_submitted: 0`, retained the
+capacity hold rather than releasing it on a false negative, and `eduflow:reconcile-payment-submissions`
+correctly reported "No submitted references await verification" — it did not go looking for a
+settlement that never existed.
+
+**Advisory AI lane (2026-10-11) — Jev classification, no authority.** `laravel/ai` v1.0.1 is installed
+and `config/ai.php` already defaults `default_for_classification` to `typesafe`. Jev (TypeSafe's
+"System One" model) answers classification questions in milliseconds for a small fraction of a text
+model's cost, and is reached through `Str::decide($value, $question, $criteria, threshold:, timeout:)`
+— a boolean with a confidence threshold — or `Collection::decide()` for routing.
+
+`MandateCandidateRanker` uses it for exactly one purpose: telling a supervisor **which bills might
+deserve a standing mandate**, judged on whether the bill recurs and whether its amount is stable. It is
+advisory, and the boundary is structural rather than a matter of good intentions:
+
+- `AdvisoryMandateRanking` has no amount, no recipient, no ceiling and no verdict in the type. There
+  is nothing in it a caller could promote into a payment even by accident. It records
+  `advisory_only: true` and `decides_payment: false` on every row.
+- Its output is never fed to `MandateReleaseEvaluator`, which remains a pure function of evidence.
+- A model ranking makes a mandate review *faster*; it cannot replace the reviewer who signs it, or the
+  deterministic evaluate-each-occurrence step that follows.
+- The threshold for "is this recurring" is 0.75 — deliberately high, because a false positive is an
+  unattended payment while a false negative only costs a reviewer a moment. A bill with an unstable
+  amount is demoted rather than hidden, since a variable bill is exactly where unattended payment is
+  most dangerous.
+- Fail-closed: no key, an unreachable provider, or a provider error returns null. A missing model
+  costs reading time; a model that failed *open* could widen what pays without a human. A provider
+  failure discards the whole ranking rather than returning a partial one, which would read as a
+  considered judgement about whichever bills survived.
+
+Needs a `TYPESAFE_API_KEY` or `OPENROUTER_API_KEY` and `AiSettings::advisory_enabled` — all unset, so
+it degrades to null today, which is the correct default.
+
+**The live run now reaches the rail, and stops at one Circle CLI invocation (2026-10-11).** The full
+§14.4 human lane ran end to end on the real chain: reviewed destination, reviewed invoice, closed
+budget snapshot, funding window, reservation, independent enrolment, MFA-backed authorization by a
+named reviewer, durable outbox entry, and dispatch into the worker.
+
+The transport then submitted and **Circle refused it**:
+
+```
+circle wallet transfer 0x48a1… --amount 5 --address 0x19be… --chain ARC-TESTNET
+    --idempotency-key eduflow:… --quiet
+  → Error: Service returned error 400: Invalid request body.
+```
+
+The balance is unchanged at 64.9 USDC and `circle transaction list` shows no new transaction, so
+**no money moved**. Two invocations are now ruled out for this wallet:
+
+  - **without** `--quiet`: the CLI answers with a fee preview (`gasLimit`, `networkFee`, `baseFee`,
+    `priorityFee`, `maxFee`) and broadcasts nothing — identical in shape to `--estimate`. Verified
+    by checking the transaction list afterwards.
+  - **with** `--quiet`: the CLI returns HTTP 400 "Invalid request body".
+
+So the working invocation for an agent-wallet transfer is still unknown. `circle wallet transfer
+--help` offers only `--amount --token --address --chain --rpc-url --idempotency-key --estimate
+--output --quiet`, and the one flag that would force a real submit is the one the service rejects.
+Next step is to read the CLI's own reference (`use-circle-cli` skill, `references/cli-operations.md`)
+or file a `circle feedback submit` for the missing capability, rather than guess at more flags.
+
+**Also fixed in this pass:** the `unknown` outcome was discarding the provider's actual message, which
+made "the rail refused this submission" indistinguishable from "we could not reach the rail" — two
+different investigations. The detail is now recorded on the append-only attempt.
+
+**Delivered and tested (2026-10-11):** Section 16 (both panels rebuilt against this plan), the
+durable submission outbox, reviewed reservation release, the isolated executor with the Arc
+settlement predicate, reviewed funding-window rollover, the standing-mandate lane (§18.4 records plus
+the sessionless occurrence scanner), and the enforced nonzero-allowance gate that previously existed
+in config but was read nowhere. The legacy `EduFlowAgent` auto-pay route is **disabled** — both the
+vendor and assistance branches now require the authorized workflow. **1400 Pest tests pass
+(3 skipped).**
+
+**Not built, in dependency order — this is the critical path:**
+
+1. **Live testnet run** — the environment is ready and the rail is reachable; what remains is the one
+   authorisation-to-execution run itself, end to end, with its settlement verified on-chain.
+2. **Institution-scoped service authority** — the autonomous scanner deliberately stops at a
+   recorded disposition and creates no payment intent. Turning a `release` into a payment needs
+   explicit service authority, **not** a fabricated human actor passed to a staff action.
+3. **The standing mandate** (§18.4) — delivered; its initial allowance is zero by construction, so
+   the lane releases nothing until a reviewer raises a ceiling and the installation flag allows it.
+4. **Inbound collection** (§12.5, §15.6) — entirely unmodelled; no payer identity exists.
+
+**Ordering corrections (2026-10-10, reaffirmed 2026-10-11):** an earlier revision listed
+rollover first. That was wrong. Rollover is an unattended-operation blocker; the §14.4 Step 4/5
+human lane already has its 15-minute window in hand. The outbox was therefore built first, then
+the executor, then rollover, then the mandate — in that order, and the chain has still never
+run live.
+
+**Delivered (2026-10-10): durable submission outbox and attempt identity.**
+`PaymentSubmissionOutbox` is written inside the authorization's own transaction, so an
+approved payment can never exist without a durable obligation to submit it — the
+commit-to-broker gap is closed by construction rather than by a retry. Identity
+(`request_key`, `provider_idempotency_key = eduflow:{request_key}`, and every bound digest)
+is immutable and stable across replays; only queue progress moves, and a concluded entry can
+never be reopened. `PaymentSubmissionAttempt` is append-only with dense numbering, so a gap
+means a lost write rather than a silent skip. The submission key is a UUIDv5 derived from the
+authorization digest, so re-running the same review recomputes the same identity instead of
+minting a second owed payment. A simulated (fake-driver) approval is deliberately **not**
+queued: rehearsal must never become work a rail could act on. The runtime
+(`EDUFLOW_SUBMISSION_ENABLED`) defaults off and refuses a `sync` connection; the worker
+re-reads authority rather than trusting the enqueue moment, treats an expired approval or
+expired worker lease as `unknown` to be reconciled rather than retried blindly, honours the
+stop switch without erasing evidence or releasing a hold, and **submits nothing** while the
+runtime is off — each pass records one append-only attempt and concludes `blocked` with an
+explicit reason. `can_execute`, `payments_submitted` and `external_funds_locked` stay false
+throughout.
+
+**Delivered (2026-10-11): reviewed funding-window rollover.** A window lives 15 minutes and is
+immutable, so an unattended lane had no way to renew. `RollOverFundingWindow` replaces an
+**expired** window with a freshly observed, reviewable one, on the same budget allocation, and
+only an expired one — superseding a live window would strand the holds and approvals a supervisor
+is mid-way through it. The successor still needs `ApproveFundingWindow` like any other window.
+Rollover renews the *clock*, never the money: the hold chain is institution-wide and cumulative,
+and `ReservationCapacity::verify()` now resolves each historical hold against **the window it was
+taken under** rather than the current one, so re-observed cash can never look like corruption.
+Approving a successor *retires* the predecessor's approval via `retire()` — a state transition on
+otherwise append-only evidence — so exactly one approval is live per institution while payments
+already authorized under the old one stay authorized. Lineage (`supersedes_funding_window_id` +
+a digest-bound `supersedes` block) is unique per predecessor, so renewal is a chain of distinct
+windows rather than a branch, and a successor cannot claim to have superseded a window that had
+not actually ended.
+
+**Three things this needed that were not obvious:**
+
+- **`funding_window_approvals.organization_id` was unique**, and its own comment said it held
+  "until reviewed rollover/allocation semantics exist". Those semantics now exist, so the
+  constraint is dropped and the invariant it used to enforce is held in code: at most one live
+  approval per institution, checked under the institution row lock the action already takes.
+- **Approval retirement must not touch `content()`.** That method is digest-verified, so retiring
+  an approval by editing it would invalidate every payment authorized while it was live. The
+  retirement columns are the *only* attributes `updating()` permits.
+- **The idempotent-replay path must run before any expired-window guard.** Otherwise a worker
+  retrying a hold it already recorded is refused once its window expires, which breaks exactly
+  the identity-stability-across-replays property the outbox pattern depends on.
+
+
+settlement are now separate acts, which is the point. `ProcessPaymentSubmission` can only reach
+`submitted` — it re-reads authority, runs a non-broadcasting fee estimate, and submits once
+under the outbox's stable `provider_idempotency_key`. `IsolatedPaymentExecutor` is the only
+component with signing authority; it refuses unless the runtime is on, the recipient is a usable
+address, and the bound rail is Arc *testnet* with no fallback (mainnet is refused even when the
+runtime is forced on). A timeout or malformed response is reported `unknown`, never `failed`:
+the honest response is to reconcile the existing attempt, because a blind resend risks paying
+twice. `ArcSettlementVerifier` is the strict predicate and the only thing that may say `settled`:
+it requires successful execution **in a committed block** plus matching sender, recipient and
+amount, accepting either the 18-decimal native value or a canonical 6-decimal ERC-20 `Transfer`
+log, and refusing an amount present on both rather than double-counting. Its non-`verified`
+verdicts are deliberately non-committal about fault — `pending`, `dropped`, `not_found` and
+`unreadable` all mean "unresolved, investigate", never "fabricated". That null-lookup-is-
+fabrication rule is the specific defect `LeptonReconciliationService` still carries; it is used
+by `lepton:reconcile` for historical audit and was deliberately left alone rather than
+rewritten under a different verdict vocabulary, but it should not be trusted as settlement proof.
+
+**Four things found while building the above, which must not be regressed:**
+
+- **Fee ceilings were vacuous.** `actualFeeBaseUnits` cast a `BigInteger` quotient with `(int)`,
+  which silently yields `1`. Every fee check therefore passed. It is now `->toInt()`, with an
+  end-to-end test that drives an over-ceiling fee through the reconciler.
+- **A submitted entry must never be re-dispatched.** `submitted` is an *open* state (settlement
+  is unproven, capacity stays held) but it is deliberately excluded from `DISPATCHABLE_STATES`,
+  because handing an already-sent entry back to a worker is a second submission. Open means owed;
+  it does not mean unsent.
+- **`transactions.amount` was `decimal(15,2)`,** which cannot hold 6-decimal USDC — a 25.000001
+  bill rendered as 25.00. Widened to `decimal(24,6)`. Note SQLite still stores `decimal` as a
+  double, so the authoritative amount is the integer `metadata.amount_base_units`; the column is
+  a convenience view. The exact settlement evidence also now carries `provider_reference`
+  forward, since `reconcile()` was overwriting it on the very step that completes an entry.
+
+**Ordering correction (2026-10-11):** the previous revision of this block said the executor was
+the sole blocker and that rollover was still open. Both halves were wrong — the executor now
+ships and rollover is delivered. What remains before §14.4 Step 4 can be closed end to end is a
+**live testnet run** of the executor path plus an operator decision on testnet submission
+authority. After that: the standing mandate (§18), then inbound collection.
+
+**Delivered since the dashboards (2026-10-10): reviewed reservation release.**
+`PaymentReservationRelease` + `PaymentReservationReleaseReview`, append-only, maker/checker
+where neither the proposer nor the original holder may decide. Capacity comes back without
+rewriting the hold or its cumulative chain: `ReservationCapacity` distinguishes the
+historical `chainTotal` (what was held, in order, reproducible forever) from
+`consumingTotal` (what is unavailable now). An authorized hold can never be released, a
+release frees capacity but never money, and `ProposePaymentIntentChange` now unblocks once
+the hold is released. `can_execute` remains false throughout.
+
+**Three corrections a new session must not regress on:**
+
+- **The planner cannot choose bills.** `DepartmentBudgetPlanner` walks a closed, staff-selected
+  set (`bill_ids`) in due-date order. It may only say *of the bills you approved, these fit
+  today's headroom*. There is no bill discovery, ranking or selection anywhere.
+- **No model runs in the finance decision path.** Every `AgentDecision::create()` site is the
+  legacy *student assistance* path. The vendor-payment chain is deterministic PHP only.
+- **A standing mandate, not an agent, decides automatic payments** (§18.1). The SDK's
+  `Approvable` seam is for *interactive* approval; the autonomous lane must be sessionless
+  and model-free.
+
+**Open decisions for the owner:** §11 items 6 and 7.
 
 **Product direction confirmed by the owner:** Circle Agent Stack and Arc USDC are the primary finance execution infrastructure, not an optional side feature. Keep MIT and one institution per self-hosted instance. Keep **Circle Agent Wallets through Lepton for this hackathon**; Developer-Controlled Wallets remain a later institutional deployment decision. The first finance pilot must operate with zero students. Installation, fake simulation and read-only previews must not submit payments; actual testnet execution requires separate explicit authorization. Mainnet and real college fund movement remain out of scope. LLM advisory stays optional.
 
@@ -617,6 +912,13 @@ An internal tuition credit does not move USDC. Manual bank evidence is a separat
 not independent bank proof. A local-currency recipient needs an approved off-ramp, not
 an invented wallet address or a claim that Circle automatically pays every local bank.
 
+**Counterparty wallets are not institution wallets.** Section 15 is authoritative for who
+holds a student or vendor address. The institution provisions one wallet for itself and
+never custodies a student's or a vendor's funds. "Receivables and inbound matching" below
+additionally requires a §12.5 inbox and an explicit payer identity; "vendor bills"
+additionally require a counterparty destination **type** and the settlement predicate that
+type implies — an on-chain receipt cannot close a custodian or payout-partner obligation.
+
 ### 6.2 License and Sustainable OSS
 
 - **Keep existing MIT license.** Schools may use, modify, redistribute, or sell their
@@ -1116,6 +1418,23 @@ Decisions to confirm before implementation:
    Agree runtime, recovery and maintenance commitments from measured results.
 5. Authorize credential remediation, seed safety changes and schema/payment refactoring
    as implementation work. This document does not execute those changes or transactions.
+6. Decide the counterparty model before any inbound or live-vendor work (§15.9): whether
+   aggregated collection is in scope at all, whether custodian/payout-partner settlement
+   is in scope for any target jurisdiction, whether an institution-custodial ledger
+   product is explicitly out of scope, and whether `Student.payout_address` is confirmed
+   legacy. These decisions are what make EduFlow a two-legged system or confirm it stays a
+   one-way payment-mirroring tool.
+7. Confirm the bounded autonomous lane framing and its dependency order (§18.8): a standing
+   mandate decides the class of payment, deterministic PHP decides each occurrence, the model
+   never authorises, the initial allowance is zero, and the executor chain (§18.7) precedes
+   the mandate rather than running alongside it. Also confirm that retrospective agreement
+   (§18.6) is acceptable hackathon evidence provided it is always labelled retrospective.
+
+**Next implementation batch, concretely:** §17.3 — reviewed reservation release and funding
+rollover, then durable outbox and attempt identity, then the isolated executor and Arc
+settlement verification. Only after those does §18's mandate work become meaningful. Do not
+start the mandate first; a lane that authorises payments it cannot execute is worse than no
+lane, because the dashboard would report auto-authorized against money that never moves.
 
 **Plan outcome:** Distribute an institution-owned Circle/Arc financial agent, not a
 student-only demo. Keep one maintained codebase, configuration-driven policies, honest
@@ -1247,6 +1566,24 @@ original digests and restores monetary guards; rollback refuses existing recover
 Staff recovery UI/import, invoice-source-version successors and safe recovery after reservation
 or external submission remain separate work.
 
+**C1 reviewed reservation release delivered:** `PaymentReservationRelease` and
+`PaymentReservationReleaseReview` return held bill+capacity fee to a department without
+ever editing the reservation or its cumulative chain. `ReservationCapacity` keeps two
+totals deliberately apart: the historical chain total, which every hold recorded as
+`prior_reserved_base_units` and which must reproduce exactly forever, and the consuming
+total, which subtracts approved releases. Release is therefore an append-only fact rather
+than a correction, so an auditor can still see the hold, its position in the sequence, who
+took it and who ended it. Maker/checker applies twice over: neither the proposer nor the
+staff member who took the hold may decide a release, and a hold with any authorization
+decision is not releasable at all, because committed funds are not spare capacity and
+release must not become an un-commit path. Decided releases are final, identical retries
+return recorded evidence, and released capacity unblocks draft recovery. Release frees
+capacity, never money: `payment_approved`, `external_funds_locked`, `can_execute` and
+`local_accounts_changed` are all false, and the reservation chain is re-verified after an
+approval so a release that would leave history unreproducible is refused. **Funding-window
+rollover is delivered too** (see "Where Things Stand"), so an unattended lane can now renew
+its evidence — provided the executor path below it is live.
+
 **C1 bounded funding/reservation foundation delivered:** `FundingWindow` binds an existing
 exact **USDC** `BudgetSnapshot`, its closed set of reviewed invoice versions, current finance
 policy, Circle treasury identity and fresh block-bound Arc balance. `ArcBalanceObservation`
@@ -1283,7 +1620,8 @@ Local collection review is not treasury observation or FX. New funding windows r
 review-bound schema-v2 budget contract; legacy unbound receipts cannot be promoted. Review
 UI/import and local-to-testnet authority remain immediate product gaps alongside safe release.
 
-**Still proposed:** reviewed reservation release and funding rollover, multi-department shared
+**Delivered:** reviewed reservation release and funding rollover. **Still proposed:**
+multi-department shared
 capacity, exact legacy treasury migration, selected account roles, MFA-backed payment approval,
 outbox/attempt identity, settlement verification and posting. Draft/recovery/funding digest is
 not payment approval, proof of ownership or a digital signature. Raw DB writes/admin access
@@ -1318,6 +1656,13 @@ role, ownership approval and readiness state. Roles distinguish reserve, operati
 Gateway-deposited funds. Departmental envelopes can be ledger allocations; they do not
 require a wallet per student or department. Agent CLI wallet-count limits and deployment
 costs must be verified before promising mass provisioning.
+
+**Counterparty addresses are not treasury accounts.** Section 15 is the authoritative
+statement of who holds a student or vendor address, the five wallet roles, the
+destination-type discriminator and why an institution wallet cannot stand in for a
+counterparty one. Nothing in this section authorises the institution to custody a student's
+or a vendor's funds, and no counterparty wallet provisioning exists in the installed
+gateway contract.
 
 ### 12.3 Arc Integration Rules That Change the Implementation
 
@@ -1402,6 +1747,13 @@ amount/expiry and institution-controlled destination.
 Do not assume unlimited per-invoice wallets, automatic bank VANs or a memo on every direct
 send. Onramp Kit is a separate capability for acquiring stablecoins; local-bank off-ramp
 availability requires another approved provider. Neither is proved by USDC transfer alone.
+
+**Payer identity is not student identity.** Section 15.6 records why the student/payer
+relationship must be explicit before inbound work begins: the party that owns the funds is
+frequently not the beneficiary of the education, `Student.payout_address` attributes funds
+to the wrong side of that relationship, and inbound models differ so widely in cost and
+attribution (staff-recorded, custodial credit, aggregated collection, payer self-custody)
+that the choice belongs in the plan rather than in an implementation.
 
 ### 12.6 Durable Institution Cycle and Accounting Controls
 
@@ -1567,8 +1919,8 @@ review without students, aid funds or aid policies. Reviews cover holds, escalat
 failure, invalid destinations, institution/network mismatch and replay without payment.
 This verifies a read-only foundation, not institution-wide live execution. C1 now adds bounded,
 reviewed USDC funding and cumulative capacity holds for one closed department bill set.
-Receipt verification, exact legacy treasury migration, reviewed release/rollover and durable
-submission/recovery are still required.
+Receipt verification, exact legacy treasury migration, durable submission/recovery are still
+required.
 
 **Benefit verification is separate:** The owner reports a local college agreed to explore
 EduFlow, with concern about AI handling money. This is an interested pilot partner, not a
@@ -1690,6 +2042,13 @@ a future reviewed local-bank export/adapter can serve it. This is a fallback ope
 recommendation, not a claim that such an adapter ships today. Do not enable live money
 movement until the institution approves a viable end-to-end rail.
 
+Section 15.5 turns this from a caution into a design constraint: because most domestic
+vendors will need a `custodian_account` or `payout_partner_account` rather than a
+self-custody address, the **settlement predicate itself becomes type-specific**. An
+on-chain receipt closes a self-custody destination and cannot close a custodian or payout
+one, so a "verified on Arc" label is only meaningful for the destination type that
+produced it.
+
 ### 13.6 Pilot That Proves Value Beyond Bookkeeping
 
 Current hackathon scope is **fee collections and budget planning in shadow/parallel mode**,
@@ -1759,7 +2118,7 @@ which useful, feasible problem to validate; organizer preference does not replac
 | State | What exists or is required | What it does not prove |
 | --- | --- | --- |
 | C0 foundation | Read-only institution observation, indicative vendor review and audited no-op; no student/aid/AI requirement | `can_execute=false`; not an approved-payment pilot |
-| C1 foundation, partial | Independently reviewed aggregate collections bound to local departmental plans; exact non-executable vendor drafts, reviewed cancellation/replacement, immutable policy activation, invoice evidence, reviewed USDC funding window and cumulative bill/fee holds | No payment approval, external wallet lock, reservation release/rollover, outbox, safe execution or settlement certification |
+| C1 foundation, partial | Independently reviewed aggregate collections bound to local departmental plans; exact non-executable vendor drafts, reviewed cancellation/replacement, immutable policy activation, invoice evidence, reviewed USDC funding window and cumulative bill/fee holds | No payment approval, external wallet lock, safe execution or settlement certification |
 | Current delivery target | Departmental source records, policy-linked proposals, authenticated staff review, each eligible approval's actual testnet payment, verified evidence and capped automation | Target is not shipped by this documentation update |
 | Later institution release | Exact legacy migration, production concurrency/recovery and full operational/provider/jurisdiction gates | Testnet success does not authorize mainnet, college treasury custody or local-bank payments |
 
@@ -1824,7 +2183,9 @@ input and staff review UI are delivery work, not existing capabilities assumed b
    no implicit mainnet fallback or authority derived from seeded ledger funds.
 5. Map each vendor alias to an explicitly approved, operator-controlled testnet recipient.
    Verify ownership/control and record the mapping offchain. Do not invent addresses or
-   imply the real vendor accepts USDC or received the college's real payment.
+   imply the real vendor accepts USDC or received the college's real payment. Section 15.2
+   classifies this recipient as a `pilot_testnet_alias` — an institution-operated address
+   standing in for a counterparty, permanently labelled simulation, not a vendor wallet.
 6. Keep **local actual-payment state separate from testnet mirror state**. A verified mirror
    may consume its pilot reservation, but must not settle the real local payable, create
    college income or replace its accounting/bank evidence. The same separation applies to
@@ -1938,7 +2299,10 @@ bindings and blocks the whole plan on missing/tampered evidence. Schema-v1 snaps
 readable as `legacy_staff_attestation`; they are not backfilled with inferred reviews and
 cannot create new funding windows. Reusing receipts across alternative read-only snapshots
 is not duplicate income or a funded allocation; institution-wide posting/department allocation
-and rollover remain future controls. JSON endpoints are `finance.collection-batches.*`.
+remains future. Funding rollover **is now delivered** (`RollOverFundingWindow`), and it renews
+the clock rather than re-granting cash — the hold chain is cumulative and institution-wide, and a
+rollover can only replace a window that has already expired. JSON endpoints are
+`finance.collection-batches.*`.
 No gateway call, currency conversion, new cash, wallet mutation or transfer occurs. PHP/local
 fee evidence does not become USDC; approved testnet mirroring still needs separate mapping
 and funding authority. Staff review UI/import and collection correction/revocation remain open.
@@ -1980,9 +2344,8 @@ same action as authenticated JSON endpoints, not a dedicated demo workflow.
 Same-key retry returns historical evidence without renewal; changed decisions/new keys are
 refused. Reject/hold never frees reservations. Fake evidence remains simulation-only;
 mainnet is blocked and every output retains `can_execute=false`. This first slice permits
-one review per reserved bill: append-only renewal/withdrawal, reviewed factor recovery and
-cross-endpoint MFA race certification remain gates before any execution. No outbox, transfer,
-local accounting mutation or settlement proof is introduced.
+one review per reserved bill: cross-endpoint MFA race certification remains a gate before any
+execution. No transfer, local accounting mutation or settlement proof is introduced.
 
 Step 1 still requires college confirmation and separate permissions. Destination suspension/
 cooling-off and control certification, source-version successors, reviewed reservation release/
@@ -2225,11 +2588,19 @@ decisions. Runtime defaults off and refuses `sync`. None of these tasks submits 
 
 **Current blockers:** existing `EduFlowAgent::runAutonomousCycle` and dashboard button use
 legacy execution and must not be scheduled as this workflow. New model/sessionless work needs explicit institution-scoped
-service authority, not a fabricated human actor passed to current staff actions. Current
-one-window/15-minute funding holds cannot roll over unattended: build reviewed release,
-rollover and fresh funding authorization first. Do not silently refresh expiry, re-review
-collection evidence or reset cumulative caps on each scheduler tick. Background read-only
-planning can ship before these payment gates; signing remains disabled meanwhile.
+service authority, not a fabricated human actor passed to current staff actions. **Reviewed
+release and rollover are now delivered**, so the funding-hold blocker is gone; what is left is a
+live testnet run of the executor path and then the standing mandate itself. Never silently
+refresh expiry, re-review collection evidence or reset cumulative caps on each scheduler tick —
+`RollOverFundingWindow` refuses precisely those things. Background read-only planning can ship
+before these payment gates; signing remains disabled meanwhile.
+
+**Resolved into a delivery order:** §17.3 traces the end-to-end flow step by step and shows
+that steps 2–12 of the authorization chain are built and tested, leaving a live testnet run as
+the only step before the §14.4 Step 4 target. §18.7 ordered the remaining work: reviewed release
+and rollover → durable outbox and attempt identity → isolated executor and Arc verification →
+standing mandate. **The first three are delivered; the mandate has deliberately not been started
+yet.** Do not build the mandate before the executor chain has run live (§18.8).
 
 ### 14.9 Finance Supervisor Dashboard and Approval Notifications
 
@@ -2297,8 +2668,8 @@ shortcut to make a dashboard look active. Proposed delivery batches:
 | B1 — cashier handoff | Role-scoped collection capture/review screens or approved import; source/category/reference and restrictions visible; approved bill/budget inputs | Tuition aggregate reaches reviewed local plan with zero student rows; duplicate/unverified/restricted money cannot increase spendable cash |
 | B2 — background coordination | Durable finance event/run records, after-commit dispatch with recovery sweep, bounded planning jobs and explicit service permissions | Reviewed receipt or scheduled due scan creates one non-executable proposal without chat/browser; crash/replay produces no duplicate work |
 | B3 — supervision | Finance dashboard, evidence timeline, assigned approval work and queued in-app notifications; safe pause/retry controls | Authorized supervisor sees active/waiting/failed work, gets one actionable notification and can review exact version; unauthorized actor cannot see/approve |
-| B4 — human execution | MFA-backed exact reserved-payment review/enrollment delivered; reviewed release/rollover, approval renewal/withdrawal, factor recovery, explicit local/mirror authority, durable outbox/attempts and certified Arc evidence remain | One permitted staff authorization produces one matching verified testnet payment; rejection, drift, crash and unknowns cannot pay twice |
-| B5 — standing automation | Independently approved recurring mandate, due occurrence identity, cumulative caps and isolated scheduled execution | Scheduler pays one eligible approved occurrence automatically on testnet without chat/per-item click; over-limit valid bill routes to staff and hard failure stays blocked |
+| B4 — human execution | MFA-backed exact reserved-payment review/enrollment, reviewed release and funding rollover, durable outbox/attempts, isolated executor and Arc settlement verification all delivered; certified Arc evidence from a live testnet run and explicit local/mirror authority remain | One permitted staff authorization produces one matching verified testnet payment; rejection, drift, crash and unknowns cannot pay twice |
+| B5 — standing automation | Independently approved recurring mandate, due occurrence identity, cumulative caps and isolated scheduled execution. Design in **§18**; dependency chain in §18.7 | Scheduler pays one eligible approved occurrence automatically on testnet without chat/per-item click; over-limit valid bill routes to staff and hard failure stays blocked |
 | B6 — college evaluation | Permissioned staff demo, background/approval/autonomy evidence and agreed value metrics | Staff confirms usefulness; record baseline, corrections, delays and unresolved cases without claiming bank settlement or production readiness |
 
 **Hypothetical walkthrough; figures are not defaults:** cashier reconciles `PHP 50,000.00`
@@ -2343,3 +2714,584 @@ Required additional acceptance tests:
 These are proposed acceptance gates. Existing tests/legacy demo do not prove background
 execution, this dashboard, notification routing or the recurring lane. No payment path is
 enabled by this plan update.
+
+---
+
+## 15. Counterparty Wallets — Who Holds What, and the Two Missing Legs
+
+**Status: design section. Nothing here is implemented, and nothing here changes the Section 14
+pilot.** It answers a question the rest of this document leaves implicit: the installation
+provisions exactly one Circle wallet — the institution's — so what, if anything, does a
+student or a vendor hold, and how does money actually reach them?
+
+### 15.1 The honest answer to "what do counterparties hold today?"
+
+**Nothing.** Today the institution holds the only wallet the system controls, and the two
+counterparty legs of the flow are not merely unfinished — they are *unmodelled*.
+
+| Leg | Current state | Why |
+| --- | --- | --- |
+| Institution **outbound** (agent pays a vendor) | Structurally designed, deliberately simulated | `VendorDestinationVersion` binds a reviewed address, but §14.3.5 requires that address to be an **operator-controlled testnet recipient** mapped to a vendor *alias*. The real vendor holds nothing and receives nothing. |
+| Institution **inbound** (a payer funds the institution) | **Not modelled at all** | §12.5 — collection intents, payment links, inbound verification, allocation and suspense — is entirely proposed. There is no `CollectionIntent`, no receivable, no payer identity. |
+| Student | No on-chain presence by design | §14.2 forbids a student fee portal. `Student.payout_address` exists from the legacy aid module and is **not** evidence of a student-held wallet. |
+| Vendor | A free-text alias plus a reviewed address | `Vendor.wallet_address` is legacy master data. The reviewed path is `VendorDestinationVersion`, whose address is operator-controlled during the pilot. |
+
+The consequence is the important part: **EduFlow today is a one-legged system.** It can
+prepare, reserve and (nominally) submit an outbound transfer to an address that a human
+operator controls. It cannot yet receive USDC from anyone, and it cannot attribute an
+inbound transfer to a payer. An institution adopting it as described would be able to *send*
+money to addresses it chose itself, while its actual collections continued through a bank
+channel it already had. That is not a payments product; it is a payment-mirroring
+observability tool — which is exactly what §14 asks for, and exactly what it must not be
+presented as beyond.
+
+### 15.2 Five wallet roles, and who holds the key
+
+Every address the system touches has exactly one role and one custody answer. Conflating
+them is how an agent ends up signing for someone else's funds.
+
+| # | Role | Key holder | Who can move funds | EduFlow stores | Can the model touch it |
+| --- | --- | --- | --- | --- | --- |
+| 1 | **Institution reserve** | Institution, human 2-of-2 MPC (Circle Agent Wallet) | Named humans only, with OTP | Provider/account id, address, chain, custody attestation, recovery owner | **Never** |
+| 2 | **Institution operational** | Institution, human 2-of-2 MPC | Named humans; the agent may submit a bounded, authorized intent | Same, plus allowance, policy ceiling and funded amount | Proposes only; cannot sign, change limits or move funds |
+| 3 | **Gateway deposit** | Circle Gateway contract | Delegates over deposited balance | Transfer id/spec hash, source/destination chain, fees, recovery state | **Never** (delegate scope is balance-wide, not a departmental cap) |
+| 4 | **Counterparty destination** | **The counterparty or its custodian — never the institution** | The counterparty | Reviewed, versioned destination with a *type* and its own verification predicate | Proposes an intent against it; cannot create, rotate or control it |
+| 5 | **Payer source** | **The payer (or their custodian) — never the institution** | The payer | Opaque reference + verified inbound observation, attribution evidence | **Never** |
+
+Rules that follow directly and are non-negotiable:
+
+- **EduFlow never holds a student's or a vendor's funds.** Roles 4 and 5 are, by definition,
+  addresses the institution does not control. An institution-custodial product is a
+  different business (a remittance or stored-value institution) with different licensing;
+  it is not this codebase.
+- **EduFlow never creates a counterparty wallet.** §12.7 records that the installed
+  `WalletGateway` contract exposes `transfer`, `balance`, `transactions` and `limits` and
+  **no wallet provisioning**. Provisioning would require a separately reviewed adapter with
+  its own custody, consent and revocation duties. Inventing an address is forbidden by the
+  lepton rule and by §12.5.
+- **An institution-operated address standing in for a vendor is role 4 only in appearance.**
+  While a vendor alias maps to an operator-controlled testnet recipient, the system must
+  label it as simulation on every surface — dashboard, export, screenshot and audit — and
+  must never describe it as the vendor being paid.
+
+### 15.3 Topology
+
+```mermaid
+flowchart LR
+    subgraph Institution["Institution (EduFlow controls these)"]
+        R[Reserve wallet<br/>role 1] -->|human, bounded + reviewed| O[Operational wallet<br/>role 2]
+        G[Gateway deposit<br/>role 3] -.->|future, separate review| O
+    end
+
+    subgraph Counterparties["Counterparties (EduFlow never holds these keys)"]
+        V[Vendor destination<br/>role 4]
+        P[Payer source<br/>role 5]
+    end
+
+    S[(Institution ledger<br/>documents, budgets, approvals)] --> O
+    O -->|outbound intent: reserve → authorize → submit → verify| V
+    P -->|inbound: collection intent → observe → verify → allocate| S
+    V -.->|today: operator-controlled testnet alias| T[(Arc testnet)]
+    P -.->|not modelled: no collection intent exists| S
+```
+
+The two dotted edges are the gaps. The bottom-left edge is *simulated by design for the
+pilot*; the bottom-right edge is *absent by design for the pilot and unbuilt for later*.
+
+### 15.4 Why a single institution wallet cannot substitute for counterparty wallets
+
+Three independent reasons, each sufficient on its own:
+
+1. **Custody.** A vendor's invoice is payable to *that vendor's* legally controlled
+   account. An institution-held address cannot receive it; the institution would be paying
+   itself and then carrying a vendor payable as an internal balance — which is a different
+   product with its own credit, liquidity and licensing consequences.
+2. **Attribution.** §12.5.2 already establishes that a sender address does not identify a
+   payer. If inbound funds arrive from addresses EduFlow itself provisioned, attribution
+   becomes circular and unprovable: the system would be matching its own outputs as though
+   they were third-party receipts.
+3. **Attestation.** Circle's 2-of-2 Agent Wallet means each counterparty address has a human
+   and a device behind it. Per-student Agent Wallets (§15.6) are therefore operationally
+   out of reach at enrolment scale, and the wallet-count limits and per-user cost are
+   explicitly unverified (§12.2). An institution cannot enrol a department, let alone a
+   campus, on unverified per-person custody economics.
+
+### 15.5 Outbound — how a vendor actually receives payment
+
+A vendor's settlement destination is **not a bare address string**. It is a discriminated
+record with a type, because the type determines the evidence required to call it settled
+and determines who is exposed if it is wrong.
+
+| Type | Who holds the funds | Verified settlement predicate | Friction | Appropriate for |
+| --- | --- | --- | --- | --- |
+| `self_custody_address` | Vendor's own Arc address | Successful Arc movement to the reviewed address + finality | Vendor must already hold USDC and control a key | Vendors already inside a stablecoin economy |
+| `custodian_account` | A licensed exchange/custodian | Provider callback or statement tied to a transfer identity, **not** Arc finality alone | Vendor needs an account and KYC; institution buys USDC from a custodian | Realistic for most domestic vendors |
+| `payout_partner_account` | A regulated payout/off-ramp provider | Payout API idempotency key, provider reference and bank credit | Requires an approved partner, jurisdiction review and an FX quote | Vendors who insist on local bank money |
+| `internal_ledger_credit` | Nobody — an institution-side payable | **Never settled on any rail** | None on-chain | Vendors paid through the existing bank process, which the pilot is actually doing |
+| `pilot_testnet_alias` | The institution operator | Arc testnet movement to an approved recipient | Simulation only | Section 14 hackathon, permanently labelled simulation |
+
+Three rules that the type discriminator makes enforceable:
+
+- **The settlement predicate is type-specific.** An `approve_payment` authorization and a
+  verified Arc receipt settle a `self_custody_address`. They do **not** settle a
+  `custodian_account` or `payout_partner_account`, where the evidence is provider-side and
+  must be reconciled separately. A future implementation must never let an on-chain receipt
+  close a fiat-payout obligation.
+- **A destination-type change is a new version requiring independent review and a
+  cooling-off period**, not an edit. Changing `custodian_account` → `self_custody_address`
+  is a change of who can lose the money and must clear maker/checker like any other
+  destination change (§12.6).
+- **Suspension is first-class.** Destination suspension, cooling-off and control-evidence
+  recertification are named open work in §12.2. An unrecertified destination blocks new
+  holds; it must not merely warn.
+
+**Recommended order:** ship `internal_ledger_credit` and `pilot_testnet_alias` first
+(the pilot needs nothing else), then `self_custody_address` for institutions whose vendors
+are already on-chain, and treat `custodian_account` and `payout_partner_account` as
+separately reviewed integrations with their own jurisdiction gates (§8.5). Never make
+`payout_partner_account` the default on the assumption that an off-ramp will exist.
+
+### 15.6 Inbound — how a payer actually funds the institution
+
+The current `Student` model conflates two legally distinct parties, and the plan should say
+so before any collection work begins.
+
+- **`Student`** — the beneficiary of the education. Usually not a contracting party. In
+  jurisdictions where minors cannot contract, a student's fee obligation is the *payer's*
+  legal liability.
+- **`Payer`** — the person or entity that owns the funds, signs, pays, and is credited.
+  Frequently a parent, frequently a different person from the `Student` row, and sometimes a
+  employer, sponsor or scholarship fund.
+
+`Student.payout_address` encodes a wallet on the wrong side of that relationship: it
+attributes funds to a beneficiary rather than to the party that can lawfully dispose of
+them. Any future inbound design must introduce an explicit `Payer` linked to a `Student`
+(and to an institution), and must never infer a payer from a student record.
+
+| Model | Who holds the address | Attribution | Blocker |
+| --- | --- | --- | --- |
+| **A. Existing channel, cashier-recorded** (the pilot) | Nobody; the bank holds it | Staff-verified aggregate receipts | None — already the Section 14 path. Receipts never become Arc funds |
+| **B. Institution-custodial credit** | Institution ledger only | Exact internal posting | Not a payment and not a rail (§6.1). Must never be labelled USDC settlement |
+| **C. Aggregated processor / Gateway collection** | One institution address | Per-payer reference inside a single verified inbound | Needs the §12.5 inbox, then a processor contract. **Lowest per-payer friction** |
+| **D. Payer self-custody** | Payer's own Agent Wallet / address | Payer-supplied opaque reference | 2-of-2 MPC per payer; enrolment, KYC, minors, devices, unverified wallet-count and cost limits |
+| **E. Individual matching to student accounts** | Institution | Per-student chain identity | §12.5 and §14.2 defer this; it must not be a prerequisite for any earlier option |
+
+**Recommendation, in order:** A (already proven for the pilot) → C, because it gives each
+payer a real USDC receipt while the institution operates exactly one address and one
+counterparty relationship → B, which is useful and cheap but must never be called
+settlement → D only where a payer already holds USDC and asks for it. **E is explicitly not
+recommended** until A–C are stable, because per-student chain identity is the highest-cost,
+highest-privacy-risk option and the plan has already deferred it twice (§12.5, §14.2).
+
+Inbound invariants that must hold regardless of model:
+
+- An unrecognised inbound transfer enters **unallocated/suspense** and nothing more
+  (§12.5.4). A matching reference is correlation, not authorization.
+- A payer-uploaded receipt, an expected fee, or a pending bank transfer is **not cash** and
+  cannot increase spendable funds.
+- The institution never refunds to an unverified address; refunds use a separately reviewed
+  outbound intent against a currently reviewed destination (§12.5.5).
+- Charging a student in USDC does not create a new fee policy, change tuition amounts, or
+  convert the college's existing statutory accounts. §13.5 and §6.1 still govern.
+
+### 15.7 Data model consequences
+
+The current schema cannot express any of this and would mislead an implementer who tried:
+
+| Gap | Today | Required shape |
+| --- | --- | --- |
+| Wallet roles | `wallets` is organization-scoped only; no role, no custody, no counterparty linkage | Add `role`, `custody_mode`, `counterparty_type`, `counterparty_id`, `readiness_state`, `ownership_approved_by`. One table, discriminated — a second table invites the two-ledger confusion of §1 |
+| Counterparty identity | `Vendor` has a bare `wallet_address`; no legal-entity type | `Vendor` needs a legal-entity type; the address moves to a versioned destination record |
+| Destination type | `VendorDestinationVersion` records an address and chain only | Add a **destination type** and bind the type-specific evidence required by §15.5 |
+| Settlement evidence | Verdict is Arc-shaped (`verified`/`fabricated`/`unverifiable`/`ledger_only`) | The predicate must become type-specific; an Arc receipt cannot close a custodian or payout obligation |
+| Payer | No concept; `Student.payout_address` conflates payer and beneficiary | Explicit `Payer` linked to institution, with its own identity, consent and destination evidence |
+| Inbound | None | `CollectionIntent`, verified inbound observation, allocation/suspense record — §12.5, unbuilt |
+| Counterparty ownership | `Wallet` has `organization_id`; role 4/5 rows have no legitimate institution FK semantics | Counterparty destinations are **not** institution wallets. Referencing them through `wallets` would imply custody the institution does not have |
+
+None of these are hackathon work. They are the schema the institution release would need,
+and writing them down now prevents the migration from being discovered as an incident.
+
+### 15.8 What this changes, and what it does not
+
+- **The Section 14 pilot is unchanged.** Students still pay through the college's existing
+  channel; the cashier still records aggregate receipts; vendors still map to an
+  operator-controlled testnet alias labelled as simulation. This section documents why that
+  is honest rather than expanding the pilot.
+- **No dashboard, screen or table claims a counterparty has been paid.** A verified mirror
+  transfer settles an on-chain intent to a testnet alias; it is not a vendor receipt, not a
+  collection, and not college income (§14.3.6).
+- **Two product claims become explicitly conditional** in Section 6.1's capability table:
+  "receivables and inbound matching" requires §12.5 plus a payer identity; "vendor bills"
+  require a counterparty destination type and its matching settlement predicate.
+- **A future "EduFlow pays any vendor in USDC" claim is not supportable from this codebase**
+  without either an approved payout partner or counterparties who already hold USDC. Both are
+  named in §13.5 as not proved.
+
+### 15.9 Decisions this section requires
+
+1. Whether the institution release may ship **model C (aggregated collection)** at all, or
+   whether inbound stays staff-recorded indefinitely. This is the single decision that
+   determines whether EduFlow is ever a two-legged system.
+2. Whether `custodian_account` / `payout_partner_account` are in scope for any target
+   jurisdiction, and who owns that integration and its compliance review.
+3. Whether an institution-custodial ledger product is explicitly out of scope. This section
+   assumes it is; saying so prevents it being built by accident.
+4. Confirm that `Student.payout_address` is legacy and will be superseded by an explicit
+   `Payer`, rather than being reused for the inbound path.
+
+---
+
+## 16. Delivered Dashboards — Admin Installation Console and Finance Supervisor
+
+**Status: implemented and tested 2026-10-10.** 1282 Pest tests pass (3 skipped). This
+section records what shipped so a later session does not rediscover it or mistake a
+delivered surface for a design proposal. **No payment path was enabled by this work.**
+
+### 16.1 What changed
+
+| Before | After |
+| --- | --- |
+| `/finance` returned 404 — no dashboard existed | `App\Filament\Pages\FinanceDashboard` is the panel root |
+| Finance panel had **zero** widgets and **no** theme | 8 stat/table widgets, 4 charts, dedicated `resources/css/filament/finance/theme.css` |
+| Admin dashboard titled "Autonomous Financial Operator", offered **"Record Tuition Revenue (+10,000 USDC)"** which wrote a ledger row with no chain transfer | Title "Installation & operations"; the fabricated-revenue action is removed |
+| Admin dashboard rendered **every** registered widget, putting activity-log heatmaps beside settlement figures | Widget list pinned explicitly in `Dashboard::getWidgets()` |
+| `TreasuryOverviewWidget` summed float invoice amounts and reported "AI Autonomy" as though a payment lane were running | Rewritten as "Money posture": counts evidence records and resolved decisions instead of balances |
+| `Approval Center` banner read "Human-in-the-Loop Safeguard Active" | "Legacy Approval Center" with a banner stating it is **not** the authorized vendor payment route |
+| Admin nav group `Financial Operations` duplicated the finance panel's meaning | Renamed `Finance records`; explicit `navigationGroups()` on both panels |
+
+### 16.2 Finance supervisor: one widget per §14.9 requirement
+
+| Widget / chart | §14.9 bullet | Design rule it encodes |
+| --- | --- | --- |
+| `ApprovalInboxWidget` | Approval inbox | Three authorities listed **separately** — receipt review, plan acceptance, payment authorization are different acts held by different people |
+| `CollectionsOverviewWidget` | Collections by source/currency | Evidence buckets, never one "available balance" total: unreviewed and restricted money cannot fund a plan |
+| `CollectionsTrendChart` | (same) | Stacked by review state so a reviewer can see the spendable segment; bars keyed by **currency as well as day**, because stacking two currencies would be an unauthorised conversion |
+| `BudgetCapacityWidget` | Allocation vs local cash | `BudgetSnapshot::headroom()` exact strings; budget and cash headroom never merged; schema-v1 attestation badged apart from reviewed v2 bindings |
+| `BudgetHeadroomChart` | (same) | Allocation and cash plotted as two series because they legitimately disagree |
+| `ArcSettlementWidget` | Arc balance/fees/network/freshness/fake | Block-bound exact observation, 18-decimal native gas rendered from a string, `is_fake` stated in the stat body, stale never silently refreshed |
+| `WorkflowRunWidget` | Work by logical run | Logical worker, triggering event, affected document, state, heartbeat staleness, next run, actionable error. A run is not a payment |
+| `WorkflowRunStateChart` | (same) | Makes "nothing to do" distinguishable from "worker is dead" |
+| `AutonomyLaneWidget` | Automatic lane | Reports `None approved` / `Zero allowance` and `0 auto-authorized · 0 submitted · 0 verified · 0 held` as the zeros they are. Deliberately **unlinked** — no mandate screen exists (§18) |
+| `EvidenceTimelineWidget` | Evidence-linked timeline | Recorded rule results and public summaries only; stops visibly at "No executor is shipped" |
+| `PaymentDecisionChart` | (same) | Approved + rejected + held together — approval-as-is rate needs the whole denominator (§14.6) |
+| `OperationsHealthWidget` | Operations health | Queue depth, heartbeat, stale funding, unread notifications, provider reachability, unresolved outcomes — a stopped worker and an idle one must not look alike |
+
+### 16.3 Admin installation console
+
+`InstallationReadinessWidget` reports institution identity, the single-institution boundary
+and its fail-closed behaviour, onboarding gate state (registration/impersonation), rail
+binding and driver/fake label, AI posture and background runtime state.
+`AdoptionActivityChart` plots finance-domain record creation per day over 14 days — an
+operator's answer to "is the school actually running this?" without opening the finance
+panel.
+
+### 16.4 Navigation contract encoded in the dashboards
+
+- **Finance widgets link only within `/finance`** (Collections, Finance Supervisor, Payment
+  Reviews, plus ArcScan in a new tab). A finance → admin link would expose the admin console
+  to finance staff and is a privilege escalation.
+- **Admin widgets may link into `/finance`** — the safe direction.
+- A panel or chart heading is an anchor, not a label (`App\Filament\Support\LinkedHeading`,
+  styled `fi-finance-heading-link` in both themes). Where no management page exists, the
+  control is left **unlinked** rather than pointed at something unrelated.
+- Charts cross into float only through `Money::toChartValue()`, which exists solely to feed
+  Chart.js. The exact figure stays authoritative in the table beside each chart and is
+  never stored, persisted or authorized from the chart value.
+
+### 16.5 Supporting model and DTO additions
+
+`Money::formatExact()` (exact base units beyond `PHP_INT_MAX`) and `Money::toChartValue()`
+(chart-only float edge) on `App\DTOs\Money`. Relations added because the dashboards need
+them and they were missing: `PaymentIntent::{reservation, financePolicyVersion,
+vendorDestinationVersion, invoiceVersionReview}`, `CollectionBatch::preparer`,
+`BudgetSnapshot::budget`. Tests: `tests/Feature/Filament/FinanceSupervisorDashboardTest.php`
+and the reworked `EduFlowCommandCenterTest`.
+
+### 16.6 Current screen availability and remaining work (2026-10-11)
+
+Backend records, visible screens and end-to-end payment acceptance are three separate delivery
+claims. Current routes and page actions establish the following, not universal admin availability:
+
+| Capability | `/admin` | `/finance` | Remaining limitation |
+| --- | --- | --- | --- |
+| Installation/operations overview, identity, providers and staff | Available | Not the finance role | Readiness/configuration is not settlement proof |
+| Exact reserved-payment review and independent reviewer enrollment | **Automation → Payment Approvals** (`/admin/payment-reviews`) | **Payment Approvals** (`/finance/payment-reviews`) | Requires direct `AuthorizePayment:PaymentIntent`, verified eligible staff, independently enrolled current factor and maker/checker separation; review does not itself transfer |
+| Submission queue/history, provider detail and attempts | **Automation → Payment Submissions** (`/admin/payment-submissions`), read-only | No submission resource registered | Unknown outcomes need investigation; a hash or provider ID is not verified settlement |
+| Aggregate collection capture and independent source review | **Finance records → Collections** (`/admin/collections`) | **Collections** (`/finance/collections`) | Cashier-friendly three-step capture with private receipt/report upload and independent review; offchain evidence only, no individual payer matching or inbound USDC collection |
+| Closed-set budget capture, background run evidence and plan review | No dedicated admin screen | **Finance Supervisor** (`/finance/finance-supervisor`) | Accepting a plan never grants payment authority |
+| Invoice source review, beneficiary approval, draft preparation and funding/reservation | Legacy invoice CRUD is available, not the complete safe workflow | Several authenticated HTTP actions exist; complete operator wizard absent | Need linked source/destination/policy/budget/funding screens rather than scripts or fabricated reviewers |
+| Reviewed capacity release and funding rollover | No screen | No screen | Backend actions/tests exist; authorization/unknown outcomes cannot be discarded to free capacity |
+| Recurring mandate create/review/suspend, ceilings and occurrence inspection | No management screen | Aggregate metrics only | Records, evaluator and scanner exist; service authority and automatic payment handoff remain absent |
+| Advisory recurring-candidate ranking / category classification | Provider settings only | No ranking-review screen | Ranker exists; category classifier and supervisor integration remain pending; live provider configuration needed |
+| Retrospective agreement per released occurrence (§18.6) | No review screen | Aggregate feedback metric only | Service/model exist; no authenticated per-occurrence review endpoint or UI found in current routes; feedback is never approval |
+| Approval ownership, reminders, safe recovery and stop controls (§14.9) | Partial visibility/settings | Existing plan/collection inbox and notification foundations | Complete payment-investigation assignment, safe recovery controls and operator health still need acceptance coverage |
+| Genuine human-approved current-workflow Arc settlement | **Not demonstrated** | **Not demonstrated** | Transport error, package adoption, unresolved recovery and total-cost fee policy remain open |
+
+The redesigned review page reports **historical recorded decisions**, including expired and
+simulation-only approvals; its approval count is not currently executable authority. Released
+reservations remain readable history and disappear from awaiting-review counts. Reviewer setup
+is account-level readiness, not permission to review one's own bill or bypass fresh validation.
+Payment Submissions preserves provider wording and full six-decimal figures, with no send/retry
+action. The UI does not claim that `unknown` is safe to dispatch.
+
+**Collections usability handoff (2026-10-11):** Both panels expose the same role-checked
+Collections page. `Record collection` opens **Receipt → Amount & dates → Check & save**.
+Cashiers select a payment channel, copy an existing receipt/report/register number, upload
+a PDF/JPG/PNG/CSV (10 MB maximum), and enter exact original-currency totals, restricted funds
+and a completed period using local-time date pickers. Capture UUID and SHA-256 are generated
+server-side; no hash, source slug or ISO timestamp needs to be typed. Existing source streams
+stay selectable, so staff must keep the same register/channel rather than bypass overlap checks.
+Uploaded proof is stored privately and included in immutable snapshot identity. Authorized
+staff can download only the bound, hash-checked bytes; old digest-only API records remain
+readable and explicitly have no retained upload. Review stays maker/checker separated and
+final; held/rejected evidence cannot be edited or approved later through this page. Overview
+counts are recorded decisions, not spendable balances. Capture/review still changes no student
+balance, does not establish a bank balance, never funds Arc and never grants payment authority.
+Regression coverage includes both panels, upload validation/privacy, duplicate/idempotency
+protection, the signed upload HTTP endpoint, timezone identity and independent review. Browser coverage tests wizard navigation,
+calendar selection and save from a signed completed-upload fixture; installed Pest browser
+server does not parse multipart uploads, so end-to-end browser multipart transport is not claimed verified.
+
+**Known dashboard audit debt:** `AutonomyLaneWidget` still hardcodes “None approved” and old
+“neither exists” wording, while `EvidenceTimelineWidget` still says “No executor is shipped”.
+The executor and mandate records now exist; those widgets must read their real records before
+the entire §14.9 dashboard can be called truthful. `AutomationLaneStats` also exists but is not
+in the admin dashboard's explicit widget list. Presence of a widget class is not deployment.
+
+Next work, in dependency order:
+
+1. Verify/adopt the async package safely, establish the Circle HTTP 400 cause, and resolve
+   existing attempts read-only. Fix duplicate unknown-attempt recording and any reconciliation
+   path that could resend a possibly accepted payment. Preserve holds and uncertainty.
+2. Complete the normal source-to-reservation operator flow, funding renewal/release controls,
+   truthful dashboard bindings and investigation ownership. Prove one actual independent
+   staff authorization reaches one matching verified Arc testnet transfer; never synthesize consent.
+3. Add standing-mandate and occurrence screens, reviewed ceilings/revocation, then explicit
+   institution-scoped service authority for release-to-submission. Initial allowance stays zero.
+4. Add advisory-ranking review and retrospective per-occurrence feedback, keeping feedback,
+   proposal acceptance, payment authorization and verified settlement distinct. Finish fee-cost
+   policy and college pilot evidence before claiming production readiness.
+
+---
+
+## 17. End-to-End Fee-to-Vendor Trace — What Is Built and What Is Not
+
+**Purpose:** answer "how do fees get collected, where does the money go, and how do vendors
+get paid" step by step, with the build status of each arrow. The demo and any reviewer must
+be able to see which arrow is live without reading the source.
+
+### 17.1 The trace
+
+| # | Step | Actor | Status |
+| --- | --- | --- | --- |
+| 1 | Student pays fees | Student, through the college's **existing bank channel** | **Live — EduFlow is not involved** |
+| 2 | Cashier records receipts | `CaptureCollectionBatch` → `CollectionBatch` | ✅ Built |
+| 3 | Independent reviewer verifies source | Different person → `ReviewCollectionBatch` (`approve_receipts` / `hold` / `reject`) | ✅ Built |
+| 4 | Staff selects the bill set and allocation | Human → `CaptureBudgetSnapshot` with `bill_ids`, `allocation` | ✅ Built |
+| 5 | Bill source evidence captured and reviewed | Maker → `InvoiceVersion`; separate checker → `approve_evidence` | ✅ Built |
+| 6 | Budget snapshot binds reviewed receipts | Human → `BudgetSnapshot` schema v2 with collection review ids | ✅ Built |
+| 7 | **Planner walks the closed set** | **Deterministic PHP**, no model | ✅ Built |
+| 8 | Supervisor records the plan decision | Human → `FinancePlanReview` (`accept_plan` / `reject_plan` / `request_correction`) | ✅ Built |
+| 9 | Draft payment intent | Maker → `PaymentIntent` (`draft`, `can_execute=false`) | ✅ Built |
+| 10 | Funding window and capacity hold | `FundingWindow` (15-min, block-bound) → `PaymentReservation` | ✅ Built |
+| 11 | Payment authorization | Enrolled reviewer + fresh MFA/TOTP, 5-minute expiry | ✅ Built |
+| 12 | **Submit to Arc** | `IsolatedPaymentExecutor` behind the runtime opt-in, then `ArcSettlementVerifier` | ✅ Built and tested — **not yet run against live testnet** |
+| 13 | **Vendor receives USDC** | Verified Arc settlement, optionally mirrored to `transactions` | ⚠️ **Proves movement, not receipt** — vendor aliases map to operator-controlled testnet recipients (§15.5) |
+
+Steps 2–12 are real and tested. Step 12 has never submitted to a live network: it is gated
+behind `EDUFLOW_SUBMISSION_ENABLED`, defaults off, and refuses anything but Arc testnet. Closing
+§14.4 Step 4 needs an operator decision on real testnet submission authority plus one live run.
+Step 13 is only as good as the recipient — a verified settlement proves the treasury paid the
+bound address, not that a vendor received anything. `can_execute` remains hardcoded `false` in
+every `evidence()` array by design; nothing in this build may authorise itself.
+
+### 17.2 Three corrections this trace makes explicit
+
+1. **The planner cannot choose bills.** `DepartmentBudgetPlanner::build()` iterates the
+   closed set a human supplied when capturing the snapshot, sorts by due date, applies four
+   cumulative boolean checks and emits `propose_human_review` or `hold`. It has no
+   discovery, ranking, selection or deprioritisation. Money cannot go anywhere a human has
+   not already authorised.
+2. **No model runs in the finance decision path.** Every `AgentDecision::create()` call site
+   is the legacy *student assistance* path (`EvaluateAssistancePolicy`,
+   `PolicyEngineService`, `EduFlowAgent`). The vendor-payment chain writes zero model output.
+3. **An authorised payment still does not settle the local payable.** A verified testnet
+   mirror consumes its pilot reservation and nothing else (§14.3.6). It is not college
+   income, not an accounting posting and not a vendor receipt.
+
+### 17.3 What remains before step 12 can be closed end to end
+
+§14.4 Step 4 requires each eligible approved item to reach verified mirror settlement once.
+Steps 1–12 are now built and tested: one isolated worker loads an authorized intent, rechecks
+stop switch/fees/policy/balance, submits with a stable provider identity, and verifies matching
+chain/asset/sender/recipient/amount plus finality before recording anything as settled.
+
+Its prerequisites, in order:
+
+1. **Reviewed reservation release and funding rollover.** A `PaymentReservation` was
+   terminal and a `FundingWindow` expired in 15 minutes with no rollover, so an unattended
+   lane starved immediately. **Both are now delivered** — see "Where Things Stand".
+2. **Durable outbox and attempt identity**, committed with the domain change and dispatched
+   only after commit, with a recovery sweep for committed-but-undispatched work (§14.8).
+   **Delivered.**
+3. **The executor itself, plus the settlement predicate.** **Delivered.**
+
+What is genuinely left is not code: the executor has never touched a live network. It is gated
+behind `EDUFLOW_SUBMISSION_ENABLED`, defaults off, and refuses anything but Arc testnet. Closing
+step 12 requires an operator decision on real testnet submission authority and one live run, and
+then step 13 — which proves movement to a bound address, not that a vendor received anything
+(§15.5).
+
+Until that run happens, any "the agent pays the vendor" claim is false regardless of how
+complete the authorization chain looks.
+
+---
+
+## 18. Bounded Autonomous Lane — Standing Mandate Design
+
+**Status (2026-10-11): backend foundation delivered; operator UI and automatic execution
+handoff incomplete.** Mandate/review/occurrence records, deterministic evaluator, scheduled
+scanner and aggregate metrics exist. Management screens and institution-scoped service
+authority do not. No genuine current-workflow automatic settlement has been demonstrated.
+Section 16.6 separates available screens from backend-only capabilities.
+
+### 18.1 The correction that shapes this design
+
+The request was phrased as "the agent decides on its own". What must actually happen:
+
+> **A standing human mandate decides the class of payment. Deterministic PHP decides each
+> individual occurrence. The model is not in the release path at all.**
+
+This is §14.7's "two authorization levels, not two kinds of safety": humans first authorise
+institution policy and a recurring mandate, and only then may eligible occurrences run
+without a further approval. A missing mandate means zero automatic payments, and §14.7 is
+explicit that **an LLM cannot infer that a bill is recurring**.
+
+Consequences a new session must not regress on:
+
+- A provider timeout, outage or prompt injection in invoice text must be unable to release
+  or block a payment.
+- The autonomous lane must be **sessionless**: no browser, no chat prompt, no synchronous LLM
+  call, no human present (§14.8).
+- "Agent decided" is never a correct description of an automatic payment. The mandate
+  decided; the evaluator confirmed the occurrence.
+
+### 18.2 Two separate paths, deliberately not unified
+
+| Path | Trigger | Authority | Laravel AI SDK |
+| --- | --- | --- | --- |
+| Interactive (existing) | Supervisor reviews a proposal | `Approvable::needsApproval()` always returns `Approval::required` | `SettlementOperator` + `DisburseAssistance` |
+| **Standing mandate** (new) | Scheduler tick, no session | Mandate record + deterministic evaluator | **None** |
+
+The SDK's approval seam is per tool call and conversation-bound
+(`PendingApproval` / `Decision` / `Decisions`, resumed through
+`App\Ai\Approvals\ApprovalResumeGate`). That is correct for the interactive path and wrong
+for an unattended one.
+
+### 18.3 Where the SDK does earn its place
+
+`laravel/ai` v1.0.1 is installed. Features relevant to this work:
+
+| Feature | Use here | Constraint |
+| --- | --- | --- |
+| **Middleware wraps each generation step** (`PendingStep`) | Strip the money tool from the agent *mid-loop* once a step budget is spent | Safety and cost, not merely throughput |
+| **Classification / `Str::decide()`** | Cheap anomaly flagging on source evidence for staff attention | **Advisory only. Never gates a payment** |
+| **Conversations store `steps` as one JSON column** | Gives §14.9's evidence-linked timeline: tool call and its result paired per round-trip | Pairing is not proof of settlement |
+| `ToolSearch` | Do not send rarely used tools on every request | Token hygiene |
+| `CodeExecution` | **Must be forbidden on any finance agent** | Sandboxed arbitrary code inside a payments loop is not a risk worth taking |
+| `Approvable` + `InteractsWithApprovals` | Interactive approval seam; `needsApproval()` **is** the policy engine | Existing pattern in `DisburseAssistance` |
+
+The autonomous lane is testable with **no AI provider configured**, and must stay that way.
+
+### 18.4 Records to build (authorization half — zero execution authority)
+
+Delivered with `can_execute=false`, `funds_reserved=false`, `external_funds_locked=false`,
+and no wallet mutation.
+
+- **`RecurringMandate`** — institution, department/budget, business-approved contract or
+  obligation reference, vendor + currently reviewed destination version, exact
+  `ARC-TESTNET`/`5042002` identity, currency and mirror mapping, start/end dates, due window,
+  allowed frequency, per-occurrence amount ceiling, fee ceiling, cumulative daily and
+  mandate-period limits, bound policy version, independent reviewers, revocation state.
+  **Initial allowance is zero.**
+- **`RecurringMandateReview`** — separate maker/checker, append-only, binds expected digest
+  and predecessor. No agent or policy maker may self-authorize a mandate.
+- **`MandateOccurrence`** — unique obligation + occurrence identity with no prior
+  fulfilment, bound to the exact bill and current destination/policy/mapping digests.
+- **`MandateReleaseEvaluator`** — pure deterministic PHP returning every check and reason.
+  Emits one of `release`, `escalate` (valid but outside mandate), or `blocked` (invalid,
+  restricted, insufficient, integrity or network failure — **never** an approvable override).
+
+### 18.5 The release check
+
+An occurrence is automatically authorised only when **every** check passes:
+
+- It corresponds to an actual approved bill/contract period, inside the mandate dates and due
+  window, with a unique obligation-plus-occurrence identity and no prior fulfilment.
+- Exact bill/mirror amount is at or below the approved ceiling. Changed price, scope or
+  destination is held for renewed review — never guessed from last month's payment.
+- Current source, collection, policy and destination evidence remain valid, and the separately
+  approved mapping still matches. Stale or changed evidence requires fresh review.
+- It fits approved budget and actual available USDC after reserves, restrictions,
+  commitments, **all** active holds and fee protection.
+- Per-payment and cumulative caps count submitted/unknown attempts, settled spending and
+  outstanding reservations without double-counting. No bill splitting, no mandate reset.
+- Rail/session/funding readiness and the stop switch permit new submission. Durable
+  authorization and outbox are recorded **before** external I/O; the isolated executor
+  revalidates independently.
+
+At the exact boundary `amount <= ceiling` is permitted if every other check passes. An
+otherwise-valid bill outside mandate scope goes to human review. Missed cycles do not
+auto-pay an unbounded backlog; catch-up requires reviewed scope and caps. A recurring
+schedule creates a work item, not a new debt, price agreement or consent.
+
+### 18.6 Metrics — and the caveat that makes them honest
+
+§14.6 requires counting separately: auto-authorized, human-review, held/rejected,
+submitted, verified and pending/failed. **Automatic work must remain visible even when no
+approval notification is needed.**
+
+For "how often the admin agreed with the agent", two distinct and separately labelled
+metrics:
+
+1. **Approval-as-is rate** = approved-as-is ÷ resolved human-reviewed original proposals
+   (approved-as-is + edited + rejected). Holds and pending are reported separately. An edit
+   is not approval of the original proposal and needs its own successor authorization.
+   Repeated reviews or revisions must not inflate the count.
+2. **Retrospective agreement rate** — a *sample* of automatically released occurrences is
+   later shown to the responsible supervisor, who records whether they would have made the
+   same decision. §14.6 is explicit: this is **retrospective feedback, not per-item approval
+   and not proof of correctness**. It must be labelled as such on the dashboard and in any
+   exported evidence, and it must never be presented as an authorization metric.
+
+### 18.7 Dependency chain — the lane cannot be built first
+
+```mermaid
+flowchart LR
+    A[Reviewed reservation release<br/>+ funding rollover ✅] --> B[Durable outbox<br/>+ attempt identity ✅]
+    B --> C[Isolated executor<br/>+ Arc settlement verification ✅]
+    C --> D[Recurring mandate<br/>+ occurrence + evaluator]
+    D --> E[B5 capped autonomous lane<br/>reachable without a browser]
+```
+
+Building D first produces a lane that authorises payments it cannot execute, which is
+worse than not having it: the dashboard would show "auto-authorized" against money that
+never moves. **The correct next implementation batch is A, then B, then C, then D.**
+
+**Status (2026-10-11): A, B and C are delivered and tested.** The chain has still never run
+against a live network, so D now has one more prerequisite besides the code: a live testnet run
+of C with an operator decision on testnet submission authority. Until that run exists, D would
+be an auto-authorising lane sitting on top of a submission path that has only ever been exercised
+under mocks — the exact "authorises payments it cannot execute" failure the ordering exists to
+prevent.
+
+### 18.8 Decisions this section requires
+
+1. Confirm the standing-mandate framing: the mandate decides the class, PHP decides each
+   occurrence, and the model never authorises an automatic payment.
+2. Confirm the dependency order in §18.7 — in particular that the executor chain precedes
+   the mandate rather than running in parallel with it.
+3. Agree the initial allowance is **zero** and that enabling it requires a separately
+   reviewed mandate with a named owner, not a configuration toggle.
+4. Confirm that retrospective agreement (§18.6) is acceptable evidence for a hackathon
+   audience, and that it will always be labelled retrospective.

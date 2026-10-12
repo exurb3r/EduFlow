@@ -66,7 +66,13 @@ final readonly class ProposePaymentIntentChange
                 return $existing;
             }
             $this->lifecycle->requireActive($stored);
-            if (PaymentReservation::query()->where('invoice_id', $stored->invoice_id)->exists()) {
+            $liveHold = PaymentReservation::query()
+                ->where('invoice_id', $stored->invoice_id)
+                ->get()
+                ->reject(fn (PaymentReservation $hold): bool => $hold->isReleased())
+                ->isNotEmpty();
+
+            if ($liveHold) {
                 throw ValidationException::withMessages(['payment' => 'Bill has held capacity; reviewed reservation release is required before draft recovery.']);
             }
             $snapshot = null;

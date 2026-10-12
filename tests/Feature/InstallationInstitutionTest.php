@@ -96,7 +96,8 @@ test('dashboard remains accessible with ambiguous institution context and no wal
 
     $this->actingAs($admin)->get(Dashboard::getUrl())
         ->assertSuccessful()
-        ->assertSee('EduFlow AI');
+        ->assertSee('Installation &amp; operations', escape: false)
+        ->assertSee('Institution context unavailable');
 });
 
 test('malformed persisted identity fails closed even when environment ID is configured', function (): void {
