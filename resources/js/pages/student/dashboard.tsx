@@ -715,58 +715,6 @@ export default function StudentDashboard({
                         </DialogContent>
                     </Dialog>
 
-                    <section
-                        className="clay-card grid gap-4 p-5"
-                        aria-labelledby="tuition-attempts-heading"
-                    >
-                        <h2 id="tuition-attempts-heading" className="clay-h2">
-                            Pilot tuition attempts
-                        </h2>
-                        <p className="clay-meta">
-                            Transfer and allocation are separate. Unknown means
-                            investigate the existing payment, never send again.
-                        </p>
-                        {tuitionAttempts.length === 0 ? (
-                            <p className="clay-body">
-                                No pilot tuition attempt recorded.
-                            </p>
-                        ) : (
-                            tuitionAttempts.map((a) => (
-                                <div key={a.id} className="grid gap-2 text-sm">
-                                    <p className="font-semibold">
-                                        #{a.id} — {a.state_label} —{' '}
-                                        {formatBaseUnits(a.amount_base_units)}{' '}
-                                        USDC
-                                    </p>
-                                    <p>
-                                        {a.guidance} Allocation:{' '}
-                                        {a.posted
-                                            ? `${formatBaseUnits(a.applied_base_units)} USDC applied to pilot account`
-                                            : 'Not posted'}
-                                        .
-                                    </p>
-                                    <p className="break-all text-xs">
-                                        Request: {a.request_key}{' '}
-                                        {a.tx_hash
-                                            ? `· Transaction: ${a.tx_hash}`
-                                            : '· No chain hash yet'}
-                                    </p>
-                                </div>
-                            ))
-                        )}
-                        <Button
-                            type="button"
-                            variant="ghost"
-                            onClick={() =>
-                                router.reload({
-                                    only: ['tuitionAttempts', 'tuitionAccount'],
-                                })
-                            }
-                        >
-                            Refresh attempt status
-                        </Button>
-                    </section>
-
                     {/* -- Wallet hero -- */}
                     <section
                         aria-labelledby="wallet-heading"

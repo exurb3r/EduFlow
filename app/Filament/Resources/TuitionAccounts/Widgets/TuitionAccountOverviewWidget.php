@@ -41,7 +41,7 @@ class TuitionAccountOverviewWidget extends Widget
             return null;
         }
 
-        $address = $account->student->wallet?->address ?? $account->student->payout_address;
+        $address = $account->student->wallet->address ?? $account->student->payout_address;
 
         if (! $address) {
             return null;

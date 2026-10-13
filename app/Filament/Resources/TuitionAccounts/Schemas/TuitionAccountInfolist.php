@@ -151,9 +151,9 @@ class TuitionAccountInfolist
                             TextEntry::make('wallet_address')
                                 ->label('Arc Payout Wallet')
                                 ->fontFamily('mono')
-                                ->state(fn (TuitionAccount $record): string => $record->student->wallet?->address ?? $record->student->payout_address ?? 'No wallet assigned')
-                                ->copyable(fn (TuitionAccount $record): bool => (bool) ($record->student->wallet?->address ?? $record->student->payout_address))
-                                ->url(fn (TuitionAccount $record): ?string => ($address = $record->student->wallet?->address ?? $record->student->payout_address) ? app(ArcNetworkGateway::class)->addressExplorerUrl($address) : null)
+                                ->state(fn (TuitionAccount $record): string => $record->student->wallet->address ?? $record->student->payout_address ?? 'No wallet assigned')
+                                ->copyable(fn (TuitionAccount $record): bool => (bool) ($record->student->wallet->address ?? $record->student->payout_address))
+                                ->url(fn (TuitionAccount $record): ?string => ($address = $record->student->wallet->address ?? $record->student->payout_address) ? app(ArcNetworkGateway::class)->addressExplorerUrl($address) : null)
                                 ->openUrlInNewTab()
                                 ->helperText('Click to inspect address on ArcScan explorer.'),
                         ]),

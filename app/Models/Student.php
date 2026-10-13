@@ -28,6 +28,7 @@ use Spatie\Activitylog\Traits\LogsActivity;
  * @property-read User $user
  * @property-read Collection<int, TuitionAccount> $tuitionAccounts
  * @property-read Collection<int, AssistanceRequest> $assistanceRequests
+ * @property-read Collection<int, StudentBill> $bills
  * @property-read StudentWallet|null $wallet
  * @property-read Collection<int, StudentWalletFunding> $walletFundings
  */

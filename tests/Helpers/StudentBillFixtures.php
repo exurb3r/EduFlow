@@ -20,6 +20,7 @@ use Brick\Math\BigInteger;
 use Illuminate\Support\Facades\Bus;
 use Spatie\Permission\Models\Role;
 use Yukazakiri\Lepton\Contracts\ArcNetworkGateway;
+use Yukazakiri\Lepton\Contracts\AuthGateway;
 
 /**
  * Shared fixtures for the student-bill quote, allocation and submission suites.
@@ -76,7 +77,14 @@ function billPaymentContext(array $overrides = []): array
     $transport->shouldReceive('estimate')->andReturn(['networkFee' => '0.02945113436514256']);
     app()->instance(AsyncPaymentTransport::class, $transport);
 
-    return ['student' => $student, 'bill' => $bill, 'arc' => $arc];
+    $auth = Mockery::mock(AuthGateway::class);
+    if (! $auth instanceof AuthGateway) {
+        throw new RuntimeException('Auth mock does not implement gateway.');
+    }
+    mockExpectation($auth, 'isAuthenticatedFor')->with('ARC-TESTNET')->andReturn(true);
+    app()->instance(AuthGateway::class, $auth);
+
+    return ['student' => $student, 'bill' => $bill, 'arc' => $arc, 'auth' => $auth];
 }
 
 /**

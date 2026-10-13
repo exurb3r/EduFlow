@@ -26,6 +26,7 @@ class StudentBillsRelationManager extends RelationManager
 
     protected static string|BackedEnum|null $icon = Heroicon::ReceiptPercent;
 
+    #[\Override]
     public static function getBadge(Model $ownerRecord, string $pageClass): ?string
     {
         /** @var Student $ownerRecord */
@@ -34,6 +35,7 @@ class StudentBillsRelationManager extends RelationManager
         return $count > 0 ? (string) $count : null;
     }
 
+    #[\Override]
     public static function getBadgeColor(Model $ownerRecord, string $pageClass): ?string
     {
         return 'gray';

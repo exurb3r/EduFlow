@@ -20,6 +20,7 @@ use Filament\Forms\Components\TextInput;
 use Filament\Notifications\Notification;
 use Filament\Resources\Pages\ViewRecord;
 use Filament\Support\Icons\Heroicon;
+use Illuminate\Support\Facades\Gate;
 use Yukazakiri\Lepton\Contracts\ArcNetworkGateway;
 
 class ViewStudent extends ViewRecord
@@ -49,6 +50,15 @@ class ViewStudent extends ViewRecord
     }
 
     #[\Override]
+    public function getRecord(): Student
+    {
+        /** @var Student $record */
+        $record = parent::getRecord();
+
+        return $record;
+    }
+
+    #[\Override]
     protected function getHeaderActions(): array
     {
         return [
@@ -56,7 +66,7 @@ class ViewStudent extends ViewRecord
                 ->label('New tuition account')
                 ->icon('heroicon-m-banknotes')
                 ->color('primary')
-                ->visible(fn (): bool => auth()->user()?->can('create', TuitionAccount::class) ?? false)
+                ->visible(fn (): bool => Gate::allows('create', TuitionAccount::class))
                 ->modalHeading('Create Tuition Account')
                 ->modalDescription('Open a tuition account for this student for a selected academic term.')
                 ->modalSubmitActionLabel('Create account')
@@ -92,7 +102,6 @@ class ViewStudent extends ViewRecord
                         ->rules(['regex:/^\d+(\.\d{1,6})?$/']),
                 ])
                 ->action(function (array $data): void {
-                    /** @var Student $student */
                     $student = $this->getRecord();
                     $totalUnits = Money::fromDecimal((string) $data['total_amount'], CurrencyCode::USDC)->toBaseUnits();
                     $paidUnits = Money::fromDecimal((string) $data['paid_amount'], CurrencyCode::USDC)->toBaseUnits();
@@ -120,9 +129,9 @@ class ViewStudent extends ViewRecord
                 ->label('Student ArcScan')
                 ->icon(Heroicon::ArrowTopRightOnSquare)
                 ->color('gray')
-                ->visible(fn (): bool => filled($this->getRecord()->wallet?->address ?? $this->getRecord()->payout_address))
+                ->visible(fn (): bool => filled($this->getRecord()->wallet->address ?? $this->getRecord()->payout_address))
                 ->url(function (): ?string {
-                    $address = $this->getRecord()->wallet?->address ?? $this->getRecord()->payout_address;
+                    $address = $this->getRecord()->wallet->address ?? $this->getRecord()->payout_address;
 
                     if (! $address) {
                         return null;
