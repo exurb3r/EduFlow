@@ -22,7 +22,7 @@
         [
             'key' => 'payments',
             'title' => 'Reserved payments awaiting authorization',
-            'authority' => 'A hold exists. Authorization is separate, MFA-backed, expires within five minutes, and still cannot execute: no executor is shipped.',
+            'authority' => 'A hold exists. Exact authorization requires fresh MFA and expires within five minutes. A separately enabled worker submits; verified settlement alone proves payment.',
             'empty' => 'No reserved payments are waiting for authorization.',
             'url' => $queues['payments'],
         ],

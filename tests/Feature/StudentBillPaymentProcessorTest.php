@@ -299,7 +299,7 @@ test('a rehearsal reaches no signer and allocates nothing', function (): void {
         ->and($fresh->last_error)->toContain('Rehearsal');
 });
 
-test('the sweep redelivers owed work and skips anything already submitted', function (): void {
+test('the sweep redelivers owed work and never redelivers work with nothing left to advance', function (): void {
     $c = billPaymentContext();
     enableBillLane();
     allowPilot($c);
@@ -307,18 +307,97 @@ test('the sweep redelivers owed work and skips anything already submitted', func
 
     $payment = billConsent($c, 5_000_000);
     $dispatcher = app(StudentBillPaymentDispatcher::class);
-    $processor = app(StudentBillPaymentProcessor::class);
 
-    // Not dispatchable yet: consent alone is not a prepared submission.
-    expect($dispatcher->dispatchDue())->toBe(0);
+    // Consent alone is not a submission, but a consented row IS owed work: the
+    // lane may have been enabled after the student signed. Delivering it lets
+    // the worker prepare it, and preparing reaches no signer.
+    expect($dispatcher->dispatchDue())->toBe(1);
+    Bus::assertDispatched(ProcessStudentBillPayment::class, fn (ProcessStudentBillPayment $job): bool => $job->paymentId === $payment->id);
 
     $payment->fresh()->update(['submission_state' => StudentBillPayment::SUBMISSION_PREPARED]);
     expect($dispatcher->dispatchDue())->toBe(1);
 
     Bus::assertDispatched(ProcessStudentBillPayment::class, fn (ProcessStudentBillPayment $job): bool => $job->paymentId === $payment->id);
 
+    // A payment the rail already owns is the one that most needs another look:
+    // dropping it here is what strands real money in an unverified state.
     $payment->fresh()->update(['submitted_at' => now(), 'submission_state' => StudentBillPayment::SUBMISSION_ACCEPTED]);
+    expect($dispatcher->dispatchDue())->toBe(1);
+
+    // Awaiting a person is not awaiting a worker: no amount of sweeping resolves it.
+    $payment->fresh()->update(['submission_state' => StudentBillPayment::SUBMISSION_NEEDS_REVIEW]);
     expect($dispatcher->dispatchDue())->toBe(0);
+
+    // And an allocated payment has nothing left to advance at all.
+    $payment->fresh()->update(['submission_state' => StudentBillPayment::SUBMISSION_VERIFIED, 'allocated_at' => now()]);
+    expect($dispatcher->dispatchDue())->toBe(0);
+});
+
+test('the sweep recovers every stage a worker could still advance and never a leased one', function (string $state, string $lease): void {
+    $c = billPaymentContext();
+    enableBillLane();
+    allowPilot($c);
+    Bus::fake();
+
+    $payment = billConsent($c, 5_000_000);
+    $payment->update(['submission_state' => $state,
+        'submitted_at' => in_array($state, StudentBillPayment::OBSERVABLE_STATES, true) ? now() : null,
+        'leased_until' => $lease === 'live' ? now()->addMinutes(5) : null,
+        'next_attempt_at' => $lease === 'live' ? null : now()->subMinute()]);
+
+    $dispatched = app(StudentBillPaymentDispatcher::class)->dispatchDue();
+
+    expect($dispatched)->toBe($lease === 'live' ? 0 : 1);
+})->with([
+    'consented after the lane was enabled' => [StudentBillPayment::SUBMISSION_CONSENTED, 'expired'],
+    'prepared but not yet sent' => [StudentBillPayment::SUBMISSION_PREPARED, 'expired'],
+    'signer may already have been reached' => [StudentBillPayment::SUBMISSION_SUBMITTING, 'expired'],
+    'rail accepted, nobody observed again' => [StudentBillPayment::SUBMISSION_ACCEPTED, 'expired'],
+    'hash exists, proof outstanding' => [StudentBillPayment::SUBMISSION_AWAITING_VERIFICATION, 'expired'],
+    'verified, allocation still owed' => [StudentBillPayment::SUBMISSION_VERIFIED, 'expired'],
+    'a live worker owns this one' => [StudentBillPayment::SUBMISSION_ACCEPTED, 'live'],
+]);
+
+test('the sweep leaves an accepted transfer alone while observation is switched off', function (): void {
+    $c = billPaymentContext();
+    enableBillLane();
+    config(['eduflow.student_bills.observe_enabled' => false]);
+    allowPilot($c);
+    Bus::fake();
+
+    $payment = billConsent($c, 5_000_000);
+    $payment->update(['submission_state' => StudentBillPayment::SUBMISSION_ACCEPTED, 'submitted_at' => now()]);
+
+    // Reporting it as recovered would overstate the lane: nothing can read the
+    // rail right now, so the payment stays exactly as stranded as it was.
+    expect(app(StudentBillPaymentDispatcher::class)->dispatchDue())->toBe(0);
+});
+
+test('observation recovery stays available when new bill submissions are disabled', function (): void {
+    $c = billPaymentContext();
+    enableBillLane();
+    allowPilot($c);
+    Bus::fake();
+    $payment = billConsent($c);
+    $payment->update(['submission_state' => StudentBillPayment::SUBMISSION_ACCEPTED, 'submitted_at' => now()]);
+    config(['eduflow.student_bills.enabled' => false]);
+
+    expect(app(StudentBillPaymentDispatcher::class)->dispatchDue())->toBe(1);
+    Bus::assertDispatched(ProcessStudentBillPayment::class, fn (ProcessStudentBillPayment $job): bool => $job->paymentId === $payment->id);
+    $this->artisan('eduflow:dispatch-student-bill-payments')->assertSuccessful();
+    expect($payment->fresh()->submission_state)->toBe(StudentBillPayment::SUBMISSION_ACCEPTED);
+});
+
+test('stop switch does not strand verified bill allocation while observation is off', function (): void {
+    $c = billPaymentContext();
+    enableBillLane();
+    Bus::fake();
+    $payment = billConsent($c);
+    $payment->update(['submission_state' => StudentBillPayment::SUBMISSION_VERIFIED]);
+    config(['eduflow.student_bills.stop_switch' => true, 'eduflow.student_bills.observe_enabled' => false]);
+
+    expect(app(StudentBillPaymentDispatcher::class)->dispatchDue())->toBe(1);
+    Bus::assertDispatched(ProcessStudentBillPayment::class, fn (ProcessStudentBillPayment $job): bool => $job->paymentId === $payment->id);
 });
 
 test('a job that runs twice observes rather than resends', function (): void {

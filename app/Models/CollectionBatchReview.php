@@ -5,6 +5,9 @@ declare(strict_types=1);
 namespace App\Models;
 
 use Illuminate\Database\Eloquent\Model;
+use Illuminate\Database\Eloquent\Relations\BelongsTo;
+use Illuminate\Database\Eloquent\Relations\BelongsToMany;
+use Illuminate\Database\Eloquent\Relations\HasOne;
 use LogicException;
 
 /**
@@ -17,6 +20,7 @@ use LogicException;
  * @property string $reason
  * @property string $batch_digest
  * @property string $review_digest
+ * @property-read CollectionBatch|null $batch
  */
 class CollectionBatchReview extends Model
 {
@@ -64,5 +68,23 @@ class CollectionBatchReview extends Model
             && trim($this->reason) !== '' && mb_strlen($this->reason) <= 1000
             && hash_equals($batch->snapshot_digest, $this->batch_digest)
             && hash_equals($this->review_digest, PaymentIntent::digest($this->content()));
+    }
+
+    /** @return BelongsToMany<BudgetSnapshot, $this> */
+    public function budgetSnapshots(): BelongsToMany
+    {
+        return $this->belongsToMany(BudgetSnapshot::class, 'budget_snapshot_collection_review');
+    }
+
+    /** @return BelongsTo<CollectionBatch, $this> */
+    public function batch(): BelongsTo
+    {
+        return $this->belongsTo(CollectionBatch::class, 'collection_batch_id');
+    }
+
+    /** @return HasOne<ReceiptPlanTrigger, $this> */
+    public function planningTrigger(): HasOne
+    {
+        return $this->hasOne(ReceiptPlanTrigger::class);
     }
 }

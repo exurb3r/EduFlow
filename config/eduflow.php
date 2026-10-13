@@ -6,6 +6,7 @@ return [
 
     'background_finance' => [
         'enabled' => env('EDUFLOW_BACKGROUND_FINANCE', false),
+        'receipt_routing_enabled' => env('EDUFLOW_RECEIPT_BUDGET_ROUTING', false),
         'queue_connection' => env('EDUFLOW_FINANCE_QUEUE_CONNECTION', 'database'),
         'queue' => 'finance-planning',
     ],
@@ -121,6 +122,8 @@ return [
         'enabled' => env('EDUFLOW_BILL_SUBMISSION_ENABLED', false),
         'observe_enabled' => env('EDUFLOW_BILL_OBSERVATION_ENABLED', false),
         'stop_switch' => env('EDUFLOW_BILL_SUBMISSION_STOP', false),
+        'auto_intake' => env('EDUFLOW_BILL_AUTO_INTAKE', false),
+        'intake_owner_id' => env('EDUFLOW_BILL_INTAKE_OWNER_ID'),
         // An explicit allow-list. A bill absent from it is never sent, whatever the
         // student consents to. Comma-separated ids; an empty value disables the
         // lane entirely rather than permitting everything.

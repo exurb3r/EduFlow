@@ -5,10 +5,12 @@ declare(strict_types=1);
 namespace App\Models;
 
 use App\Enums\StudentBillCategory;
+use App\Services\StudentBillPaymentProcessor;
 use Database\Factories\StudentBillPaymentFactory;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
+use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Str;
 use LogicException;
@@ -154,6 +156,29 @@ class StudentBillPayment extends Model
 
     /** A person must reconcile an existing submission. Never resolved by sending again. */
     public const string SUBMISSION_NEEDS_REVIEW = 'needs_operator_review';
+
+    /**
+     * States a signer has not necessarily been reached from.
+     *
+     * `consented` and `prepared` are the only two a sweep may redeliver on the
+     * path that *can* submit, and even there the write-ahead fence in
+     * {@see StudentBillPaymentProcessor::submit()} is what makes a
+     * second delivery harmless — the sweep is recovery, not permission.
+     */
+    public const array SENDABLE_STATES = [self::SUBMISSION_CONSENTED, self::SUBMISSION_PREPARED];
+
+    /**
+     * States where the transfer may already exist and only reading can advance.
+     *
+     * These are never a path to sending again. They are swept so a transfer the
+     * rail accepted cannot be stranded: without them, a crash between acceptance
+     * and verification leaves a real payment that nobody ever looks at again.
+     */
+    public const array OBSERVABLE_STATES = [
+        self::SUBMISSION_SUBMITTING,
+        self::SUBMISSION_ACCEPTED,
+        self::SUBMISSION_AWAITING_VERIFICATION,
+    ];
 
     protected $fillable = [
         'request_key', 'movement_key', 'organization_id', 'quoted_for', 'student_bill_id', 'student_id',
@@ -578,5 +603,11 @@ class StudentBillPayment extends Model
     public function studentWallet(): BelongsTo
     {
         return $this->belongsTo(StudentWallet::class);
+    }
+
+    /** @return HasMany<CollectionBatch, $this> */
+    public function collections(): HasMany
+    {
+        return $this->hasMany(CollectionBatch::class);
     }
 }

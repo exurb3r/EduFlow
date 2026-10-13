@@ -111,10 +111,79 @@ class BudgetSnapshot extends Model
 
             return $asOf instanceof Carbon && $validUntil instanceof Carbon && $start instanceof Carbon && $end instanceof Carbon
                 && $asOf->lt($validUntil) && $start->lte($end) && $this->hasValidCollectionBindings($content)
+                && $this->hasValidReceiptRouting($content)
                 && hash_equals($this->snapshot_digest, PaymentIntent::digest($content));
         } catch (Throwable) {
             return false;
         }
+    }
+
+    /** @param array<string, mixed> $content */
+    private function hasValidReceiptRouting(array $content): bool
+    {
+        if (! array_key_exists('receipt_routing', $content)) {
+            return true;
+        }
+        $link = $content['receipt_routing'];
+        if (! is_array($link) || ($link['schema_version'] ?? null) !== 1
+            || ($link['service_capability'] ?? null) !== 'receipt_successor_planning' || ($link['can_execute'] ?? null) !== false) {
+            return false;
+        }
+        $trigger = ReceiptPlanTrigger::query()->find($link['trigger_id'] ?? null);
+        $approval = ReceiptBudgetRouteApproval::query()->find($link['approval_id'] ?? null);
+        $predecessor = self::query()->find($link['predecessor_snapshot_id'] ?? null);
+        $review = CollectionBatchReview::query()->find($link['collection_review_id'] ?? null);
+        if (! $trigger instanceof ReceiptPlanTrigger || ! $approval instanceof ReceiptBudgetRouteApproval
+            || ! $predecessor instanceof self || ! $review instanceof CollectionBatchReview
+            || $predecessor->id === $this->id || ($this->exists && $predecessor->id >= $this->id)
+            || ! $predecessor->hasValidSnapshot() || ! $approval->hasValidEvidence($approval->route)
+            || $trigger->organization_id !== $this->organization_id || $approval->organization_id !== $this->organization_id
+            || $review->organization_id !== $this->organization_id || $predecessor->budget_id !== $this->budget_id
+            || $trigger->receipt_budget_route_approval_id !== $approval->id || $trigger->collection_batch_review_id !== $review->id
+            || $trigger->review_digest !== $review->review_digest || $trigger->approval_digest !== $approval->approval_digest
+            || $link['route_id'] !== $approval->receipt_budget_route_id || $link['approval_digest'] !== $approval->approval_digest
+            || $link['predecessor_digest'] !== $predecessor->snapshot_digest || $link['review_digest'] !== $review->review_digest
+            || ($trigger->state === 'completed' && $trigger->budget_snapshot_id !== $this->id)
+            || ! in_array($trigger->state, ['queued', 'completed'], true)) {
+            return false;
+        }
+        $route = $approval->route;
+        $base = $route->budgetSnapshot;
+        $batch = $review->batch;
+        if ($batch === null || ! $review->hasValidEvidence($batch) || $review->decision !== 'approve_receipts'
+            || $this->prepared_by !== $route->prepared_by || $this->currency !== $route->currency
+            || $this->budget_id !== $base->budget_id || $content['bills'] !== $base->snapshot['bills']
+            || ($predecessor->id !== $base->id && ($predecessor->snapshot['receipt_routing']['approval_id'] ?? null) !== $approval->id)
+            || ($trigger->state === 'completed' && $trigger->predecessor_snapshot_id !== $predecessor->id)
+            || $batch->source_stream !== $route->source_stream || ! $batch->isMovementSourced()
+            || $batch->collected_from->lt($route->receipts_from) || $batch->collected_until->gt($route->valid_until)
+            || $content['valid_until'] !== $route->valid_until->utc()->toIso8601String()
+            || Carbon::parse($content['valid_until'])->gt(Carbon::parse($predecessor->snapshot['valid_until']))
+            || Carbon::parse($content['as_of'])->lt($batch->collected_until)
+            || Carbon::parse($content['as_of'])->lt(Carbon::parse($predecessor->snapshot['as_of']))) {
+            return false;
+        }
+        foreach (['bills', 'department', 'budget_fingerprint', 'evidence'] as $field) {
+            if ($content[$field] !== $predecessor->snapshot[$field]) {
+                return false;
+            }
+        }
+        foreach (self::AMOUNT_FIELDS as $field) {
+            $increment = match ($field) {
+                'realized_receipts' => $batch->received_minor_units, 'restricted_cash' => $batch->restricted_minor_units, default => 0,
+            };
+            if ($content['amounts'][$field] !== (string) BigInteger::of($predecessor->snapshot['amounts'][$field])->plus($increment)) {
+                return false;
+            }
+        }
+        $before = array_column($predecessor->snapshot['collections'], 'review_id');
+        if (in_array($review->id, $before, true)) {
+            return false;
+        }
+        $before[] = $review->id;
+        sort($before, SORT_NUMERIC);
+
+        return array_column($content['collections'], 'review_id') === $before;
     }
 
     /**

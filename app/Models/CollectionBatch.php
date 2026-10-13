@@ -21,6 +21,7 @@ use Throwable;
  * @property int $organization_id
  * @property int $prepared_by
  * @property int|null $student_tuition_payment_id
+ * @property int|null $student_bill_payment_id
  * @property string $source_stream
  * @property string $source_reference
  * @property string $source_document_digest
@@ -34,6 +35,7 @@ use Throwable;
  * @property Carbon $created_at
  * @property-read User|null $preparer
  * @property-read StudentTuitionPayment|null $tuitionPayment
+ * @property-read StudentBillPayment|null $billPayment
  * @property-read Collection<int, CollectionBatchReview> $reviews
  * @property-read Collection<int, FinanceWorkflowRun> $workflowRuns
  */
@@ -47,7 +49,9 @@ class CollectionBatch extends Model
      */
     public const string TUITION_PORTAL_STREAM = 'student-portal.tuition';
 
-    protected $fillable = ['capture_key', 'organization_id', 'prepared_by', 'student_tuition_payment_id', 'source_stream',
+    public const string BILL_PORTAL_STREAM = 'student-portal.bills';
+
+    protected $fillable = ['capture_key', 'organization_id', 'prepared_by', 'student_tuition_payment_id', 'student_bill_payment_id', 'source_stream',
         'source_reference', 'source_document_digest', 'currency', 'received_minor_units', 'restricted_minor_units',
         'collected_from', 'collected_until', 'snapshot', 'snapshot_digest'];
 
@@ -71,7 +75,8 @@ class CollectionBatch extends Model
     #[\Override]
     protected function casts(): array
     {
-        return ['organization_id' => 'integer', 'prepared_by' => 'integer', 'received_minor_units' => 'integer',
+        return ['organization_id' => 'integer', 'prepared_by' => 'integer', 'student_tuition_payment_id' => 'integer',
+            'student_bill_payment_id' => 'integer', 'received_minor_units' => 'integer',
             'restricted_minor_units' => 'integer', 'collected_from' => 'datetime', 'collected_until' => 'datetime', 'snapshot' => 'array'];
     }
 
@@ -105,6 +110,12 @@ class CollectionBatch extends Model
     public function tuitionPayment(): BelongsTo
     {
         return $this->belongsTo(StudentTuitionPayment::class, 'student_tuition_payment_id');
+    }
+
+    /** @return BelongsTo<StudentBillPayment, $this> */
+    public function billPayment(): BelongsTo
+    {
+        return $this->belongsTo(StudentBillPayment::class, 'student_bill_payment_id');
     }
 
     /**
@@ -184,19 +195,35 @@ class CollectionBatch extends Model
         $origin = $snapshot['evidence_origin'] ?? 'staff_attestation';
 
         if ($origin === 'staff_attestation') {
-            return $this->student_tuition_payment_id === null;
+            return $this->student_tuition_payment_id === null && $this->student_bill_payment_id === null;
         }
 
-        if ($origin !== 'verified_chain_movement' || $this->student_tuition_payment_id === null) {
+        if ($origin !== 'verified_chain_movement'
+            || ($this->student_tuition_payment_id === null) === ($this->student_bill_payment_id === null)) {
             return false;
         }
 
-        $payment = StudentTuitionPayment::query()->find($this->student_tuition_payment_id);
+        if ($this->student_bill_payment_id !== null) {
+            $payment = StudentBillPayment::query()->find($this->student_bill_payment_id);
+            if (! $payment instanceof StudentBillPayment || ! $payment->hasValidSettlement() || ! $payment->isAllocated()
+                || $payment->organization_id !== $this->organization_id
+                || $this->source_stream !== self::BILL_PORTAL_STREAM
+                || ($snapshot['movement']['settlement_evidence_digest'] ?? null) !== $payment->settlement_evidence_digest
+                || ($snapshot['movement']['student_bill_id'] ?? null) !== $payment->student_bill_id
+                || ($snapshot['movement']['chain'] ?? null) !== $payment->chain
+                || ($snapshot['movement']['settlement_verdict'] ?? null) !== 'verified'
+                || $payment->applied_base_units < 0 || $payment->overpayment_base_units < 0
+                || ! BigInteger::of($payment->applied_base_units)->plus($payment->overpayment_base_units)->isEqualTo($payment->amount_base_units)) {
+                return false;
+            }
+        } else {
+            $payment = StudentTuitionPayment::query()->find($this->student_tuition_payment_id);
+            if (! $payment instanceof StudentTuitionPayment || ! $payment->isReal() || $this->source_stream !== self::TUITION_PORTAL_STREAM) {
+                return false;
+            }
+        }
 
-        return $payment instanceof StudentTuitionPayment
-            && $payment->isReal()
-            && $this->currency === CurrencyCode::USDC->value
-            && $this->source_stream === self::TUITION_PORTAL_STREAM
+        return $payment->executed_at !== null && $this->currency === CurrencyCode::USDC->value
             && $this->received_minor_units === $payment->amount_base_units
             && $this->restricted_minor_units === $payment->overpayment_base_units
             && ($snapshot['movement']['applied_base_units'] ?? null) === $payment->applied_base_units
@@ -220,10 +247,10 @@ class CollectionBatch extends Model
      * document-digest slot, so the capture-time duplicate check catches a
      * second receipt for the same settlement without any new rule.
      */
-    public static function movementDigest(StudentTuitionPayment $payment): string
+    public static function movementDigest(StudentTuitionPayment|StudentBillPayment $payment): string
     {
         return hash('sha256', implode("\x1f", [
-            'student_tuition_payment',
+            $payment instanceof StudentBillPayment ? 'student_bill_payment' : 'student_tuition_payment',
             (string) $payment->getKey(),
             strtolower((string) $payment->request_key),
             strtolower((string) $payment->tx_hash),

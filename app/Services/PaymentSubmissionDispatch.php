@@ -64,9 +64,8 @@ final readonly class PaymentSubmissionDispatch
     /**
      * Stale leases are work that was claimed and never concluded.
      *
-     * They are reopened rather than abandoned so the entry stays owed, and the
-     * provider idempotency key is unchanged, so a late-arriving worker and a
-     * retry still converge on the same payment identity.
+     * They become unknown, never queued: a signer may already have been reached.
+     * Observation or an operator investigation resolves the existing identity.
      */
     public function recoverStaleLeases(int $staleAfterMinutes = 15): int
     {

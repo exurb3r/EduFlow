@@ -6,7 +6,8 @@
         </x-slot>
         <x-filament::badge color="warning">Non-executable workspace</x-filament::badge>
         <p>
-            No funds are reserved, no accounts are changed and no transfers are made here.
+            Accepting a plan changes no accounts and sends no transfer. Preparing an accepted bill for payment review
+            may hold capacity against independently reviewed funding; exact payment approval stays separate.
             USDC valuations are reference values, not verified settlement funding. Legacy agents cannot run from this page.
         </p>
     </x-filament::section>

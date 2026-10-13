@@ -20,7 +20,8 @@ use Throwable;
 
 final readonly class FinanceWorkflowDispatcher
 {
-    public function __construct(private InstallationInstitution $institutions, private FinanceWorkflows $workflows) {}
+    public function __construct(private InstallationInstitution $institutions, private FinanceWorkflows $workflows,
+        private ReceiptTriggeredPlanning $receiptPlans) {}
 
     /** Claims one queued run per lease. Jobs may retry; the run identity stays unique. */
     public function dispatchRun(int $runId): bool
@@ -122,6 +123,13 @@ final readonly class FinanceWorkflowDispatcher
         }
         $this->requireDurableQueue();
         $institution = $this->institutions->require();
+        foreach ($this->receiptPlans->pendingReviews() as $review) {
+            try {
+                $this->workflows->collectionReviewed($review);
+            } catch (ValidationException $exception) {
+                report($exception);
+            }
+        }
         /** @var Collection<int, BudgetSnapshot> $budgets */
         $budgets = BudgetSnapshot::query()->where('organization_id', $institution->id)->whereDoesntHave('workflowRuns')->orderBy('id')->limit(100)->get();
         $budgets->each(function (BudgetSnapshot $snapshot): void {

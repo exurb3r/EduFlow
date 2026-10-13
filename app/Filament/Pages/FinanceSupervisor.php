@@ -4,17 +4,27 @@ declare(strict_types=1);
 
 namespace App\Filament\Pages;
 
+use App\Actions\ApproveReceiptBudgetRoute;
 use App\Actions\CaptureBudgetSnapshot;
+use App\Actions\PrepareReceiptBudgetRoute;
 use App\Actions\ReviewFinancePlan;
 use App\DTOs\Money;
 use App\Enums\CurrencyCode;
+use App\Filament\Resources\PaymentSubmissions\PaymentSubmissionResource;
 use App\Models\Budget;
 use App\Models\BudgetSnapshot;
+use App\Models\CollectionBatch;
 use App\Models\CollectionBatchReview;
+use App\Models\FinancePlanReview;
 use App\Models\FinanceWorkflowRun;
+use App\Models\FundingWindow;
+use App\Models\FundingWindowApproval;
 use App\Models\InvoiceVersion;
 use App\Models\PaymentIntent;
+use App\Models\ReceiptBudgetRoute;
+use App\Models\ReceiptPlanTrigger;
 use App\Models\User;
+use App\Services\AcceptedPlanPayments;
 use App\Services\InstallationInstitution;
 use BackedEnum;
 use Filament\Actions\Action;
@@ -92,6 +102,10 @@ class FinanceSupervisor extends Page implements HasTable
     #[Locked]
     public array $mountedPlan = [];
 
+    /** @var list<array<string, mixed>> */
+    #[Locked]
+    public array $mountedPaymentProgress = [];
+
     #[\Override]
     public static function canAccess(): bool
     {
@@ -106,7 +120,7 @@ class FinanceSupervisor extends Page implements HasTable
         return $table
             ->query($this->runsQuery())
             ->heading('Background finance runs')
-            ->description('Refreshes every 10 seconds. Inspect worker progress and review exact proposals; this ledger cannot execute payments.')
+            ->description('Refreshes every 10 seconds. Review exact proposals and prepare eligible bills for independent payment review; no transfer is submitted here.')
             ->defaultSort('id', 'desc')->striped()->poll('10s')
             ->columns([
                 TextColumn::make('id')->label('Run')->prefix('#')->sortable(),
@@ -189,6 +203,47 @@ class FinanceSupervisor extends Page implements HasTable
                         }
                         Notification::make()->title('Plan decision recorded')->body('Exact proposal reviewed. No payment authorized, funds reserved or accounts changed.')->success()->send();
                     }),
+                Action::make('preparePlanPayment')->label('Prepare payment review')->icon(Heroicon::ClipboardDocumentCheck)
+                    ->visible(fn (FinanceWorkflowRun $record): bool => Gate::forUser(Auth::user())->allows('view', $record)
+                        && FinancePlanReview::query()->where('finance_workflow_run_id', $record->id)->where('decision', 'accept_plan')->exists())
+                    ->modalHeading('Prepare accepted bill for payment review')->modalWidth('5xl')
+                    ->modalDescription('Uses this exact accepted plan and an independently reviewed funding window. Holds bill and fee capacity; does not approve or send a payment.')
+                    ->mountUsing(function (FinanceWorkflowRun $record, Schema $schema): void {
+                        $this->mountRunEvidence($record);
+                        $schema->fill();
+                    })
+                    ->schema(fn (): array => [
+                        Select::make('invoice_version_id')->label('Eligible proposed bill')->required()->options(fn (): array => collect($this->mountedPlan['bills'] ?? [])
+                            ->filter(fn (array $bill): bool => $bill['decision'] === 'propose_human_review')
+                            ->mapWithKeys(fn (array $bill): array => [$bill['invoice_version_id'] => 'Invoice #'.$bill['invoice_id'].' · '.$this->formatUnits($bill['valuation_base_units'], 'USDC')])->all()),
+                        Select::make('funding_approval_digest')->label('Reviewed funding window')->required()->options(fn (): array => FundingWindowApproval::query()
+                            ->where('organization_id', app(InstallationInstitution::class)->current()?->id)->whereNull('superseded_at')
+                            ->whereIn('funding_window_id', FundingWindow::query()->select('id')->where('budget_snapshot_id', $this->mountedPlan['snapshot_id'] ?? null))
+                            ->get()->mapWithKeys(fn (FundingWindowApproval $approval): array => [$approval->approval_digest => 'Funding approval #'.$approval->id])->all()),
+                        TextInput::make('max_fee')->label('Maximum fee (USDC)')->inputMode('decimal')->required()
+                            ->helperText('Exact six-decimal amount. Must match an existing draft; policy and funding checks still apply.'),
+                    ])
+                    ->action(function (FinanceWorkflowRun $record, array $data, Schema $schema, AcceptedPlanPayments $payments): void {
+                        abort_unless($this->mountedRunId === $record->id && $this->mountedResultDigest !== '', 403);
+                        $approval = FundingWindowApproval::query()->where('organization_id', $record->organization_id)
+                            ->where('approval_digest', $data['funding_approval_digest'])->firstOrFail();
+                        try {
+                            $fee = Money::fromDecimal($data['max_fee'], CurrencyCode::USDC);
+                        } catch (\InvalidArgumentException|\OverflowException) {
+                            throw ValidationException::withMessages([$schema->getStatePath().'.max_fee' => 'Exact non-negative USDC amount with at most six decimals required.']);
+                        }
+                        try {
+                            $hold = $payments->prepareBill($this->actor(), $record, (int) $data['invoice_version_id'], $approval,
+                                $this->mountedResultDigest, $data['funding_approval_digest'], $fee);
+                        } catch (ValidationException $exception) {
+                            Notification::make()->title('Payment preparation refused')->body(collect($exception->errors())->flatten()->first())->danger()->send();
+
+                            throw ValidationException::withMessages([$schema->getStatePath().'.invoice_version_id' => collect($exception->errors())->flatten()->all()]);
+                        }
+                        Notification::make()->title('Bill prepared for independent payment review')
+                            ->body('Reservation #'.$hold->id.' holds capacity. Open Payment approvals for exact MFA-backed authorization; nothing was sent.')
+                            ->success()->send();
+                    }),
             ])
             ->emptyStateHeading('No background finance runs')
             ->emptyStateDescription('Runs appear when backend finance workflows are queued. This page cannot start legacy agents or execute payments.');
@@ -199,6 +254,11 @@ class FinanceSupervisor extends Page implements HasTable
     protected function getHeaderActions(): array
     {
         return [
+            $this->prepareReceiptRouteAction(),
+            $this->approveReceiptRouteAction(),
+            Action::make('paymentProgress')->label('Payment progress')->icon(Heroicon::QueueList)->color('gray')
+                ->visible(fn (): bool => PaymentSubmissionResource::canViewAny())
+                ->url(fn (): string => PaymentSubmissionResource::getUrl(panel: 'finance')),
             Action::make('captureBudgetSnapshot')->label('Capture budget planning evidence')->icon(Heroicon::Plus)
                 ->visible(fn (): bool => Gate::forUser(Auth::user())->allows('create', BudgetSnapshot::class))
                 ->modalHeading('Capture budget planning evidence')->modalWidth('5xl')
@@ -231,6 +291,75 @@ class FinanceSupervisor extends Page implements HasTable
                         ->success()->send();
                 }),
         ];
+    }
+
+    private function prepareReceiptRouteAction(): Action
+    {
+        return Action::make('prepareReceiptRoute')->label('Prepare receipt route')->icon(Heroicon::ArrowsRightLeft)->color('gray')
+            ->visible(fn (): bool => Gate::forUser(Auth::user())->allows('create', ReceiptBudgetRoute::class))
+            ->modalHeading('Prepare exact receipt routing')->modalWidth('5xl')
+            ->modalSubmitActionLabel('Prepare route for review')
+            ->modalDescription('Planning only. Selected staff context fixes budget, bill set, commitments and expiry. Incoming receipts still need independent review. No budget allocation, reservation or payment authority is created.')
+            ->schema([
+                Select::make('base_digest')->label('Staff planning context')->required()->options(fn (): array => BudgetSnapshot::query()
+                    ->where('organization_id', app(InstallationInstitution::class)->current()?->id)->where('currency', 'USDC')->orderByDesc('id')->limit(100)->get()
+                    ->filter(fn (BudgetSnapshot $snapshot): bool => ! isset($snapshot->snapshot['receipt_routing'])
+                        && ($snapshot->snapshot['schema_version'] ?? null) === 3 && ($snapshot->snapshot['amounts']['opening_funds'] ?? null) === '0')
+                    ->mapWithKeys(fn (BudgetSnapshot $snapshot): array => [$snapshot->snapshot_digest => 'Snapshot #'.$snapshot->id.' · '.$snapshot->snapshot['department']['name'].' · '.count($snapshot->snapshot['bills']).' bound bills'])->all()),
+                Select::make('source_stream')->label('Exact receipt source')->required()->options([
+                    CollectionBatch::TUITION_PORTAL_STREAM => 'Verified tuition receipts', CollectionBatch::BILL_PORTAL_STREAM => 'Verified other student bill receipts',
+                ]),
+                TextInput::make('receipts_from')->label('Receipt coverage starts (UTC)')->required()->default(fn (): string => now()->utc()->toIso8601String()),
+                TextInput::make('valid_until')->label('Route valid until (UTC)')->required()->helperText('Cannot exceed original planning context expiry. Automation never renews evidence.'),
+            ])
+            ->action(function (array $data, Schema $schema, PrepareReceiptBudgetRoute $prepare): void {
+                $base = BudgetSnapshot::query()->where('organization_id', app(InstallationInstitution::class)->require()->id)
+                    ->where('snapshot_digest', $data['base_digest'])->firstOrFail();
+                try {
+                    $route = $prepare->handle($this->actor(), $base, $data['source_stream'], $data['receipts_from'], $data['valid_until'], (string) Str::uuid());
+                } catch (ValidationException $exception) {
+                    throw ValidationException::withMessages([$schema->getStatePath().'.base_digest' => collect($exception->errors())->flatten()->all()]);
+                }
+                Notification::make()->title('Receipt route #'.$route->id.' prepared')->body('Different authorized reviewer must approve exact routing. No financial authority created.')->success()->send();
+            });
+    }
+
+    private function approveReceiptRouteAction(): Action
+    {
+        return Action::make('approveReceiptRoute')->label('Review receipt route')->icon(Heroicon::ClipboardDocumentCheck)->color('gray')
+            ->visible(fn (): bool => $this->actor()->hasAnyRole(['admin', 'super_admin']))
+            ->modalHeading('Review exact receipt routing')->modalWidth('5xl')
+            ->modalSubmitActionLabel('Approve planning route')
+            ->modalDescription('Allows background capture of bounded non-executable successor proposals only. Receipt review, plan acceptance and exact MFA payment approval remain separate.')
+            ->schema([
+                Select::make('route_digest')->label('Prepared route')->required()->live()->options(fn (): array => ReceiptBudgetRoute::query()
+                    ->where('organization_id', app(InstallationInstitution::class)->current()?->id)->whereDoesntHave('approval')->orderByDesc('id')->get()
+                    ->filter(fn (ReceiptBudgetRoute $route): bool => Gate::forUser(Auth::user())->allows('approve', $route))
+                    ->mapWithKeys(fn (ReceiptBudgetRoute $route): array => [$route->snapshot_digest => 'Route #'.$route->id.' · '.$route->source_stream.' · Snapshot #'.$route->budget_snapshot_id])->all()),
+                TextEntry::make('route_scope')->label('Exact context')->state(function (Get $get): string {
+                    $route = ReceiptBudgetRoute::query()->where('organization_id', app(InstallationInstitution::class)->current()?->id)
+                        ->where('snapshot_digest', $get('route_digest'))->first();
+
+                    return $route === null ? 'Choose a prepared route to inspect its scope.'
+                        : 'Budget #'.$route->snapshot['budget_id'].' · Invoice versions '.implode(', ', array_column($route->snapshot['bills'], 'id'))
+                            .' · '.$route->source_stream.' · '.$route->currency.' · '.$route->receipts_from->toIso8601String().' through '.$route->valid_until->toIso8601String()
+                            .' · Bound amounts (base units): '.json_encode($route->budgetSnapshot->snapshot['amounts'], JSON_THROW_ON_ERROR)
+                            .' · Source evidence: '.json_encode($route->budgetSnapshot->snapshot['evidence'], JSON_THROW_ON_ERROR)
+                            .' · Digest '.$route->snapshot_digest;
+                })->wrap(),
+                Textarea::make('reason')->label('Independent review reason')->required()->maxLength(1000),
+                Checkbox::make('attestation')->label('I reviewed exact source coverage, existing allocation, closed bills, commitments and expiry. This grants no payment authority.')->required()->accepted(),
+            ])
+            ->action(function (array $data, Schema $schema, ApproveReceiptBudgetRoute $approve): void {
+                $route = ReceiptBudgetRoute::query()->where('organization_id', app(InstallationInstitution::class)->require()->id)
+                    ->where('snapshot_digest', $data['route_digest'])->firstOrFail();
+                try {
+                    $approve->handle($this->actor(), $route, $data['route_digest'], $data['reason']);
+                } catch (ValidationException $exception) {
+                    throw ValidationException::withMessages([$schema->getStatePath().'.attestation' => collect($exception->errors())->flatten()->all()]);
+                }
+                Notification::make()->title('Receipt routing reviewed')->body('Successor planning remains default off until operator enables it. No spending approved.')->success()->send();
+            });
     }
 
     /** @return list<Component> */
@@ -360,6 +489,26 @@ class FinanceSupervisor extends Page implements HasTable
                         ])->columnSpanFull(),
                     ])->columns(['default' => 1, 'md' => 2])->columnSpan(1),
             ])->columnSpanFull(),
+            Section::make('Receipt routing and successors')->description('Approved mapping only. Routing never widens bill sets, refreshes expiry, accepts proposals or authorizes payment.')
+                ->schema([
+                    TextEntry::make('receipt_routing_enabled')->label('Receipt-triggered planning')
+                        ->state(fn (): string => config('eduflow.background_finance.receipt_routing_enabled', false) ? 'Enabled in configuration' : 'Disabled in configuration')
+                        ->badge()->color('gray'),
+                    RepeatableEntry::make('receipt_routes')->label('Prepared and approved contexts')->state(fn (): array => ReceiptBudgetRoute::query()
+                        ->where('organization_id', app(InstallationInstitution::class)->current()?->id)->with('approval')->orderByDesc('id')->limit(20)->get()
+                        ->map(fn (ReceiptBudgetRoute $route): array => ['id' => $route->id, 'source' => $route->source_stream,
+                            'snapshot_id' => $route->budget_snapshot_id, 'status' => $route->approval === null ? 'Awaiting independent approval' : 'Approved for planning only',
+                            'valid_until' => $route->valid_until->toIso8601String()])->all())
+                        ->schema([TextEntry::make('id')->label('Route ID'), TextEntry::make('source')->label('Source'),
+                            TextEntry::make('snapshot_id')->label('Staff context snapshot'), TextEntry::make('status')->label('Status')->badge()->color('gray'),
+                            TextEntry::make('valid_until')->label('Original expiry')])->columns(['default' => 1, 'md' => 2]),
+                    RepeatableEntry::make('receipt_triggers')->label('Receipt-triggered planning work')->state(fn (): array => ReceiptPlanTrigger::query()
+                        ->where('organization_id', app(InstallationInstitution::class)->current()?->id)->orderByDesc('id')->limit(20)->get()->toArray())
+                        ->schema([TextEntry::make('collection_batch_review_id')->label('Receipt review ID'), TextEntry::make('state')->badge()->color('gray'),
+                            TextEntry::make('predecessor_snapshot_id')->label('Predecessor snapshot')->placeholder('Not captured'),
+                            TextEntry::make('budget_snapshot_id')->label('Successor snapshot')->placeholder('Not captured'),
+                            TextEntry::make('last_error')->label('Blocked reason')->placeholder('None')->wrap()])->columns(['default' => 1, 'md' => 2]),
+                ])->columnSpanFull(),
         ]);
     }
 
@@ -397,6 +546,8 @@ class FinanceSupervisor extends Page implements HasTable
         $this->mountedRunId = $run->id;
         $this->mountedResultDigest = $run->result_digest ?? '';
         $this->mountedPlan = $run->result ?? [];
+        $this->mountedPaymentProgress = $run->kind === 'budget_plan' && $run->hasValidResult()
+            ? app(AcceptedPlanPayments::class)->progress($this->actor(), $run) : [];
         $intact = $run->result !== null && $run->result_digest !== null
             && hash_equals($run->result_digest, PaymentIntent::digest($run->result));
         $this->mountedRunEvidence = [
@@ -461,9 +612,22 @@ class FinanceSupervisor extends Page implements HasTable
                             TextEntry::make('remaining_cash')->label('Remaining cash after this bill'),
                         ])->columns(['default' => 1, 'md' => 2])->columnSpanFull(),
                 ])->columns(['default' => 1, 'md' => 2])->columnSpanFull(),
-            Section::make('Authority boundary')->description('Collection and plan reviews do not verify bank balances or Arc funding. No execution controls exist on this page.')
+            Section::make('Bill payment progress')->visible(fn (): bool => $this->mountedPaymentProgress !== [])
+                ->description('Persisted vendor-payment work linked by exact invoice version. Reopen details for current progress; viewing never dispatches work.')
                 ->schema([
-                    TextEntry::make('authority')->hiddenLabel()->state('Planning and evidence review only. No payment authorization, fund reservation, cash posting or legacy agent execution.'),
+                    RepeatableEntry::make('payment_progress')->hiddenLabel()->state(fn (): array => $this->mountedPaymentProgress)
+                        ->schema([
+                            TextEntry::make('invoice_id')->label('Invoice ID'),
+                            TextEntry::make('state')->label('Payment state')->badge()->color('gray'),
+                            TextEntry::make('stage')->label('Stage')->placeholder('Not started'),
+                            TextEntry::make('provider_handle')->label('Provider transaction ID')->placeholder('Not recorded')->wrap(),
+                            TextEntry::make('tx_hash')->label('Chain hash — not proof alone')->placeholder('Not published')->wrap(),
+                            IconEntry::make('settled')->label('Verified settlement recorded')->boolean(),
+                        ])->columns(['default' => 1, 'md' => 2])->columnSpanFull(),
+                ])->columnSpanFull(),
+            Section::make('Authority boundary')->description('Collection and plan reviews do not verify bank balances or Arc funding. Preparing payment review holds capacity only.')
+                ->schema([
+                    TextEntry::make('authority')->hiddenLabel()->state('Accepting a plan grants no payment authority. Prepare payment review may hold capacity against independently reviewed funding. Exact MFA-backed payment approval and background execution remain separate.'),
                 ])->columnSpanFull(),
         ];
     }

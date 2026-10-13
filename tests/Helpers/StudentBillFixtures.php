@@ -31,12 +31,14 @@ use Yukazakiri\Lepton\Contracts\AuthGateway;
  * and the submission worker are all production code, so what these suites assert
  * is the lane's own behaviour and not a stub of it.
  */
-function billPaymentContext(array $overrides = []): array
+function billPaymentContext(array $overrides = [], ?Organization $institution = null): array
 {
     Bus::fake();
     config(['eduflow.institution_id' => null, 'lepton.default' => 'circle', 'lepton.arc.chain' => 'ARC-TESTNET',
         'lepton.arc.chain_id' => 5042002, 'lepton.arc.treasury' => '0x'.str_repeat('2', 40)]);
-    Organization::factory()->create();
+    if ($institution === null) {
+        Organization::factory()->create();
+    }
 
     $student = Student::factory()->create(['payout_address' => '0x'.str_repeat('1', 40)]);
     if (! $student instanceof Student) {

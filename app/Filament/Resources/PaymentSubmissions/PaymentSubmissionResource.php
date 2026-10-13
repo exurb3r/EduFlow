@@ -8,11 +8,16 @@ use App\Filament\Resources\PaymentSubmissions\Pages\ListPaymentSubmissions;
 use App\Filament\Resources\PaymentSubmissions\Pages\ViewPaymentSubmission;
 use App\Filament\Resources\PaymentSubmissions\Tables\PaymentSubmissionsTable;
 use App\Models\PaymentSubmissionOutbox;
+use App\Models\User;
+use App\Services\InstallationInstitution;
 use BackedEnum;
+use Filament\Facades\Filament;
 use Filament\Resources\Pages\PageRegistration;
 use Filament\Resources\Resource;
 use Filament\Support\Icons\Heroicon;
 use Filament\Tables\Table;
+use Illuminate\Database\Eloquent\Builder;
+use Illuminate\Database\Eloquent\Model;
 use UnitEnum;
 
 /**
@@ -47,6 +52,49 @@ class PaymentSubmissionResource extends Resource
     protected static ?string $pluralModelLabel = 'payment submissions';
 
     protected static ?string $recordTitleAttribute = 'request_key';
+
+    #[\Override]
+    public static function canViewAny(): bool
+    {
+        $user = Filament::auth()->user();
+
+        return $user instanceof User && $user->hasVerifiedEmail()
+            && app(InstallationInstitution::class)->current() !== null
+            && ($user->hasRole('super_admin') || (Filament::getCurrentPanel()?->getId() === 'finance'
+                && $user->hasAnyRole(['admin', 'finance_officer'])));
+    }
+
+    #[\Override]
+    public static function canView(Model $record): bool
+    {
+        return static::canViewAny() && $record instanceof PaymentSubmissionOutbox
+            && $record->organization_id === app(InstallationInstitution::class)->current()?->id;
+    }
+
+    #[\Override]
+    public static function canCreate(): bool
+    {
+        return false;
+    }
+
+    #[\Override]
+    public static function canEdit(Model $record): bool
+    {
+        return false;
+    }
+
+    #[\Override]
+    public static function canDelete(Model $record): bool
+    {
+        return false;
+    }
+
+    /** @return Builder<PaymentSubmissionOutbox> */
+    #[\Override]
+    public static function getEloquentQuery(): Builder
+    {
+        return PaymentSubmissionOutbox::query()->where('organization_id', app(InstallationInstitution::class)->current()?->id);
+    }
 
     #[\Override]
     public static function table(Table $table): Table

@@ -8,6 +8,7 @@ use App\Actions\EnrollPaymentReviewer;
 use App\Actions\ReviewVendorPayment;
 use App\DTOs\Money;
 use App\Enums\CurrencyCode;
+use App\Filament\Resources\PaymentSubmissions\PaymentSubmissionResource;
 use App\Models\FundingWindow;
 use App\Models\FundingWindowApproval;
 use App\Models\PaymentIntent;
@@ -325,6 +326,9 @@ class PaymentReviews extends Page implements HasTable
     protected function getHeaderActions(): array
     {
         return [
+            Action::make('paymentProgress')->label('Payment progress')->icon(Heroicon::QueueList)->color('gray')
+                ->visible(fn (): bool => PaymentSubmissionResource::canViewAny())
+                ->url(fn (): string => PaymentSubmissionResource::getUrl(panel: filament()->getCurrentPanel()?->getId())),
             Action::make('enrollPaymentReviewer')->label('Set up reviewer')->icon(Heroicon::UserPlus)->color('gray')
                 ->visible(fn (): bool => Gate::forUser($this->actor())->allows('create', PaymentReviewerEnrollment::class))
                 ->modalHeading('Independently enroll payment reviewer')->modalWidth('5xl')

@@ -85,7 +85,7 @@ function tuitionTransport(
  *
  * @return array{student: Student, account: TuitionAccount, transport: FeeBoundedPaymentTransport&MockInterface, arc: ArcNetworkGateway&MockInterface}
  */
-function consentContext(): array
+function consentContext(?Organization $institution = null): array
 {
     Bus::fake();
     config(['eduflow.institution_id' => null, 'lepton.default' => 'circle', 'lepton.arc.chain' => 'ARC-TESTNET',
@@ -93,7 +93,9 @@ function consentContext(): array
         'eduflow.student_tuition.enabled' => true, 'eduflow.student_tuition.observe_enabled' => true,
         'eduflow.student_tuition.queue_connection' => 'database', 'queue.connections.database.retry_after' => 360,
         'eduflow.student_tuition.auto_intake' => false]);
-    Organization::factory()->create();
+    if ($institution === null) {
+        Organization::factory()->create();
+    }
     $student = Student::factory()->create(['payout_address' => '0x'.str_repeat('1', 40)]);
     if (! $student instanceof Student) {
         throw new RuntimeException('Student factory returned no student.');

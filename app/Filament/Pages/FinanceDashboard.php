@@ -66,7 +66,7 @@ class FinanceDashboard extends BaseDashboard
         $status = app(LeptonTreasuryService::class)->status($institution->primaryWallet());
 
         return sprintf(
-            '%s · %s driver on %s %s%s · no submitted payment exists in this build',
+            '%s · %s driver on %s %s%s · exact payment approval and background settlement remain separate',
             $institution->name,
             $status['driver'],
             strtoupper((string) $status['chain']),

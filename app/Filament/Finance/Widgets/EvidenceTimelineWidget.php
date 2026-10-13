@@ -48,7 +48,7 @@ class EvidenceTimelineWidget extends TableWidget
 
         return PaymentIntent::query()
             ->where('organization_id', $institution->id)
-            ->with(['invoice.vendor', 'reservation', 'authorization', 'invoiceVersionReview']);
+            ->with(['invoice.vendor', 'reservation', 'authorization', 'invoiceVersionReview', 'submission']);
     }
 
     #[\Override]
@@ -57,6 +57,7 @@ class EvidenceTimelineWidget extends TableWidget
         return $table
             ->heading(LinkedHeading::make(self::HEADING, PaymentReviews::getUrl(panel: 'finance')))
             ->description(self::DESCRIPTION)
+            ->poll('10s')
             ->striped()
             ->columns([
                 TextColumn::make('id')->label('Draft')->prefix('#')->sortable(),
@@ -94,9 +95,15 @@ class EvidenceTimelineWidget extends TableWidget
                         : $this->authorizationDetail($record)),
                 TextColumn::make('settlement_stage')->label('Provider attempt & verification')
                     ->badge()
-                    ->state(fn (): string => 'None')
-                    ->color('gray')
-                    ->description('No executor is shipped, so nothing has been submitted and no hash exists to treat as proof.'),
+                    ->state(fn (PaymentIntent $record): string => $record->submission->state ?? 'Not queued')
+                    ->color(fn (PaymentIntent $record): string => match ($record->submission?->state) {
+                        'completed' => 'success', 'unknown', 'blocked', 'failed', 'running' => 'warning', default => 'gray',
+                    })
+                    ->description(fn (PaymentIntent $record): string => $record->submission === null
+                        ? 'No submission work recorded. Exact payment approval remains separate.'
+                        : ($record->submission->state === 'completed' && ($record->submission->result['settled'] ?? false) === true
+                            ? 'Verified settlement recorded; local payable remains separate.'
+                            : 'Stage: '.($record->submission->stage ?? 'queued').'. No verified settlement recorded.')),
                 TextColumn::make('advisory')->label('Recorded advisory')
                     ->state(fn (PaymentIntent $record): string => $this->advisory($record) ?? 'None recorded')
                     ->limit(60)->wrap()

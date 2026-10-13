@@ -8,6 +8,8 @@ use App\Actions\CaptureInvoiceVersion;
 use App\Actions\ReviewCollectionBatch;
 use App\Actions\ReviewFinancePlan;
 use App\Actions\ReviewInvoiceVersion;
+use App\DTOs\Money;
+use App\Enums\CurrencyCode;
 use App\Filament\Pages\Collections;
 use App\Filament\Pages\FinanceSupervisor;
 use App\Jobs\ProcessFinanceWorkflow;
@@ -23,6 +25,7 @@ use App\Models\Student;
 use App\Models\Transaction;
 use App\Models\User;
 use App\Models\Vendor;
+use App\Services\AcceptedPlanPayments;
 use App\Services\FinanceReviewAlerts;
 use App\Services\FinanceWorkflowDispatcher;
 use App\Services\FinanceWorkflows;
@@ -113,6 +116,57 @@ test('supervisor records exact plan feedback without payment authority and retri
         ->and($run->fresh()->state)->toBe('completed')->and(FinancePlanReview::query()->count())->toBe(1)
         ->and(Transaction::query()->count())->toBe(0)->and($review->hasValidEvidence($run->fresh()))->toBeTrue();
 });
+
+test('accepted proposal prepares one exact bill reservation without payment authority and exposes progress', function (): void {
+    $c = paymentAuthorizationContext();
+    config(['eduflow.background_finance.enabled' => true]);
+    $snapshot = $c['window']->snapshot['budget_snapshot_id'];
+    app(FinanceWorkflows::class)->budgetCaptured(BudgetSnapshot::query()->findOrFail($snapshot));
+    $run = FinanceWorkflowRun::query()->where('budget_snapshot_id', $snapshot)->firstOrFail();
+    app(FinanceWorkflows::class)->process($run->id);
+    $run->refresh();
+    app(ReviewFinancePlan::class)->handle($c['reviewer'], $run, $run->result_digest, 'accept_plan', 'Approved proposal within existing allocation.');
+    $service = app(AcceptedPlanPayments::class);
+    $billId = $c['drafts'][1]->invoice_version_id;
+
+    $hold = $service->prepareBill($c['maker'], $run, $billId, $c['approval'], $run->result_digest,
+        $c['approval']->approval_digest, new Money(2, CurrencyCode::USDC));
+    $replay = $service->prepareBill($c['maker'], $run, $billId, $c['approval'], $run->result_digest,
+        $c['approval']->approval_digest, new Money(2, CurrencyCode::USDC));
+
+    expect($replay->id)->toBe($hold->id)->and($hold->payment_intent_id)->toBe($c['drafts'][1]->id)
+        ->and($c['drafts'][1]->fresh()->authorization)->toBeNull()->and(Transaction::query()->count())->toBe(0);
+    expect(collect($service->progress($c['reviewer'], $run))->firstWhere('invoice_version_id', $billId)['state'])
+        ->toBe('awaiting_payment_review');
+    Filament::setCurrentPanel('finance');
+    actingAs($c['maker']);
+    $page = Livewire::test(FinanceSupervisor::class);
+    $page->__call('callAction', [TestAction::make('preparePlanPayment')->table($run), [
+        'invoice_version_id' => $billId, 'funding_approval_digest' => $c['approval']->approval_digest, 'max_fee' => '0.000002',
+    ]]);
+    $page->__call('assertHasNoActionErrors', []);
+    $page = Livewire::test(FinanceSupervisor::class);
+    $page->__call('mountAction', [TestAction::make('viewFinanceRun')->table($run)]);
+    $page->assertSet('mountedRunId', $run->id);
+    expect(collect($page->get('mountedPaymentProgress'))->firstWhere('invoice_version_id', $billId)['state'])->toBe('awaiting_payment_review');
+});
+
+test('plan handoff refuses unaccepted plan stale digest and different funding context', function (string $case): void {
+    $c = paymentAuthorizationContext();
+    config(['eduflow.background_finance.enabled' => true]);
+    app(FinanceWorkflows::class)->budgetCaptured(BudgetSnapshot::query()->findOrFail($c['window']->budget_snapshot_id));
+    $run = FinanceWorkflowRun::query()->where('kind', 'budget_plan')->firstOrFail();
+    app(FinanceWorkflows::class)->process($run->id);
+    $run->refresh();
+    if ($case !== 'unaccepted') {
+        app(ReviewFinancePlan::class)->handle($c['reviewer'], $run, $run->result_digest, 'accept_plan', 'Exact plan reviewed.');
+    }
+
+    expect(fn () => app(AcceptedPlanPayments::class)->prepareBill($c['maker'], $run, $c['drafts'][1]->invoice_version_id,
+        $c['approval'], $case === 'digest' ? str_repeat('0', 64) : $run->result_digest,
+        $case === 'funding' ? str_repeat('0', 64) : $c['approval']->approval_digest, new Money($case === 'fee' ? 3 : 2, CurrencyCode::USDC)))
+        ->toThrow(ValidationException::class);
+})->with(['unaccepted', 'digest', 'funding', 'fee']);
 
 test('stale source blocks background planning and cannot generate an approvable result', function (): void {
     $c = workflowContext();

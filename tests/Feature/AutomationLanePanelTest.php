@@ -3,11 +3,16 @@
 declare(strict_types=1);
 
 use App\DTOs\Money;
+use App\Filament\Finance\Widgets\EvidenceTimelineWidget;
 use App\Filament\Pages\PaymentReviews;
 use App\Filament\Resources\PaymentSubmissions\PaymentSubmissionResource;
+use App\Models\Organization;
 use App\Models\PaymentSubmissionOutbox;
 use App\Models\User;
 use App\Services\Advisory\AutomationLaneStatus;
+use Filament\Facades\Filament;
+use Illuminate\Support\Facades\Bus;
+use Livewire\Livewire;
 use Spatie\Permission\Models\Role;
 
 /**
@@ -37,7 +42,7 @@ test('every state is placed in the bucket its meaning supports', function (): vo
     // owed work a worker will blindly retry.
     $expected = [
         'queued' => 'owed',
-        'running' => 'owed',
+        'running' => 'unresolved',
         'accepted' => 'in_flight',
         'submitted' => 'in_flight',
         'unknown' => 'unresolved',
@@ -49,26 +54,14 @@ test('every state is placed in the bucket its meaning supports', function (): vo
     $buckets = [
         'owed' => PaymentSubmissionOutbox::DISPATCHABLE_STATES,
         'in_flight' => PaymentSubmissionOutbox::IN_FLIGHT_STATES,
-        'unresolved' => ['unknown', 'blocked', 'failed'],
+        'unresolved' => ['running', 'unknown', 'blocked', 'failed'],
         'verified' => ['completed'],
     ];
-
-    // Every state lands somewhere, and the one state that appears in two
-    // buckets appears there on purpose.
-    //
-    // `unknown` is dispatchable and also needs a human: the worker may be able
-    // to reconcile it, but nobody should assume that happened. Every other
-    // overlap would be a counting error, because it would let one payment read
-    // as both "the rail has it" and "nobody has looked at it".
-    $deliberateOverlap = ['unknown' => ['owed', 'unresolved']];
 
     $seen = [];
     foreach ($buckets as $bucket => $states) {
         foreach ($states as $state) {
-            if (isset($seen[$state])) {
-                expect(isset($deliberateOverlap[$state]) && in_array($bucket, $deliberateOverlap[$state], true))
-                    ->toBeTrue("{$state} is counted in two buckets at once, which was never decided.");
-            }
+            expect(isset($seen[$state]))->toBeFalse("{$state} is counted in two buckets.");
 
             $seen[$state] = true;
         }
@@ -165,4 +158,65 @@ test('unresolved submission detail never treats a missing provider handle as pro
     $response->assertSuccessful()->assertSee('not recorded — outcome may be unknown')
         ->assertSee('Investigate the existing attempt before any resend; safe recovery is not yet proven.')
         ->assertDontSee('none — nothing in flight')->assertDontSee('No USDC moved.');
+});
+
+test('finance sees provider progress without opening admin or dispatching work', function (): void {
+    $entry = laneBillFor('accepted', ['provider_handle' => '116c7ce7-8f2f-53ac-8b06-f18aac151ce3']);
+    $reviewer = User::factory()->create()->assignRole(Role::findOrCreate('finance_officer', 'web'));
+    Bus::fake();
+    Filament::setCurrentPanel('finance');
+
+    $this->actingAs($reviewer)->get(PaymentSubmissionResource::getUrl('index', panel: 'finance'))
+        ->assertSuccessful()->assertSee('accepted by the rail')->assertSee('/finance/payment-reviews', false)
+        ->assertSee($entry->intent->invoice->reference);
+    $this->get(PaymentSubmissionResource::getUrl('view', ['record' => $entry], panel: 'finance'))
+        ->assertSuccessful()->assertSee('116c7ce7-8f2f-53ac-8b06-f18aac151ce3')
+        ->assertSee('This is in flight, not settled.');
+    $this->get(PaymentReviews::getUrl(panel: 'finance'))
+        ->assertSuccessful()->assertSee('/finance/payment-submissions', false);
+
+    Bus::assertNothingDispatched();
+    expect($entry->fresh()->state)->toBe('accepted')
+        ->and(PaymentSubmissionResource::canCreate())->toBeFalse()
+        ->and(PaymentSubmissionResource::canEdit($entry))->toBeFalse()
+        ->and(PaymentSubmissionResource::canDelete($entry))->toBeFalse();
+});
+
+test('student and unverified finance account cannot read payment progress', function (): void {
+    laneBillFor('accepted');
+    Filament::setCurrentPanel('finance');
+    $student = User::factory()->create()->assignRole(Role::findOrCreate('student', 'web'));
+    $this->actingAs($student)->get(PaymentSubmissionResource::getUrl('index', panel: 'finance'))->assertForbidden();
+
+    $unverified = User::factory()->unverified()->create()->assignRole(Role::findOrCreate('finance_officer', 'web'));
+    $this->actingAs($unverified)->get(PaymentSubmissionResource::getUrl('index', panel: 'finance'))->assertForbidden();
+});
+
+test('finance evidence timeline shows stored submission progress instead of claiming no executor exists', function (): void {
+    $entry = laneBillFor('accepted', ['stage' => 'awaiting_rail_completion']);
+    $reviewer = User::factory()->create()->assignRole(Role::findOrCreate('finance_officer', 'web'));
+    Filament::setCurrentPanel('finance');
+    Bus::fake();
+
+    Livewire::actingAs($reviewer)->test(EvidenceTimelineWidget::class)
+        ->assertSee('accepted')->assertSee('awaiting_rail_completion')->assertSee('No verified settlement recorded.')
+        ->assertDontSee('No executor is shipped');
+    expect($entry->intent->submission->id)->toBe($entry->id);
+    Bus::assertNothingDispatched();
+});
+
+test('finance progress never exposes submission from another installation', function (): void {
+    $entry = laneBillFor('accepted');
+    $other = Organization::factory()->create();
+    if (! $other instanceof Organization) {
+        throw new RuntimeException('Organization factory returned no organization.');
+    }
+    config(['eduflow.institution_id' => $other->id]);
+    $reviewer = User::factory()->create()->assignRole(Role::findOrCreate('finance_officer', 'web'));
+    Filament::setCurrentPanel('finance');
+    $this->actingAs($reviewer);
+
+    expect(PaymentSubmissionResource::getEloquentQuery()->whereKey($entry->id)->exists())->toBeFalse()
+        ->and(PaymentSubmissionResource::canView($entry))->toBeFalse();
+    $this->get(PaymentSubmissionResource::getUrl('view', ['record' => $entry], panel: 'finance'))->assertNotFound();
 });

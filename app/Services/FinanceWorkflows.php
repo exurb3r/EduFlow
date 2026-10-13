@@ -17,7 +17,8 @@ use Illuminate\Validation\ValidationException;
 /** Durable read-only work/outbox identity. Never calls legacy execution or impersonates staff. */
 final readonly class FinanceWorkflows
 {
-    public function __construct(private InstallationInstitution $institutions, private DepartmentBudgetPlanner $planner) {}
+    public function __construct(private InstallationInstitution $institutions, private DepartmentBudgetPlanner $planner,
+        private ReceiptTriggeredPlanning $receiptPlans) {}
 
     public function budgetCaptured(BudgetSnapshot $snapshot): void
     {
@@ -41,11 +42,18 @@ final readonly class FinanceWorkflows
             throw ValidationException::withMessages(['collection' => 'Collection review failed integrity checks.']);
         }
         $this->collectionCaptured($batch);
+        $trigger = null;
+        try {
+            $trigger = $this->receiptPlans->record($review);
+        } catch (ValidationException $exception) {
+            report($exception);
+        }
         /** @var FinanceWorkflowRun|null $run */
         $run = FinanceWorkflowRun::query()
             ->where('organization_id', $institution->id)->where('trigger_key', 'collection:'.$batch->id)
             ->lockForUpdate()->first();
-        if ($run !== null && $run->state === 'waiting_for_review' && $run->hasValidSource()) {
+        if ($run !== null && $run->hasValidSource()
+            && ($run->state === 'waiting_for_review' || ($run->state === 'completed' && $trigger?->state === 'queued'))) {
             $run->update(['state' => 'queued', 'dispatched_at' => null, 'next_attempt_at' => null]);
         }
     }
@@ -114,6 +122,12 @@ final readonly class FinanceWorkflows
                         throw ValidationException::withMessages(['collection' => 'Collection review changed; investigation required.']);
                     }
                     $run->state = $review === null ? 'waiting_for_review' : 'completed';
+                    if ($review !== null) {
+                        $successor = $this->receiptPlans->process($review);
+                        if ($successor instanceof BudgetSnapshot) {
+                            $this->budgetCaptured($successor);
+                        }
+                    }
                     if ($run->result_digest !== null) {
                         if (! $run->hasValidResult()) {
                             throw ValidationException::withMessages(['collection' => 'Recorded collection result failed integrity checks.']);

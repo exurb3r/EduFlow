@@ -39,11 +39,12 @@ final readonly class PaymentSettlementReconciler
         // verified. It can, however, be *observed*: asking the rail whether the
         // transaction it already owns has finished is the only legitimate next
         // step, and it never re-sends.
-        if ($entry->state === 'accepted') {
+        if (in_array($entry->state, ['accepted', 'unknown'], true)
+            && ($entry->result['provider_reference'] ?? null) === null && $entry->provider_handle !== null) {
             return $this->resolveAcceptance($entry);
         }
 
-        if ($entry->state !== 'submitted' || ($entry->result['provider_reference'] ?? null) === null) {
+        if (! in_array($entry->state, ['submitted', 'unknown'], true) || ($entry->result['provider_reference'] ?? null) === null) {
             return ['verdict' => 'not_applicable', 'settled' => false,
                 'reason' => 'Only a submitted entry with a provider reference can be verified.'];
         }
