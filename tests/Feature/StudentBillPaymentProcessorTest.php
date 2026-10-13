@@ -11,6 +11,7 @@ use App\Services\StudentBillPaymentProcessor;
 use Illuminate\Support\Facades\Bus;
 use Spatie\Permission\Models\Role;
 use Yukazakiri\Lepton\Contracts\ArcNetworkGateway;
+use Yukazakiri\Lepton\Contracts\AuthGateway;
 use Yukazakiri\Lepton\Contracts\WalletGateway;
 use Yukazakiri\Lepton\Gateways\FakeLeptonGateway;
 
@@ -252,6 +253,27 @@ test('a wallet that cannot cover the principal is refused before the signer', fu
 
     expect($payment->fresh()->submitted_at)->toBeNull()
         ->and($payment->fresh()->last_error)->toContain('cannot cover what this rail will debit');
+});
+
+test('an unauthenticated operator session is refused before the signer', function (): void {
+    $c = billPaymentContext();
+    enableBillLane();
+    allowPilot($c);
+    Bus::fake();
+
+    $auth = Mockery::mock(AuthGateway::class);
+    if (! $auth instanceof AuthGateway) {
+        throw new RuntimeException('Auth mock does not implement gateway.');
+    }
+    mockExpectation($auth, 'isAuthenticatedFor')->with('ARC-TESTNET')->andReturn(false);
+    app()->instance(AuthGateway::class, $auth);
+    quietRail();
+
+    $payment = billConsent($c, 5_000_000);
+    app(StudentBillPaymentProcessor::class)->process($payment->id);
+
+    expect($payment->fresh()->submitted_at)->toBeNull()
+        ->and($payment->fresh()->last_error)->toContain('Operator testnet session unavailable');
 });
 
 test('a rehearsal reaches no signer and allocates nothing', function (): void {
