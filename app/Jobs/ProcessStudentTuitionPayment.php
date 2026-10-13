@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Jobs;
 
+use App\Models\StudentTuitionPaymentAttempt;
 use App\Services\StudentTuitionPaymentProcessor;
 use Illuminate\Contracts\Queue\ShouldQueue;
 use Illuminate\Foundation\Queue\Queueable;
@@ -29,6 +30,12 @@ class ProcessStudentTuitionPayment implements ShouldQueue
     public function handle(StudentTuitionPaymentProcessor $processor): void
     {
         $processor->process($this->attemptId);
+
+        $attempt = StudentTuitionPaymentAttempt::query()->find($this->attemptId);
+        if ($attempt !== null && in_array($attempt->state, ['accepted', 'awaiting_verification'], true)
+            && $attempt->posted_at === null && $attempt->attempts < 10) {
+            self::dispatch($this->attemptId)->delay(now()->addSeconds(5));
+        }
     }
 
     public function failed(?Throwable $exception): void

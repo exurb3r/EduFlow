@@ -73,9 +73,11 @@ export type StudentDashboardProps = {
         total_amount: string;
         paid_amount: string;
         remaining_amount: string;
+        held_amount?: string;
         remaining_amount_fiat?: string;
         total_amount_fiat?: string;
         paid_amount_fiat?: string;
+        held_amount_fiat?: string;
     } | null;
     requests: AssistanceRequestSummary[];
     canRequest: boolean;

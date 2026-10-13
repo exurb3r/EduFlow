@@ -147,7 +147,7 @@ export default function StudentDashboard({
     );
     const [consent, setConsent] = useState(false);
     const [receipt, setReceipt] = useState<TuitionAttempt | null>(null);
-    usePoll(10000, { only: ['tuitionAttempts', 'tuitionAccount'] });
+    usePoll(8000, { only: ['tuitionAttempts', 'tuitionAccount', 'wallet'] });
 
     const defaultPayBaseUnits = Math.min(
         remainingBase,
@@ -280,7 +280,9 @@ export default function StudentDashboard({
             setReceipt(payload);
 
             // The wallet balance and paid figures both changed on-chain.
-            router.reload({ only: ['tuitionAttempts', 'tuitionAccount'] });
+            router.reload({
+                only: ['tuitionAttempts', 'tuitionAccount', 'wallet'],
+            });
         } catch {
             setPayError(
                 'Response lost. Check existing attempt history before doing anything else; do not create a new payment.',
@@ -904,6 +906,17 @@ export default function StudentDashboard({
                                         </p>
                                     )}
 
+                                    {Number(tuitionAccount.held_amount ?? 0) >
+                                        0 && (
+                                        <p className="mt-2 text-xs font-medium text-amber-500">
+                                            {balanceVisible
+                                                ? `Includes ${formatUsdc(
+                                                      tuitionAccount.held_amount!,
+                                                  )} held in flight`
+                                                : '••••'}
+                                        </p>
+                                    )}
+
                                     <dl className="mt-6 grid grid-cols-2 gap-4 border-t border-[var(--clay-border)] pt-5">
                                         <div>
                                             <dt className="bulletin-eyebrow">
@@ -928,6 +941,17 @@ export default function StudentDashboard({
                                                       )
                                                     : '••••'}
                                             </dd>
+                                            {Number(
+                                                tuitionAccount.held_amount ?? 0,
+                                            ) > 0 && (
+                                                <p className="mt-1 text-xs text-amber-500">
+                                                    +
+                                                    {formatUsdc(
+                                                        tuitionAccount.held_amount!,
+                                                    )}{' '}
+                                                    held
+                                                </p>
+                                            )}
                                         </div>
                                     </dl>
                                 </>

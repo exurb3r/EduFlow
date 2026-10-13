@@ -145,12 +145,13 @@ return [
         // deterministic capture identity per movement.
         'auto_intake' => env('EDUFLOW_TUITION_AUTO_INTAKE', false),
         'intake_owner_id' => env('EDUFLOW_TUITION_INTAKE_OWNER_ID'),
-        'pilot_account_ids' => [],
+        'pilot_account_ids' => array_values(array_filter(array_map('intval', explode(',', (string) env('EDUFLOW_TUITION_PILOT_ACCOUNT_IDS', ''))))),
+        'enforce_fee_ceiling' => (bool) env('EDUFLOW_TUITION_ENFORCE_FEE_CEILING', false),
         'queue_connection' => env('EDUFLOW_TUITION_QUEUE_CONNECTION', 'database'),
         'queue' => 'student-tuition',
         'quote_seconds' => 120,
         'max_observations' => 10,
-        'investigation_owner_id' => null,
+        'investigation_owner_id' => env('EDUFLOW_TUITION_INVESTIGATION_OWNER_ID') ? (int) env('EDUFLOW_TUITION_INVESTIGATION_OWNER_ID') : null,
     ],
 
     /*
