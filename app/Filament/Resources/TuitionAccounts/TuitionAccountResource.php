@@ -11,6 +11,9 @@ use App\Filament\Resources\TuitionAccounts\Pages\CreateTuitionAccount;
 use App\Filament\Resources\TuitionAccounts\Pages\EditTuitionAccount;
 use App\Filament\Resources\TuitionAccounts\Pages\ListTuitionAccounts;
 use App\Filament\Resources\TuitionAccounts\Pages\ViewTuitionAccount;
+use App\Filament\Resources\TuitionAccounts\RelationManagers\PaymentAttemptsRelationManager;
+use App\Filament\Resources\TuitionAccounts\RelationManagers\PaymentsRelationManager;
+use App\Filament\Resources\TuitionAccounts\Schemas\TuitionAccountInfolist;
 use App\Models\Student;
 use App\Models\TuitionAccount;
 use BackedEnum;
@@ -228,6 +231,21 @@ class TuitionAccountResource extends Resource
                 'data.student_id' => 'This student already has a tuition account for the selected term.',
             ]);
         }
+    }
+
+    #[\Override]
+    public static function infolist(Schema $schema): Schema
+    {
+        return TuitionAccountInfolist::configure($schema);
+    }
+
+    #[\Override]
+    public static function getRelations(): array
+    {
+        return [
+            PaymentsRelationManager::class,
+            PaymentAttemptsRelationManager::class,
+        ];
     }
 
     #[\Override]

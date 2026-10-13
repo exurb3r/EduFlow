@@ -4,9 +4,13 @@ declare(strict_types=1);
 
 use App\Filament\Resources\TuitionAccounts\Pages\CreateTuitionAccount;
 use App\Filament\Resources\TuitionAccounts\Pages\EditTuitionAccount;
+use App\Filament\Resources\TuitionAccounts\Pages\ViewTuitionAccount;
+use App\Filament\Resources\TuitionAccounts\RelationManagers\PaymentsRelationManager;
 use App\Filament\Resources\TuitionAccounts\TuitionAccountResource;
+use App\Filament\Resources\TuitionAccounts\Widgets\TuitionAccountOverviewWidget;
 use App\Models\AcademicTerm;
 use App\Models\Student;
+use App\Models\StudentTuitionPayment;
 use App\Models\TuitionAccount;
 use App\Models\User;
 use Livewire\Livewire;
@@ -121,4 +125,109 @@ test('staff can update the paid amount from the edit page', function (): void {
 
     expect($account->fresh()->paid_amount)->toBe(150250000)
         ->and($account->fresh()->remainingAmount())->toBe(149750000);
+});
+
+test('staff can open the view tuition account page in both panels', function (string $role, string $panel): void {
+    $this->actingAs(User::factory()->create()->assignRole($role));
+    filament()->setCurrentPanel($panel);
+
+    $account = TuitionAccount::factory()->create([
+        'total_amount' => 500000000,
+        'paid_amount' => 200000000,
+    ]);
+
+    $this->get(TuitionAccountResource::getUrl('view', ['record' => $account->getKey()], panel: $panel))
+        ->assertSuccessful();
+
+    Livewire::test(ViewTuitionAccount::class, ['record' => $account->getKey()])
+        ->assertSuccessful()
+        ->assertSee($account->student->user->name)
+        ->assertSee($account->student->student_number)
+        ->assertSee($account->academicTerm->name)
+        ->assertSee('500.00 USDC')
+        ->assertSee('200.00 USDC')
+        ->assertSee('300.00 USDC')
+        ->assertSee('Partially paid')
+        ->assertSee('40% Settled');
+})->with([
+    ['super_admin', 'admin'],
+    ['super_admin', 'finance'],
+    ['admin', 'finance'],
+    ['finance_officer', 'finance'],
+]);
+
+test('overview widget renders correct balance and settlement progress', function (): void {
+    $this->actingAs(User::factory()->create()->assignRole('finance_officer'));
+    filament()->setCurrentPanel('finance');
+
+    $account = TuitionAccount::factory()->create([
+        'total_amount' => 1000000000,
+        'paid_amount' => 1000000000,
+    ]);
+
+    Livewire::test(TuitionAccountOverviewWidget::class, ['record' => $account])
+        ->assertSuccessful()
+        ->assertSee('1,000.00 USDC')
+        ->assertSee('Paid in full')
+        ->assertSee('100% Complete');
+});
+
+test('staff can record payment from the view page action', function (): void {
+    $this->actingAs(User::factory()->create()->assignRole('finance_officer'));
+    filament()->setCurrentPanel('finance');
+
+    $account = TuitionAccount::factory()->create([
+        'total_amount' => 300000000,
+        'paid_amount' => 50000000,
+    ]);
+
+    Livewire::test(ViewTuitionAccount::class, ['record' => $account->getKey()])
+        ->mountAction('recordPayment')
+        ->set('mountedActions.0.data.amount', '100.00')
+        ->callMountedAction()
+        ->assertHasNoActionErrors();
+
+    expect($account->fresh()->paid_amount)->toBe(150000000)
+        ->and($account->fresh()->remainingAmount())->toBe(150000000);
+});
+
+test('recording payment rejects amount exceeding remaining balance', function (): void {
+    $this->actingAs(User::factory()->create()->assignRole('finance_officer'));
+    filament()->setCurrentPanel('finance');
+
+    $account = TuitionAccount::factory()->create([
+        'total_amount' => 300000000,
+        'paid_amount' => 200000000,
+    ]);
+
+    Livewire::test(ViewTuitionAccount::class, ['record' => $account->getKey()])
+        ->mountAction('recordPayment')
+        ->set('mountedActions.0.data.amount', '150.00')
+        ->callMountedAction()
+        ->assertHasActionErrors(['amount']);
+
+    expect($account->fresh()->paid_amount)->toBe(200000000);
+});
+
+test('payments relation manager displays settled tuition receipts', function (): void {
+    $this->actingAs(User::factory()->create()->assignRole('finance_officer'));
+    filament()->setCurrentPanel('finance');
+
+    $account = TuitionAccount::factory()->create();
+    $payment = StudentTuitionPayment::factory()->create([
+        'tuition_account_id' => $account->id,
+        'student_id' => $account->student_id,
+        'amount_base_units' => 75000000,
+        'applied_base_units' => 75000000,
+        'tx_hash' => '0x'.str_repeat('f', 64),
+        'tx_verified_on_chain' => true,
+    ]);
+
+    Livewire::test(PaymentsRelationManager::class, [
+        'ownerRecord' => $account,
+        'pageClass' => ViewTuitionAccount::class,
+    ])
+        ->assertSuccessful()
+        ->assertCanSeeTableRecords([$payment])
+        ->assertSee('75.00 USDC');
 });

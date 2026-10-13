@@ -8,6 +8,7 @@ use App\Models\Student;
 use App\Models\StudentTuitionPayment;
 use App\Models\StudentWallet;
 use App\Models\TuitionAccount;
+use Illuminate\Database\Eloquent\Factories\Factory;
 
 /** @extends Factory<StudentTuitionPayment> */
 class StudentTuitionPaymentFactory extends Factory

@@ -6,6 +6,7 @@ namespace App\Models;
 
 use App\Enums\StudentTuitionPaymentState;
 use Database\Factories\TuitionAccountFactory;
+use Illuminate\Database\Eloquent\Collection;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
@@ -19,6 +20,8 @@ use Illuminate\Database\Eloquent\Relations\HasMany;
  * @property int $paid_amount
  * @property-read Student $student
  * @property-read AcademicTerm $academicTerm
+ * @property-read Collection<int, StudentTuitionPayment> $payments
+ * @property-read Collection<int, StudentTuitionPaymentAttempt> $paymentAttempts
  */
 class TuitionAccount extends Model
 {
@@ -79,5 +82,67 @@ class TuitionAccount extends Model
     public function academicTerm(): BelongsTo
     {
         return $this->belongsTo(AcademicTerm::class);
+    }
+
+    /** @return HasMany<StudentTuitionPayment, $this> */
+    public function payments(): HasMany
+    {
+        return $this->hasMany(StudentTuitionPayment::class);
+    }
+
+    /** @return HasMany<StudentTuitionPaymentAttempt, $this> */
+    public function paymentAttempts(): HasMany
+    {
+        return $this->hasMany(StudentTuitionPaymentAttempt::class);
+    }
+
+    public function isPaidInFull(): bool
+    {
+        return $this->total_amount > 0 && $this->paid_amount >= $this->total_amount;
+    }
+
+    public function isPartiallyPaid(): bool
+    {
+        return $this->paid_amount > 0 && $this->paid_amount < $this->total_amount;
+    }
+
+    public function isUnpaid(): bool
+    {
+        return $this->paid_amount === 0;
+    }
+
+    public function paymentProgressPercentage(): float
+    {
+        if ($this->total_amount <= 0) {
+            return 100.0;
+        }
+
+        return round(min(100.0, ($this->paid_amount / $this->total_amount) * 100), 1);
+    }
+
+    public function statusLabel(): string
+    {
+        if ($this->isPaidInFull()) {
+            return 'Paid in full';
+        }
+
+        if ($this->isPartiallyPaid()) {
+            return 'Partially paid';
+        }
+
+        return 'Unpaid';
+    }
+
+    public function statusColor(): string
+    {
+        if ($this->isPaidInFull()) {
+            return 'success';
+        }
+
+        if ($this->isPartiallyPaid()) {
+            return 'warning';
+        }
+
+        return 'danger';
     }
 }

@@ -4,6 +4,8 @@
 
 @source '../../../../app/Filament/Finance/**/*';
 @source '../../../../resources/views/filament/finance/**/*';
+@source '../../../../app/Filament/**/*';
+@source '../../../../resources/views/filament/**/*';
 @source '../../../../app/Filament/Pages/PaymentReviews.php';
 @source '../../../../resources/views/filament/pages/payment-reviews.blade.php';
 @source '../../../../app/Filament/Pages/Collections.php';
