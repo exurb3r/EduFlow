@@ -15,8 +15,10 @@ use App\Models\TuitionAccount;
 use App\Models\User;
 use App\Services\Payments\AsyncPaymentTransport;
 use App\Services\Payments\FeeBoundedPaymentTransport;
+use App\Services\Payments\FeeGuarantee;
 use Brick\Math\BigDecimal;
 use Brick\Math\BigInteger;
+use Brick\Math\RoundingMode;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Str;
@@ -77,8 +79,9 @@ final readonly class StudentTuitionPaymentProcessor
         }
         try {
             $this->assertRail($attempt);
-            if (! $this->transport instanceof FeeBoundedPaymentTransport || ! $this->transport->supportsFeeCeiling()) {
-                throw ValidationException::withMessages(['fee' => 'Rail cannot enforce accepted sender-fee ceiling. No signer called.']);
+            $guarantee = $this->feeGuarantee();
+            if ($guarantee === FeeGuarantee::Unbounded) {
+                throw ValidationException::withMessages(['fee' => 'Rail bounds network fees by no mechanism at all. No signer called.']);
             }
             if (! $this->auth->isAuthenticatedFor('ARC-TESTNET')) {
                 throw ValidationException::withMessages(['auth' => 'Operator testnet session unavailable. No automated login or signer call.']);
@@ -108,6 +111,7 @@ final readonly class StudentTuitionPaymentProcessor
                 || BigDecimal::of($balance->balance)->isLessThan(BigDecimal::of($attempt->total_base_units)->withPointMovedLeft(6))) {
                 throw ValidationException::withMessages(['balance' => 'Fresh wallet balance cannot cover accepted total.']);
             }
+            $lossBound = $this->assertLossBounded($attempt, $balance->balance, $guarantee);
         } catch (Throwable $exception) {
             report($exception);
             $this->hold($attempt, 'Preflight blocked. '.$exception->getMessage());
@@ -115,7 +119,7 @@ final readonly class StudentTuitionPaymentProcessor
             return;
         }
 
-        $claimed = DB::transaction(function () use ($attempt): bool {
+        $claimed = DB::transaction(function () use ($attempt, $lossBound): bool {
             $stored = StudentTuitionPaymentAttempt::query()->whereKey($attempt->id)->lockForUpdate()->firstOrFail();
             if ($stored->state !== 'prepared' || $stored->submission_started_at !== null || ! $stored->hasValidConsent()
                 || ! config('eduflow.student_tuition.enabled', false) || config('eduflow.student_tuition.stop_switch', false)) {
@@ -131,7 +135,7 @@ final readonly class StudentTuitionPaymentProcessor
                 return false;
             }
             $stored->update(['state' => 'submitting', 'stage' => 'signer_may_have_been_called', 'submission_started_at' => now(),
-                'leased_until' => now()->addMinutes(5), 'last_error' => null]);
+                'leased_until' => now()->addMinutes(5), 'fee_guarantee' => $lossBound, 'last_error' => null]);
 
             return true;
         }, 3);
@@ -291,6 +295,52 @@ final readonly class StudentTuitionPaymentProcessor
         } catch (Throwable $exception) {
             report($exception);
         }
+    }
+
+    /**
+     * What this rail can promise about network fees, or a refusal.
+     *
+     * A transport that does not implement the capability interface at all is
+     * treated as `Unbounded`, not as "probably fine": an unknown rail must be
+     * the most conservative reading, because the whole point of asking is to
+     * find out whether fees are bounded before a signer is invoked.
+     */
+    private function feeGuarantee(): FeeGuarantee
+    {
+        return $this->transport instanceof FeeBoundedPaymentTransport
+            ? $this->transport->feeGuarantee()
+            : FeeGuarantee::Unbounded;
+    }
+
+    /**
+     * Establish the loss bound the rail cannot establish for itself.
+     *
+     * With a signer-enforced ceiling the transaction carries it and there is
+     * nothing more to prove. With only the balance bound, the caller has to
+     * supply the missing half: the wallet must hold nothing beyond the accepted
+     * total, because the EVM rule `sender >= value + fee` means the balance is
+     * the *only* thing stopping the fee from exceeding what was agreed.
+     *
+     * The returned string is recorded on the attempt, because "the fee cannot
+     * exceed the balance" and "the fee cannot exceed the agreed ceiling" are
+     * different promises and a later reader must be able to tell them apart.
+     *
+     * @throws ValidationException
+     */
+    private function assertLossBounded(StudentTuitionPaymentAttempt $attempt, string $balance, FeeGuarantee $guarantee): string
+    {
+        if ($guarantee === FeeGuarantee::SignerEnforced) {
+            return FeeGuarantee::SignerEnforced->value;
+        }
+
+        $surplus = BigDecimal::of($balance)->withPointMovedRight(6)->toScale(0, RoundingMode::Floor)
+            ->minus($attempt->total_base_units)->toInt();
+
+        if ($surplus > 0) {
+            throw ValidationException::withMessages(['fee' => 'This rail cannot cap the fee, so the wallet must hold nothing beyond the accepted principal plus fee ceiling. It currently holds more. No signer called.']);
+        }
+
+        return FeeGuarantee::SenderBalanceBounded->value;
     }
 
     private function assertRail(StudentTuitionPaymentAttempt $attempt, bool $observation = false): void

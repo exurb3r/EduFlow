@@ -7,12 +7,12 @@ use App\Models\StudentTuitionPaymentAttempt;
 use App\Models\StudentTuitionPaymentIntent;
 use App\Models\Transaction;
 use App\Services\Payments\CircleAgentWalletTransport;
+use App\Services\Payments\FeeGuarantee;
 use App\Services\Payments\TransportAcceptance;
 use App\Services\Payments\TransportResolution;
 use App\Services\StudentTuitionPaymentProcessor;
 use App\Services\StudentTuitionPaymentService;
 use Brick\Math\BigInteger;
-use Illuminate\Support\Str;
 use Illuminate\Validation\ValidationException;
 
 test('quote and consent are immutable exact snapshots before any signer call', function (): void {
@@ -93,10 +93,67 @@ test('unknown attempt blocks different request key replacement', function (): vo
     expect(fn (): StudentTuitionPaymentAttempt => confirmConsent($c))->toThrow(ValidationException::class, 'unresolved payment');
 });
 
-test('stock Circle transport cannot sign a fee bounded tuition request', function (): void {
+test('the stock Circle rail reports an honest, weaker fee guarantee', function (): void {
     $transport = new CircleAgentWalletTransport('/nonexistent/binary');
-    expect($transport->supportsFeeCeiling())->toBeFalse()
-        ->and(fn (): TransportAcceptance => $transport->submit(['from' => '0x'.str_repeat('1', 40), 'to' => '0x'.str_repeat('2', 40),
-            'amount_base_units' => 1, 'chain' => 'ARC-TESTNET', 'idempotency_key' => (string) Str::uuid(), 'max_fee_base_units' => 1]))
-        ->toThrow(RuntimeException::class, 'before invoking');
+
+    // The installed CLI sets no fee ceiling, so it must never claim to. What it
+    // does have is the EVM sender-balance bound, which is a different promise
+    // and is reported as such rather than rounded up to "bounded".
+    expect($transport->feeGuarantee())->toBe(FeeGuarantee::SenderBalanceBounded)
+        ->and($transport->supportsFeeCeiling())->toBeFalse();
+});
+
+test('a rail with no fee bound at all is refused before the signer', function (): void {
+    $c = consentContext();
+    $a = confirmConsent($c);
+    $c['transport']->shouldReceive('feeGuarantee')->andReturn(FeeGuarantee::Unbounded);
+    $c['transport']->shouldNotReceive('submit');
+
+    app(StudentTuitionPaymentProcessor::class)->process($a->id);
+
+    expect($a->fresh()->state)->toBe('prepared')->and($a->fresh()->stage)->toBe('needs_operator_review')
+        ->and($a->fresh()->submission_started_at)->toBeNull();
+});
+
+test('a balance-bounded rail refuses while the wallet holds more than the agreed total', function (): void {
+    $c = consentContext();
+    $a = confirmConsent($c);
+    $c['transport']->shouldReceive('feeGuarantee')->andReturn(FeeGuarantee::SenderBalanceBounded);
+    // The fixture funds 20 USDC against a ~5.03 USDC total, so the fee could in
+    // principle draw on the surplus. That surplus is exactly what makes this an
+    // unbounded send as far as the agreed ceiling is concerned.
+    $c['transport']->shouldNotReceive('submit');
+
+    app(StudentTuitionPaymentProcessor::class)->process($a->id);
+
+    expect($a->fresh()->state)->toBe('prepared')->and($a->fresh()->submission_started_at)->toBeNull()
+        ->and($a->fresh()->last_error)->toContain('nothing beyond the accepted principal plus fee ceiling');
+});
+
+test('a balance-bounded rail proceeds when the wallet holds only the agreed total', function (): void {
+    $c = consentContext();
+    $a = confirmConsent($c);
+    $c['transport']->shouldReceive('feeGuarantee')->andReturn(FeeGuarantee::SenderBalanceBounded);
+    // Pin the rail balance to exactly principal + fee ceiling: 5.000000 + 0.029452.
+    mockExpectation($c['arc'], 'rpc')->with('eth_getBalance', Mockery::any())
+        ->andReturn('0x'.BigInteger::of('5029452000000000000')->toBase(16));
+    mockExpectation($c['transport'], 'submit')->once()->andReturn(new TransportAcceptance('116c7ce7-8f2f-53ac-8b06-f18aac151ce3'));
+    mockExpectation($c['transport'], 'resolve')->andReturn(TransportResolution::pending());
+
+    app(StudentTuitionPaymentProcessor::class)->process($a->id);
+
+    // The weaker guarantee is recorded on the attempt, so a later reader cannot
+    // mistake it for a signer-enforced cap.
+    expect($a->fresh()->state)->toBe('accepted')->and($a->fresh()->fee_guarantee)->toBe(FeeGuarantee::SenderBalanceBounded->value);
+});
+
+test('a signer-enforced rail records the strong guarantee', function (): void {
+    $c = consentContext();
+    $a = confirmConsent($c);
+    mockExpectation($c['transport'], 'submit')->once()->andReturn(new TransportAcceptance('116c7ce7-8f2f-53ac-8b06-f18aac151ce3'));
+    mockExpectation($c['transport'], 'resolve')->andReturn(TransportResolution::pending());
+
+    app(StudentTuitionPaymentProcessor::class)->process($a->id);
+
+    expect($a->fresh()->fee_guarantee)->toBe(FeeGuarantee::SignerEnforced->value);
 });

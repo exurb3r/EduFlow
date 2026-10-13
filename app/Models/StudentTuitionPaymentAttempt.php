@@ -56,6 +56,7 @@ use LogicException;
  * @property string|null $settlement_evidence_digest
  * @property string|null $actual_network_fee
  * @property Carbon|null $posted_at
+ * @property string|null $fee_guarantee
  * @property int|null $investigation_owner_id
  * @property Carbon $created_at
  * @property Carbon $updated_at
@@ -74,6 +75,7 @@ class StudentTuitionPaymentAttempt extends Model
         'student_tuition_payment_intent_id', 'consent_snapshot', 'consent_digest', 'confirmed_at',
         'submission_started_at', 'dispatched_at', 'next_attempt_at', 'leased_until',
         'settlement_evidence', 'settlement_evidence_digest', 'actual_network_fee', 'posted_at', 'investigation_owner_id',
+        'fee_guarantee',
     ];
 
     /** @return array<string, string> */
@@ -113,7 +115,7 @@ class StudentTuitionPaymentAttempt extends Model
                 'total_base_units', 'payer_address', 'recipient_address', 'chain', 'chain_id', 'consent_snapshot', 'consent_digest', 'confirmed_at'])) {
                 throw new LogicException('Tuition consent and request identity cannot be rewritten.');
             }
-            foreach (['submission_started_at', 'provider_handle', 'provider_reference', 'settlement_evidence_digest', 'posted_at'] as $field) {
+            foreach (['submission_started_at', 'provider_handle', 'provider_reference', 'settlement_evidence_digest', 'posted_at', 'fee_guarantee'] as $field) {
                 if ($attempt->getRawOriginal($field) !== null && $attempt->isDirty($field)) {
                     throw new LogicException('Tuition submission and settlement evidence are write-once.');
                 }

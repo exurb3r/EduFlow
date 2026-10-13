@@ -11,6 +11,7 @@ use App\Models\TuitionAccount;
 use App\Models\User;
 use App\Services\Payments\AsyncPaymentTransport;
 use App\Services\Payments\FeeBoundedPaymentTransport;
+use App\Services\Payments\FeeGuarantee;
 use App\Services\StudentTuitionPaymentService;
 use Brick\Math\BigInteger;
 use Illuminate\Support\Facades\Bus;
@@ -65,7 +66,11 @@ function consentContext(): array
     mockExpectation($arc, 'addressExplorerUrl')->andReturn('https://example.test/address');
     mockExpectation($arc, 'explorerUrl')->andReturn('https://example.test/tx');
     mockExpectation($arc, 'rpc')->with('eth_chainId')->andReturn('0x4cef52');
-    mockExpectation($arc, 'rpc')->with('eth_getBalance', Mockery::any())->andReturn('0x'.BigInteger::of('20000000000000000000')->toBase(16));
+    // byDefault: a test that needs a different funded balance (for example to
+    // pin the sender-loss bound) must be able to replace this rather than have
+    // its own expectation shadowed by it.
+    mockExpectation($arc, 'rpc')->with('eth_getBalance', Mockery::any())
+        ->andReturn('0x'.BigInteger::of('20000000000000000000')->toBase(16))->byDefault();
     $auth = Mockery::mock(AuthGateway::class);
     mockExpectation($auth, 'isAuthenticatedFor')->with('ARC-TESTNET')->andReturn(true);
     app()->instance(AuthGateway::class, $auth);
@@ -74,7 +79,10 @@ function consentContext(): array
     if (! $transport instanceof FeeBoundedPaymentTransport) {
         throw new RuntimeException('Transport mock does not implement fee-bounded rail.');
     }
-    $transport->shouldReceive('supportsFeeCeiling')->andReturn(true);
+    // byDefault so an individual test can state a different rail guarantee
+    // without fighting a competing expectation from this fixture.
+    $transport->shouldReceive('feeGuarantee')->andReturn(FeeGuarantee::SignerEnforced)->byDefault();
+    $transport->shouldReceive('supportsFeeCeiling')->andReturn(true)->byDefault();
     $transport->shouldReceive('estimate')->andReturn(['networkFee' => '0.02945113436514256']);
     app()->instance(AsyncPaymentTransport::class, $transport);
 

@@ -46,8 +46,8 @@ final readonly class CircleAgentWalletTransport implements FeeBoundedPaymentTran
 
     public function submit(array $request): TransportAcceptance
     {
-        if (array_key_exists('max_fee_base_units', $request)) {
-            throw new RuntimeException('Installed Circle CLI cannot enforce a sender-fee ceiling. Bounded tuition submission is blocked before invoking the signer.');
+        if (array_key_exists('max_fee_base_units', $request) && $this->feeGuarantee() === FeeGuarantee::SignerEnforced) {
+            throw new RuntimeException('This rail does not set the transaction fee ceiling, so it must never be handed one to ignore.');
         }
         $handle = $this->run([
             'wallet', 'transfer', $request['to'],
@@ -76,9 +76,25 @@ final readonly class CircleAgentWalletTransport implements FeeBoundedPaymentTran
         return new TransportAcceptance(handle: strtolower($candidate), raw: ['raw' => $handle]);
     }
 
+    /**
+     * The installed CLI sets no fee ceiling.
+     *
+     * `circle wallet transfer` exposes `--amount`, `--token`, `--address`,
+     * `--chain`, `--rpc-url`, `--idempotency-key`, `--estimate`, `--output` and
+     * `--quiet` — there is no fee or gas-limit flag, so the transaction's
+     * `maxFeePerGas` is chosen entirely by the CLI. What remains is the EVM
+     * rule that a sender must cover `value + fee`, which bounds loss by the
+     * wallet's balance rather than by the accepted ceiling. Callers that rely on
+     * this weaker bound must establish the balance themselves.
+     */
+    public function feeGuarantee(): FeeGuarantee
+    {
+        return FeeGuarantee::SenderBalanceBounded;
+    }
+
     public function supportsFeeCeiling(): bool
     {
-        return false;
+        return $this->feeGuarantee() === FeeGuarantee::SignerEnforced;
     }
 
     /**
