@@ -31,7 +31,8 @@ test('a student sees their own wallet screen', function (): void {
             ->component('student/wallet')
             ->where('snapshot.address', '0x'.str_repeat('a', 40))
             ->where('snapshot.is_available', true)
-            ->where('snapshot.state', 'ok'));
+            ->where('snapshot.state', 'ok')
+            ->has('tuitionAttempts'));
 });
 
 test('the wallet screen shows the live balance', function (): void {

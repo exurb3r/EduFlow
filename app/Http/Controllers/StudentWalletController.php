@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Http\Controllers;
 
 use App\Models\Student;
+use App\Models\StudentTuitionPaymentAttempt;
 use App\Services\StudentWalletService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\RedirectResponse;
@@ -29,6 +30,12 @@ class StudentWalletController extends Controller
 
         return Inertia::render('student/wallet', [
             'snapshot' => $this->wallets->snapshot($student)->toArray(),
+            'tuitionAttempts' => StudentTuitionPaymentAttempt::query()
+                ->where('student_id', $student->id)
+                ->latest('id')
+                ->limit(20)
+                ->get()
+                ->map(fn (StudentTuitionPaymentAttempt $attempt): array => StudentTuitionPaymentController::statusData($attempt)),
         ]);
     }
 
