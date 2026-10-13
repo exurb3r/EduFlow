@@ -15,6 +15,16 @@ enum AgentDecisionType: string implements HasColor, HasLabel
     case ESCALATE = 'escalate';
     case REJECT = 'reject';
 
+    /**
+     * A model's read on a bill, recorded as commentary and nothing more.
+     *
+     * Added after the decision cases because it is not one: this value carries
+     * no authority to release, hold or decline anything, and it exists only so
+     * an advisory classification can be stored and audited alongside the
+     * decisions it explains.
+     */
+    case ADVISORY_CLASSIFICATION = 'advisory_classification';
+
     public function getLabel(): string
     {
         return match ($this) {
@@ -23,6 +33,7 @@ enum AgentDecisionType: string implements HasColor, HasLabel
             self::HOLD => 'Held for Safety',
             self::ESCALATE => 'Escalated to Human',
             self::REJECT => 'Rejected by Policy',
+            self::ADVISORY_CLASSIFICATION => 'Advisory Classification (No Authority)',
         };
     }
 
@@ -34,6 +45,7 @@ enum AgentDecisionType: string implements HasColor, HasLabel
             self::HOLD => 'warning',
             self::ESCALATE => 'danger',
             self::REJECT => 'gray',
+            self::ADVISORY_CLASSIFICATION => 'info',
         };
     }
 

@@ -85,6 +85,14 @@
                                 \App\Enums\AgentDecisionType::HOLD => 'text-amber-500 bg-amber-500/10 border-amber-500/20',
                                 \App\Enums\AgentDecisionType::ESCALATE => 'text-amber-500 bg-amber-500/10 border-amber-500/20',
                                 \App\Enums\AgentDecisionType::REJECT => 'text-red-500 bg-red-500/10 border-red-500/20',
+                                // An advisory classification moved no money, so it
+                                // must not borrow a colour that reads as an
+                                // approval or a rejection.
+                                \App\Enums\AgentDecisionType::ADVISORY_CLASSIFICATION => 'text-zinc-500 bg-zinc-500/10 border-zinc-500/20',
+                                // Default rather than an exhaustive list: this
+                                // renders stored rows, so the page must not 500
+                                // the first time a sixth decision type exists.
+                                default => 'text-zinc-500 bg-zinc-500/10 border-zinc-500/20',
                             };
                         @endphp
                         <button
