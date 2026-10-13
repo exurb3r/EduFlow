@@ -11,6 +11,7 @@ use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
+use Illuminate\Support\Carbon;
 
 /**
  * @property int $id
@@ -58,6 +59,19 @@ class TuitionAccount extends Model
                     });
             })
             ->whereNull('posted_at')
+            ->get()
+            ->filter(function (StudentTuitionPaymentAttempt $attempt): bool {
+                if ($attempt->state === 'prepared' && $attempt->submission_started_at === null) {
+                    $intent = StudentTuitionPaymentIntent::query()->find($attempt->student_tuition_payment_intent_id);
+                    if ($intent instanceof StudentTuitionPaymentIntent
+                        && isset($intent->snapshot['expires_at'])
+                        && Carbon::parse($intent->snapshot['expires_at'])->lte(now())) {
+                        return false;
+                    }
+                }
+
+                return true;
+            })
             ->sum('amount_base_units');
     }
 

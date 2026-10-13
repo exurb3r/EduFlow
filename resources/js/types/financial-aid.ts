@@ -132,7 +132,11 @@ export type TuitionAttempt = {
     quoted_network_fee: string;
     actual_network_fee: string | null;
     tx_hash: string | null;
+    provider_handle?: string | null;
+    explorer_url?: string | null;
+    last_error?: string | null;
     simulated: boolean;
+    verified?: boolean;
     posted: boolean;
     applied_base_units: string;
     overpayment_base_units: string;
