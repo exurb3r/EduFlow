@@ -121,7 +121,13 @@ return [
         'enabled' => env('EDUFLOW_BILL_SUBMISSION_ENABLED', false),
         'observe_enabled' => env('EDUFLOW_BILL_OBSERVATION_ENABLED', false),
         'stop_switch' => env('EDUFLOW_BILL_SUBMISSION_STOP', false),
-        'pilot_bill_ids' => [],
+        // An explicit allow-list. A bill absent from it is never sent, whatever the
+        // student consents to. Comma-separated ids; an empty value disables the
+        // lane entirely rather than permitting everything.
+        'pilot_bill_ids' => array_values(array_filter(array_map(
+            'intval',
+            explode(',', (string) env('EDUFLOW_BILL_PILOT_IDS', '')),
+        ))),
         'recovery_owner_id' => env('EDUFLOW_BILL_RECOVERY_OWNER_ID'),
         'queue_connection' => env('EDUFLOW_BILL_QUEUE_CONNECTION', 'database'),
         'queue' => 'student-bills',
