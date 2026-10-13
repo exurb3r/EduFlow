@@ -46,8 +46,12 @@ final readonly class CircleAgentWalletTransport implements FeeBoundedPaymentTran
 
     public function submit(array $request): TransportAcceptance
     {
-        if (array_key_exists('max_fee_base_units', $request) && $this->feeGuarantee() === FeeGuarantee::SignerEnforced) {
-            throw new RuntimeException('This rail does not set the transaction fee ceiling, so it must never be handed one to ignore.');
+        // A ceiling this rail cannot apply must be refused outright rather than
+        // silently dropped. Previously this only fired for a signer-enforced rail
+        // — a condition that could never hold here — so the cap travelled to the
+        // CLI and was discarded, leaving a caller believing it had been honoured.
+        if (array_key_exists('max_fee_base_units', $request)) {
+            throw new RuntimeException('Circle CLI sets no transaction fee ceiling; a requested cap cannot be honoured and is refused rather than ignored.');
         }
         $handle = $this->run([
             'wallet', 'transfer', $request['to'],
@@ -82,14 +86,22 @@ final readonly class CircleAgentWalletTransport implements FeeBoundedPaymentTran
      * `circle wallet transfer` exposes `--amount`, `--token`, `--address`,
      * `--chain`, `--rpc-url`, `--idempotency-key`, `--estimate`, `--output` and
      * `--quiet` — there is no fee or gas-limit flag, so the transaction's
-     * `maxFeePerGas` is chosen entirely by the CLI. What remains is the EVM
-     * rule that a sender must cover `value + fee`, which bounds loss by the
-     * wallet's balance rather than by the accepted ceiling. Callers that rely on
-     * this weaker bound must establish the balance themselves.
+     * `maxFeePerGas` is chosen entirely by the CLI. But that flag is irrelevant
+     * here, because the CLI does not transact from the payer's account at all:
+     * a Circle agent wallet transfer is relayed, and Circle sponsors the gas.
+     *
+     * Verified on three real ARC-TESTNET receipts rather than inferred from the
+     * EVM rule. The payer's balance moved by exactly the principal and not one
+     * wei more, while the receipt still carried a non-zero `gasUsed ×
+     * effectiveGasPrice`. That fee was paid by Circle: a Transfer log shows the
+     * relay contract reimbursing the relayer.
+     *
+     * So the payer's debit here is the principal alone. Callers must therefore
+     * test affordability against the amount, not against amount + fee ceiling.
      */
     public function feeGuarantee(): FeeGuarantee
     {
-        return FeeGuarantee::SenderBalanceBounded;
+        return FeeGuarantee::RelayerSponsored;
     }
 
     public function supportsFeeCeiling(): bool

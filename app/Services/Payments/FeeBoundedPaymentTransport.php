@@ -7,12 +7,14 @@ namespace App\Services\Payments;
 /**
  * A rail that can say what it does about network fees.
  *
- * Declaring this honestly matters more than declaring it optimistically: a rail
- * that answers `Unbounded` must never be treated as safe to send on, and a rail
- * that answers `SenderBalanceBounded` must only be used when the caller has
- * itself established the balance bound. The transport cannot check the caller's
- * balance, so this interface only reports capability; enforcement lives in the
- * caller.
+ * Declaring this honestly matters more than declaring it optimistically. The
+ * caller has to choose between two genuinely different facts — "the
+ * transaction caps the fee" and "the payer pays no fee" — and those imply
+ * different affordability arithmetic, so collapsing them would either overstate
+ * a rail's safety or understate what a payer is being asked to accept.
+ *
+ * The transport reports capability only. It cannot see the caller's balance or
+ * the amount being sent, so enforcement lives in the caller.
  */
 interface FeeBoundedPaymentTransport extends AsyncPaymentTransport
 {
@@ -20,8 +22,8 @@ interface FeeBoundedPaymentTransport extends AsyncPaymentTransport
      * The strongest guarantee this rail actually provides.
      *
      * Never inferred from the presence of an `--estimate` flag: an estimate is
-     * a prediction made before the transaction exists, not a limit applied to
-     * it.
+     * a prediction made before the transaction exists, not a fact about who
+     * ends up paying.
      */
     public function feeGuarantee(): FeeGuarantee;
 

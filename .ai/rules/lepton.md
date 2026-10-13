@@ -117,3 +117,20 @@ With `--quiet`, the CLI returns a transaction ID for agent wallets ("transaction
 `CircleCliGateway::transfer()` requires txHash and throws without it. That is correct -- it must never record a fake reference -- but it means every real agent-wallet payment ends `unknown`. The working path is: quiet submit -> Circle transaction id -> poll `circle transaction list` until COMPLETE/FAILED -> take txHash -> ArcSettlementVerifier.
 
 Do not 'fix' this by recording the Circle id as if it were a hash, and do not retry a `unknown` by resending: the payment may already have been accepted.
+
+## Circle sponsors the gas: the payer of an agent-wallet transfer pays NO fee
+This is the measured corollary of the relayed-SCA shape above, and it inverts the usual EVM reasoning. On `0x9e358757…` (treasury -> vendor, ARC-TESTNET):
+
+- `tx.from` `0x9ae75fa8…` (Circle relayer), `tx.to` `0x0000000071727de…` (W3S relay), `value` absent.
+- Transfer log: treasury `0x19bee6be…` -> vendor `0x48a196…`, **30.0 USDC**.
+- Transfer log: relay contract `0x0000000071727de…` -> relayer `0x9ae75fa8…`, 0.014456 USDC (gas reimbursement).
+- `eth_getBalance(treasury)` before/after the block differs by exactly **30.000000000000000000** — zero fee.
+
+Three more transfers behaved identically (45.00, 0.01, and one more at 30.00): payer balance delta always equalled the principal exactly. The receipt fee (`gasUsed x effectiveGasPrice`) is Circle's cost, not the payer's.
+
+So do NOT apply "the sender must hold value + fee, therefore the balance bounds the fee" to this rail: the payer is not `tx.from`. Two rules follow, and both were wrong here before this was measured:
+
+1. Affordability is `amount <= balance`. Adding a fee ceiling made a funded 20 USDC wallet unable to send 5 USDC.
+2. A receipt fee above the payer's accepted ceiling must NOT refuse a settlement. It is Circle's cost, so the comparison can reject a payment that genuinely settled -- student pays, debt stands, no repair path.
+
+**To prove who pays, read the payer's balance across the block.** Do not infer it from `tx.from`, and do not infer it from `gasUsed x effectiveGasPrice`.

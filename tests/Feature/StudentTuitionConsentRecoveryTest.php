@@ -98,10 +98,10 @@ test('unknown attempt blocks different request key replacement', function (): vo
 test('the stock Circle rail reports an honest, weaker fee guarantee', function (): void {
     $transport = new CircleAgentWalletTransport('/nonexistent/binary');
 
-    // The installed CLI sets no fee ceiling, so it must never claim to. What it
-    // does have is the EVM sender-balance bound, which is a different promise
-    // and is reported as such rather than rounded up to "bounded".
-    expect($transport->feeGuarantee())->toBe(FeeGuarantee::SenderBalanceBounded)
+    // The installed CLI sets no fee ceiling, so it must never claim to. What is
+    // true instead -- measured on real relayed receipts -- is that the rail
+    // sponsors the gas and the payer loses exactly the principal.
+    expect($transport->feeGuarantee())->toBe(FeeGuarantee::RelayerSponsored)
         ->and($transport->supportsFeeCeiling())->toBeFalse();
 });
 
@@ -118,37 +118,54 @@ test('a rail with no fee bound at all is refused before the signer', function ()
         ->and($a->fresh()->submission_started_at)->toBeNull();
 });
 
-test('a balance-bounded rail refuses while the wallet holds more than the agreed total', function (): void {
+test('a sponsored rail lets a wallet holding far more than the total proceed', function (): void {
     $c = consentContext();
     $a = confirmConsent($c);
-    // The fixture funds 20 USDC against a ~5.03 USDC total, so the fee could in
-    // principle draw on the surplus. That surplus is exactly what makes this an
-    // unbounded send as far as the agreed ceiling is concerned.
-    $transport = tuitionTransport(FeeGuarantee::SenderBalanceBounded);
-    $transport->shouldNotReceive('submit');
-    app()->instance(AsyncPaymentTransport::class, $transport);
-
-    app(StudentTuitionPaymentProcessor::class)->process($a->id);
-
-    expect($a->fresh()->state)->toBe('prepared')->and($a->fresh()->submission_started_at)->toBeNull()
-        ->and($a->fresh()->last_error)->toContain('nothing beyond the accepted principal plus fee ceiling');
-});
-
-test('a balance-bounded rail proceeds when the wallet holds only the agreed total', function (): void {
-    $c = consentContext();
-    $a = confirmConsent($c);
-    // Pin the payer balance to exactly principal + fee ceiling: 5.000000 + 0.029452.
-    app()->instance(ArcNetworkGateway::class, tuitionArcGateway(5_029_452));
-    $transport = tuitionTransport(FeeGuarantee::SenderBalanceBounded);
+    // The fixture funds 20 USDC against a 5 USDC principal. An earlier rule
+    // required the balance to be no greater than principal + ceiling, which made
+    // every normally funded wallet unable to send anything on this rail -- the
+    // check was bounding an account that pays no gas.
+    $transport = tuitionTransport(FeeGuarantee::RelayerSponsored);
     mockExpectation($transport, 'submit')->once()->andReturn(new TransportAcceptance('116c7ce7-8f2f-53ac-8b06-f18aac151ce3'));
     mockExpectation($transport, 'resolve')->andReturn(TransportResolution::pending());
     app()->instance(AsyncPaymentTransport::class, $transport);
 
     app(StudentTuitionPaymentProcessor::class)->process($a->id);
 
-    // The weaker guarantee is recorded on the attempt, so a later reader cannot
-    // mistake it for a signer-enforced cap.
-    expect($a->fresh()->state)->toBe('accepted')->and($a->fresh()->fee_guarantee)->toBe(FeeGuarantee::SenderBalanceBounded->value);
+    // The guarantee is recorded, so a later reader knows the rail paid the fee
+    // rather than the transaction capping it.
+    expect($a->fresh()->state)->toBe('accepted')
+        ->and($a->fresh()->fee_guarantee)->toBe(FeeGuarantee::RelayerSponsored->value);
+});
+
+test('a sponsored rail refuses a wallet that cannot cover the principal itself', function (): void {
+    $c = consentContext();
+    $a = confirmConsent($c);
+    // 4.999999 USDC against a 5.000000 principal: the rail's sponsorship does not
+    // make the principal affordable.
+    app()->instance(ArcNetworkGateway::class, tuitionArcGateway(4_999_999));
+    $transport = tuitionTransport(FeeGuarantee::RelayerSponsored);
+    $transport->shouldNotReceive('submit');
+    app()->instance(AsyncPaymentTransport::class, $transport);
+
+    app(StudentTuitionPaymentProcessor::class)->process($a->id);
+
+    expect($a->fresh()->state)->toBe('prepared')->and($a->fresh()->submission_started_at)->toBeNull()
+        ->and($a->fresh()->last_error)->toContain('cannot cover the amount this rail will debit');
+});
+
+test('a wallet holding exactly the principal may pay it on a sponsored rail', function (): void {
+    $c = consentContext();
+    $a = confirmConsent($c);
+    app()->instance(ArcNetworkGateway::class, tuitionArcGateway(5_000_000));
+    $transport = tuitionTransport(FeeGuarantee::RelayerSponsored);
+    mockExpectation($transport, 'submit')->once()->andReturn(new TransportAcceptance('116c7ce7-8f2f-53ac-8b06-f18aac151ce3'));
+    mockExpectation($transport, 'resolve')->andReturn(TransportResolution::pending());
+    app()->instance(AsyncPaymentTransport::class, $transport);
+
+    app(StudentTuitionPaymentProcessor::class)->process($a->id);
+
+    expect($a->fresh()->state)->toBe('accepted');
 });
 
 test('a signer-enforced rail records the strong guarantee', function (): void {

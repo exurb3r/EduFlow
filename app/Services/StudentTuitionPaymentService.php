@@ -14,6 +14,8 @@ use App\Models\StudentTuitionPaymentIntent;
 use App\Models\StudentWallet;
 use App\Models\TuitionAccount;
 use App\Services\Payments\AsyncPaymentTransport;
+use App\Services\Payments\FeeBoundedPaymentTransport;
+use App\Services\Payments\FeeGuarantee;
 use Brick\Math\BigDecimal;
 use Brick\Math\RoundingMode;
 use Illuminate\Support\Carbon;
@@ -60,7 +62,14 @@ final readonly class StudentTuitionPaymentService
         $feeUnits = self::feeCeiling($fee);
         $total = BigDecimal::of($amountBaseUnits)->plus($feeUnits)->toInt();
         $available = BigDecimal::of($balance->balance)->withPointMovedRight(6)->toScale(0, RoundingMode::Floor)->toInt();
-        if ($total > $available) {
+        // Affordability is judged against what the payer is actually debited, not
+        // against a notional total. On a relayed rail the fee is Circle's cost and
+        // the payer's whole debit is the principal, so demanding principal + ceiling
+        // would refuse a wallet that can in fact pay -- and the fee ceiling is
+        // still recorded, because it bounds what the payer would lose on a rail
+        // where they do pay it.
+        $required = $this->payerDebitBaseUnits($amountBaseUnits, $feeUnits, $simulated);
+        if ($required > $available) {
             throw ValidationException::withMessages(['amount_base_units' => 'Wallet cannot cover this principal plus the network fee ceiling.']);
         }
         $s = ['schema_version' => 1, 'purpose' => 'student_tuition_testnet_demo', 'plane' => 'pilot', 'asset' => 'USDC',
@@ -185,6 +194,29 @@ final readonly class StudentTuitionPaymentService
         return [...$s, 'recipient' => $s['recipient_address'], 'network_fee' => $s['quoted_network_fee'],
             'request_digest' => $intent->snapshot_digest, 'total' => BigDecimal::of($s['amount_base_units'])->withPointMovedLeft(6)->plus($s['quoted_network_fee'])->__toString(),
             'remaining_base_units' => TuitionAccount::query()->findOrFail($intent->tuition_account_id)->remainingAmount()];
+    }
+
+    /**
+     * What this rail will actually debit the payer for.
+     *
+     * A relayed rail sponsors the gas, so the payer loses exactly the principal
+     * and a wallet holding precisely that amount can send it. A rehearsal charges
+     * nothing, so a rehearsal is also principal-only. Only a rail where the payer
+     * bears the fee needs the ceiling added, and this lane refuses to submit on
+     * such a rail without a separate decision, so the ceiling is what the payer
+     * would lose if that ever changed.
+     *
+     * Derived from the transport's own guarantee rather than assumed, so a rail
+     * that starts paying the fee again stops being under-funded silently.
+     */
+    private function payerDebitBaseUnits(int $amountBaseUnits, int $feeCeilingBaseUnits, bool $simulated): int
+    {
+        if ($simulated || $this->transport instanceof FeeBoundedPaymentTransport
+            && $this->transport->feeGuarantee() === FeeGuarantee::RelayerSponsored) {
+            return $amountBaseUnits;
+        }
+
+        return BigDecimal::of($amountBaseUnits)->plus($feeCeilingBaseUnits)->toInt();
     }
 
     public static function feeCeiling(string $fee): int

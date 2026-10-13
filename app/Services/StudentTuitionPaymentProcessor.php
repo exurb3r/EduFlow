@@ -107,9 +107,8 @@ final readonly class StudentTuitionPaymentProcessor
             }
             $this->balances->forget($student);
             $balance = $this->balances->snapshot($student);
-            if (! is_string($balance->balance) || $balance->isFake
-                || BigDecimal::of($balance->balance)->isLessThan(BigDecimal::of($attempt->total_base_units)->withPointMovedLeft(6))) {
-                throw ValidationException::withMessages(['balance' => 'Fresh wallet balance cannot cover accepted total.']);
+            if (! is_string($balance->balance) || $balance->isFake) {
+                throw ValidationException::withMessages(['balance' => 'Fresh wallet balance unavailable; no signer called.']);
             }
             $lossBound = $this->assertLossBounded($attempt, $balance->balance, $guarantee);
         } catch (Throwable $exception) {
@@ -160,6 +159,10 @@ final readonly class StudentTuitionPaymentProcessor
 
     private function observe(StudentTuitionPaymentAttempt $attempt): void
     {
+        // Re-read the rail's own answer rather than the one captured at submit
+        // time: a payment observed long after submission must be judged against
+        // what the rail says now, not against a stale claim about it.
+        $guarantee = $this->feeGuarantee();
         if ($attempt->leased_until !== null && $attempt->leased_until->isFuture()) {
             return;
         }
@@ -203,8 +206,14 @@ final readonly class StudentTuitionPaymentProcessor
                 'amount_base_units' => $attempt->amount_base_units, 'max_fee_base_units' => $attempt->fee_ceiling_base_units], $attempt->provider_reference);
             $receipt = $verdict['receipt'] ?? null;
             $fee = is_array($receipt) ? $this->actualFee($receipt) : null;
+            // Whether the receipt's fee may refuse the settlement depends on who
+            // paid it, which depends on the rail -- see assertLossBounded(). On a
+            // sponsored rail this fee is Circle's cost and says nothing about what
+            // the student was debited, so letting it reject the settlement would
+            // discard a real payment the student actually paid for.
+            $feeMayRefuse = $guarantee !== FeeGuarantee::RelayerSponsored;
             if (($verdict['verdict'] ?? null) !== 'verified' || $fee === null
-                || StudentTuitionPaymentService::feeCeiling($fee) > $attempt->fee_ceiling_base_units
+                || ($feeMayRefuse && StudentTuitionPaymentService::feeCeiling($fee) > $attempt->fee_ceiling_base_units)
                 || strtolower((string) ($receipt['transactionHash'] ?? '')) !== $attempt->provider_reference) {
                 $attempt->update(['settlement_verdict' => ($verdict['verdict'] ?? null) === 'verified' ? 'fee_or_reference_unproven' : (string) ($verdict['verdict'] ?? 'unreadable'),
                     'settlement_reason' => mb_substr((string) ($verdict['reason'] ?? 'Movement proof unavailable.'), 0, 1000),
@@ -214,7 +223,7 @@ final readonly class StudentTuitionPaymentProcessor
             }
             $proof = [...$verdict, 'consent_digest' => $attempt->consent_digest, 'tx_hash' => $attempt->provider_reference,
                 'chain_id' => $attempt->chain_id, 'sender' => $attempt->payer_address, 'recipient' => $attempt->recipient_address,
-                'amount_base_units' => $attempt->amount_base_units, 'actual_network_fee' => $fee];
+                'amount_base_units' => $attempt->amount_base_units, 'actual_network_fee' => $fee, 'fee_paid_by' => $guarantee->value];
             $attempt->update(['state' => 'verified', 'stage' => 'movement_verified_posting_due', 'settlement_verdict' => 'verified',
                 'settlement_reason' => mb_substr((string) $verdict['reason'], 0, 1000), 'settlement_verified_at' => now(),
                 'settlement_evidence' => $proof, 'settlement_evidence_digest' => PaymentIntent::digest($proof), 'actual_network_fee' => $fee,
@@ -303,7 +312,7 @@ final readonly class StudentTuitionPaymentProcessor
      * A transport that does not implement the capability interface at all is
      * treated as `Unbounded`, not as "probably fine": an unknown rail must be
      * the most conservative reading, because the whole point of asking is to
-     * find out whether fees are bounded before a signer is invoked.
+     * find out who pays the fee before a signer is invoked.
      */
     private function feeGuarantee(): FeeGuarantee
     {
@@ -313,34 +322,41 @@ final readonly class StudentTuitionPaymentProcessor
     }
 
     /**
-     * Establish the loss bound the rail cannot establish for itself.
+     * Establish what the payer can actually lose, from the rail's own claim.
      *
-     * With a signer-enforced ceiling the transaction carries it and there is
-     * nothing more to prove. With only the balance bound, the caller has to
-     * supply the missing half: the wallet must hold nothing beyond the accepted
-     * total, because the EVM rule `sender >= value + fee` means the balance is
-     * the *only* thing stopping the fee from exceeding what was agreed.
+     * Each guarantee implies a different affordability question, so this is
+     * where the rail's answer is turned into an arithmetic check:
      *
-     * The returned string is recorded on the attempt, because "the fee cannot
-     * exceed the balance" and "the fee cannot exceed the agreed ceiling" are
-     * different promises and a later reader must be able to tell them apart.
+     *  - `RelayerSponsored`: the rail pays the gas, so the payer's whole debit
+     *    is the principal. Affordability is `amount <= balance` and a wallet
+     *    holding exactly the amount may send it. This was measured, not assumed:
+     *    the payer's balance moved by exactly the principal on three real
+     *    relayed ARC-TESTNET transfers while the receipts still carried fees.
+     *  - `SignerEnforced`: the transaction carries the ceiling, so the payer may
+     *    spend up to principal plus the accepted ceiling.
+     *  - `Unbounded`: refused before the signer, because nothing bounds the fee
+     *    except consent and there is no way to check what it will be.
+     *
+     * The returned string is recorded on the attempt. "The rail paid the fee" and
+     * "the transaction capped the fee" are different promises about a student's
+     * money, and a later reader has to be able to tell which one was relied on.
      *
      * @throws ValidationException
      */
     private function assertLossBounded(StudentTuitionPaymentAttempt $attempt, string $balance, FeeGuarantee $guarantee): string
     {
-        if ($guarantee === FeeGuarantee::SignerEnforced) {
-            return FeeGuarantee::SignerEnforced->value;
+        $available = BigDecimal::of($balance)->withPointMovedRight(6)->toScale(0, RoundingMode::Floor)->toInt();
+        $required = $guarantee === FeeGuarantee::RelayerSponsored
+            ? $attempt->amount_base_units
+            : $attempt->total_base_units;
+
+        if ($available < $required) {
+            throw ValidationException::withMessages([
+                'balance' => 'Fresh wallet balance cannot cover the amount this rail will debit the payer for. No signer called.',
+            ]);
         }
 
-        $surplus = BigDecimal::of($balance)->withPointMovedRight(6)->toScale(0, RoundingMode::Floor)
-            ->minus($attempt->total_base_units)->toInt();
-
-        if ($surplus > 0) {
-            throw ValidationException::withMessages(['fee' => 'This rail cannot cap the fee, so the wallet must hold nothing beyond the accepted principal plus fee ceiling. It currently holds more. No signer called.']);
-        }
-
-        return FeeGuarantee::SenderBalanceBounded->value;
+        return $guarantee->value;
     }
 
     private function assertRail(StudentTuitionPaymentAttempt $attempt, bool $observation = false): void

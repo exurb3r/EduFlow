@@ -13,10 +13,25 @@ paths:
 
 # Feature
 
-## Arc tuition payments: the fee comes out of the sender, goes to the network
-Arc pays gas in NATIVE USDC, so a transfer's fee is taken from the SENDER's wallet on top of the amount, and it goes to the Arc network's validators — not to Circle, not to the institution treasury, and not to EduFlow. The recipient receives exactly the amount. A wallet therefore holds amount + fee or it cannot send, so the quote prices the fee first and refuses an amount the balance cannot cover once the fee ceiling is added.
+## On a Circle agent wallet the payer pays NO fee — it is a relayed transfer
+Arc pays gas in native USDC, but **a Circle agent wallet transfer is relayed**: the receipt's `from` is a relayer, `to` is the W3S relay contract, `value` is zero, and the payer appears only as the `from` topic of a Transfer log. Circle sponsors the gas, so the payer's total debit is the principal and nothing else.
 
-The fee is denominated at 18 decimals, so it is NEVER stored as an integer of base units or passed through a float. It is carried as an exact decimal string (`networkFee` from the rail) into `quoted_network_fee`, `actual_network_fee` and `StudentTuitionPayment.network_fee`, which are string columns for that reason. Fees of ~0.03 USDC overflow 6-decimal base-unit arithmetic in either direction. The fee ceiling is derived UP (`RoundingMode::Ceiling`), so a wallet holding exactly the quoted total is never a few base units short.
+Measured on three real relayed ARC-TESTNET transfers (treasury → vendor):
+
+| tx | principal | payer's balance delta | receipt fee |
+| --- | --- | --- | --- |
+| `0x9e358757…` | 30.00 | 30.000000000000000000 | 0.006351425 |
+| `0x94411f09…` | 45.00 | 45.000000000000000000 | 0.003811550 |
+| `0xcecac1d9…` | 0.01 | 0.010000000000000000 | 0.003185650 |
+
+Delta minus principal is **zero** in all three. The receipt fee is real but it is Circle's cost: a second Transfer log shows the relay contract reimbursing the relayer.
+
+Two consequences that are easy to get backwards:
+
+- **Affordability is `amount <= balance`, not `amount + fee <= balance`.** A previous rule required the wallet to hold nothing beyond the total, which made a normally funded 20 USDC wallet unable to send 5 USDC — it was bounding an account that pays no gas.
+- **The receipt fee must never be able to refuse a settlement.** It is not the payer's cost, so comparing it against the payer's accepted ceiling can reject a payment that genuinely settled: the student pays, the debt stands, and nothing repairs it. Record the fee as metadata and gate on *who paid* it.
+
+`FeeGuarantee` exists because of this. `SignerEnforced` (the transaction caps the fee) and `RelayerSponsored` (the rail pays it, so the payer's debit is the principal) are **different facts with different arithmetic**, not a strong and a weak form of one thing. `Unbounded` is refused before the signer, and a transport that does not implement the capability interface is read as `Unbounded`, not as "probably fine".
 
 A fee the rail will not report is a refusal, never a figure: `readFee()` throws on an unreadable, malformed, zero or non-string `networkFee` instead of falling back to `'0.000000'`. A payer told a transfer is free will be charged one.
 
@@ -32,8 +47,10 @@ The recipient is read from `config('lepton.arc.treasury')` on the server and is 
 
 A Circle agent wallet returns a transaction **id**, not a hash, so `provider_handle` and `provider_reference` are different columns and a hash-only predicate would read an in-flight payment as a fabricated one. `TransportResolution::pending()` is an ordinary state, not a failure; only a completed resolution may set `provider_reference`, and it must match `/^0x[0-9a-fA-F]{64}$/`. Observation is bounded by `max_observations` and requires an explicit `observe_enabled` flag; exhausting it parks the attempt for a human. If the handle was lost, the attempt goes to operator review and is never re-sent.
 
-## A fee ceiling must be enforced by the signer, not estimated afterwards
-`FeeBoundedPaymentTransport::supportsFeeCeiling()` is the gate: `StudentTuitionPaymentProcessor` refuses to call a rail that cannot enforce the accepted `max_fee_base_units`, and `CircleAgentWalletTransport::submit()` throws when a `max_fee_base_units` key is present because the installed `circle wallet transfer` exposes no enforceable cap. A `--estimate` quote is a prediction, not a spending limit, so quoting one and then sending unbounded is not a bounded payment. Preflight also re-reads the fee, refuses a current quote above the accepted ceiling, and re-checks a fresh balance against the accepted total immediately before the claim.
+## A cap the rail cannot apply must be refused, never silently dropped
+`CircleAgentWalletTransport::submit()` throws whenever `max_fee_base_units` is present, because the installed `circle wallet transfer` exposes no fee or gas-limit flag — `maxFeePerGas` only appears in the CLI's *local-wallet* path, never the agent relay. An earlier version threw only when the rail claimed `SignerEnforced`, a condition that could never hold there, so the cap travelled to the CLI and was discarded while the caller believed it had been honoured.
+
+An `--estimate` is a prediction, not a spending limit, so quoting one and then sending unbounded is not a bounded payment. Preflight re-reads the fee and refuses a current quote above the accepted ceiling — but that ceiling bounds the *payer's* loss only on a rail where the payer pays, so `assertLossBounded()` selects the required balance from `FeeGuarantee` rather than always adding the ceiling.
 
 ## A signer requires two independent human decisions before it may run
 Both `eduflow.student_tuition.enabled` and the absence of `stop_switch` must hold, and `investigation_owner_id` must name a verified-email user holding `finance_officer`/`admin`/`super_admin` who is not the payer. Consent alone is not authority to sign: the owner decides recovery, the payer consents to the bounded transfer, and `AuthGateway::isAuthenticatedFor('ARC-TESTNET')` must already be true. Nothing in this lane ever calls `beginLogin()`/`completeLogin()` — the OTP needs a human.

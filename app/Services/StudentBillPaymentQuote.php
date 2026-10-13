@@ -5,9 +5,9 @@ declare(strict_types=1);
 namespace App\Services;
 
 use App\Ai\Advisory\AdvisoryEnvelope;
-use App\DTOs\BillPolicyContext;
 use App\DTOs\BillPolicyDecision;
 use App\DTOs\WalletReadState;
+use App\Enums\AgentDecisionType;
 use App\Enums\StudentBillCategory;
 use App\Models\Organization;
 use App\Models\PaymentIntent;
@@ -59,18 +59,39 @@ use Yukazakiri\Lepton\Gateways\FakeLeptonGateway;
  *
  * ## A student may always pay what they owe
  *
- * The deterministic `BillPaymentPolicy` governs whether a payment may be
- * released *unattended*. Anything other than `AUTO_APPROVE` is still quotable
- * and still consentable — refusing to let a student settle their own debt
- * because an institutional automation rule is not satisfied would be the wrong
- * kind of safety — so the verdict is recorded on the quote and exposed through
- * {@see StudentBillPayment::isEligibleForUnattendedSubmission()} instead.
+ * `consent()` is available for every non-void payable bill, whatever the
+ * assessment recorded on the quote says. Refusing to let a student settle their
+ * own debt because an institutional rule is not satisfied would be the wrong
+ * kind of safety.
  *
- * No advisory classification is sought here. `AdvisoryGate::classifyBill()`
+ * ## The assessment on this quote is triage metadata, never spend authority
+ *
+ * `BillPaymentPolicy` decides whether the **institution** may release its own
+ * funds unattended. This lane is the other direction: a student pays a fee they
+ * owe, so evaluating that policy here asked institutional questions with
+ * answers the caller does not have — whose balance is the reserve, which vendor
+ * has a reviewed destination — and filled the gaps with the payer's own funds
+ * and a configured treasury address. That produced `AUTO_APPROVE`,
+ * `requires_human_approval = false` and `isEligibleForUnattendedSubmission()`
+ * true on a student's receipt: institutional permission to release the
+ * treasury, manufactured from a payment that arrives at it.
+ *
+ * So the policy is **not** evaluated here. What is recorded is an assessment of
+ * the classification alone — is there one, is it confident, is it anomaly-free,
+ * is the recorded category on the policy's own allow-list — for a bursar
+ * triaging the queue, carrying {@see AgentDecisionType::ADVISORY_CLASSIFICATION}
+ * and never an approval. The thresholds and the codes still come from the
+ * policy, so there is one place they are defined. Every row states
+ * `authorizes_outgoing_spend = false` under
+ * {@see StudentBillPayment::SPEND_ASSESSMENT_SCOPE}, and PLAN §17.2 correction 4
+ * is why that is not negotiable: "an incoming payment still does not approve use
+ * of funds".
+ *
+ * No advisory classification is sought here either. `AdvisoryGate::classifyBill()`
  * prompts a model, and a model must never sit on the critical path of a payment,
  * so the caller may pass a classification that was already produced and
- * sanitized elsewhere. Absent one, the policy reads `unknown` and escalates,
- * which is the only safe direction for a missing classification.
+ * sanitized elsewhere. Absent one, the assessment reads `unknown`, which is the
+ * only safe direction for a missing classification.
  */
 final readonly class StudentBillPaymentQuote
 {
@@ -148,7 +169,7 @@ final readonly class StudentBillPaymentQuote
             throw ValidationException::withMessages(['amount_base_units' => 'Wallet cannot cover this principal plus the network fee ceiling.']);
         }
 
-        $decision = $this->decide($bill, $amountBaseUnits, $available, $recipient, $advisory);
+        $assessment = $this->assess($bill, $advisory);
         $snapshot = [
             'schema_version' => 1,
             'purpose' => StudentBillPayment::PURPOSE,
@@ -174,34 +195,48 @@ final readonly class StudentBillPaymentQuote
             'chain' => StudentBillPayment::CHAIN,
             'chain_id' => StudentBillPayment::CHAIN_ID,
             'simulated' => $simulated,
-            'policy_decision' => $decision->decision->value,
-            'policy_code' => $decision->policyCode,
-            'requires_human_approval' => $decision->blocksUnattendedPayment(),
+            // The assessment below is triage metadata. It is recorded under its
+            // own decision type, it authorises nothing, and the row says so in
+            // the two keys below so no reader has to infer it from the verdict.
+            'policy_decision' => $assessment->decision->value,
+            'policy_code' => $assessment->policyCode,
+            'requires_human_approval' => true,
+            'authorizes_outgoing_spend' => false,
+            'outgoing_spend_assessment_scope' => StudentBillPayment::SPEND_ASSESSMENT_SCOPE,
             'quoted_at' => now()->utc()->toIso8601String(),
             'expires_at' => now()->utc()->addSeconds(self::QUOTE_SECONDS)->toIso8601String(),
             'consent_text' => StudentBillPayment::CONSENT_TEXT,
         ];
 
-        $payment = StudentBillPayment::query()->create([
-            'request_key' => $snapshot['request_key'],
-            'organization_id' => $institution->id,
-            'quoted_for' => $student->user_id,
-            'student_bill_id' => $bill->id,
-            'student_id' => $student->id,
-            'student_wallet_id' => $wallet->id,
-            'amount_base_units' => $amountBaseUnits,
-            'payer_address' => $snapshot['payer_address'],
-            'recipient_address' => $recipient,
-            'chain' => StudentBillPayment::CHAIN,
-            'policy_decision' => $snapshot['policy_decision'],
-            'policy_code' => $decision->policyCode,
-            'requires_human_approval' => $snapshot['requires_human_approval'],
-            'simulated' => $simulated,
-            'snapshot' => $snapshot,
-            'snapshot_digest' => PaymentIntent::digest($snapshot),
-        ]);
+        return DB::transaction(function () use ($snapshot, $bill, $student, $wallet, $recipient, $simulated, $institution, $amountBaseUnits): array {
+            // Re-read the bill under a lock, so two mounts racing for the same
+            // bill cannot both conclude there is no earlier payment to wait for.
+            $locked = StudentBill::query()->whereKey($bill->id)->lockForUpdate()->firstOrFail();
+            $this->assertNoUnresolvedPaymentForBill($locked);
 
-        return $this->quoteData($payment);
+            $payment = StudentBillPayment::query()->create([
+                'request_key' => $snapshot['request_key'],
+                'organization_id' => $institution->id,
+                'quoted_for' => $student->user_id,
+                'student_bill_id' => $bill->id,
+                'student_id' => $student->id,
+                'student_wallet_id' => $wallet->id,
+                'amount_base_units' => $amountBaseUnits,
+                'payer_address' => $snapshot['payer_address'],
+                'recipient_address' => $recipient,
+                'chain' => StudentBillPayment::CHAIN,
+                'policy_decision' => $snapshot['policy_decision'],
+                'policy_code' => $snapshot['policy_code'],
+                // Not the assessment's flag: this row is an incoming receipt,
+                // and an incoming receipt never releases institutional funds.
+                'requires_human_approval' => true,
+                'simulated' => $simulated,
+                'snapshot' => $snapshot,
+                'snapshot_digest' => PaymentIntent::digest($snapshot),
+            ]);
+
+            return $this->quoteData($payment);
+        }, 3);
     }
 
     /**
@@ -374,6 +409,13 @@ final readonly class StudentBillPaymentQuote
      *    instant. An amount larger than the remainder settles only the
      *    remainder and the excess is recorded as an overpayment, because money
      *    owed back to a student is a liability, not settled debt.
+     *  - A withdrawn bill owes nothing, so nothing may be applied to it at all:
+     *    the whole arriving amount becomes that overpayment. Crediting a void
+     *    charge would resurrect it as settled debt, and `syncStatus()` would
+     *    then read a withdrawn bill as paid.
+     *  - A bill that is no longer this student's is refused outright rather than
+     *    credited for nothing, because a payment against someone else's charge
+     *    is a question for a person, not a row to record.
      *  - It writes no `Transaction` and moves no wallet balance. The money moved
      *    when the transfer settled; this only allocates a settlement against a
      *    debt. Counting it twice — as a chain balance and again as a ledger
@@ -418,7 +460,14 @@ final readonly class StudentBillPaymentQuote
                 ]);
             }
 
-            $applied = min($stored->amount_base_units, max(0, $bill->remainingAmount()));
+            // A bill the registrar withdrew, after the payer already consented,
+            // is the case the arithmetic above would get wrong: it has a
+            // remaining balance, so the ordinary split would apply part of the
+            // arrival to a charge that no longer exists.
+            $applied = $bill->status === StudentBill::STATUS_VOID
+                ? 0
+                : min($stored->amount_base_units, max(0, $bill->remainingAmount()));
+
             $stored->update([
                 'movement_key' => $movementKey,
                 'applied_base_units' => $applied,
@@ -519,66 +568,152 @@ final readonly class StudentBillPaymentQuote
     }
 
     /**
-     * The deterministic verdict for this bill, evaluated from plain values.
+     * The classification assessment recorded on an incoming receipt.
      *
-     * Two context fields deserve their reasoning spelled out:
+     * Deliberately **not** `$this->policy->evaluate()`. That policy answers
+     * "may the institution release funds unattended", and four of its checks are
+     * institutional facts this lane does not have:
      *
-     *  - `availableBalanceBaseUnits` is the **payer's** balance, not the
-     *    institution's. This lane's payer is the student and its recipient is
-     *    the college, so the reserve floor is the liquidity the student must
-     *    keep, and the quote has already refused any amount the balance cannot
-     *    cover once the fee ceiling is added. No institutional reserve is
-     *    configured here, so the floor is zero and the policy's own ceilings
-     *    stay in force.
-     *  - `hasVerifiedVendorDestination` is true because the destination is the
-     *    configured treasury that {@see self::recipientAddress()} refuses to
-     *    produce without one. The lane never falls back to a generated address.
+     *  - `availableBalanceBaseUnits` / `minimumReserveBaseUnits`. The reserve
+     *    floor belongs to the treasury, and the balance reaching this lane is
+     *    the *payer's*. Answering an institutional reserve question with a
+     *    student's wallet balance is the inverse-direction nonsense this method
+     *    exists to remove, so neither is passed at all.
+     *  - `hasVerifiedVendorDestination`. There is no vendor: the recipient is
+     *    the college's own treasury, which becomes a reviewed vendor
+     *    destination only through `VendorDestinationVersion` (PLAN §14.3.5).
+     *    A configured treasury address is not one, so this lane never claims a
+     *    destination it has not reviewed.
+     *  - the per-bill ceiling and the day's unattended outflow cap. Both bound
+     *    institutional money leaving unattended; a student's own fee leaves
+     *    their own wallet, and it leaves once, against a consent they gave for
+     *    that exact amount.
      *
-     * `spentTodayBaseUnits` counts only what the policy itself let release
-     * unattended, so the day's cap bounds unattended outflow rather than being
-     * consumed by payments a person already authorised.
+     * What survives is the part that is genuinely about this bill and is useful
+     * to a person triaging the queue: is there a classification, is it
+     * confident, is it anomaly-free, and is the category the registrar
+     * recorded on the policy's own allow-list. The thresholds and the codes
+     * come from the policy, so they are still defined in exactly one place, and
+     * the order is the policy's own: flags, then absence, then doubt, then
+     * category.
+     *
+     * Every outcome is {@see AgentDecisionType::ADVISORY_CLASSIFICATION} with
+     * `approvedAmountBaseUnits` of `0` and `requiresHumanApproval` of `true`.
+     * The first says what the value is; the second is a safety property of this
+     * method, not a conclusion reached by a check that does not exist here.
      */
-    private function decide(
-        StudentBill $bill,
-        int $amountBaseUnits,
-        int $available,
-        string $recipient,
-        ?AdvisoryEnvelope $advisory,
-    ): BillPolicyDecision {
-        // Read once, so the context states plainly what is known: no
-        // classification means the policy is told so and escalates.
-        $advisoryCategory = $advisory instanceof AdvisoryEnvelope ? $advisory->category : null;
-        $advisoryConfidence = $advisory instanceof AdvisoryEnvelope ? $advisory->confidence : null;
-        $advisoryFlags = $advisory instanceof AdvisoryEnvelope ? $advisory->anomalyFlags : [];
+    private function assess(StudentBill $bill, ?AdvisoryEnvelope $advisory): BillPolicyDecision
+    {
+        // Read once, so the assessment states plainly what is known: no
+        // classification means nobody classified this bill.
+        $classified = $advisory instanceof AdvisoryEnvelope && $advisory->isBillClassification();
+        $confidence = $advisory instanceof AdvisoryEnvelope ? $advisory->confidence : null;
+        $flags = $advisory instanceof AdvisoryEnvelope ? $advisory->anomalyFlags : [];
+        $category = $bill->category->value;
+        $floor = $this->policy->advisoryConfidenceFloor();
 
-        return $this->policy->evaluate(new BillPolicyContext(
-            amountBaseUnits: $amountBaseUnits,
-            availableBalanceBaseUnits: $available,
-            minimumReserveBaseUnits: 0,
-            // Zero means "no institutional limit supplied", which leaves the
-            // policy's own built-in ceilings in force rather than widening them.
-            autoPayCeilingBaseUnits: 0,
-            dailyCapBaseUnits: 0,
-            spentTodayBaseUnits: $this->spentTodayBaseUnits(),
-            category: $bill->category->value,
-            categoryAllowListed: in_array($bill->category->value, $this->policy->allowedCategories(), true),
-            hasVerifiedVendorDestination: $recipient !== '0x'.str_repeat('0', 40),
-            allowedCategories: $this->policy->allowedCategories(),
-            advisoryCategory: $advisoryCategory,
-            advisoryConfidence: $advisoryConfidence,
-            advisoryAnomalyFlags: $advisoryFlags,
-        ));
+        $checks = [
+            'advisory_present' => $classified,
+            'advisory_confident' => $classified && $confidence !== null && $confidence >= $floor,
+            'advisory_anomaly_free' => $flags === [],
+            // The recorded category only. Advisory confidence never grants a
+            // category, exactly as in the policy itself.
+            'category_allow_listed' => in_array($category, $this->policy->allowedCategories(), true),
+        ];
+
+        if ($flags !== []) {
+            return $this->assessment(
+                BillPaymentPolicy::CODE_ADVISORY_ANOMALY_FLAGS,
+                'The classification raised anomalies ('.implode(', ', $flags).'), so the bill needs a person before anything is done with it.',
+                ['Advisory anomaly flags present: '.implode(', ', $flags).'.'], $checks,
+            );
+        }
+
+        if (! $classified) {
+            return $this->assessment(
+                BillPaymentPolicy::CODE_ADVISORY_MISSING,
+                'Nobody classified this bill. Absence is treated as unknown rather than as permission, so it is flagged for a person.',
+                ['No advisory classification was supplied for this bill.'], $checks,
+            );
+        }
+
+        if (! $checks['advisory_confident']) {
+            return $this->assessment(
+                BillPaymentPolicy::CODE_ADVISORY_CONFIDENCE,
+                'The classification is below the confidence the policy requires ('.number_format($floor, 2, '.', '').'), so it is recorded as unsure.',
+                ['Advisory confidence is below the floor of '.number_format($floor, 2, '.', '').'.'], $checks,
+            );
+        }
+
+        if (! $checks['category_allow_listed']) {
+            return $this->assessment(
+                BillPaymentPolicy::CODE_CATEGORY_NOT_ALLOWED,
+                "Bill category '{$category}' is not on the policy's reviewed list, so a person should read it.",
+                ["Category '{$category}' is not on the reviewed list."], $checks,
+            );
+        }
+
+        return $this->assessment(
+            StudentBillPayment::CODE_INBOUND_ADVISORY_ONLY,
+            'The classification is confident, anomaly-free and in a reviewed category. That makes this bill ordinary to triage; it authorises nothing.',
+            [], $checks,
+        );
     }
 
-    /** What the lane has already committed to release unattended today. */
-    private function spentTodayBaseUnits(): int
+    /**
+     * Wrap one assessment conclusion.
+     *
+     * @param  array<string, bool>  $checks
+     * @param  list<string>  $violations
+     */
+    private function assessment(string $policyCode, string $reasoning, array $violations, array $checks): BillPolicyDecision
     {
-        return (int) StudentBillPayment::query()
-            ->where('requires_human_approval', false)
-            ->where('simulated', false)
+        return new BillPolicyDecision(
+            decision: AgentDecisionType::ADVISORY_CLASSIFICATION,
+            approvedAmountBaseUnits: 0,
+            requiresHumanApproval: true,
+            policyCode: $policyCode,
+            reasoning: $reasoning,
+            violations: $violations,
+            checks: $checks,
+        );
+    }
+
+    /**
+     * Refuse a second quote for a bill whose first payment has no outcome yet.
+     *
+     * Two consents on one bill is the unknown-outcome hole. The payer has
+     * authorised twice, one transfer may be in flight or lost, and the second
+     * pair of funds has no evidence of its own — so the outcome of one is
+     * guessed from the other. The lane already treats an unproven movement as
+     * something to investigate rather than resend; the same has to hold for
+     * consent itself.
+     *
+     * Unresolved means consented and not yet settled, allocated or rehearsed.
+     * An allocated payment is finished and its debt has moved, so a genuinely
+     * further payment is then legitimate. A rehearsal settles nothing by
+     * construction, so it must not wedge the real payment behind it forever.
+     *
+     * Replay is not a second payment: {@see self::quote()} returns the stored
+     * quote when handed the original `request_key`, so a retried form or a
+     * double-submitted button reads its own row back rather than minting a new
+     * consent.
+     */
+    private function assertNoUnresolvedPaymentForBill(StudentBill $bill): void
+    {
+        $unresolved = StudentBillPayment::query()
+            ->where('student_bill_id', $bill->id)
             ->whereNotNull('consented_at')
-            ->whereBetween('consented_at', [now()->startOfDay(), now()])
-            ->sum('amount_base_units');
+            ->whereNull('settlement_evidence_digest')
+            ->whereNull('allocated_at')
+            ->where('simulated', false)
+            ->exists();
+
+        if ($unresolved) {
+            throw ValidationException::withMessages([
+                'amount_base_units' => 'This bill already has a payment with no outcome yet. Reopen that quote to check it; a second payment waits until the first is allocated.',
+            ]);
+        }
     }
 
     private function assertOwner(StudentBillPayment $payment, Student $student, StudentBill $bill, int $amountBaseUnits): void
@@ -610,6 +745,10 @@ final readonly class StudentBillPaymentQuote
             // to whatever this returns now.
             'remaining_base_units' => StudentBill::query()->findOrFail($payment->student_bill_id)->remainingAmount(),
             'category_label' => StudentBillCategory::from($s['bill_category'])->label(),
+            // Read from the row, not from the snapshot, so a quote mounted
+            // before the marker existed also answers this honestly.
+            'authorizes_outgoing_spend' => $payment->authorizesOutgoingSpend(),
+            'outgoing_spend_assessment_scope' => StudentBillPayment::SPEND_ASSESSMENT_SCOPE,
             'eligible_for_unattended_submission' => $payment->isEligibleForUnattendedSubmission(),
         ];
     }

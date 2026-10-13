@@ -37,6 +37,10 @@ use Yukazakiri\Lepton\Support\Amounts;
  *  3. {@see self::hasValidSettlement()} — the persisted chain proof, written
  *     once and never rewritten.
  *
+ * The classification assessment those layers carry is triage metadata and
+ * nothing more: see {@see self::SPEND_ASSESSMENT_SCOPE}. Money flows *into*
+ * the college here, so no verdict on this row can authorise money flowing out.
+ *
  * @property int $id
  * @property string $request_key
  * @property string|null $movement_key
@@ -89,6 +93,27 @@ class StudentBillPayment extends Model
 
     /** Distinguishes this lane's snapshots from the tuition lane's, which are not interchangeable. */
     public const string PURPOSE = 'student_bill_testnet_payment';
+
+    /**
+     * What the recorded classification assessment on this row is for.
+     *
+     * This row is money **arriving** at the college from a student's own wallet.
+     * `BillPaymentPolicy` answers a different question — may the institution
+     * release *its* funds unattended — so its verdict, however favourable, is
+     * recorded here as staff triage metadata only. PLAN §17.2 correction 4 is
+     * explicit that an incoming payment "creates no budget allocation, policy,
+     * standing mandate or outgoing approval", and this constant is the
+     * machine-readable form of that sentence.
+     */
+    public const string SPEND_ASSESSMENT_SCOPE = 'outgoing_spend_advisory_only';
+
+    /**
+     * Why a clean classification assessment still authorises nothing.
+     *
+     * Stable and safe to persist, so a row can be read as what it is without
+     * inferring anything from the age of the code that wrote it.
+     */
+    public const string CODE_INBOUND_ADVISORY_ONLY = 'INBOUND_STUDENT_RECEIPT_ADVISORY_ONLY_V1';
 
     public const string CHAIN = 'ARC-TESTNET';
 
@@ -260,14 +285,45 @@ class StudentBillPayment extends Model
                 && preg_match('/^(?:0|[1-9][0-9]*)(?:\.[0-9]{1,18})?$/D', $s['quoted_network_fee']) === 1
                 && $s['total_base_units'] === $s['amount_base_units'] + $s['fee_ceiling_base_units']
                 && $s['available_base_units'] >= $s['total_base_units']
-                // Only a full auto-approval may move unattended. Every other
-                // verdict is a stop that a person must clear first.
-                && $this->requires_human_approval === ($s['policy_decision'] !== 'auto_approve')
+                && $this->hasValidSpendScope($s)
                 && Carbon::parse($s['expires_at'])->gt(Carbon::parse($s['quoted_at']))
                 && hash_equals($this->snapshot_digest, PaymentIntent::digest($s));
         } catch (Throwable) {
             return false;
         }
+    }
+
+    /**
+     * Whether the recorded assessment still claims what a receipt may claim.
+     *
+     * A quote mounted before {@see self::SPEND_ASSESSMENT_SCOPE} existed carries
+     * no scope marker, and its `requires_human_approval` flag tracked the
+     * policy verdict beside it. Those rows still re-derive: tightening the
+     * validator to reject them would expire the consent of every student with
+     * an outstanding quote for a reason that has nothing to do with their money,
+     * and their digests must keep matching the bytes that were actually signed
+     * for. So the marker is required only when it is present, and when it is
+     * present nothing may contradict it.
+     *
+     * @param  array<string, mixed>  $snapshot
+     */
+    private function hasValidSpendScope(array $snapshot): bool
+    {
+        $authorizes = $snapshot['authorizes_outgoing_spend'] ?? null;
+        $scope = $snapshot['outgoing_spend_assessment_scope'] ?? null;
+
+        if ($authorizes === null && $scope === null) {
+            // A pre-marker quote: the flag follows the verdict it was written
+            // with, which is the only thing that quote ever asserted.
+            return $this->requires_human_approval === ($snapshot['policy_decision'] !== 'auto_approve');
+        }
+
+        return $authorizes === false
+            && $scope === self::SPEND_ASSESSMENT_SCOPE
+            // An incoming receipt never authorises a release of institutional
+            // funds, so the flag is unconditionally true. Recording it as
+            // anything else would be a receipt asserting spend authority.
+            && $this->requires_human_approval === true;
     }
 
     /**
@@ -366,16 +422,32 @@ class StudentBillPayment extends Model
     }
 
     /**
+     * Whether this receipt authorises any release of institutional funds.
+     *
+     * Never, in any row, of any age — including a row written before
+     * {@see self::SPEND_ASSESSMENT_SCOPE} existed and recorded an
+     * `auto_approve` verdict beside `requires_human_approval = false`. The
+     * verdict was an *outbound* policy evaluation applied to an inbound
+     * receipt, so honouring it would let a student's fee payment read as
+     * permission to spend the treasury's money. PLAN §17.2 correction 4.
+     */
+    public function authorizesOutgoingSpend(): bool
+    {
+        return false;
+    }
+
+    /**
      * Whether a queue may release this payment with nobody watching.
      *
-     * Two independent refusals, either of which is enough: the deterministic
-     * bill policy did not fully auto-approve, or this is a rehearsal. A bill a
-     * student always owes may still be paid by them — this predicate governs
-     * *unattended* release, not whether the payer may pay.
+     * Always false, for the reason {@see self::authorizesOutgoingSpend()} gives.
+     * A student pays their own debt, so this row never carries institutional
+     * permission to move; the predicate is kept so a caller asking the old
+     * question gets the safe answer rather than a `null` it might read as
+     * "nothing to check".
      */
     public function isEligibleForUnattendedSubmission(): bool
     {
-        return ! $this->requires_human_approval && ! $this->simulated && $this->hasValidConsent();
+        return false;
     }
 
     /**

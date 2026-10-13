@@ -4,8 +4,10 @@ declare(strict_types=1);
 
 use App\Ai\Advisory\AdvisoryEnvelope;
 use App\Ai\Advisory\AdvisoryGate;
+use App\Enums\AgentDecisionType;
 use App\Enums\StudentBillCategory;
 use App\Models\Organization;
+use App\Models\PaymentIntent;
 use App\Models\Student;
 use App\Models\StudentBill;
 use App\Models\StudentBillPayment;
@@ -16,7 +18,9 @@ use App\Services\BillPaymentPolicy;
 use App\Services\Payments\AsyncPaymentTransport;
 use App\Services\StudentBillPaymentQuote;
 use Brick\Math\BigInteger;
+use Illuminate\Support\Arr;
 use Illuminate\Support\Facades\Bus;
+use Illuminate\Support\Str;
 use Illuminate\Validation\ValidationException;
 use LogicException;
 use Mockery\MockInterface;
@@ -197,6 +201,10 @@ test('a quote binds the exact principal, the bill and a digest', function (): vo
         ->and($quote['expires_at'])->not->toBe($quote['quoted_at'])
         ->and($quote['consent_text'])->toBe(StudentBillPayment::CONSENT_TEXT)
         ->and($quote['purpose'])->toBe(StudentBillPayment::PURPOSE)
+        // Money is arriving at the college, so the quote says in as many words
+        // that it grants nothing about money leaving it.
+        ->and($quote['authorizes_outgoing_spend'])->toBeFalse()
+        ->and($quote['outgoing_spend_assessment_scope'])->toBe(StudentBillPayment::SPEND_ASSESSMENT_SCOPE)
         ->and($quote['request_digest'])->toMatch('/^[0-9a-f]{64}$/');
 
     $stored = StudentBillPayment::query()->where('request_key', $quote['request_key'])->sole();
@@ -397,8 +405,13 @@ test('the same settled movement cannot be posted under a second consent', functi
     $service->recordSettlement($payment, billSettlementStub($c, $payment));
     $service->allocate($payment->fresh());
 
-    // A second consent for the identical transfer, which is what a replayed
-    // settlement would look like if the movement were the only identity.
+    // Only now is a second consent legitimate: the first payment is allocated,
+    // so its outcome is known and the debt has already moved by 5.000000. A
+    // second consent while the first had no outcome is refused instead — see
+    // "a second consent for a bill with no outcome yet is refused" below.
+    //
+    // A second consent for the identical transfer is still what a replayed
+    // settlement looks like if the movement were the only identity.
     $twin = billConsent($c, 5_000_000);
     $service->recordSettlement($twin, billSettlementStub($c, $twin));
 
@@ -424,6 +437,7 @@ test('a rehearsal is recorded as a rehearsal and allocates nothing', function ()
         // fabricated one — and it says nothing settled.
         ->and($payment->snapshot['quoted_network_fee'])->toBe('0.000000')
         ->and($payment->hasValidSettlement())->toBeFalse()
+        ->and($payment->authorizesOutgoingSpend())->toBeFalse()
         ->and($payment->isEligibleForUnattendedSubmission())->toBeFalse();
 
     expect(fn () => $service->recordSettlement($payment, '0x'.str_repeat('f', 64)))
@@ -435,76 +449,226 @@ test('a rehearsal is recorded as a rehearsal and allocates nothing', function ()
         ->and($payment->fresh()->allocated_at)->toBeNull()
         ->and($payment->fresh()->applied_base_units)->toBe(0)
         ->and(Transaction::query()->count())->toBe(0);
+
+    // A rehearsal can never settle, so it must not wedge the bill: a further
+    // payment for the same bill is still mountable.
+    $rehearsed = $service->quote($c['student'], $c['bill'], 5_000_000);
+
+    expect($rehearsed['request_key'])->not->toBe($payment->request_key)
+        ->and($rehearsed['simulated'])->toBeTrue();
 });
 
-test('a bill the policy escalates is quotable and consentable but never unattended', function (): void {
+test('a bill the assessment cannot vouch for is still consentable, and still authorises nothing', function (): void {
     // `miscellaneous` is the catch-all the registrar falls back to, so the
-    // policy refuses to let it pay without a person whatever a classifier says.
+    // assessment cannot vouch for it whatever a classifier says. That is a
+    // reason for a person to read it, not a reason to stop the student paying.
     $c = billPaymentContext(['category' => StudentBillCategory::MISCELLANEOUS]);
     $service = app(StudentBillPaymentQuote::class);
 
     $quote = $service->quote($c['student'], $c['bill'], 5_000_000, null, billAdvisory());
 
-    expect($quote['policy_decision'])->toBe('escalate')
+    expect($quote['policy_decision'])->toBe('advisory_classification')
         ->and($quote['policy_code'])->toBe(BillPaymentPolicy::CODE_CATEGORY_NOT_ALLOWED)
         ->and($quote['requires_human_approval'])->toBeTrue()
         ->and($quote['eligible_for_unattended_submission'])->toBeFalse();
 
-    // The student may still settle their own charge.
+    // Consent is a statement by the payer about their own transfer. It does not
+    // ask for a vendor spending approval, so it is not gated on one.
     $payment = $service->consent($c['student'], $c['bill'], 5_000_000, $quote['request_key'], $quote['request_digest'], true);
 
     expect($payment->requires_human_approval)->toBeTrue()
         ->and($payment->policy_code)->toBe(BillPaymentPolicy::CODE_CATEGORY_NOT_ALLOWED)
+        ->and($payment->hasValidConsent())->toBeTrue()
         ->and($payment->isEligibleForUnattendedSubmission())->toBeFalse()
+        ->and($payment->authorizesOutgoingSpend())->toBeFalse()
         ->and($payment->hasValidSnapshot())->toBeTrue()
-        // The denial is bound into the quote, so it cannot be dropped between
-        // mounting and consenting.
-        ->and($payment->snapshot['requires_human_approval'])->toBeTrue();
+        // The assessment is bound into the quote, so it cannot be dropped
+        // between mounting and consenting.
+        ->and($payment->snapshot['requires_human_approval'])->toBeTrue()
+        ->and($payment->snapshot['policy_code'])->toBe(BillPaymentPolicy::CODE_CATEGORY_NOT_ALLOWED);
 });
 
-test('with no advisory classification the policy treats the bill as unknown and escalates', function (): void {
+test('with no advisory classification the assessment records the bill as unknown', function (): void {
     $c = billPaymentContext();
     $quote = app(StudentBillPaymentQuote::class)->quote($c['student'], $c['bill'], 5_000_000);
 
     expect(billAdvisory())->not->toBeNull()
-        ->and($quote['policy_decision'])->toBe('escalate')
+        ->and($quote['policy_decision'])->toBe('advisory_classification')
         ->and($quote['policy_code'])->toBe(BillPaymentPolicy::CODE_ADVISORY_MISSING)
-        ->and($quote['requires_human_approval'])->toBeTrue();
+        ->and($quote['requires_human_approval'])->toBeTrue()
+        ->and($quote['authorizes_outgoing_spend'])->toBeFalse();
 });
 
-test('a confident anomaly-free allow-listed bill is the only one eligible for unattended submission', function (): void {
+test('a confident anomaly-free allow-listed bill is ordinary to triage and never spend authority', function (): void {
     $c = billPaymentContext();
     $quote = app(StudentBillPaymentQuote::class)->quote($c['student'], $c['bill'], 5_000_000, null, billAdvisory());
 
-    expect($quote['policy_decision'])->toBe('auto_approve')
-        ->and($quote['policy_code'])->toBe(BillPaymentPolicy::CODE_AUTO_PAYMENT)
-        ->and($quote['requires_human_approval'])->toBeFalse()
-        // Nothing has been accepted yet, so even an auto-approved quote is not
-        // yet a submission.
+    expect($quote['policy_decision'])->toBe('advisory_classification')
+        ->and($quote['policy_code'])->toBe(StudentBillPayment::CODE_INBOUND_ADVISORY_ONLY)
+        // The old verdict here was `auto_approve` with
+        // `requires_human_approval = false`, which read as permission to release
+        // treasury funds on the strength of a payment arriving at the treasury.
+        ->and($quote['policy_decision'])->not->toBe('auto_approve')
+        ->and($quote['requires_human_approval'])->toBeTrue()
+        ->and($quote['authorizes_outgoing_spend'])->toBeFalse()
         ->and($quote['eligible_for_unattended_submission'])->toBeFalse();
 
     $payment = billConsent($c, 5_000_000, billAdvisory());
 
-    expect($payment->isEligibleForUnattendedSubmission())->toBeTrue();
+    // Consent is intact, the balance is ample and the classification is certain,
+    // and it is still not releasable unattended.
+    expect($payment->hasValidConsent())->toBeTrue()
+        ->and($payment->authorizesOutgoingSpend())->toBeFalse()
+        ->and($payment->isEligibleForUnattendedSubmission())->toBeFalse();
 });
 
-test('a wallet that would be left empty is held for a person rather than paid', function (): void {
+test('a wallet holding exactly the principal is never read as the treasury reserve', function (): void {
+    // The old verdict here was `TREASURY_RESERVE_BREACH_V1` — a *treasury* hold
+    // produced by the *student's* wallet being emptied. That is an
+    // institutional question answered with the payer's balance, so no reserve
+    // code may appear at all: this lane has no reserve to protect, and never
+    // had one to breach.
     $c = billPaymentContext();
     config(['lepton.default' => 'fake']);
     $fake = new FakeLeptonGateway;
-    // Exactly the principal and nothing else: a rehearsal charges no fee, so
-    // this is the one balance for which the reserve check can bite.
+    // Exactly the principal and nothing else: a rehearsal charges no fee.
     $fake->seedBalance($c['student']->payout_address, 5_000_000);
     app()->instance(ArcNetworkGateway::class, $fake);
     app()->instance(WalletGateway::class, $fake);
 
     $quote = app(StudentBillPaymentQuote::class)->quote($c['student'], $c['bill'], 5_000_000, null, billAdvisory());
 
-    expect($quote['policy_decision'])->toBe('hold')
-        ->and($quote['policy_code'])->toBe(BillPaymentPolicy::CODE_RESERVE_BREACH)
+    expect($quote['policy_decision'])->toBe('advisory_classification')
+        ->and($quote['policy_code'])->toBe(StudentBillPayment::CODE_INBOUND_ADVISORY_ONLY)
+        ->and($quote['policy_code'])->not->toBe(BillPaymentPolicy::CODE_RESERVE_BREACH)
+        ->and($quote['available_base_units'])->toBe(5_000_000)
         ->and($quote['requires_human_approval'])->toBeTrue()
-        ->and($quote['eligible_for_unattended_submission'])->toBeFalse();
+        ->and($quote['authorizes_outgoing_spend'])->toBeFalse();
 });
+
+test('a second consent for a bill with no outcome yet is refused, and a replay is not a second payment', function (): void {
+    $c = billPaymentContext();
+    $service = app(StudentBillPaymentQuote::class);
+    $payment = billConsent($c, 5_000_000);
+
+    // Replaying the SAME request key reads the mounted quote back rather than
+    // minting a second one, so a double-submitted button is not a second
+    // payment.
+    $replay = $service->quote($c['student'], $c['bill'], 5_000_000, $payment->request_key);
+
+    expect($replay['request_digest'])->toBe($payment->snapshot_digest)
+        ->and($replay['authorizes_outgoing_spend'])->toBeFalse()
+        ->and(StudentBillPayment::query()->count())->toBe(1);
+
+    // A NEW request key for the same bill is refused while the first payment
+    // has no outcome: two consents authorise two transfers whose results cannot
+    // be told apart, and the lane treats an unproven movement as something to
+    // investigate rather than resend.
+    expect(fn () => $service->quote($c['student'], $c['bill'], 5_000_000))
+        ->toThrow(ValidationException::class, 'already has a payment with no outcome yet')
+        ->and(StudentBillPayment::query()->count())->toBe(1)
+        ->and($c['bill']->fresh()->paid_base_units)->toBe(0);
+
+    // Only once the first is proven and allocated is a further payment a
+    // legitimate one: its outcome is known and the debt has already moved.
+    $service->recordSettlement($payment, billSettlementStub($c, $payment));
+    $service->allocate($payment->fresh());
+    $c['bill']->refresh();
+
+    $second = $service->quote($c['student'], $c['bill'], 5_000_000, null, billAdvisory());
+    $consented = $service->consent($c['student'], $c['bill'], 5_000_000, $second['request_key'], $second['request_digest'], true);
+
+    expect($consented->id)->not->toBe($payment->id)
+        ->and($consented->hasValidConsent())->toBeTrue()
+        ->and(StudentBillPayment::query()->count())->toBe(2)
+        ->and($c['bill']->fresh()->remainingAmount())->toBe(145_000_000);
+});
+
+test('a bill withdrawn after the payer consented is credited nothing and owes the student the whole arrival', function (): void {
+    $c = billPaymentContext();
+    $service = app(StudentBillPaymentQuote::class);
+    $payment = billConsent($c, 5_000_000);
+    $service->recordSettlement($payment, billSettlementStub($c, $payment));
+
+    // The registrar withdraws the charge while the transfer is in flight. The
+    // bill still has a remaining balance, so the ordinary split would have
+    // applied part of the arrival to a charge that no longer exists.
+    $c['bill']->update(['status' => StudentBill::STATUS_VOID]);
+
+    $allocated = $service->allocate($payment->fresh());
+
+    expect($allocated->isAllocated())->toBeTrue()
+        ->and($allocated->applied_base_units)->toBe(0)
+        ->and($allocated->overpayment_base_units)->toBe(5_000_000)
+        ->and($allocated->overpayment())->toBe('5.0 USDC')
+        ->and($c['bill']->fresh()->paid_base_units)->toBe(0)
+        ->and($c['bill']->fresh()->status)->toBe(StudentBill::STATUS_VOID);
+});
+
+test('a bill that is no longer the paying students is refused and credited nothing', function (): void {
+    $c = billPaymentContext();
+    $service = app(StudentBillPaymentQuote::class);
+    $payment = billConsent($c, 5_000_000);
+    $service->recordSettlement($payment, billSettlementStub($c, $payment));
+
+    // The charge is reassigned to another student after the payer consented. It
+    // is not this student's debt, so nothing may be allocated against it.
+    $c['bill']->update(['student_id' => Student::factory()->create()->id]);
+
+    expect(fn () => $service->allocate($payment->fresh()))
+        ->toThrow(ValidationException::class, 'not this student\'s')
+        ->and($c['bill']->fresh()->paid_base_units)->toBe(0)
+        ->and($c['bill']->fresh()->status)->toBe(StudentBill::STATUS_OPEN)
+        ->and($payment->fresh()->allocated_at)->toBeNull()
+        ->and($payment->fresh()->applied_base_units)->toBe(0);
+});
+
+test('no payer wealth, no category and no classifier confidence grants spend authority', function (
+    StudentBillCategory $category,
+    int $balance,
+    array $advisoryOverrides,
+    string $expectedCode,
+): void {
+    $c = billPaymentContext(['category' => $category, 'balance' => $balance]);
+    $service = app(StudentBillPaymentQuote::class);
+
+    $quote = $service->quote($c['student'], $c['bill'], 5_000_000, null, billAdvisory($advisoryOverrides));
+
+    expect($quote['policy_decision'])->toBe('advisory_classification')
+        ->and($quote['policy_code'])->toBe($expectedCode)
+        ->and($quote['requires_human_approval'])->toBeTrue()
+        ->and($quote['authorizes_outgoing_spend'])->toBeFalse()
+        ->and($quote['outgoing_spend_assessment_scope'])->toBe(StudentBillPayment::SPEND_ASSESSMENT_SCOPE)
+        ->and($quote['eligible_for_unattended_submission'])->toBeFalse();
+
+    $payment = $service->consent($c['student'], $c['bill'], 5_000_000, $quote['request_key'], $quote['request_digest'], true);
+
+    expect($payment->hasValidConsent())->toBeTrue()
+        ->and($payment->requires_human_approval)->toBeTrue()
+        ->and($payment->authorizesOutgoingSpend())->toBeFalse()
+        ->and($payment->isEligibleForUnattendedSubmission())->toBeFalse();
+})->with([
+    // The wallet balance is the PAYER's own money, so these four say the same
+    // thing about spend authority from four directions.
+    'a very rich student, a reviewed category, a certain classifier' => [
+        StudentBillCategory::LABORATORY, 100_000_000, [], StudentBillPayment::CODE_INBOUND_ADVISORY_ONLY,
+    ],
+    'a reviewed category with a hesitant classifier' => [
+        StudentBillCategory::EXAMINATION, 100_000_000, ['confidence' => 0.4], BillPaymentPolicy::CODE_ADVISORY_CONFIDENCE,
+    ],
+    'a reviewed category the classifier itself flagged' => [
+        StudentBillCategory::LABORATORY, 100_000_000, ['anomaly_flags' => ['recurring_unexpected']], BillPaymentPolicy::CODE_ADVISORY_ANOMALY_FLAGS,
+    ],
+    'an unreviewed category with a certain classifier' => [
+        StudentBillCategory::MISCELLANEOUS, 100_000_000, [], BillPaymentPolicy::CODE_CATEGORY_NOT_ALLOWED,
+    ],
+    // A wallet holding exactly the principal plus the ceiling: the old
+    // `reserve_protected` check evaluated this student's own funds against the
+    // treasury's reserve floor and held the payment for a person as a result.
+    'a wallet holding exactly the principal and the fee ceiling' => [
+        StudentBillCategory::LABORATORY, 5_029_452, [], StudentBillPayment::CODE_INBOUND_ADVISORY_ONLY,
+    ],
+]);
 
 test('a bill amount cannot be rewritten once money is applied, and the allocation path does not try', function (): void {
     $c = billPaymentContext();
@@ -564,8 +728,17 @@ test('allocation refuses a payment whose proof is not intact', function (): void
         ->and($consented->fresh()->allocated_at)->toBeNull();
 
     // Proven for a different principal than the one consented: the chain says
-    // 1.000000 moved, so nothing is stored and nothing may be allocated.
-    $other = billConsent($c, 5_000_000);
+    // 1.000000 moved, so nothing is stored and nothing may be allocated. This
+    // runs on a second bill, because the first bill's consent is now itself an
+    // unresolved payment and the lane refuses a second one against it.
+    $otherBill = StudentBill::factory()->for($c['student'])->create([
+        'amount_base_units' => 5_000_000, 'paid_base_units' => 0, 'status' => StudentBill::STATUS_OPEN,
+    ]);
+
+    expect(fn () => $service->quote($c['student'], $c['bill'], 5_000_000))
+        ->toThrow(ValidationException::class, 'already has a payment with no outcome yet');
+
+    $other = billConsent(['student' => $c['student'], 'bill' => $otherBill], 5_000_000);
     $hash = billSettlementStub($c, $other, 1_000_000);
 
     expect(fn () => $service->recordSettlement($other, $hash))
@@ -575,7 +748,8 @@ test('allocation refuses a payment whose proof is not intact', function (): void
         ->and($other->fresh()->tx_verified_on_chain)->toBeFalse()
         ->and(fn () => $service->allocate($other->fresh()))
         ->toThrow(ValidationException::class, 'exact verified movement proof')
-        ->and($c['bill']->fresh()->paid_base_units)->toBe(0);
+        ->and($c['bill']->fresh()->paid_base_units)->toBe(0)
+        ->and($otherBill->fresh()->paid_base_units)->toBe(0);
 });
 
 test('a reverted receipt proves nothing and is never recorded as a settlement', function (): void {
@@ -639,5 +813,57 @@ test('the factory mints a row whose quote re-derives from its own columns', func
     expect($rehearsal->hasValidSnapshot())->toBeTrue()
         ->and($rehearsal->isRehearsal())->toBeTrue()
         ->and($rehearsal->hasValidSettlement())->toBeFalse()
+        ->and($rehearsal->authorizesOutgoingSpend())->toBeFalse()
         ->and($rehearsal->isEligibleForUnattendedSubmission())->toBeFalse();
+});
+
+test('a quote minted before the scope marker existed still re-derives, and still grants nothing', function (): void {
+    $legacy = StudentBillPayment::factory()->create();
+
+    // Shaped exactly like a quote mounted before the marker existed: no scope
+    // keys, an `auto_approve` verdict and `requires_human_approval = false`.
+    // Its digest covers those exact bytes, so tightening the validator to
+    // reject it would expire every outstanding consent a student already gave.
+    expect($legacy->snapshot)->not->toHaveKey('authorizes_outgoing_spend')
+        ->and($legacy->snapshot)->not->toHaveKey('outgoing_spend_assessment_scope')
+        ->and($legacy->policy_decision)->toBe('auto_approve')
+        ->and($legacy->requires_human_approval)->toBeFalse()
+        ->and($legacy->hasValidSnapshot())->toBeTrue()
+        ->and($legacy->hasValidConsent())->toBeFalse()
+        // The factory's default row carries no consent, so the two layers above
+        // the snapshot are correctly absent. What matters is that the snapshot
+        // still re-derives, so the row can still be read and still allocated.
+        ->and($legacy->consent_digest)->toBeNull()
+        // And the verdict it recorded buys nothing: an old row cannot be the
+        // one place where an inbound receipt reads as permission to spend.
+        ->and($legacy->authorizesOutgoingSpend())->toBeFalse()
+        ->and($legacy->isEligibleForUnattendedSubmission())->toBeFalse();
+});
+
+test('a quote that claims to authorise outgoing spend cannot be created at all', function (): void {
+    // An intact, well-formed row carrying everything the original quote carried.
+    // Only the two scope keys and the flag are added, and they contradict each
+    // other: nothing here is malformed except the claim of authority.
+    $row = StudentBillPayment::factory()->create();
+    $snapshot = $row->snapshot;
+    $snapshot['policy_decision'] = AgentDecisionType::AUTO_APPROVE->value;
+    $snapshot['policy_code'] = BillPaymentPolicy::CODE_AUTO_PAYMENT;
+    $snapshot['requires_human_approval'] = false;
+    $snapshot['authorizes_outgoing_spend'] = true;
+    $snapshot['outgoing_spend_assessment_scope'] = StudentBillPayment::SPEND_ASSESSMENT_SCOPE;
+
+    $attributes = Arr::except($row->getAttributes(), ['id']);
+
+    // The marker is not decorative: a row carrying it and contradicting it is
+    // refused, however well-formed the rest of its evidence is.
+    expect(fn () => StudentBillPayment::query()->create([
+        ...$attributes,
+        'request_key' => (string) Str::uuid(),
+        'policy_decision' => $snapshot['policy_decision'],
+        'policy_code' => $snapshot['policy_code'],
+        'requires_human_approval' => false,
+        'snapshot' => $snapshot,
+        'snapshot_digest' => PaymentIntent::digest($snapshot),
+    ]))->toThrow(LogicException::class, 'requires exact intact evidence')
+        ->and(StudentBillPayment::query()->count())->toBe(1);
 });
