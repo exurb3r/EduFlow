@@ -31,6 +31,10 @@ Route::get('/', fn () => Inertia::render('welcome', [
     'canRegister' => Features::enabled(Features::registration()),
 ]))->name('home');
 
+Route::get('/skills/design', fn () => Inertia::render('skills/design', [
+    'canRegister' => Features::enabled(Features::registration()),
+]))->name('skills.design');
+
 Route::get('dashboard', [StudentDashboardController::class, 'index'])->middleware(['auth', 'verified'])->name('dashboard');
 
 Route::middleware(['auth', 'verified'])->group(function (): void {
