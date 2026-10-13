@@ -16,6 +16,7 @@ use Filament\Forms\Components\TextInput;
 use Filament\Notifications\Notification;
 use Filament\Resources\Pages\ViewRecord;
 use Filament\Support\Icons\Heroicon;
+use Illuminate\Support\Facades\Gate;
 use Yukazakiri\Lepton\Contracts\ArcNetworkGateway;
 
 class ViewTuitionAccount extends ViewRecord
@@ -31,6 +32,15 @@ class ViewTuitionAccount extends ViewRecord
     }
 
     #[\Override]
+    public function getRecord(): TuitionAccount
+    {
+        /** @var TuitionAccount $record */
+        $record = parent::getRecord();
+
+        return $record;
+    }
+
+    #[\Override]
     protected function getHeaderActions(): array
     {
         return [
@@ -38,7 +48,7 @@ class ViewTuitionAccount extends ViewRecord
                 ->label('Record payment')
                 ->icon('heroicon-m-banknotes')
                 ->color('success')
-                ->visible(fn (): bool => $this->getRecord()->remainingAmount() > 0 && (auth()->user()?->can('update', $this->getRecord()) ?? false))
+                ->visible(fn (): bool => $this->getRecord()->remainingAmount() > 0 && Gate::allows('update', $this->getRecord()))
                 ->modalHeading('Record Tuition Payment')
                 ->modalDescription('Record a payment towards this student tuition account in USDC.')
                 ->modalSubmitActionLabel('Confirm payment')
@@ -54,7 +64,6 @@ class ViewTuitionAccount extends ViewRecord
                         ->placeholder('100.00'),
                 ])
                 ->action(function (array $data): void {
-                    /** @var TuitionAccount $account */
                     $account = $this->getRecord();
                     $addUnits = Money::fromDecimal((string) $data['amount'], CurrencyCode::USDC)->toBaseUnits();
 
@@ -67,7 +76,7 @@ class ViewTuitionAccount extends ViewRecord
                         return;
                     }
 
-                    $account->increment('paid_amount', $addUnits);
+                    $account->update(['paid_amount' => $account->paid_amount + $addUnits]);
 
                     Notification::make()
                         ->title('Payment recorded')
@@ -90,9 +99,9 @@ class ViewTuitionAccount extends ViewRecord
                 ->label('Student ArcScan')
                 ->icon(Heroicon::ArrowTopRightOnSquare)
                 ->color('gray')
-                ->visible(fn (): bool => filled($this->getRecord()->student->wallet?->address ?? $this->getRecord()->student->payout_address))
+                ->visible(fn (): bool => filled($this->getRecord()->student->wallet->address ?? $this->getRecord()->student->payout_address))
                 ->url(function (): ?string {
-                    $address = $this->getRecord()->student->wallet?->address ?? $this->getRecord()->student->payout_address;
+                    $address = $this->getRecord()->student->wallet->address ?? $this->getRecord()->student->payout_address;
 
                     if (! $address) {
                         return null;

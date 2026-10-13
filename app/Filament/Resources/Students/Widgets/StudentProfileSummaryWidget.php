@@ -52,7 +52,7 @@ class StudentProfileSummaryWidget extends Widget
             $initials .= Str::upper(substr($w, 0, 1));
         }
 
-        $walletAddress = $student->wallet?->address ?? $student->payout_address;
+        $walletAddress = $student->wallet->address ?? $student->payout_address;
         $explorerUrl = null;
         if ($walletAddress) {
             try {

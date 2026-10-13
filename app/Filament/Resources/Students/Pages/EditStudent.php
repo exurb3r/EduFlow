@@ -20,6 +20,15 @@ class EditStudent extends EditRecord
     protected static string $resource = StudentResource::class;
 
     #[\Override]
+    public function getRecord(): Student
+    {
+        /** @var Student $record */
+        $record = parent::getRecord();
+
+        return $record;
+    }
+
+    #[\Override]
     protected function getHeaderActions(): array
     {
         return [
@@ -28,9 +37,9 @@ class EditStudent extends EditRecord
                 ->label('Student ArcScan')
                 ->icon(Heroicon::ArrowTopRightOnSquare)
                 ->color('gray')
-                ->visible(fn (): bool => filled($this->getRecord()->wallet?->address ?? $this->getRecord()->payout_address))
+                ->visible(fn (): bool => filled($this->getRecord()->wallet->address ?? $this->getRecord()->payout_address))
                 ->url(function (): ?string {
-                    $address = $this->getRecord()->wallet?->address ?? $this->getRecord()->payout_address;
+                    $address = $this->getRecord()->wallet->address ?? $this->getRecord()->payout_address;
 
                     if (! $address) {
                         return null;

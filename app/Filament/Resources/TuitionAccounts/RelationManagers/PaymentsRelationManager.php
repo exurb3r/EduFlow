@@ -7,6 +7,7 @@ namespace App\Filament\Resources\TuitionAccounts\RelationManagers;
 use App\DTOs\Money;
 use App\Enums\CurrencyCode;
 use App\Models\StudentTuitionPayment;
+use App\Models\TuitionAccount;
 use BackedEnum;
 use Filament\Actions\Action;
 use Filament\Actions\ViewAction;
@@ -29,13 +30,16 @@ class PaymentsRelationManager extends RelationManager
 
     protected static string|BackedEnum|null $icon = Heroicon::CreditCard;
 
+    #[\Override]
     public static function getBadge(Model $ownerRecord, string $pageClass): ?string
     {
+        /** @var TuitionAccount $ownerRecord */
         $count = $ownerRecord->payments()->count();
 
         return $count > 0 ? (string) $count : null;
     }
 
+    #[\Override]
     public static function getBadgeColor(Model $ownerRecord, string $pageClass): ?string
     {
         return 'success';

@@ -8,6 +8,7 @@ use App\DTOs\Money;
 use App\Enums\CurrencyCode;
 use App\Enums\StudentTuitionPaymentState;
 use App\Models\StudentTuitionPaymentAttempt;
+use App\Models\TuitionAccount;
 use BackedEnum;
 use Filament\Actions\ViewAction;
 use Filament\Infolists\Components\TextEntry;
@@ -26,13 +27,16 @@ class PaymentAttemptsRelationManager extends RelationManager
 
     protected static string|BackedEnum|null $icon = Heroicon::ArrowPath;
 
+    #[\Override]
     public static function getBadge(Model $ownerRecord, string $pageClass): ?string
     {
+        /** @var TuitionAccount $ownerRecord */
         $count = $ownerRecord->paymentAttempts()->count();
 
         return $count > 0 ? (string) $count : null;
     }
 
+    #[\Override]
     public static function getBadgeColor(Model $ownerRecord, string $pageClass): ?string
     {
         return 'gray';

@@ -295,12 +295,6 @@ parameters:
 			path: app/Console/Commands/EduFlowDemo.php
 
 		-
-			rawMessage: 'Call to function is_string() with string will always evaluate to true.'
-			identifier: function.alreadyNarrowedType
-			count: 1
-			path: app/Console/Commands/LeptonDoctor.php
-
-		-
 			rawMessage: 'Method App\Console\Commands\LeptonDoctor::emailHint() is unused.'
 			identifier: method.unused
 			count: 1
@@ -607,12 +601,6 @@ parameters:
 			path: app/Filament/Resources/Transactions/Pages/ViewTransaction.php
 
 		-
-			rawMessage: 'Call to function is_string() with string will always evaluate to true.'
-			identifier: function.alreadyNarrowedType
-			count: 1
-			path: app/Filament/Resources/Transactions/Pages/ViewTransaction.php
-
-		-
 			rawMessage: 'Call to static method make() on an unknown class Filament\Infolists\Components\Section.'
 			identifier: class.notFound
 			count: 3
@@ -787,6 +775,54 @@ parameters:
 			path: app/Http/Controllers/StudentAssistanceController.php
 
 		-
+			rawMessage: Access to an undefined property App\Models\StudentTuitionPayment::$created_at.
+			identifier: property.notFound
+			count: 1
+			path: app/Http/Controllers/StudentDashboardController.php
+
+		-
+			rawMessage: Access to an undefined property App\Models\Transaction::$created_at.
+			identifier: property.notFound
+			count: 1
+			path: app/Http/Controllers/StudentDashboardController.php
+
+		-
+			rawMessage: Expression on left side of ?? is not nullable.
+			identifier: nullCoalesce.expr
+			count: 2
+			path: app/Http/Controllers/StudentDashboardController.php
+
+		-
+			rawMessage: Using nullsafe method call on non-nullable type Carbon\CarbonInterface. Use -> instead.
+			identifier: nullsafe.neverNull
+			count: 1
+			path: app/Http/Controllers/StudentDashboardController.php
+
+		-
+			rawMessage: Using nullsafe property access "?->timestamp" on left side of ?? is unnecessary. Use -> instead.
+			identifier: nullsafe.neverNull
+			count: 5
+			path: app/Http/Controllers/StudentDashboardController.php
+
+		-
+			rawMessage: Using nullsafe property access on non-nullable type App\Models\AcademicTerm. Use -> instead.
+			identifier: nullsafe.neverNull
+			count: 1
+			path: app/Http/Controllers/StudentDashboardController.php
+
+		-
+			rawMessage: Using nullsafe property access on non-nullable type App\Models\StudentBill. Use -> instead.
+			identifier: nullsafe.neverNull
+			count: 1
+			path: app/Http/Controllers/StudentDashboardController.php
+
+		-
+			rawMessage: Using nullsafe property access on non-nullable type App\Models\TuitionAccount. Use -> instead.
+			identifier: nullsafe.neverNull
+			count: 1
+			path: app/Http/Controllers/StudentDashboardController.php
+
+		-
 			rawMessage: 'Strict comparison using !== between non-empty-array<string, string> and array{} will always evaluate to true.'
 			identifier: notIdentical.alwaysTrue
 			count: 1
@@ -821,12 +857,6 @@ parameters:
 			identifier: return.type
 			count: 1
 			path: app/Models/ChatSession.php
-
-		-
-			rawMessage: Type Database\Factories\StudentTuitionPaymentFactory in generic type Illuminate\Database\Eloquent\Factories\HasFactory<Database\Factories\StudentTuitionPaymentFactory> in PHPDoc tag @use is not subtype of template type TFactory of Illuminate\Database\Eloquent\Factories\Factory of trait Illuminate\Database\Eloquent\Factories\HasFactory.
-			identifier: generics.notSubtype
-			count: 1
-			path: app/Models/StudentTuitionPayment.php
 
 		-
 			rawMessage: 'Method App\Models\User::chatSessions() should return Illuminate\Database\Eloquent\Relations\HasMany<App\Models\ChatSession, $this(App\Models\User)> but returns Illuminate\Database\Eloquent\Builder<App\Models\ChatSession>.'
@@ -951,12 +981,6 @@ parameters:
 		-
 			rawMessage: 'Offset ''error'' on array{chain: string, chain_id: int, block: int|null, rpc_host: non-empty-string|null, driver: string, live_available: false, onchain_balance: null, ledger_balance: float, ...} on left side of ??= always exists and is always null.'
 			identifier: nullCoalesce.offset
-			count: 2
-			path: app/Services/LeptonTreasuryService.php
-
-		-
-			rawMessage: Using nullsafe property access "?->address" on left side of ?? is unnecessary. Use -> instead.
-			identifier: nullsafe.neverNull
 			count: 1
 			path: app/Services/LeptonTreasuryService.php
 
@@ -971,30 +995,6 @@ parameters:
 			identifier: staticMethod.notFound
 			count: 1
 			path: app/Services/PolicyEngineService.php
-
-		-
-			rawMessage: 'Call to an undefined static method App\Models\StudentTuitionPayment::create().'
-			identifier: staticMethod.notFound
-			count: 1
-			path: app/Services/StudentTuitionPaymentService.php
-
-		-
-			rawMessage: 'Call to an undefined static method App\Models\Transaction::create().'
-			identifier: staticMethod.notFound
-			count: 1
-			path: app/Services/StudentTuitionPaymentService.php
-
-		-
-			rawMessage: 'Call to function is_string() with string will always evaluate to true.'
-			identifier: function.alreadyNarrowedType
-			count: 1
-			path: app/Services/StudentTuitionPaymentService.php
-
-		-
-			rawMessage: 'Call to protected method increment() of class Illuminate\Database\Eloquent\Model.'
-			identifier: method.protected
-			count: 2
-			path: app/Services/StudentTuitionPaymentService.php
 
 		-
 			rawMessage: 'Call to an undefined static method App\Models\StudentWallet::create().'
@@ -1897,6 +1897,12 @@ parameters:
 			path: tests/Feature/Filament/SocialLoginSettingsPageTest.php
 
 		-
+			rawMessage: 'Call to an undefined method Illuminate\Testing\TestResponse::assertCanSeeTableRecords().'
+			identifier: method.notFound
+			count: 3
+			path: tests/Feature/Filament/StudentResourceTest.php
+
+		-
 			rawMessage: 'Call to an undefined method Livewire\Features\SupportTesting\Testable::callAction().'
 			identifier: method.notFound
 			count: 2
@@ -1906,6 +1912,12 @@ parameters:
 			rawMessage: 'Call to an undefined method Livewire\Features\SupportTesting\Testable::fillForm().'
 			identifier: method.notFound
 			count: 6
+			path: tests/Feature/Filament/StudentResourceTest.php
+
+		-
+			rawMessage: 'Call to an undefined method Livewire\Features\SupportTesting\Testable::mountAction().'
+			identifier: method.notFound
+			count: 1
 			path: tests/Feature/Filament/StudentResourceTest.php
 
 		-
@@ -1921,9 +1933,21 @@ parameters:
 			path: tests/Feature/Filament/StudentWalletWidgetTest.php
 
 		-
+			rawMessage: 'Call to an undefined method Illuminate\Testing\TestResponse::assertCanSeeTableRecords().'
+			identifier: method.notFound
+			count: 1
+			path: tests/Feature/Filament/TuitionAccountResourceTest.php
+
+		-
 			rawMessage: 'Call to an undefined method Livewire\Features\SupportTesting\Testable::fillForm().'
 			identifier: method.notFound
 			count: 4
+			path: tests/Feature/Filament/TuitionAccountResourceTest.php
+
+		-
+			rawMessage: 'Call to an undefined method Livewire\Features\SupportTesting\Testable::mountAction().'
+			identifier: method.notFound
+			count: 2
 			path: tests/Feature/Filament/TuitionAccountResourceTest.php
 
 		-
@@ -2203,6 +2227,18 @@ parameters:
 			path: tests/Feature/StudentAssistanceFlowTest.php
 
 		-
+			rawMessage: 'Access to an undefined property Illuminate\Database\Eloquent\Collection<int, Illuminate\Database\Eloquent\Model>|Illuminate\Database\Eloquent\Model::$id.'
+			identifier: property.notFound
+			count: 2
+			path: tests/Feature/StudentDashboardTransactionsTest.php
+
+		-
+			rawMessage: 'Call to an undefined static method App\Models\StudentTuitionPayment::create().'
+			identifier: staticMethod.notFound
+			count: 1
+			path: tests/Feature/StudentDashboardTransactionsTest.php
+
+		-
 			rawMessage: 'Call to an undefined method Illuminate\Testing\TestResponse::getContent().'
 			identifier: method.notFound
 			count: 1
@@ -2231,24 +2267,6 @@ parameters:
 			identifier: property.notFound
 			count: 1
 			path: tests/Feature/StudentTuitionPaymentEndpointTest.php
-
-		-
-			rawMessage: 'Access to an undefined property Illuminate\Database\Eloquent\Collection<int, Illuminate\Database\Eloquent\Model>|Illuminate\Database\Eloquent\Model::$balance.'
-			identifier: property.notFound
-			count: 1
-			path: tests/Feature/StudentTuitionPaymentTest.php
-
-		-
-			rawMessage: 'Access to an undefined property Illuminate\Database\Eloquent\Collection<int, Illuminate\Database\Eloquent\Model>|Illuminate\Database\Eloquent\Model::$id.'
-			identifier: property.notFound
-			count: 1
-			path: tests/Feature/StudentTuitionPaymentTest.php
-
-		-
-			rawMessage: 'Property App\Services\CircleAgentWalletCli@anonymous/tests/Feature/StudentTuitionPaymentTest.php:33::$failure is never read, only written.'
-			identifier: property.onlyWritten
-			count: 1
-			path: tests/Feature/StudentTuitionPaymentTest.php
 
 		-
 			rawMessage: 'Offset 0 does not exist on array{}.'
