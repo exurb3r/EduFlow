@@ -4,9 +4,9 @@ declare(strict_types=1);
 
 namespace App\Policies;
 
+use App\Models\Organization;
 use App\Models\ReceiptBudgetRoute;
 use App\Models\User;
-use App\Models\Organization;
 use App\Services\InstallationInstitution;
 
 class ReceiptBudgetRoutePolicy
