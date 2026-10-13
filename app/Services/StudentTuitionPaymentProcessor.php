@@ -102,7 +102,7 @@ final readonly class StudentTuitionPaymentProcessor
                 throw ValidationException::withMessages(['wallet' => 'Payer wallet changed after consent.']);
             }
             $fee = StudentTuitionPaymentService::readFee($this->transport->estimate($this->request($attempt)));
-            if (StudentTuitionPaymentService::feeCeiling($fee) > $attempt->fee_ceiling_base_units) {
+            if ($guarantee !== FeeGuarantee::RelayerSponsored && StudentTuitionPaymentService::feeCeiling($fee) > $attempt->fee_ceiling_base_units) {
                 throw ValidationException::withMessages(['fee' => 'Current network quote exceeds accepted fee ceiling.']);
             }
             $this->balances->forget($student);
@@ -113,6 +113,23 @@ final readonly class StudentTuitionPaymentProcessor
             $lossBound = $this->assertLossBounded($attempt, $balance->balance, $guarantee);
         } catch (Throwable $exception) {
             report($exception);
+            $intent = StudentTuitionPaymentIntent::query()->find($attempt->student_tuition_payment_intent_id);
+            $isQuoteExpired = $intent instanceof StudentTuitionPaymentIntent
+                && isset($intent->snapshot['expires_at'])
+                && Carbon::parse($intent->snapshot['expires_at'])->lte(now());
+
+            if ($attempt->submission_started_at === null && $isQuoteExpired) {
+                $attempt->update([
+                    'state' => 'failed',
+                    'stage' => 'quote_expired_unsubmitted',
+                    'last_error' => mb_substr('Consent quote expired before submission. No signer called.', 0, 1000),
+                    'leased_until' => null,
+                    'next_attempt_at' => null,
+                ]);
+
+                return;
+            }
+
             $this->hold($attempt, 'Preflight blocked. '.$exception->getMessage());
 
             return;
@@ -131,6 +148,16 @@ final readonly class StudentTuitionPaymentProcessor
             if (Carbon::parse($intent->snapshot['expires_at'])->lte(now()) || $stored->amount_base_units > $account->remainingAmount()
                 || $wallet->status !== 'active' || strtolower($wallet->address) !== $stored->payer_address
                 || strtolower((string) $student->payout_address) !== $stored->payer_address) {
+                if (Carbon::parse($intent->snapshot['expires_at'])->lte(now())) {
+                    $stored->update([
+                        'state' => 'failed',
+                        'stage' => 'quote_expired_unsubmitted',
+                        'last_error' => 'Consent quote expired before submission. No signer called.',
+                        'leased_until' => null,
+                        'next_attempt_at' => null,
+                    ]);
+                }
+
                 return false;
             }
             $stored->update(['state' => 'submitting', 'stage' => 'signer_may_have_been_called', 'submission_started_at' => now(),
@@ -372,11 +399,22 @@ final readonly class StudentTuitionPaymentProcessor
         }
     }
 
-    /** @return array{from:string,to:string,amount_base_units:int,chain:string,idempotency_key:string,max_fee_base_units:int} */
+    /** @return array{from:string,to:string,amount_base_units:int,chain:string,idempotency_key:string,max_fee_base_units?:int} */
     private function request(StudentTuitionPaymentAttempt $a): array
     {
-        return ['from' => $a->payer_address, 'to' => $a->recipient_address, 'amount_base_units' => $a->amount_base_units,
-            'chain' => $a->chain, 'idempotency_key' => $a->request_key, 'max_fee_base_units' => $a->fee_ceiling_base_units];
+        $request = [
+            'from' => $a->payer_address,
+            'to' => $a->recipient_address,
+            'amount_base_units' => $a->amount_base_units,
+            'chain' => $a->chain,
+            'idempotency_key' => $a->request_key,
+        ];
+
+        if ($this->transport instanceof FeeBoundedPaymentTransport && $this->transport->supportsFeeCeiling()) {
+            $request['max_fee_base_units'] = $a->fee_ceiling_base_units;
+        }
+
+        return $request;
     }
 
     /** @param array<string, mixed> $receipt */

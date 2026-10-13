@@ -115,6 +115,26 @@ final readonly class StudentTuitionPaymentService
                 || $wallet->id !== $intent->student_wallet_id || strtolower($wallet->address) !== $intent->snapshot['payer_address']) {
                 throw ValidationException::withMessages(['consent' => 'Quote expired or wallet/rail changed; obtain fresh consent.']);
             }
+            StudentTuitionPaymentAttempt::query()
+                ->where('tuition_account_id', $stored->id)
+                ->where('state', 'prepared')
+                ->whereNull('submission_started_at')
+                ->get()
+                ->each(function (StudentTuitionPaymentAttempt $stale): void {
+                    $staleIntent = StudentTuitionPaymentIntent::query()->find($stale->student_tuition_payment_intent_id);
+                    if ($staleIntent instanceof StudentTuitionPaymentIntent
+                        && isset($staleIntent->snapshot['expires_at'])
+                        && Carbon::parse($staleIntent->snapshot['expires_at'])->lte(now())) {
+                        $stale->update([
+                            'state' => 'failed',
+                            'stage' => 'quote_expired_unsubmitted',
+                            'last_error' => 'Consent quote expired before submission. No signer called.',
+                            'leased_until' => null,
+                            'next_attempt_at' => null,
+                        ]);
+                    }
+                });
+
             if (StudentTuitionPaymentAttempt::query()->where('tuition_account_id', $stored->id)
                 ->where(function ($q): void {
                     $q->whereIn('state', StudentTuitionPaymentState::openStates())->orWhere(function ($q): void {

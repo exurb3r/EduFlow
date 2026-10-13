@@ -11,6 +11,7 @@ use App\Models\TuitionAccount;
 use App\Services\StudentTuitionPaymentService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
+use Yukazakiri\Lepton\Contracts\ArcNetworkGateway;
 
 /**
  * Tuition paid from the student's own wallet into the institution treasury.
@@ -85,16 +86,26 @@ class StudentTuitionPaymentController extends Controller
     public static function statusData(StudentTuitionPaymentAttempt $attempt): array
     {
         $payment = StudentTuitionPayment::query()->where('request_key', $attempt->request_key)->first();
+        $explorerUrl = null;
+        if (is_string($attempt->provider_reference) && trim($attempt->provider_reference) !== '') {
+            try {
+                $explorerUrl = app(ArcNetworkGateway::class)->explorerUrl($attempt->provider_reference);
+            } catch (\Throwable) {
+                $explorerUrl = 'https://testnet.arcscan.app/tx/'.$attempt->provider_reference;
+            }
+        }
 
         return ['id' => $attempt->id, 'request_key' => $attempt->request_key, 'state' => $attempt->state,
             'state_label' => $attempt->state()->label(), 'guidance' => $attempt->state()->guidance(), 'stage' => $attempt->stage,
             'amount_base_units' => (string) $attempt->amount_base_units, 'quoted_network_fee' => $attempt->quoted_network_fee,
             'fee_ceiling_base_units' => (string) $attempt->fee_ceiling_base_units, 'actual_network_fee' => $attempt->actual_network_fee,
             'tx_hash' => $attempt->provider_reference, 'provider_handle' => $attempt->provider_handle,
+            'explorer_url' => $explorerUrl,
             'simulated' => $attempt->state === 'simulated', 'verified' => $attempt->isVerified() && $attempt->hasValidSettlement(),
             'posted' => $attempt->posted_at !== null, 'applied_base_units' => (string) ($payment instanceof StudentTuitionPayment ? $payment->applied_base_units : 0),
             'overpayment_base_units' => (string) ($payment instanceof StudentTuitionPayment ? $payment->overpayment_base_units : 0),
-            'requires_investigation' => $attempt->stage === 'needs_operator_review', 'created_at' => $attempt->created_at->toIso8601String()];
+            'requires_investigation' => $attempt->stage === 'needs_operator_review', 'created_at' => $attempt->created_at->toIso8601String(),
+            'last_error' => $attempt->last_error];
     }
 
     /**
