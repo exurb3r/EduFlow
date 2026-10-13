@@ -127,19 +127,18 @@ export default function StudentDashboard({
     const remainingBase = Number(tuitionAccount?.remaining_amount ?? 0);
     const remainingUsdc = remainingBase / 1_000_000;
     const canPay = hasWallet && remainingBase > 0;
-    const hasInFlight = Boolean(
-        tuitionAttempts?.some(
-            (a) =>
-                [
-                    'prepared',
-                    'submitting',
-                    'accepted',
-                    'awaiting_verification',
-                    'unknown',
-                ].includes(a.state) ||
-                (a.state === 'verified' && !a.posted),
-        ),
+    const inFlightAttempt = tuitionAttempts?.find(
+        (a) =>
+            [
+                'prepared',
+                'submitting',
+                'accepted',
+                'awaiting_verification',
+                'unknown',
+            ].includes(a.state) ||
+            (a.state === 'verified' && !a.posted),
     );
+    const hasInFlight = Boolean(inFlightAttempt);
     const [payOpen, setPayOpen] = useState(false);
     const [payAmount, setPayAmount] = useState('');
     const [payQuote, setPayQuote] = useState<{
@@ -255,11 +254,7 @@ export default function StudentDashboard({
         setConsent(false);
         setRequestKey(null);
         setPayError(null);
-        setReceipt(
-            tuitionAttempts.find(
-                (a) => !['simulated', 'failed'].includes(a.state) && !a.posted,
-            ) ?? null,
-        );
+        setReceipt(null);
         setPayOpen(true);
     };
 
@@ -369,7 +364,6 @@ export default function StudentDashboard({
             }
 
             setReceipt(payload);
-            setMonitorDrawerOpen(true);
 
             // The wallet balance and paid figures both changed on-chain.
             router.reload({
@@ -469,6 +463,7 @@ export default function StudentDashboard({
                                 setPayOpen(open);
                                 if (!open) {
                                     setReceipt(null);
+                                    setMonitorDrawerOpen(false);
                                 }
                             }}
                         >
@@ -723,16 +718,35 @@ export default function StudentDashboard({
                                                 budget.
                                             </p>
                                         )}
-                                        <Button
-                                            type="button"
-                                            className="clay-focus rounded-full bg-[var(--clay-primary)] font-semibold text-[var(--clay-primary-foreground)]"
-                                            onClick={() => {
-                                                setPayOpen(false);
-                                                setReceipt(null);
-                                            }}
-                                        >
-                                            Done
-                                        </Button>
+                                        <div className="flex flex-wrap items-center gap-2.5">
+                                            <Button
+                                                type="button"
+                                                className="clay-focus flex-1 rounded-full bg-[var(--clay-primary)] font-semibold text-[var(--clay-primary-foreground)]"
+                                                onClick={() => {
+                                                    setPayOpen(false);
+                                                    setReceipt(null);
+                                                    setMonitorDrawerOpen(false);
+                                                }}
+                                            >
+                                                Done
+                                            </Button>
+                                            {activeReceipt.posted &&
+                                                remainingBase > 0 && (
+                                                    <Button
+                                                        type="button"
+                                                        variant="outline"
+                                                        className="clay-focus rounded-full border-[var(--clay-border)] text-xs font-semibold"
+                                                        onClick={() => {
+                                                            setReceipt(null);
+                                                            setPayQuote(null);
+                                                            setConsent(false);
+                                                            setRequestKey(null);
+                                                        }}
+                                                    >
+                                                        Make another payment
+                                                    </Button>
+                                                )}
+                                        </div>
                                     </div>
                                 ) : (
                                     <form
@@ -742,6 +756,32 @@ export default function StudentDashboard({
                                             void submitPay();
                                         }}
                                     >
+                                        {inFlightAttempt && (
+                                            <div className="flex items-center justify-between gap-3 rounded-xl border border-amber-500/30 bg-amber-500/10 p-3 text-xs text-amber-300">
+                                                <div className="flex items-center gap-2 min-w-0">
+                                                    <Loader2 className="size-4 shrink-0 animate-spin text-amber-400" />
+                                                    <span className="truncate">
+                                                        Transfer of{' '}
+                                                        {formatBaseUnits(
+                                                            inFlightAttempt.amount_base_units,
+                                                        )}{' '}
+                                                        USDC is processing
+                                                        on-chain.
+                                                    </span>
+                                                </div>
+                                                <button
+                                                    type="button"
+                                                    onClick={() =>
+                                                        setReceipt(
+                                                            inFlightAttempt,
+                                                        )
+                                                    }
+                                                    className="clay-focus shrink-0 font-semibold text-amber-200 underline hover:text-amber-100"
+                                                >
+                                                    View receipt
+                                                </button>
+                                            </div>
+                                        )}
                                         <dl className="grid gap-3 text-sm">
                                             <div className="flex items-baseline justify-between gap-4">
                                                 <dt className="clay-meta">
@@ -850,6 +890,7 @@ export default function StudentDashboard({
                                                 disabled={
                                                     paying ||
                                                     quoting ||
+                                                    Boolean(inFlightAttempt) ||
                                                     (!!payQuote && !consent)
                                                 }
                                                 data-loading={paying || quoting}
@@ -860,11 +901,13 @@ export default function StudentDashboard({
                                                 ) : (
                                                     <ArrowUpRight className="size-4" />
                                                 )}
-                                                {payQuote
-                                                    ? 'Confirm pilot consent'
-                                                    : quoting
-                                                      ? 'Reading the fee…'
-                                                      : 'Pay Now'}
+                                                {inFlightAttempt
+                                                    ? 'Transfer in progress…'
+                                                    : payQuote
+                                                      ? 'Confirm pilot consent'
+                                                      : quoting
+                                                        ? 'Reading the fee…'
+                                                        : 'Pay Now'}
                                             </Button>
                                             <Button
                                                 type="button"
