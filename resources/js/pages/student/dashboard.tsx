@@ -4,11 +4,16 @@ import {
     ArrowRight,
     ArrowUpRight,
     BadgeCheck,
+    Check,
+    CheckCircle2,
+    ChevronRight,
     Copy,
+    ExternalLink,
     Eye,
     EyeOff,
     Loader2,
     ReceiptText,
+    RefreshCw,
     Sparkles,
     TriangleAlert,
     Wallet,
@@ -45,6 +50,7 @@ import {
 } from '@/routes/student/tuition';
 import { show as walletShow } from '@/routes/student/wallet';
 import type {
+    PaymentTransaction,
     StudentDashboardProps,
     TuitionAttempt,
 } from '@/types/financial-aid';
@@ -64,6 +70,10 @@ function statusPillClass(status: string): string {
 
 function shortAddress(address: string): string {
     return `${address.slice(0, 6)}…${address.slice(-4)}`;
+}
+
+function shortHash(hash: string): string {
+    return `${hash.slice(0, 10)}…${hash.slice(-6)}`;
 }
 
 /**
@@ -147,7 +157,60 @@ export default function StudentDashboard({
     );
     const [consent, setConsent] = useState(false);
     const [receipt, setReceipt] = useState<TuitionAttempt | null>(null);
-    usePoll(8000, { only: ['tuitionAttempts', 'tuitionAccount', 'wallet'] });
+    const [txFilter, setTxFilter] = useState<'all' | 'inbound' | 'outbound'>(
+        'all',
+    );
+    const [selectedTx, setSelectedTx] = useState<PaymentTransaction | null>(
+        null,
+    );
+    const [isRefreshingTxs, setIsRefreshingTxs] = useState(false);
+    const [copiedTxHash, setCopiedTxHash] = useState<string | null>(null);
+    usePoll(8000, {
+        only: [
+            'tuitionAttempts',
+            'tuitionAccount',
+            'wallet',
+            'recentTransactions',
+            'totals',
+        ],
+    });
+
+    const copyTxHash = (hash: string, event?: React.MouseEvent) => {
+        event?.stopPropagation();
+        navigator.clipboard.writeText(hash);
+        setCopiedTxHash(hash);
+        toast.success('Transaction hash copied', {
+            description: 'Verify it on Arcscan block explorer.',
+        });
+        setTimeout(() => {
+            setCopiedTxHash(null);
+        }, 2000);
+    };
+
+    const refreshTransactions = () => {
+        setIsRefreshingTxs(true);
+        router.reload({
+            only: ['recentTransactions', 'wallet', 'totals'],
+            onFinish: () => {
+                setIsRefreshingTxs(false);
+                toast.success('Transactions refreshed from the chain.');
+            },
+        });
+    };
+
+    const filteredTransactions = transactions.filter((tx) => {
+        const isInbound =
+            tx.direction === 'inbound' ||
+            tx.type === 'student_assistance' ||
+            tx.type === 'refund';
+        if (txFilter === 'inbound') {
+            return isInbound;
+        }
+        if (txFilter === 'outbound') {
+            return !isInbound;
+        }
+        return true;
+    });
 
     const defaultPayBaseUnits = Math.min(
         remainingBase,
@@ -1122,76 +1185,594 @@ export default function StudentDashboard({
                         )}
                     </nav>
 
-                    {/* -- Recent activity -- */}
+                    {/* -- Recent transactions -- */}
                     <section
                         aria-labelledby="activity-heading"
                         className="space-y-4"
                     >
-                        <div className="flex items-baseline justify-between gap-4">
-                            <h2 id="activity-heading" className="clay-h2">
-                                Recent activity
-                            </h2>
-                            <Link
-                                href={paymentsIndex()}
-                                className="clay-meta transition-colors hover:text-[var(--clay-text)]"
-                            >
-                                View all
-                            </Link>
+                        <div className="flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
+                            <div>
+                                <div className="flex items-center gap-2">
+                                    <p className="bulletin-eyebrow flex items-center gap-1.5">
+                                        <ReceiptText className="size-3.5 text-[var(--clay-primary-bright)]" />
+                                        EduFlow &middot; Arc Testnet Ledger
+                                    </p>
+                                    {transactions.length > 0 && (
+                                        <span className="rounded-full bg-[var(--clay-surface-soft)] px-2 py-0.5 text-[10px] font-semibold text-[var(--clay-text-muted)]">
+                                            {transactions.length} record
+                                            {transactions.length === 1
+                                                ? ''
+                                                : 's'}
+                                        </span>
+                                    )}
+                                </div>
+                                <h2
+                                    id="activity-heading"
+                                    className="clay-h2 mt-1"
+                                >
+                                    Recent transactions
+                                </h2>
+                                <p className="clay-meta mt-0.5">
+                                    Every verified financial aid disbursement,
+                                    tuition payment, and campus bill on Arc.
+                                </p>
+                            </div>
+
+                            <div className="flex flex-wrap items-center gap-2">
+                                {transactions.length > 0 && (
+                                    <div className="flex items-center rounded-full border border-[var(--clay-border)] bg-[var(--clay-surface-soft)] p-1 text-xs">
+                                        <button
+                                            type="button"
+                                            onClick={() => setTxFilter('all')}
+                                            className={`clay-focus rounded-full px-2.5 py-1 text-xs font-semibold transition-colors ${
+                                                txFilter === 'all'
+                                                    ? 'bg-[var(--clay-surface)] text-[var(--clay-text)] shadow-xs'
+                                                    : 'text-[var(--clay-text-muted)] hover:text-[var(--clay-text)]'
+                                            }`}
+                                        >
+                                            All ({transactions.length})
+                                        </button>
+                                        <button
+                                            type="button"
+                                            onClick={() =>
+                                                setTxFilter('inbound')
+                                            }
+                                            className={`clay-focus inline-flex items-center gap-1 rounded-full px-2.5 py-1 text-xs font-semibold transition-colors ${
+                                                txFilter === 'inbound'
+                                                    ? 'bg-[var(--clay-surface)] text-[var(--status-resolved)] shadow-xs'
+                                                    : 'text-[var(--clay-text-muted)] hover:text-[var(--clay-text)]'
+                                            }`}
+                                        >
+                                            <span className="size-1.5 rounded-full bg-[var(--status-resolved)]" />
+                                            Received
+                                        </button>
+                                        <button
+                                            type="button"
+                                            onClick={() =>
+                                                setTxFilter('outbound')
+                                            }
+                                            className={`clay-focus inline-flex items-center gap-1 rounded-full px-2.5 py-1 text-xs font-semibold transition-colors ${
+                                                txFilter === 'outbound'
+                                                    ? 'bg-[var(--clay-surface)] text-sky-400 shadow-xs'
+                                                    : 'text-[var(--clay-text-muted)] hover:text-[var(--clay-text)]'
+                                            }`}
+                                        >
+                                            <span className="size-1.5 rounded-full bg-sky-400" />
+                                            Paid
+                                        </button>
+                                    </div>
+                                )}
+
+                                <button
+                                    type="button"
+                                    onClick={refreshTransactions}
+                                    disabled={isRefreshingTxs}
+                                    className="clay-focus inline-flex size-9 items-center justify-center rounded-full border border-[var(--clay-border)] text-[var(--clay-text-muted)] transition-colors hover:bg-[var(--clay-surface-soft)] hover:text-[var(--clay-text)] disabled:opacity-50"
+                                    title="Refresh recent transactions from the chain"
+                                    aria-label="Refresh transactions"
+                                >
+                                    <RefreshCw
+                                        className={`size-3.5 ${isRefreshingTxs ? 'animate-spin' : ''}`}
+                                    />
+                                </button>
+
+                                <Link
+                                    href={paymentsIndex().url}
+                                    className="clay-focus inline-flex h-9 items-center gap-1.5 rounded-full border border-[var(--clay-border)] px-3 text-xs font-semibold text-[var(--clay-text-muted)] transition-colors hover:bg-[var(--clay-surface-soft)] hover:text-[var(--clay-text)]"
+                                >
+                                    Full ledger
+                                    <ArrowRight className="size-3" />
+                                </Link>
+                            </div>
                         </div>
 
                         {transactions.length === 0 ? (
+                            <div className="clay-card flex flex-col items-center gap-4 p-8 text-center sm:p-12">
+                                <span className="clay-inset flex size-12 items-center justify-center rounded-full text-[var(--clay-text-muted)]">
+                                    <ReceiptText className="size-5" />
+                                </span>
+                                <div className="max-w-md">
+                                    <p className="clay-title">
+                                        {!hasWallet
+                                            ? 'No wallet linked yet.'
+                                            : 'No transactions recorded yet.'}
+                                    </p>
+                                    <p className="clay-body mt-1.5">
+                                        {!hasWallet
+                                            ? 'Link a payout wallet to receive assistance disbursements and make on-chain payments.'
+                                            : 'Approved assistance grants and student payments will appear here with cryptographic Arc testnet verification.'}
+                                    </p>
+                                </div>
+                                <div className="flex flex-wrap gap-2">
+                                    {!hasWallet ? (
+                                        <Link
+                                            href={walletShow()}
+                                            className="clay-focus inline-flex h-9 items-center gap-2 rounded-full bg-[var(--clay-primary)] px-4 text-xs font-semibold text-[var(--clay-primary-foreground)] transition-all hover:bg-[var(--clay-primary-bright)]"
+                                        >
+                                            <Wallet className="size-3.5" />
+                                            Link wallet
+                                        </Link>
+                                    ) : (
+                                        <>
+                                            <button
+                                                type="button"
+                                                onClick={openEligibility}
+                                                className="clay-focus inline-flex h-9 items-center gap-2 rounded-full border border-[var(--clay-border)] px-4 text-xs font-semibold transition-colors hover:bg-[var(--clay-surface-soft)]"
+                                            >
+                                                <BadgeCheck className="size-3.5" />
+                                                Check eligibility
+                                            </button>
+                                            {canPay && (
+                                                <button
+                                                    type="button"
+                                                    onClick={openPay}
+                                                    className="clay-focus inline-flex h-9 items-center gap-2 rounded-full bg-[var(--clay-primary)] px-4 text-xs font-semibold text-[var(--clay-primary-foreground)] transition-all hover:bg-[var(--clay-primary-bright)]"
+                                                >
+                                                    <ArrowUpRight className="size-3.5" />
+                                                    Pay tuition
+                                                </button>
+                                            )}
+                                        </>
+                                    )}
+                                </div>
+                            </div>
+                        ) : filteredTransactions.length === 0 ? (
                             <div className="clay-card p-8 text-center">
-                                <p className="clay-title">No payouts yet.</p>
-                                <p className="clay-body mx-auto mt-1.5 max-w-md">
-                                    Approved assistance lands here as confirmed{' '}
-                                    {totals?.currency ?? 'USDC'} transactions.
+                                <p className="clay-title">
+                                    No{' '}
+                                    {txFilter === 'inbound'
+                                        ? 'received'
+                                        : 'paid'}{' '}
+                                    transactions found.
                                 </p>
+                                <p className="clay-body mx-auto mt-1 max-w-sm">
+                                    No activity matches this filter.
+                                </p>
+                                <Button
+                                    type="button"
+                                    variant="ghost"
+                                    size="sm"
+                                    className="mt-3 rounded-full text-xs font-semibold"
+                                    onClick={() => setTxFilter('all')}
+                                >
+                                    Show all transactions
+                                </Button>
                             </div>
                         ) : (
                             <ul className="flex flex-col gap-3">
-                                {transactions.map((tx, index) => (
-                                    <li
-                                        key={tx.id}
-                                        className="clay-card clay-rise p-4 sm:p-5"
-                                        style={
-                                            {
-                                                '--stagger': Math.min(index, 8),
-                                            } as React.CSSProperties
-                                        }
-                                    >
-                                        <div className="flex items-start gap-3">
-                                            <span className="clay-icon-chip size-9 shrink-0">
-                                                <ArrowDownLeft className="size-4" />
-                                            </span>
-                                            <div className="min-w-0 flex-1">
-                                                <div className="flex flex-wrap items-center gap-x-2 gap-y-1">
-                                                    <span className="clay-title">
-                                                        +{tx.amount}{' '}
-                                                        {tx.currency}
-                                                    </span>
-                                                    <span
-                                                        className={`rounded-full px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wider ${statusPillClass(tx.status)}`}
-                                                    >
-                                                        {tx.status_label}
-                                                    </span>
-                                                    <span className="clay-meta">
-                                                        {tx.type_label}
-                                                    </span>
+                                {filteredTransactions.map((tx, index) => {
+                                    const isInbound =
+                                        tx.direction === 'inbound' ||
+                                        tx.type === 'student_assistance' ||
+                                        tx.type === 'refund';
+                                    return (
+                                        <li
+                                            key={tx.id}
+                                            onClick={() => setSelectedTx(tx)}
+                                            className="clay-card clay-rise clay-press group relative flex flex-col gap-3 p-4 sm:flex-row sm:items-center sm:justify-between sm:p-5 cursor-pointer transition-all hover:border-[var(--clay-primary-bright)]/40"
+                                            style={
+                                                {
+                                                    '--stagger': Math.min(
+                                                        index,
+                                                        8,
+                                                    ),
+                                                } as React.CSSProperties
+                                            }
+                                        >
+                                            <div className="flex items-start gap-3.5 min-w-0">
+                                                <span
+                                                    className={`clay-icon-chip size-10 shrink-0 ${
+                                                        isInbound
+                                                            ? 'border border-[var(--status-resolved)]/20 bg-[var(--status-resolved)]/10 text-[var(--status-resolved)]'
+                                                            : 'border border-sky-500/20 bg-sky-500/10 text-sky-400'
+                                                    }`}
+                                                >
+                                                    {isInbound ? (
+                                                        <ArrowDownLeft className="size-4.5" />
+                                                    ) : (
+                                                        <ArrowUpRight className="size-4.5" />
+                                                    )}
+                                                </span>
+
+                                                <div className="min-w-0 flex-1">
+                                                    <div className="flex flex-wrap items-center gap-2">
+                                                        <span className="font-semibold text-sm text-[var(--clay-text)] group-hover:text-[var(--clay-primary-bright)] transition-colors">
+                                                            {tx.description ??
+                                                                tx.type_label}
+                                                        </span>
+                                                        <span
+                                                            className={`rounded-full px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wider ${statusPillClass(tx.status)}`}
+                                                        >
+                                                            {tx.status_label}
+                                                        </span>
+                                                    </div>
+
+                                                    <div className="mt-1 flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-[var(--clay-text-muted)]">
+                                                        <span className="clay-meta">
+                                                            {tx.executed_at ??
+                                                                'Recent'}
+                                                        </span>
+                                                        <span>&middot;</span>
+                                                        <span className="clay-meta">
+                                                            {tx.network}
+                                                        </span>
+
+                                                        {tx.tx_hash && (
+                                                            <>
+                                                                <span>
+                                                                    &middot;
+                                                                </span>
+                                                                <button
+                                                                    type="button"
+                                                                    onClick={(
+                                                                        e,
+                                                                    ) =>
+                                                                        copyTxHash(
+                                                                            tx.tx_hash!,
+                                                                            e,
+                                                                        )
+                                                                    }
+                                                                    className="clay-meta clay-focus inline-flex items-center gap-1 rounded-sm font-mono text-[11px] transition-colors hover:text-[var(--clay-text)]"
+                                                                    title="Copy full transaction hash"
+                                                                >
+                                                                    {shortHash(
+                                                                        tx.tx_hash,
+                                                                    )}
+                                                                    {copiedTxHash ===
+                                                                    tx.tx_hash ? (
+                                                                        <Check className="size-3 text-[var(--status-resolved)]" />
+                                                                    ) : (
+                                                                        <Copy className="size-3" />
+                                                                    )}
+                                                                </button>
+                                                            </>
+                                                        )}
+                                                    </div>
                                                 </div>
-                                                <div className="mt-1.5 flex flex-wrap items-center gap-x-3 gap-y-1">
-                                                    <span className="clay-meta">
-                                                        {tx.network}
-                                                    </span>
-                                                    <span className="clay-meta">
-                                                        {tx.executed_at}
+                                            </div>
+
+                                            <div className="flex items-center justify-between gap-4 border-t border-[var(--clay-border)] pt-3 sm:border-t-0 sm:pt-0 sm:justify-end sm:text-right">
+                                                <div>
+                                                    <p
+                                                        className={`clay-title tabular-nums text-base font-bold ${
+                                                            isInbound
+                                                                ? 'text-[var(--status-resolved)]'
+                                                                : 'text-[var(--clay-text)]'
+                                                        }`}
+                                                    >
+                                                        {isInbound ? '+' : '-'}
+                                                        {Number(
+                                                            tx.amount,
+                                                        ).toFixed(2)}{' '}
+                                                        {tx.currency}
+                                                    </p>
+                                                    {tx.amount_fiat && (
+                                                        <p className="clay-meta mt-0.5 text-xs text-[var(--clay-text-muted)]">
+                                                            &asymp;{' '}
+                                                            {tx.amount_fiat}
+                                                        </p>
+                                                    )}
+                                                </div>
+
+                                                <div className="flex items-center gap-1 shrink-0">
+                                                    {tx.explorer_url && (
+                                                        <a
+                                                            href={
+                                                                tx.explorer_url
+                                                            }
+                                                            target="_blank"
+                                                            rel="noopener noreferrer"
+                                                            onClick={(e) =>
+                                                                e.stopPropagation()
+                                                            }
+                                                            className="clay-focus inline-flex size-8 items-center justify-center rounded-full text-[var(--clay-text-muted)] transition-colors hover:bg-[var(--clay-surface-soft)] hover:text-[var(--clay-text)]"
+                                                            title="View on Arcscan block explorer"
+                                                            aria-label="View on block explorer"
+                                                        >
+                                                            <ExternalLink className="size-3.5" />
+                                                        </a>
+                                                    )}
+                                                    <span
+                                                        className="clay-focus inline-flex size-8 items-center justify-center rounded-full text-[var(--clay-text-muted)] transition-colors group-hover:text-[var(--clay-text)]"
+                                                        aria-hidden="true"
+                                                    >
+                                                        <ChevronRight className="size-4" />
                                                     </span>
                                                 </div>
                                             </div>
-                                        </div>
-                                    </li>
-                                ))}
+                                        </li>
+                                    );
+                                })}
                             </ul>
                         )}
+
+                        {/* -- Transaction Receipt Dialog -- */}
+                        <Dialog
+                            open={!!selectedTx}
+                            onOpenChange={(open) => {
+                                if (!open) {
+                                    setSelectedTx(null);
+                                }
+                            }}
+                        >
+                            <DialogContent className="bulletin clay-card border-[var(--clay-border)] sm:max-w-lg">
+                                <DialogHeader>
+                                    <div className="flex items-center gap-3">
+                                        <span
+                                            className={`clay-icon-chip size-10 shrink-0 ${
+                                                selectedTx?.direction ===
+                                                'inbound'
+                                                    ? 'border border-[var(--status-resolved)]/20 bg-[var(--status-resolved)]/10 text-[var(--status-resolved)]'
+                                                    : 'border border-sky-500/20 bg-sky-500/10 text-sky-400'
+                                            }`}
+                                        >
+                                            {selectedTx?.direction ===
+                                            'inbound' ? (
+                                                <ArrowDownLeft className="size-5" />
+                                            ) : (
+                                                <ArrowUpRight className="size-5" />
+                                            )}
+                                        </span>
+                                        <div>
+                                            <DialogTitle className="clay-h2">
+                                                Transaction receipt
+                                            </DialogTitle>
+                                            <DialogDescription className="clay-body">
+                                                {selectedTx?.direction ===
+                                                'inbound'
+                                                    ? 'Incoming disbursement credited to your student wallet.'
+                                                    : 'Outgoing payment settled to the college treasury.'}
+                                            </DialogDescription>
+                                        </div>
+                                    </div>
+                                </DialogHeader>
+
+                                {selectedTx && (
+                                    <div className="grid gap-5">
+                                        <div className="clay-inset rounded-2xl p-4 text-center">
+                                            <p className="bulletin-eyebrow">
+                                                Settlement amount
+                                            </p>
+                                            <p
+                                                className={`bulletin-figure mt-1 text-3xl sm:text-4xl ${
+                                                    selectedTx.direction ===
+                                                    'inbound'
+                                                        ? 'text-[var(--status-resolved)]'
+                                                        : 'text-[var(--clay-text)]'
+                                                }`}
+                                            >
+                                                {selectedTx.direction ===
+                                                'inbound'
+                                                    ? '+'
+                                                    : '-'}
+                                                {Number(
+                                                    selectedTx.amount,
+                                                ).toFixed(2)}{' '}
+                                                {selectedTx.currency}
+                                            </p>
+                                            {selectedTx.amount_fiat && (
+                                                <p className="clay-meta mt-1 text-[var(--clay-text-muted)]">
+                                                    &asymp;{' '}
+                                                    {selectedTx.amount_fiat}
+                                                </p>
+                                            )}
+                                            <div className="mt-3 flex items-center justify-center gap-2">
+                                                <span
+                                                    className={`inline-flex items-center gap-1.5 rounded-full px-2.5 py-1 text-xs font-semibold ${statusPillClass(selectedTx.status)}`}
+                                                >
+                                                    <CheckCircle2 className="size-3.5" />
+                                                    {selectedTx.status_label}
+                                                </span>
+                                            </div>
+                                        </div>
+
+                                        <dl className="grid gap-3 text-sm">
+                                            <div className="flex items-baseline justify-between gap-4 border-b border-[var(--clay-border)] pb-2.5">
+                                                <dt className="clay-meta">
+                                                    Description
+                                                </dt>
+                                                <dd className="clay-title text-right font-medium">
+                                                    {selectedTx.description ??
+                                                        selectedTx.type_label}
+                                                </dd>
+                                            </div>
+
+                                            <div className="flex items-baseline justify-between gap-4 border-b border-[var(--clay-border)] pb-2.5">
+                                                <dt className="clay-meta">
+                                                    Type & Flow
+                                                </dt>
+                                                <dd className="clay-title text-right">
+                                                    {selectedTx.type_label}{' '}
+                                                    &middot;{' '}
+                                                    <span className="capitalize">
+                                                        {selectedTx.direction ??
+                                                            'Settlement'}
+                                                    </span>
+                                                </dd>
+                                            </div>
+
+                                            <div className="flex items-baseline justify-between gap-4 border-b border-[var(--clay-border)] pb-2.5">
+                                                <dt className="clay-meta">
+                                                    Executed at
+                                                </dt>
+                                                <dd className="clay-title text-right tabular-nums">
+                                                    {selectedTx.executed_at ??
+                                                        'Recorded'}
+                                                </dd>
+                                            </div>
+
+                                            <div className="flex items-baseline justify-between gap-4 border-b border-[var(--clay-border)] pb-2.5">
+                                                <dt className="clay-meta">
+                                                    Network & Chain
+                                                </dt>
+                                                <dd className="clay-title text-right">
+                                                    {selectedTx.network} (Chain
+                                                    ID 5042002)
+                                                </dd>
+                                            </div>
+
+                                            {selectedTx.network_fee && (
+                                                <div className="flex items-baseline justify-between gap-4 border-b border-[var(--clay-border)] pb-2.5">
+                                                    <dt className="clay-meta">
+                                                        Network fee
+                                                    </dt>
+                                                    <dd className="clay-title text-right tabular-nums">
+                                                        {selectedTx.network_fee}
+                                                    </dd>
+                                                </div>
+                                            )}
+
+                                            {selectedTx.payer_address && (
+                                                <div className="flex items-baseline justify-between gap-4 border-b border-[var(--clay-border)] pb-2.5">
+                                                    <dt className="clay-meta">
+                                                        Payer address
+                                                    </dt>
+                                                    <dd className="flex items-center gap-1.5 font-mono text-xs">
+                                                        <span>
+                                                            {shortAddress(
+                                                                selectedTx.payer_address,
+                                                            )}
+                                                        </span>
+                                                        <button
+                                                            type="button"
+                                                            onClick={() => {
+                                                                navigator.clipboard.writeText(
+                                                                    selectedTx.payer_address!,
+                                                                );
+                                                                toast.success(
+                                                                    'Payer address copied',
+                                                                );
+                                                            }}
+                                                            className="clay-focus text-[var(--clay-text-muted)] hover:text-[var(--clay-text)]"
+                                                            title="Copy address"
+                                                        >
+                                                            <Copy className="size-3" />
+                                                        </button>
+                                                    </dd>
+                                                </div>
+                                            )}
+
+                                            {selectedTx.recipient_address && (
+                                                <div className="flex items-baseline justify-between gap-4 border-b border-[var(--clay-border)] pb-2.5">
+                                                    <dt className="clay-meta">
+                                                        Recipient address
+                                                    </dt>
+                                                    <dd className="flex items-center gap-1.5 font-mono text-xs">
+                                                        <span>
+                                                            {shortAddress(
+                                                                selectedTx.recipient_address,
+                                                            )}
+                                                        </span>
+                                                        <button
+                                                            type="button"
+                                                            onClick={() => {
+                                                                navigator.clipboard.writeText(
+                                                                    selectedTx.recipient_address!,
+                                                                );
+                                                                toast.success(
+                                                                    'Recipient address copied',
+                                                                );
+                                                            }}
+                                                            className="clay-focus text-[var(--clay-text-muted)] hover:text-[var(--clay-text)]"
+                                                            title="Copy address"
+                                                        >
+                                                            <Copy className="size-3" />
+                                                        </button>
+                                                    </dd>
+                                                </div>
+                                            )}
+
+                                            {selectedTx.tx_hash && (
+                                                <div className="flex flex-col gap-1.5 pt-1">
+                                                    <dt className="clay-meta">
+                                                        Transaction hash
+                                                    </dt>
+                                                    <dd className="clay-inset flex items-center justify-between gap-2 p-2.5 rounded-lg">
+                                                        <span className="font-mono text-xs break-all select-all text-[var(--clay-text)]">
+                                                            {selectedTx.tx_hash}
+                                                        </span>
+                                                        <button
+                                                            type="button"
+                                                            onClick={(e) =>
+                                                                copyTxHash(
+                                                                    selectedTx.tx_hash!,
+                                                                    e,
+                                                                )
+                                                            }
+                                                            className="clay-focus inline-flex size-7 shrink-0 items-center justify-center rounded-md border border-[var(--clay-border)] bg-[var(--clay-surface)] text-[var(--clay-text-muted)] hover:text-[var(--clay-text)]"
+                                                            title="Copy hash"
+                                                        >
+                                                            {copiedTxHash ===
+                                                            selectedTx.tx_hash ? (
+                                                                <Check className="size-3.5 text-[var(--status-resolved)]" />
+                                                            ) : (
+                                                                <Copy className="size-3.5" />
+                                                            )}
+                                                        </button>
+                                                    </dd>
+                                                </div>
+                                            )}
+                                        </dl>
+
+                                        <p className="clay-meta text-xs text-[var(--clay-text-muted)]">
+                                            This transfer was cryptographically
+                                            confirmed on Arc. Finality is
+                                            reached in under 1 second and cannot
+                                            be reverted.
+                                        </p>
+
+                                        <div className="flex flex-wrap items-center justify-end gap-3 pt-2">
+                                            {selectedTx.explorer_url && (
+                                                <Button
+                                                    type="button"
+                                                    variant="outline"
+                                                    className="clay-focus rounded-full text-xs font-semibold"
+                                                    onClick={() =>
+                                                        window.open(
+                                                            selectedTx.explorer_url!,
+                                                            '_blank',
+                                                            'noopener,noreferrer',
+                                                        )
+                                                    }
+                                                >
+                                                    <ExternalLink className="size-3.5" />
+                                                    View on Arcscan
+                                                </Button>
+                                            )}
+                                            <Button
+                                                type="button"
+                                                className="clay-focus rounded-full bg-[var(--clay-primary)] text-xs font-semibold text-[var(--clay-primary-foreground)]"
+                                                onClick={() =>
+                                                    setSelectedTx(null)
+                                                }
+                                            >
+                                                Close
+                                            </Button>
+                                        </div>
+                                    </div>
+                                )}
+                            </DialogContent>
+                        </Dialog>
                     </section>
 
                     {/* -- Ask EduFlow -- */}

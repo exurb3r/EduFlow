@@ -139,15 +139,23 @@ export type TuitionAttempt = {
 };
 
 export type PaymentTransaction = {
-    id: number;
+    id: number | string;
     type: string;
     type_label: string;
+    direction?: 'inbound' | 'outbound';
     amount: number;
+    amount_fiat?: string | null;
     currency: string;
     status: string;
     status_label: string;
     tx_hash: string | null;
+    explorer_url?: string | null;
     network: string;
+    network_fee?: string | null;
+    description?: string;
+    is_verified?: boolean;
+    payer_address?: string | null;
+    recipient_address?: string | null;
     executed_at: string | null;
 };
 
