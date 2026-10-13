@@ -84,6 +84,22 @@ class Student extends Model
         return $this->hasMany(AssistanceRequest::class);
     }
 
+    /**
+     * Non-tuition charges: miscellaneous, laboratory, registration, examination.
+     *
+     * Separate from `tuitionAccounts` on purpose. An account is a term-scoped
+     * tuition ledger that the finance lane already reconciles, plans against and
+     * imports into Collections; a bill is a distinct claim with its own category,
+     * its own due date and its own status. Collapsing them would make every
+     * tuition total silently include charges that are not tuition.
+     *
+     * @return HasMany<StudentBill, $this>
+     */
+    public function bills(): HasMany
+    {
+        return $this->hasMany(StudentBill::class);
+    }
+
     /** @return HasOne<StudentWallet, $this> */
     public function wallet(): HasOne
     {
@@ -140,6 +156,7 @@ class Student extends Model
     {
         $tuition = $this->tuitionAccounts()->count();
         $assistance = $this->assistanceRequests()->count();
+        $bills = $this->bills()->count();
 
         $parts = [];
 
@@ -149,6 +166,10 @@ class Student extends Model
 
         if ($assistance > 0) {
             $parts[] = $assistance === 1 ? '1 assistance request' : "{$assistance} assistance requests";
+        }
+
+        if ($bills > 0) {
+            $parts[] = $bills === 1 ? '1 student bill' : "{$bills} student bills";
         }
 
         if ($parts === []) {
