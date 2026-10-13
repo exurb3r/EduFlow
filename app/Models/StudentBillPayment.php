@@ -44,6 +44,14 @@ use Yukazakiri\Lepton\Support\Amounts;
  * @property int $id
  * @property string $request_key
  * @property string|null $movement_key
+ * @property string $submission_state
+ * @property string|null $provider_handle
+ * @property string|null $provider_reference
+ * @property string|null $fee_guarantee
+ * @property int $observation_count
+ * @property Carbon|null $leased_until
+ * @property Carbon|null $next_attempt_at
+ * @property string|null $last_error
  * @property int $organization_id
  * @property int $quoted_for
  * @property int $student_bill_id
@@ -119,6 +127,33 @@ class StudentBillPayment extends Model
 
     public const int CHAIN_ID = 5042002;
 
+    /**
+     * Rail-facing states, each saying exactly what the rail knows.
+     *
+     * None of them may be read as money moved. `prepared` is the only state a
+     * signer may be invoked from, and reaching it again after `submitted_at` has
+     * been set is impossible by construction rather than by convention.
+     */
+    public const string SUBMISSION_CONSENTED = 'consented';
+
+    /** Consent exists, nothing has been asked of the rail yet. */
+    public const string SUBMISSION_PREPARED = 'prepared';
+
+    /** A signer may have been called; the outcome is not yet known. */
+    public const string SUBMISSION_SUBMITTING = 'submitting';
+
+    /** The rail accepted and issued its own handle. No chain hash exists yet. */
+    public const string SUBMISSION_ACCEPTED = 'accepted';
+
+    /** A hash exists. Movement is asserted, not yet proven. */
+    public const string SUBMISSION_AWAITING_VERIFICATION = 'awaiting_verification';
+
+    /** Proof is persisted and the local allocation is still owed. */
+    public const string SUBMISSION_VERIFIED = 'verified';
+
+    /** A person must reconcile an existing submission. Never resolved by sending again. */
+    public const string SUBMISSION_NEEDS_REVIEW = 'needs_operator_review';
+
     protected $fillable = [
         'request_key', 'movement_key', 'organization_id', 'quoted_for', 'student_bill_id', 'student_id',
         'student_wallet_id', 'snapshot', 'snapshot_digest', 'consent_snapshot', 'consent_digest',
@@ -127,6 +162,8 @@ class StudentBillPayment extends Model
         'amount_base_units', 'applied_base_units', 'overpayment_base_units', 'network_fee',
         'payer_address', 'recipient_address', 'chain', 'tx_hash', 'tx_verified_on_chain', 'simulated',
         'allocated_at', 'executed_at',
+        'submission_state', 'provider_handle', 'provider_reference', 'fee_guarantee',
+        'observation_count', 'leased_until', 'next_attempt_at', 'last_error',
     ];
 
     /** @var array<string, mixed> */
@@ -136,6 +173,8 @@ class StudentBillPayment extends Model
         'tx_verified_on_chain' => false,
         'simulated' => false,
         'requires_human_approval' => true,
+        'submission_state' => self::SUBMISSION_CONSENTED,
+        'observation_count' => 0,
     ];
 
     /** @return array<string, string> */
@@ -163,6 +202,9 @@ class StudentBillPayment extends Model
             'simulated' => 'boolean',
             'allocated_at' => 'datetime',
             'executed_at' => 'datetime',
+            'observation_count' => 'integer',
+            'leased_until' => 'datetime',
+            'next_attempt_at' => 'datetime',
         ];
     }
 
@@ -193,10 +235,28 @@ class StudentBillPayment extends Model
             // and the allocation fence single-valued.
             foreach (['consent_snapshot', 'consent_digest', 'consented_at', 'submitted_at', 'movement_key',
                 'settlement_evidence', 'settlement_evidence_digest', 'settlement_verified_at', 'network_fee',
-                'tx_hash', 'executed_at', 'allocated_at'] as $field) {
+                'tx_hash', 'executed_at', 'allocated_at', 'provider_handle', 'provider_reference',
+                'fee_guarantee'] as $field) {
                 if ($payment->getRawOriginal($field) !== null && $payment->isDirty($field)) {
                     throw new LogicException('Bill payment consent, submission and settlement evidence are write-once.');
                 }
+            }
+
+            /**
+             * The submission fence is the only thing standing between a crash
+             * and a second transfer, so a row that has already been handed to a
+             * signer may never look unsent again — not by rewinding `submitted_at`,
+             * and not by returning to a state a signer is allowed to act from.
+             *
+             * `provider_handle` and `provider_reference` are separately
+             * write-once above, because a Circle agent wallet answers with a
+             * transaction id first and a chain hash later, and each may only ever
+             * be learned once.
+             */
+            if ($payment->getRawOriginal('submitted_at') !== null
+                && $payment->isDirty(['submitted_at', 'submission_state'])
+                && $payment->submission_state === self::SUBMISSION_PREPARED) {
+                throw new LogicException('A bill payment that reached a signer can never return to a dispatchable state.');
             }
 
             // The flag and the split default to "nothing proven" and "nothing

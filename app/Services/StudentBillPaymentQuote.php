@@ -115,6 +115,7 @@ final readonly class StudentBillPaymentQuote
         private AsyncPaymentTransport $transport,
         private ArcSettlementVerifier $verifier,
         private BillPaymentPolicy $policy,
+        private StudentBillPaymentDispatcher $dispatcher,
     ) {}
 
     /**
@@ -305,6 +306,12 @@ final readonly class StudentBillPaymentQuote
                 'consent_digest' => PaymentIntent::digest($consent),
                 'consented_at' => now(),
             ]);
+
+            // Registered inside the transaction, so it fires only if the consent
+            // actually commits. A rolled-back consent must leave no dispatchable
+            // work, and the student must not be left believing a payment is in
+            // flight when it never was.
+            $this->dispatcher->wakeAfterCommit((int) $stored->getKey());
 
             return $stored->refresh();
         }, 3);

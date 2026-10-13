@@ -20,6 +20,12 @@ Schedule::command('eduflow:dispatch-student-tuition')->everyMinute()->withoutOve
 Schedule::command('eduflow:reconcile-tuition-receipts')->everyFiveMinutes()->withoutOverlapping(5)->onOneServer()
     ->when(fn (): bool => (bool) config('eduflow.student_tuition.auto_intake', false));
 
+// Recovery for consented bill payments nobody took. The wake inside the consent
+// transaction is the normal path; this sweep only redelivers what an outage or a
+// disabled lane left behind, and it can never create a second transfer.
+Schedule::command('eduflow:dispatch-student-bill-payments')->everyMinute()->withoutOverlapping(5)->onOneServer()
+    ->when(fn (): bool => (bool) config('eduflow.student_bills.enabled', false));
+
 // Durably owed submissions are handed to a worker only when the submission
 // runtime is explicitly enabled. Overlap control matters here: two ticks
 // racing on the same row would be the difference between one owed payment and

@@ -97,6 +97,37 @@ return [
     */
     'wallet_balance_cache_seconds' => env('EDUFLOW_WALLET_BALANCE_CACHE_SECONDS', 30),
 
+    /*
+    |--------------------------------------------------------------------------
+    | Student Bill Payment Runtime
+    |--------------------------------------------------------------------------
+    |
+    | A student's payment of a non-tuition bill. Money ARRIVES at the college
+    | here, so nothing in this lane can authorise money leaving it; the policy
+    | assessment it records is triage metadata only.
+    |
+    | All four switches default off, and turning them on is an operator
+    | decision rather than a consequence of anything else. `enabled` gates new
+    | submissions, `observe_enabled` gates resolving transfers that already
+    | exist, and `stop_switch` halts new sends while leaving reconciliation and
+    | recovery running.
+    |
+    | `pilot_bill_ids` is an explicit allow-list. A bill absent from it is never
+    | sent, whatever the student consents to.
+    |
+    */
+
+    'student_bills' => [
+        'enabled' => env('EDUFLOW_BILL_SUBMISSION_ENABLED', false),
+        'observe_enabled' => env('EDUFLOW_BILL_OBSERVATION_ENABLED', false),
+        'stop_switch' => env('EDUFLOW_BILL_SUBMISSION_STOP', false),
+        'pilot_bill_ids' => [],
+        'recovery_owner_id' => env('EDUFLOW_BILL_RECOVERY_OWNER_ID'),
+        'queue_connection' => env('EDUFLOW_BILL_QUEUE_CONNECTION', 'database'),
+        'queue' => 'student-bills',
+        'max_observations' => 10,
+    ],
+
     'student_tuition' => [
         'enabled' => env('EDUFLOW_TUITION_SUBMISSION_ENABLED', false),
         'observe_enabled' => env('EDUFLOW_TUITION_OBSERVATION_ENABLED', false),

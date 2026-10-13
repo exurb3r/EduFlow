@@ -48,6 +48,7 @@ expect()->extend('toBeOne', fn () => $this->toBe(1));
 */
 
 require_once __DIR__.'/Helpers/TuitionConsent.php';
+require_once __DIR__.'/Helpers/StudentBillFixtures.php';
 
 if (! function_exists('mockExpectation')) {
     /**
