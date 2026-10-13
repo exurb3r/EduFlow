@@ -136,6 +136,7 @@ export type TuitionAttempt = {
     explorer_url?: string | null;
     last_error?: string | null;
     simulated: boolean;
+    verified?: boolean;
     posted: boolean;
     applied_base_units: string;
     overpayment_base_units: string;

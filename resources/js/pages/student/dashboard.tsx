@@ -167,6 +167,15 @@ export default function StudentDashboard({
     );
     const [consent, setConsent] = useState(false);
     const [receipt, setReceipt] = useState<TuitionAttempt | null>(null);
+    const activeReceipt = receipt
+        ? (tuitionAttempts.find(
+              (a) =>
+                  a.id === receipt.id ||
+                  Boolean(
+                      a.request_key && a.request_key === receipt.request_key,
+                  ),
+          ) ?? receipt)
+        : null;
     const [txFilter, setTxFilter] = useState<'all' | 'inbound' | 'outbound'>(
         'all',
     );
@@ -176,7 +185,15 @@ export default function StudentDashboard({
     const [monitorDrawerOpen, setMonitorDrawerOpen] = useState(false);
     const [isRefreshingTxs, setIsRefreshingTxs] = useState(false);
     const [copiedTxHash, setCopiedTxHash] = useState<string | null>(null);
-    usePoll(8000, {
+    const shouldFastPoll =
+        hasInFlight ||
+        Boolean(
+            activeReceipt &&
+            !activeReceipt.posted &&
+            activeReceipt.state !== 'failed' &&
+            !activeReceipt.simulated,
+        );
+    usePoll(shouldFastPoll ? 2500 : 8000, {
         only: [
             'tuitionAttempts',
             'tuitionAccount',
@@ -450,6 +467,9 @@ export default function StudentDashboard({
                                 }
 
                                 setPayOpen(open);
+                                if (!open) {
+                                    setReceipt(null);
+                                }
                             }}
                         >
                             <DialogContent className="bulletin clay-card border-[var(--clay-border)] sm:max-w-md">
@@ -468,57 +488,145 @@ export default function StudentDashboard({
                                     </DialogDescription>
                                 </DialogHeader>
 
-                                {receipt ? (
+                                {activeReceipt ? (
                                     <div className="grid gap-4">
-                                        <p
-                                            className={
-                                                receipt.simulated
-                                                    ? 'clay-title text-[var(--status-pending)]'
-                                                    : 'clay-title text-[var(--status-resolved)]'
-                                            }
-                                        >
-                                            {receipt.simulated
-                                                ? 'Rehearsal — nothing was sent.'
-                                                : receipt.state_label}
-                                        </p>
+                                        <div className="flex items-center gap-2.5">
+                                            {activeReceipt.posted ? (
+                                                <>
+                                                    <CheckCircle2 className="size-5 shrink-0 text-[var(--status-resolved)]" />
+                                                    <p className="clay-title text-[var(--status-resolved)]">
+                                                        Successfully transferred
+                                                    </p>
+                                                </>
+                                            ) : activeReceipt.verified ? (
+                                                <>
+                                                    <Check className="size-5 shrink-0 text-[var(--status-resolved)]" />
+                                                    <p className="clay-title text-[var(--status-resolved)]">
+                                                        Verified on chain —
+                                                        posting allocation…
+                                                    </p>
+                                                </>
+                                            ) : activeReceipt.state ===
+                                              'failed' ? (
+                                                <>
+                                                    <TriangleAlert className="size-5 shrink-0 text-[var(--status-urgent)]" />
+                                                    <p className="clay-title text-[var(--status-urgent)]">
+                                                        Transfer could not be
+                                                        completed
+                                                    </p>
+                                                </>
+                                            ) : activeReceipt.simulated ? (
+                                                <p className="clay-title text-[var(--status-pending)]">
+                                                    Rehearsal — nothing was
+                                                    sent.
+                                                </p>
+                                            ) : (
+                                                <>
+                                                    <Loader2 className="size-5 shrink-0 animate-spin text-[var(--status-pending)]" />
+                                                    <p className="clay-title text-[var(--status-pending)]">
+                                                        {activeReceipt.state ===
+                                                        'prepared'
+                                                            ? 'Payment recorded — processing transfer…'
+                                                            : activeReceipt.state ===
+                                                                'submitting'
+                                                              ? 'Submitting to Arc network…'
+                                                              : activeReceipt.state ===
+                                                                  'accepted'
+                                                                ? 'Accepted by network — awaiting block…'
+                                                                : activeReceipt.state ===
+                                                                    'awaiting_verification'
+                                                                  ? 'On chain — verifying movement…'
+                                                                  : activeReceipt.state_label}
+                                                    </p>
+                                                </>
+                                            )}
+                                        </div>
                                         <dl className="grid gap-3 text-sm">
                                             <div className="flex items-baseline justify-between gap-4">
                                                 <dt className="clay-meta">
-                                                    {receipt.simulated
-                                                        ? 'Would be sent to the institution'
-                                                        : 'Requested principal (not a settlement claim)'}
+                                                    Status
+                                                </dt>
+                                                <dd className="clay-title">
+                                                    {activeReceipt.posted ? (
+                                                        <span className="inline-flex items-center gap-1.5 font-semibold text-[var(--status-resolved)]">
+                                                            <CheckCircle2 className="size-3.5" />
+                                                            Successfully
+                                                            transferred
+                                                        </span>
+                                                    ) : activeReceipt.verified ? (
+                                                        <span className="inline-flex items-center gap-1.5 font-semibold text-[var(--status-resolved)]">
+                                                            <Check className="size-3.5" />
+                                                            Verified on chain
+                                                        </span>
+                                                    ) : activeReceipt.state ===
+                                                      'failed' ? (
+                                                        <span className="inline-flex items-center gap-1.5 font-semibold text-[var(--status-urgent)]">
+                                                            <TriangleAlert className="size-3.5" />
+                                                            Failed
+                                                        </span>
+                                                    ) : activeReceipt.simulated ? (
+                                                        <span className="font-semibold text-[var(--status-pending)]">
+                                                            Rehearsal
+                                                        </span>
+                                                    ) : (
+                                                        <span className="inline-flex items-center gap-1.5 font-semibold text-[var(--status-pending)]">
+                                                            <Loader2 className="size-3.5 animate-spin" />
+                                                            Processing transfer…
+                                                        </span>
+                                                    )}
+                                                </dd>
+                                            </div>
+                                            <div className="flex items-baseline justify-between gap-4">
+                                                <dt className="clay-meta">
+                                                    {activeReceipt.simulated
+                                                        ? 'Would be sent to institution'
+                                                        : 'Transferred amount'}
                                                 </dt>
                                                 <dd className="clay-title tabular-nums">
                                                     {formatBaseUnits(
-                                                        receipt.amount_base_units,
+                                                        activeReceipt.amount_base_units,
                                                     )}{' '}
                                                     USDC
                                                 </dd>
                                             </div>
                                             <div className="flex items-baseline justify-between gap-4">
                                                 <dt className="clay-meta">
-                                                    {receipt.simulated
+                                                    {activeReceipt.simulated
                                                         ? 'Network fee (not charged)'
                                                         : 'Proven network fee'}
                                                 </dt>
                                                 <dd className="clay-title tabular-nums">
-                                                    {receipt.actual_network_fee ??
-                                                        'Not yet proven'}
+                                                    {activeReceipt.actual_network_fee
+                                                        ? `${Number(activeReceipt.actual_network_fee).toFixed(6)} USDC`
+                                                        : activeReceipt.posted
+                                                          ? 'Sponsored'
+                                                          : 'Not yet proven'}
                                                 </dd>
                                             </div>
                                             <div className="flex items-baseline justify-between gap-4">
                                                 <dt className="clay-meta">
                                                     Applied to this account
                                                 </dt>
-                                                <dd className="clay-title tabular-nums">
+                                                <dd
+                                                    className={`clay-title tabular-nums ${activeReceipt.posted ? 'text-[var(--status-resolved)]' : ''}`}
+                                                >
                                                     {formatBaseUnits(
-                                                        receipt.applied_base_units,
+                                                        activeReceipt.applied_base_units,
                                                     )}{' '}
                                                     USDC
+                                                    {!activeReceipt.posted &&
+                                                        activeReceipt.state !==
+                                                            'failed' &&
+                                                        !activeReceipt.simulated && (
+                                                            <span className="ml-1.5 text-xs font-normal text-[var(--clay-text-muted)]">
+                                                                (pending)
+                                                            </span>
+                                                        )}
                                                 </dd>
                                             </div>
                                             {BigInt(
-                                                receipt.overpayment_base_units,
+                                                activeReceipt.overpayment_base_units ??
+                                                    '0',
                                             ) > 0n && (
                                                 <div className="flex items-baseline justify-between gap-4">
                                                     <dt className="clay-meta">
@@ -527,7 +635,7 @@ export default function StudentDashboard({
                                                     </dt>
                                                     <dd className="clay-title tabular-nums text-[var(--status-pending)]">
                                                         {formatBaseUnits(
-                                                            receipt.overpayment_base_units,
+                                                            activeReceipt.overpayment_base_units,
                                                         )}{' '}
                                                         USDC
                                                     </dd>
@@ -549,25 +657,63 @@ export default function StudentDashboard({
                                                 <dt className="clay-meta">
                                                     Transaction
                                                 </dt>
-                                                <dd className="clay-meta mt-1 break-all">
-                                                    {receipt.tx_hash}
+                                                <dd className="clay-meta mt-1">
+                                                    {activeReceipt.tx_hash ? (
+                                                        <div className="flex flex-wrap items-center justify-between gap-2">
+                                                            <span className="font-mono text-xs break-all">
+                                                                {
+                                                                    activeReceipt.tx_hash
+                                                                }
+                                                            </span>
+                                                            {activeReceipt.explorer_url && (
+                                                                <a
+                                                                    href={
+                                                                        activeReceipt.explorer_url
+                                                                    }
+                                                                    target="_blank"
+                                                                    rel="noopener noreferrer"
+                                                                    className="clay-focus inline-flex shrink-0 items-center gap-1 rounded text-xs font-semibold text-[var(--clay-primary-bright)] hover:underline"
+                                                                >
+                                                                    Verify on
+                                                                    Arcscan
+                                                                    <ExternalLink className="size-3" />
+                                                                </a>
+                                                            )}
+                                                        </div>
+                                                    ) : (
+                                                        <span className="text-[var(--clay-text-muted)]">
+                                                            {activeReceipt.state ===
+                                                            'failed'
+                                                                ? 'No transaction broadcast'
+                                                                : 'Pending relayer dispatch…'}
+                                                        </span>
+                                                    )}
                                                 </dd>
                                             </div>
                                         </dl>
                                         <p className="clay-meta">
-                                            {receipt.simulated
-                                                ? 'No USDC moved on any network, and no fee was charged.'
-                                                : 'Fees are shown only when proven. Receipt status, allocation and official tuition are different claims.'}
+                                            {activeReceipt.posted
+                                                ? 'Receipt verified on Arc Testnet consensus and credited to tuition balance.'
+                                                : activeReceipt.simulated
+                                                  ? 'No USDC moved on any network, and no fee was charged.'
+                                                  : 'Fees are shown only when proven. Receipt status, allocation and official tuition are different claims.'}
                                         </p>
                                         <p className="clay-meta">
-                                            {receipt.guidance} Allocation:{' '}
-                                            {receipt.posted
-                                                ? 'Posted to designated pilot account'
-                                                : 'Not posted'}
-                                            .
+                                            {activeReceipt.posted ? (
+                                                <span className="font-semibold text-[var(--status-resolved)]">
+                                                    Allocation: Posted to
+                                                    designated pilot account.
+                                                </span>
+                                            ) : (
+                                                <span>
+                                                    {activeReceipt.guidance}{' '}
+                                                    Allocation: Not posted.
+                                                </span>
+                                            )}
                                         </p>
                                         {BigInt(
-                                            receipt.overpayment_base_units,
+                                            activeReceipt.overpayment_base_units ??
+                                                '0',
                                         ) > 0n && (
                                             <p className="clay-meta">
                                                 You paid more than this account
@@ -580,7 +726,10 @@ export default function StudentDashboard({
                                         <Button
                                             type="button"
                                             className="clay-focus rounded-full bg-[var(--clay-primary)] font-semibold text-[var(--clay-primary-foreground)]"
-                                            onClick={() => setPayOpen(false)}
+                                            onClick={() => {
+                                                setPayOpen(false);
+                                                setReceipt(null);
+                                            }}
                                         >
                                             Done
                                         </Button>
