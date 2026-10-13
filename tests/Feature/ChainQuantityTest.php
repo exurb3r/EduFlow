@@ -18,11 +18,11 @@ use Yukazakiri\Lepton\Contracts\ArcNetworkGateway;
  * `Invalid hex quantity [\e[1;36m0x3fcb62f\e[0m]` and answered GET /admin with
  * a 500.
  */
-final class ColorisedArcGateway implements ArcNetworkGateway
+final readonly class ColorisedArcGateway implements ArcNetworkGateway
 {
     public function __construct(
-        private readonly string $payload,
-        private readonly ?string $balance = null,
+        private string $payload,
+        private ?string $balance = null,
     ) {}
 
     public function rpcUrl(): string
@@ -45,7 +45,7 @@ final class ColorisedArcGateway implements ArcNetworkGateway
         return $this->payload;
     }
 
-    public function treasuryAddress(): ?string
+    public function treasuryAddress(): string
     {
         return '0x19bee6bef4f66d9d0cdb07f4d7fea00dc328251d';
     }
@@ -76,7 +76,10 @@ function colorise(string $payload): string
 
 function treasuryWallet(): Wallet
 {
-    $org = Organization::create([
+    // Through the factories, like every other suite: a hand-rolled create() here
+    // would drift from the schema the moment a column is added.
+    /** @var Organization $organization */
+    $organization = Organization::factory()->create([
         'name' => 'Treasury Academy',
         'currency' => 'USDC',
         'minimum_reserve' => 10000.00,
@@ -85,14 +88,17 @@ function treasuryWallet(): Wallet
         'human_approval_threshold' => 1000.00,
     ]);
 
-    return Wallet::create([
-        'organization_id' => $org->id,
+    /** @var Wallet $wallet */
+    $wallet = Wallet::factory()->create([
+        'organization_id' => $organization->id,
         'provider' => 'circle',
         'network' => 'arc',
         'address' => '0x19bee6bef4f66d9d0cdb07f4d7fea00dc328251d',
         'balance' => 20.00,
         'status' => 'active',
     ]);
+
+    return $wallet;
 }
 
 it('parses a colourised hex quantity instead of throwing', function (): void {
@@ -120,7 +126,6 @@ it('reports treasury status instead of throwing when the CLI colourises its outp
 it('degrades to unavailable rather than throwing on unreadable chain output', function (): void {
     app()->instance(ArcNetworkGateway::class, new ColorisedArcGateway(
         payload: 'Error: no agent session is active',
-        balance: null,
     ));
 
     $status = app(LeptonTreasuryService::class)->status(treasuryWallet());

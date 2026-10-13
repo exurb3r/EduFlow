@@ -319,7 +319,7 @@ final readonly class StudentBillPaymentQuote
             || StudentTuitionPaymentService::feeCeiling($fee) > $payment->feeCeilingBaseUnits()
             || strtolower((string) ($receipt['transactionHash'] ?? '')) !== strtolower($txHash)) {
             throw ValidationException::withMessages([
-                'settlement' => 'Chain proof does not establish this exact principal within the accepted fee ceiling. Verdict: '.(string) ($verdict['verdict'] ?? 'unreadable').'.',
+                'settlement' => 'Chain proof does not establish this exact principal within the accepted fee ceiling. Verdict: '.($verdict['verdict'] ?? 'unreadable').'.',
             ]);
         }
 

@@ -6,6 +6,7 @@ use App\Models\StudentTuitionPayment;
 use App\Models\StudentTuitionPaymentAttempt;
 use App\Models\StudentTuitionPaymentIntent;
 use App\Models\Transaction;
+use App\Services\Payments\AsyncPaymentTransport;
 use App\Services\Payments\CircleAgentWalletTransport;
 use App\Services\Payments\FeeGuarantee;
 use App\Services\Payments\TransportAcceptance;
@@ -14,6 +15,7 @@ use App\Services\StudentTuitionPaymentProcessor;
 use App\Services\StudentTuitionPaymentService;
 use Brick\Math\BigInteger;
 use Illuminate\Validation\ValidationException;
+use Yukazakiri\Lepton\Contracts\ArcNetworkGateway;
 
 test('quote and consent are immutable exact snapshots before any signer call', function (): void {
     $c = consentContext();
@@ -106,8 +108,9 @@ test('the stock Circle rail reports an honest, weaker fee guarantee', function (
 test('a rail with no fee bound at all is refused before the signer', function (): void {
     $c = consentContext();
     $a = confirmConsent($c);
-    $c['transport']->shouldReceive('feeGuarantee')->andReturn(FeeGuarantee::Unbounded);
-    $c['transport']->shouldNotReceive('submit');
+    $transport = tuitionTransport(FeeGuarantee::Unbounded);
+    $transport->shouldNotReceive('submit');
+    app()->instance(AsyncPaymentTransport::class, $transport);
 
     app(StudentTuitionPaymentProcessor::class)->process($a->id);
 
@@ -118,11 +121,12 @@ test('a rail with no fee bound at all is refused before the signer', function ()
 test('a balance-bounded rail refuses while the wallet holds more than the agreed total', function (): void {
     $c = consentContext();
     $a = confirmConsent($c);
-    $c['transport']->shouldReceive('feeGuarantee')->andReturn(FeeGuarantee::SenderBalanceBounded);
     // The fixture funds 20 USDC against a ~5.03 USDC total, so the fee could in
     // principle draw on the surplus. That surplus is exactly what makes this an
     // unbounded send as far as the agreed ceiling is concerned.
-    $c['transport']->shouldNotReceive('submit');
+    $transport = tuitionTransport(FeeGuarantee::SenderBalanceBounded);
+    $transport->shouldNotReceive('submit');
+    app()->instance(AsyncPaymentTransport::class, $transport);
 
     app(StudentTuitionPaymentProcessor::class)->process($a->id);
 
@@ -133,12 +137,12 @@ test('a balance-bounded rail refuses while the wallet holds more than the agreed
 test('a balance-bounded rail proceeds when the wallet holds only the agreed total', function (): void {
     $c = consentContext();
     $a = confirmConsent($c);
-    $c['transport']->shouldReceive('feeGuarantee')->andReturn(FeeGuarantee::SenderBalanceBounded);
-    // Pin the rail balance to exactly principal + fee ceiling: 5.000000 + 0.029452.
-    mockExpectation($c['arc'], 'rpc')->with('eth_getBalance', Mockery::any())
-        ->andReturn('0x'.BigInteger::of('5029452000000000000')->toBase(16));
-    mockExpectation($c['transport'], 'submit')->once()->andReturn(new TransportAcceptance('116c7ce7-8f2f-53ac-8b06-f18aac151ce3'));
-    mockExpectation($c['transport'], 'resolve')->andReturn(TransportResolution::pending());
+    // Pin the payer balance to exactly principal + fee ceiling: 5.000000 + 0.029452.
+    app()->instance(ArcNetworkGateway::class, tuitionArcGateway(5_029_452));
+    $transport = tuitionTransport(FeeGuarantee::SenderBalanceBounded);
+    mockExpectation($transport, 'submit')->once()->andReturn(new TransportAcceptance('116c7ce7-8f2f-53ac-8b06-f18aac151ce3'));
+    mockExpectation($transport, 'resolve')->andReturn(TransportResolution::pending());
+    app()->instance(AsyncPaymentTransport::class, $transport);
 
     app(StudentTuitionPaymentProcessor::class)->process($a->id);
 

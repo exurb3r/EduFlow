@@ -29,6 +29,57 @@ use Yukazakiri\Lepton\Contracts\AuthGateway;
  */
 
 /**
+ * A scripted Arc testnet gateway.
+ *
+ * The wallet balance is an argument rather than a fixed fixture value so a test
+ * can state the balance it needs outright. Mockery has no portable way to let a
+ * later expectation override an earlier one — `byDefault()` exists only on the
+ * concrete `Mockery\Expectation`, not on the interface `shouldReceive()` is
+ * typed as — so replacing the bound instance is both the honest and the
+ * statically sound way to vary it.
+ *
+ * @param  int  $balanceBaseUnits  the payer's funded balance, in 6-decimal USDC base units
+ */
+function tuitionArcGateway(int $balanceBaseUnits = 20_000_000): ArcNetworkGateway&MockInterface
+{
+    $arc = Mockery::mock(ArcNetworkGateway::class);
+    if (! $arc instanceof ArcNetworkGateway) {
+        throw new RuntimeException('Arc mock does not implement gateway.');
+    }
+    $arc->shouldReceive('chainCode')->andReturn('ARC-TESTNET');
+    $arc->shouldReceive('chainId')->andReturn(5042002);
+    mockExpectation($arc, 'addressExplorerUrl')->andReturn('https://example.test/address');
+    mockExpectation($arc, 'explorerUrl')->andReturn('https://example.test/tx');
+    mockExpectation($arc, 'rpc')->with('eth_chainId')->andReturn('0x4cef52');
+    mockExpectation($arc, 'rpc')->with('eth_getBalance', Mockery::any())
+        ->andReturn('0x'.BigInteger::of($balanceBaseUnits)->multipliedBy('1000000000000')->toBase(16));
+
+    return $arc;
+}
+
+/**
+ * A scripted payment rail and the fee guarantee it honestly claims.
+ *
+ * `supportsFeeCeiling()` is derived from the guarantee rather than asserted
+ * separately, so a test cannot accidentally pair a cap-refusing guarantee with
+ * a rail that claims to enforce one.
+ */
+function tuitionTransport(
+    FeeGuarantee $guarantee = FeeGuarantee::SignerEnforced,
+    string $quotedFee = '0.02945113436514256',
+): FeeBoundedPaymentTransport&MockInterface {
+    $transport = Mockery::mock(FeeBoundedPaymentTransport::class);
+    if (! $transport instanceof FeeBoundedPaymentTransport) {
+        throw new RuntimeException('Transport mock does not implement fee-bounded rail.');
+    }
+    $transport->shouldReceive('feeGuarantee')->andReturn($guarantee);
+    $transport->shouldReceive('supportsFeeCeiling')->andReturn($guarantee === FeeGuarantee::SignerEnforced);
+    $transport->shouldReceive('estimate')->andReturn(['networkFee' => $quotedFee]);
+
+    return $transport;
+}
+
+/**
  * A consenting pilot student with an active operator-generated wallet, a funded
  * Arc testnet rail and a named finance recovery owner.
  *
@@ -57,33 +108,12 @@ function consentContext(): array
         throw new RuntimeException('Tuition factory returned no account.');
     }
     config(['eduflow.student_tuition.pilot_account_ids' => [$account->id]]);
-    $arc = Mockery::mock(ArcNetworkGateway::class);
-    if (! $arc instanceof ArcNetworkGateway) {
-        throw new RuntimeException('Arc mock does not implement gateway.');
-    }
-    $arc->shouldReceive('chainCode')->andReturn('ARC-TESTNET');
-    $arc->shouldReceive('chainId')->andReturn(5042002);
-    mockExpectation($arc, 'addressExplorerUrl')->andReturn('https://example.test/address');
-    mockExpectation($arc, 'explorerUrl')->andReturn('https://example.test/tx');
-    mockExpectation($arc, 'rpc')->with('eth_chainId')->andReturn('0x4cef52');
-    // byDefault: a test that needs a different funded balance (for example to
-    // pin the sender-loss bound) must be able to replace this rather than have
-    // its own expectation shadowed by it.
-    mockExpectation($arc, 'rpc')->with('eth_getBalance', Mockery::any())
-        ->andReturn('0x'.BigInteger::of('20000000000000000000')->toBase(16))->byDefault();
+    $arc = tuitionArcGateway();
     $auth = Mockery::mock(AuthGateway::class);
     mockExpectation($auth, 'isAuthenticatedFor')->with('ARC-TESTNET')->andReturn(true);
     app()->instance(AuthGateway::class, $auth);
     app()->instance(ArcNetworkGateway::class, $arc);
-    $transport = Mockery::mock(FeeBoundedPaymentTransport::class);
-    if (! $transport instanceof FeeBoundedPaymentTransport) {
-        throw new RuntimeException('Transport mock does not implement fee-bounded rail.');
-    }
-    // byDefault so an individual test can state a different rail guarantee
-    // without fighting a competing expectation from this fixture.
-    $transport->shouldReceive('feeGuarantee')->andReturn(FeeGuarantee::SignerEnforced)->byDefault();
-    $transport->shouldReceive('supportsFeeCeiling')->andReturn(true)->byDefault();
-    $transport->shouldReceive('estimate')->andReturn(['networkFee' => '0.02945113436514256']);
+    $transport = tuitionTransport();
     app()->instance(AsyncPaymentTransport::class, $transport);
 
     return ['student' => $student, 'account' => $account, 'arc' => $arc, 'transport' => $transport];

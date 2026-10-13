@@ -196,10 +196,10 @@ test('the confidence floor is inclusive, configurable, and refuses nonsense', fu
         ->and($lenient->evaluate(billContext(['advisoryConfidence' => 0.49]))->decision)->toBe(AgentDecisionType::ESCALATE);
 
     // An operator may retune a floor; they may not make it nonsensical.
-    expect(fn () => new BillPaymentPolicy(['advisory_confidence_floor' => 1.5]))->toThrow(InvalidArgumentException::class)
-        ->and(fn () => new BillPaymentPolicy(['auto_pay_ceiling_base_units' => 0]))->toThrow(InvalidArgumentException::class)
-        ->and(fn () => new BillPaymentPolicy(['daily_cap_base_units' => -1]))->toThrow(InvalidArgumentException::class)
-        ->and(fn () => new BillPaymentPolicy(['allowed_categories' => 'laboratory']))->toThrow(InvalidArgumentException::class);
+    expect(fn (): BillPaymentPolicy => new BillPaymentPolicy(['advisory_confidence_floor' => 1.5]))->toThrow(InvalidArgumentException::class)
+        ->and(fn (): BillPaymentPolicy => new BillPaymentPolicy(['auto_pay_ceiling_base_units' => 0]))->toThrow(InvalidArgumentException::class)
+        ->and(fn (): BillPaymentPolicy => new BillPaymentPolicy(['daily_cap_base_units' => -1]))->toThrow(InvalidArgumentException::class)
+        ->and(fn (): BillPaymentPolicy => new BillPaymentPolicy(['allowed_categories' => 'laboratory']))->toThrow(InvalidArgumentException::class);
 });
 
 test('escalates a bill carrying advisory anomaly flags even at perfect confidence', function (): void {

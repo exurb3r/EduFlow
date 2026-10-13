@@ -384,7 +384,7 @@ it('carries no untrusted description into the prompt beyond a length cap', funct
         ->and($advisory->category)->toBe('laboratory');
 
     BillClassifier::assertPrompted(function (AgentPrompt $sent): bool {
-        $prompt = (string) $sent->prompt;
+        $prompt = $sent->prompt;
 
         // The untrusted payload is capped, the warning and the closing
         // instruction both survive, and no figure ever reached the model.

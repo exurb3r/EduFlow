@@ -43,6 +43,11 @@ class DecisionExplainer
             AgentDecisionType::HOLD => "Your request of {$display->symbol()}{$reqFiat} {$display->value} (\${$reqUsdc} USDC) is currently held under {$result->policyCode}. {$result->reasoning}",
             AgentDecisionType::ESCALATE => "Your request of {$display->symbol()}{$reqFiat} {$display->value} (\${$reqUsdc} USDC) exceeds autonomous thresholds under {$result->policyCode} and has been forwarded for administrative review.",
             AgentDecisionType::REJECT => "Your request of {$display->symbol()}{$reqFiat} {$display->value} (\${$reqUsdc} USDC) was not approved under {$result->policyCode}. {$result->reasoning}",
+            // An advisory classification moved no money and decided nothing, so
+            // it must not be narrated as though it did either. Reaching here
+            // means an advisory row was routed into an assistance explanation;
+            // saying so plainly beats inventing an approval or a rejection.
+            default => 'This record is an advisory classification, not a decision on your request. It approved nothing and refused nothing.',
         };
     }
 
