@@ -93,7 +93,7 @@ function consentContext(?Organization $institution = null): array
         'eduflow.student_tuition.enabled' => true, 'eduflow.student_tuition.observe_enabled' => true,
         'eduflow.student_tuition.queue_connection' => 'database', 'queue.connections.database.retry_after' => 360,
         'eduflow.student_tuition.auto_intake' => false]);
-    if ($institution === null) {
+    if (! $institution instanceof Organization) {
         Organization::factory()->create();
     }
     $student = Student::factory()->create(['payout_address' => '0x'.str_repeat('1', 40)]);

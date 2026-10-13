@@ -206,6 +206,10 @@ final readonly class ReceiptTriggeredPlanning
         $content['valid_until'] = $route->valid_until->utc()->toIso8601String();
         $content['amounts']['realized_receipts'] = (string) BigInteger::of($content['amounts']['realized_receipts'])->plus($batch->received_minor_units);
         $content['amounts']['restricted_cash'] = (string) BigInteger::of($content['amounts']['restricted_cash'])->plus($batch->restricted_minor_units);
+        if (BigInteger::of($content['amounts']['realized_receipts'])->isGreaterThan(PHP_INT_MAX)
+            || BigInteger::of($content['amounts']['restricted_cash'])->isGreaterThan(PHP_INT_MAX)) {
+            throw ValidationException::withMessages(['routing' => 'Cumulative exact receipt amounts exceed supported integer bounds; staff review required.']);
+        }
         $content['collections'] = $this->collections->capture($route->organization_id, $route->currency, $ids, $content['as_of'],
             $content['amounts']['realized_receipts'], $content['amounts']['restricted_cash']);
         $movement = BigInteger::zero();

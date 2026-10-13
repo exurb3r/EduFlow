@@ -36,7 +36,7 @@ function billPaymentContext(array $overrides = [], ?Organization $institution = 
     Bus::fake();
     config(['eduflow.institution_id' => null, 'lepton.default' => 'circle', 'lepton.arc.chain' => 'ARC-TESTNET',
         'lepton.arc.chain_id' => 5042002, 'lepton.arc.treasury' => '0x'.str_repeat('2', 40)]);
-    if ($institution === null) {
+    if (! $institution instanceof Organization) {
         Organization::factory()->create();
     }
 
