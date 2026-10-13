@@ -7,10 +7,12 @@ namespace App\Actions;
 use App\Models\CollectionBatch;
 use App\Models\Organization;
 use App\Models\PaymentIntent;
+use App\Models\StudentBillPayment;
 use App\Models\StudentTuitionPayment;
 use App\Models\User;
 use App\Services\FinanceWorkflows;
 use App\Services\InstallationInstitution;
+use Brick\Math\BigInteger;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Gate;
@@ -65,6 +67,18 @@ final readonly class ImportTuitionPaymentAsCollection
             ->orderByDesc('executed_at');
     }
 
+    /** @return Builder<StudentBillPayment> */
+    public function eligibleBillPayments(string $treasuryAddress): Builder
+    {
+        return StudentBillPayment::query()
+            ->where('organization_id', $this->institutions->current()?->id)
+            ->where('simulated', false)->where('tx_verified_on_chain', true)
+            ->where('recipient_address', $treasuryAddress)->whereNotNull('allocated_at')
+            ->where('chain', StudentBillPayment::CHAIN)->whereNotNull('executed_at')->whereNotNull('settlement_verified_at')
+            ->whereNotNull('settlement_evidence_digest')->whereDoesntHave('collections')
+            ->orderByDesc('executed_at');
+    }
+
     /**
      * Reconcile one verified payment into an immutable receipt.
      *
@@ -72,13 +86,19 @@ final readonly class ImportTuitionPaymentAsCollection
      *
      * @throws ValidationException when the payment cannot honestly be reconciled
      */
-    public function handle(User $actor, StudentTuitionPayment $payment, string $captureKey): CollectionBatch
+    public function handle(User $actor, StudentTuitionPayment|StudentBillPayment $payment, string $captureKey): CollectionBatch
     {
         Gate::forUser($actor)->authorize('create', CollectionBatch::class);
 
         $institution = $this->institutions->require();
         $treasury = (string) config('lepton.arc.treasury');
         $currency = 'USDC';
+        $isBill = $payment instanceof StudentBillPayment;
+        $linkColumn = $isBill ? 'student_bill_payment_id' : 'student_tuition_payment_id';
+        $this->assertReconcilable($payment, $treasury);
+        if ($isBill && $payment->organization_id !== $institution->id) {
+            throw ValidationException::withMessages(['payment' => 'Bill movement belongs to a different institution.']);
+        }
 
         // Already exact six-decimal base units from the verified movement. No
         // conversion is involved anywhere on this path, which is the only way an
@@ -90,7 +110,7 @@ final readonly class ImportTuitionPaymentAsCollection
         // `collected_from` must precede `collected_until`, and a payment has a
         // single instant. One second earlier is the narrowest honest window that
         // does not claim the receipt covers time before it happened.
-        $until = $payment->executed_at->utc();
+        $until = $payment->executed_at->copy()->utc();
         $from = $until->copy()->subSecond();
 
         $snapshot = [
@@ -99,7 +119,7 @@ final readonly class ImportTuitionPaymentAsCollection
             'capture_key' => Str::lower($captureKey),
             'institution_id' => $institution->id,
             'prepared_by' => $actor->id,
-            'source_stream' => CollectionBatch::TUITION_PORTAL_STREAM,
+            'source_stream' => $isBill ? CollectionBatch::BILL_PORTAL_STREAM : CollectionBatch::TUITION_PORTAL_STREAM,
             'source_reference' => strtolower((string) $payment->tx_hash),
             'source_document_digest' => CollectionBatch::movementDigest($payment),
             'currency' => $currency,
@@ -128,11 +148,23 @@ final readonly class ImportTuitionPaymentAsCollection
             ],
         ];
 
-        return DB::transaction(function () use ($actor, $institution, $payment, $treasury, $snapshot, $from, $until, $received, $restricted): CollectionBatch {
+        if ($isBill) {
+            $snapshot['movement']['student_bill_id'] = $payment->student_bill_id;
+            $snapshot['movement']['chain'] = $payment->chain;
+            $snapshot['movement']['settlement_evidence_digest'] = $payment->settlement_evidence_digest;
+        }
+
+        return DB::transaction(function () use ($actor, $institution, $payment, $treasury, $snapshot, $from, $until, $received, $restricted, $linkColumn): CollectionBatch {
             Organization::query()->whereKey($institution->id)->lockForUpdate()->firstOrFail();
             Gate::forUser($actor)->authorize('create', CollectionBatch::class);
 
-            $this->assertReconcilable($payment, $treasury);
+            $stored = $payment->newQuery()->whereKey($payment->getKey())->lockForUpdate()->firstOrFail();
+            $this->assertReconcilable($stored, $treasury);
+            if (! hash_equals(CollectionBatch::movementDigest($stored), $snapshot['source_document_digest'])
+                || $stored->applied_base_units !== $payment->applied_base_units
+                || $stored->overpayment_base_units !== $restricted) {
+                throw ValidationException::withMessages(['payment' => 'Movement or allocation changed before reconciliation; reload exact evidence.']);
+            }
 
             /** @var CollectionBatch|null $existing */
             $existing = CollectionBatch::query()->where('capture_key', $snapshot['capture_key'])->first();
@@ -145,13 +177,14 @@ final readonly class ImportTuitionPaymentAsCollection
                 return $existing;
             }
 
-            if (CollectionBatch::query()->where('student_tuition_payment_id', $payment->getKey())->exists()) {
+            if (CollectionBatch::query()->where($linkColumn, $payment->getKey())->exists()) {
                 throw ValidationException::withMessages(['payment' => 'This payment is already reconciled as a collection receipt.']);
             }
 
-            $duplicate = CollectionBatch::query()
-                ->where('organization_id', $institution->id)
-                ->where('source_document_digest', $snapshot['source_document_digest'])
+            $duplicate = CollectionBatch::query()->where('organization_id', $institution->id)
+                ->where(fn (Builder $query): Builder => $query->where('source_document_digest', $snapshot['source_document_digest'])
+                    ->orWhere(fn (Builder $movement): Builder => $movement->whereIn('source_stream', [CollectionBatch::TUITION_PORTAL_STREAM, CollectionBatch::BILL_PORTAL_STREAM])
+                        ->where('source_reference', $snapshot['source_reference'])))
                 ->exists();
 
             if ($duplicate) {
@@ -162,7 +195,7 @@ final readonly class ImportTuitionPaymentAsCollection
                 'capture_key' => $snapshot['capture_key'],
                 'organization_id' => $institution->id,
                 'prepared_by' => $actor->id,
-                'student_tuition_payment_id' => $payment->getKey(),
+                $linkColumn => $payment->getKey(),
                 'source_stream' => $snapshot['source_stream'],
                 'source_reference' => $snapshot['source_reference'],
                 'source_document_digest' => $snapshot['source_document_digest'],
@@ -183,13 +216,13 @@ final readonly class ImportTuitionPaymentAsCollection
                 ->event('collection_batch_reconciled_from_movement')
                 ->withProperties([
                     'snapshot_digest' => $batch->snapshot_digest,
-                    'student_tuition_payment_id' => $payment->getKey(),
+                    $linkColumn => $payment->getKey(),
                     'movement_tx_hash' => $payment->tx_hash,
                     'received_minor_units' => $received,
                     'restricted_overpayment_base_units' => $restricted,
                     'can_execute' => false,
                 ])
-                ->log('Verified tuition movement reconciled as an existing receipt; no new cash arrived and no payment authorized');
+                ->log('Verified student movement reconciled as an existing receipt; no new cash arrived and no payment authorized');
 
             return $batch;
         }, 3);
@@ -206,10 +239,21 @@ final readonly class ImportTuitionPaymentAsCollection
      *
      * @throws ValidationException
      */
-    private function assertReconcilable(StudentTuitionPayment $payment, string $treasuryAddress): void
+    private function assertReconcilable(StudentTuitionPayment|StudentBillPayment $payment, string $treasuryAddress): void
     {
-        if (! $payment->isReal()) {
+        $proven = $payment instanceof StudentBillPayment
+            ? $payment->hasValidSettlement() && $payment->isAllocated()
+            : $payment->isReal();
+        if (! $proven || $payment->executed_at === null) {
             throw ValidationException::withMessages(['payment' => 'Only a payment whose movement was verified on chain can be reconciled. A simulation settles nothing.']);
+        }
+
+        if ($payment instanceof StudentBillPayment
+            && ($payment->settlement_verified_at === null || $payment->settlement_verified_at->isFuture()
+                || $payment->executed_at->isFuture() || $payment->chain !== StudentBillPayment::CHAIN
+                || $payment->applied_base_units < 0 || $payment->overpayment_base_units < 0
+                || ! BigInteger::of($payment->applied_base_units)->plus($payment->overpayment_base_units)->isEqualTo($payment->amount_base_units))) {
+            throw ValidationException::withMessages(['payment' => 'Bill receipts require exact verified Arc-testnet settlement and applied/overpayment allocation.']);
         }
 
         if (preg_match('/^0x[0-9a-fA-F]{64}$/D', (string) $payment->tx_hash) !== 1) {

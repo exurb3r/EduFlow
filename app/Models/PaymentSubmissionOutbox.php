@@ -61,6 +61,10 @@ class PaymentSubmissionOutbox extends Model
      * has already been sent to the rail. Handing it to a worker again would be
      * a second submission, so only reconciliation may touch it.
      *
+     * Running and unknown entries are also excluded: the first claim fences a
+     * possible signer call, even when its response was lost. Only observation
+     * or independent investigation may resolve them.
+     *
      * `accepted` is excluded for the same reason and one more: on an
      * asynchronous wallet the rail has already taken the transfer and issued a
      * transaction id, but no on-chain hash exists yet. That is an in-flight
@@ -68,7 +72,7 @@ class PaymentSubmissionOutbox extends Model
      *
      * @var list<string>
      */
-    public const array DISPATCHABLE_STATES = ['queued', 'running', 'unknown'];
+    public const array DISPATCHABLE_STATES = ['queued'];
 
     /**
      * States in which the rail already owns a transfer and only observation is
@@ -110,6 +114,10 @@ class PaymentSubmissionOutbox extends Model
             if (in_array($entry->getOriginal('state'), self::TERMINAL_STATES, true)
                 && $entry->state !== $entry->getOriginal('state')) {
                 throw new LogicException('A concluded submission cannot be re-decided or reopened.');
+            }
+
+            if ($entry->state === 'queued' && $entry->getOriginal('state') !== 'queued') {
+                throw new LogicException('A claimed submission cannot become dispatchable again; reconcile the existing attempt.');
             }
 
             if (! in_array($entry->state, array_merge(self::OPEN_STATES, self::TERMINAL_STATES), true)) {
@@ -206,7 +214,8 @@ class PaymentSubmissionOutbox extends Model
      * What is durably owed.
      *
      * `can_execute` is deliberately false: an entry existing is not authority
-     * to transfer. No executor ships in this build, so nothing is submitted.
+     * to transfer. Execution belongs to a separately enabled background worker;
+     * a provider handle or hash alone is never settlement proof.
      */
     public function evidence(): array
     {
@@ -235,7 +244,11 @@ class PaymentSubmissionOutbox extends Model
             'funds_reserved' => true,
             'external_funds_locked' => false,
             'can_execute' => false,
-            'payments_submitted' => 0,
+            'payments_submitted' => match (true) {
+                $this->provider_handle !== null || ($this->result['provider_reference'] ?? null) !== null => 1,
+                in_array($this->state, ['running', 'unknown'], true) => null,
+                default => 0,
+            },
             'local_accounts_changed' => false,
         ];
     }

@@ -9,6 +9,7 @@ use App\Models\Transaction;
 use App\Services\InstallationInstitution;
 use App\Services\PaymentSettlementReconciler;
 use Illuminate\Console\Command;
+use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Validation\ValidationException;
 
 use function Laravel\Prompts\confirm;
@@ -44,7 +45,14 @@ class ReconcilePaymentSubmissions extends Command
 
         $entries = PaymentSubmissionOutbox::query()
             ->where('organization_id', $institution->id)
-            ->where('state', 'submitted')
+            ->where(function (Builder $query): void {
+                $query->whereIn('state', ['accepted', 'submitted'])
+                    ->orWhere(function (Builder $uncertain): void {
+                        $uncertain->where('state', 'unknown')
+                            ->where(fn (Builder $identified): Builder => $identified->whereNotNull('provider_handle')
+                                ->orWhereNotNull('result->provider_reference'));
+                    });
+            })
             ->orderBy('id')
             ->limit(max(1, (int) $this->option('limit')))
             ->get();

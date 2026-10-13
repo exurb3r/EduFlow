@@ -12,6 +12,7 @@ use App\Services\IsolatedPaymentExecutor;
 use Illuminate\Contracts\Queue\ShouldQueue;
 use Illuminate\Foundation\Queue\Queueable;
 use Illuminate\Support\Carbon;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Validation\ValidationException;
 use Throwable;
 
@@ -31,22 +32,20 @@ class ProcessPaymentSubmission implements ShouldQueue
 
     public int $tries = 1;
 
-    public function __construct(public readonly int $outboxId) {}
+    public function __construct(public readonly int $outboxId)
+    {
+        $this->onConnection((string) config('eduflow.submission.queue_connection', 'database'));
+        $this->onQueue((string) config('eduflow.submission.queue', 'finance-submission'));
+        $this->afterCommit();
+    }
 
     public function handle(IsolatedPaymentExecutor $executor): void
     {
-        /** @var PaymentSubmissionOutbox|null $entry */
-        $entry = PaymentSubmissionOutbox::query()->find($this->outboxId);
+        $entry = $this->claim();
 
-        if ($entry === null || ! $entry->isOpen()) {
+        if (! $entry instanceof PaymentSubmissionOutbox) {
             return;
         }
-
-        $entry->heartbeat_at = Carbon::now();
-        $entry->attempts += 1;
-        $entry->state = 'running';
-        $entry->stage = 'revalidating_authority';
-        $entry->save();
 
         $blocked = $this->blockingReason($entry);
 
@@ -89,10 +88,10 @@ class ProcessPaymentSubmission implements ShouldQueue
             // make "the rail refused this submission" indistinguishable from
             // "we could not reach the rail", which are different
             // investigations with different remedies.
-            $this->record($entry, 'unknown', null, $submission['detail']);
             $this->conclude($entry, 'unknown', 'provider_unknown',
                 (string) ($submission['detail']['error']
-                    ?? 'Provider outcome is unknown. Reconcile the existing attempt before any retry; a blind resend risks paying twice.'));
+                    ?? 'Provider outcome is unknown. Reconcile the existing attempt before any retry; a blind resend risks paying twice.'),
+                $submission['detail'], $estimate);
 
             return;
         }
@@ -140,6 +139,25 @@ class ProcessPaymentSubmission implements ShouldQueue
             'settled' => false, 'can_execute' => false, 'payments_submitted' => 1];
         $entry->result_digest = PaymentIntent::digest($entry->result);
         $entry->save();
+    }
+
+    /** Claim once before external I/O; duplicate delivery may only observe, never sign. */
+    private function claim(): ?PaymentSubmissionOutbox
+    {
+        return DB::transaction(function (): ?PaymentSubmissionOutbox {
+            $entry = PaymentSubmissionOutbox::query()->whereKey($this->outboxId)->lockForUpdate()->first();
+
+            if ($entry === null || $entry->state !== 'queued' || $entry->attempts !== 0
+                || $entry->provider_handle !== null || ($entry->result['provider_reference'] ?? null) !== null
+                || $entry->attempts()->exists()) {
+                return null;
+            }
+
+            $entry->update(['state' => 'running', 'stage' => 'revalidating_authority',
+                'heartbeat_at' => Carbon::now(), 'attempts' => 1]);
+
+            return $entry;
+        }, 3);
     }
 
     /**
@@ -198,15 +216,18 @@ class ProcessPaymentSubmission implements ShouldQueue
         $attempt->save();
     }
 
-    private function conclude(PaymentSubmissionOutbox $entry, string $state, string $stage, string $error): void
+    /** @param array<string, mixed> $detail */
+    private function conclude(PaymentSubmissionOutbox $entry, string $state, string $stage, string $error,
+        array $detail = [], ?array $estimate = null): void
     {
-        $this->record($entry, $state === 'unknown' ? 'unknown' : 'blocked', null);
+        $this->record($entry, $state === 'unknown' ? 'unknown' : 'blocked', null, $detail, $estimate);
 
         $entry->state = $state;
         $entry->stage = $stage;
         $entry->last_error = mb_substr($error, 0, 1000);
         $entry->next_attempt_at = null;
-        $entry->result = ['stage' => $stage, 'settled' => false, 'can_execute' => false, 'payments_submitted' => 0];
+        $entry->result = ['stage' => $stage, 'settled' => false, 'can_execute' => false,
+            'payments_submitted' => $state === 'unknown' ? null : 0];
         $entry->result_digest = PaymentIntent::digest($entry->result);
         $entry->save();
 
@@ -215,7 +236,7 @@ class ProcessPaymentSubmission implements ShouldQueue
                 'payment_intent_id' => $entry->payment_intent_id,
                 'stage' => $stage,
                 'can_execute' => false,
-                'payments_submitted' => 0,
+                'payments_submitted' => $state === 'unknown' ? null : 0,
             ])
             ->log($error);
     }

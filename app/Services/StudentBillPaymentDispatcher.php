@@ -53,7 +53,7 @@ final readonly class StudentBillPaymentDispatcher
      */
     public function deliver(int $paymentId): bool
     {
-        if (! config('eduflow.student_bills.enabled', false)) {
+        if (! config('eduflow.student_bills.enabled', false) && ! config('eduflow.student_bills.observe_enabled', false)) {
             return false;
         }
 
@@ -83,32 +83,57 @@ final readonly class StudentBillPaymentDispatcher
      * Recovery, not the first attempt to dispatch. Bounded per tick so one slow
      * sweep cannot try to drain the table, and it refuses anything whose consent
      * or identity no longer verifies rather than sending on a stale row.
+     *
+     * The sweep covers every state a worker could still advance, not only the
+     * unsent ones. That distinction is the whole point: a payment the rail
+     * accepted but which no worker ever observed again is a real transfer of
+     * real money that the application then describes as incomplete. Reaching
+     * {@see StudentBillPayment::SUBMISSION_VERIFIED} is safe because the
+     * processor re-reads the row and only `submit()` can move money, and the
+     * write-ahead fence refuses a second send.
      */
     public function dispatchDue(): int
     {
-        if (! config('eduflow.student_bills.enabled', false)) {
+        $enabled = (bool) config('eduflow.student_bills.enabled', false);
+        $maySubmit = $enabled && ! config('eduflow.student_bills.stop_switch', false);
+        $mayObserve = (bool) config('eduflow.student_bills.observe_enabled', false);
+        if (! $enabled && ! $mayObserve) {
             return 0;
         }
 
         $institution = $this->institutions->current();
+        if (! $institution instanceof Organization) {
+            return 0;
+        }
         $count = 0;
+        $states = [StudentBillPayment::SUBMISSION_VERIFIED];
+        if ($maySubmit) {
+            $states = [...$states, ...StudentBillPayment::SENDABLE_STATES];
+        }
+        if ($mayObserve) {
+            $states = [...$states, ...StudentBillPayment::OBSERVABLE_STATES];
+        }
 
         $payments = StudentBillPayment::query()
-            ->where('submission_state', StudentBillPayment::SUBMISSION_PREPARED)
-            ->whereNull('submitted_at')
+            ->where('organization_id', $institution->id)->where('simulated', false)
+            ->whereIn('submission_state', $states)
+            ->whereNull('allocated_at')
             ->where(fn ($q) => $q->whereNull('next_attempt_at')->orWhere('next_attempt_at', '<=', now()))
+            ->where(fn ($q) => $q->whereNull('leased_until')->orWhere('leased_until', '<=', now()))
             ->orderBy('id')
             ->limit(50)
             ->get();
 
         foreach ($payments as $payment) {
-            if (! $institution instanceof Organization) {
-                continue;
-            }
-            if ($payment->organization_id !== $institution->id) {
-                continue;
-            }
             if (! $payment->hasValidConsent()) {
+                continue;
+            }
+            // The write-ahead fence sets `submitted_at` in the same claim that
+            // leaves `prepared`. A row that somehow still says `prepared` with a
+            // submit timestamp has nothing left to send, so delivering it would
+            // inflate the recovered count with work the processor refuses.
+            if (in_array($payment->submission_state, StudentBillPayment::SENDABLE_STATES, true)
+                && $payment->submitted_at !== null) {
                 continue;
             }
             $count += (int) $this->deliver((int) $payment->getKey());

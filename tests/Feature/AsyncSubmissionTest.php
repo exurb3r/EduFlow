@@ -2,15 +2,17 @@
 
 declare(strict_types=1);
 
+use App\Actions\ReviewVendorPayment;
 use App\Jobs\ProcessPaymentSubmission;
 use App\Models\PaymentSubmissionAttempt;
 use App\Models\PaymentSubmissionOutbox;
 use App\Models\Transaction;
 use App\Services\IsolatedPaymentExecutor;
-use App\Services\Payments\AsyncPaymentTransport;
 use App\Services\Payments\TransportAcceptance;
 use App\Services\Payments\TransportResolution;
 use App\Services\PaymentSettlementReconciler;
+use App\Services\PaymentSubmissionDispatch;
+use Illuminate\Support\Facades\Bus;
 
 /**
  * The asynchronous rail.
@@ -21,26 +23,6 @@ use App\Services\PaymentSettlementReconciler;
  * dispatchable again, and an in-flight payment is never mistaken for a settled
  * one in either direction.
  */
-
-/**
- * A transport whose answers the test dictates.
- */
-function scriptedTransport(callable $submit, callable $resolve): AsyncPaymentTransport
-{
-    $transport = Mockery::mock(AsyncPaymentTransport::class);
-
-    if (! $transport instanceof AsyncPaymentTransport) {
-        throw new RuntimeException('Mockery did not build a payment transport.');
-    }
-
-    mockExpectation($transport, 'submit')->andReturnUsing($submit);
-    mockExpectation($transport, 'resolve')->andReturnUsing($resolve);
-    $transport->shouldReceive('estimate')->andReturn(['data' => ['medium' => ['networkFee' => '0.0177']]]);
-    app()->instance(AsyncPaymentTransport::class, $transport);
-
-    return $transport;
-}
-
 test('an accepted transfer records a handle and no reference, because no hash exists yet', function (): void {
     [$entry] = executorEntry();
 
@@ -197,4 +179,107 @@ test('an accepted entry whose rail is no longer configured is not retried', func
 
     expect($verdict['verdict'])->toBe('unreadable')
         ->and($entry->fresh()->state)->toBe('accepted');
+});
+
+test('scheduled reconciliation resolves an acknowledged payment without a new submission', function (string $state): void {
+    [$entry] = executorEntry();
+    $entry->update(['state' => $state, 'provider_handle' => '116c7ce7-8f2f-53ac-8b06-f18aac151ce3']);
+    $transport = scriptedTransport(
+        fn (): TransportAcceptance => throw new RuntimeException('Reconciliation must never submit.'),
+        fn (): TransportResolution => TransportResolution::completed('0x'.str_repeat('f', 64)),
+    );
+    $transport->shouldNotReceive('submit');
+    stubArc(settledReceiptFor($entry));
+    config(['eduflow.submission.transport' => 'circle_agent_wallet', 'eduflow.submission.stop_switch' => true]);
+
+    $this->artisan('eduflow:reconcile-payment-submissions')->assertSuccessful();
+
+    expect($entry->fresh()->state)->toBe('completed')
+        ->and($entry->fresh()->provider_handle)->toBe('116c7ce7-8f2f-53ac-8b06-f18aac151ce3')
+        ->and(Transaction::query()->count())->toBe(0);
+})->with(['accepted', 'unknown']);
+
+test('provider timeout records exactly one unknown attempt and can never be sent again', function (): void {
+    [$entry] = executorEntry();
+    $submissions = 0;
+    $transport = scriptedTransport(
+        function () use (&$submissions): TransportAcceptance {
+            $submissions++;
+
+            throw new RuntimeException('Provider accepted, response lost.');
+        },
+        fn (): TransportResolution => TransportResolution::unknown('Handle unavailable.'),
+    );
+    config(['eduflow.submission.enabled' => true, 'lepton.default' => 'circle',
+        'eduflow.submission.transport' => 'circle_agent_wallet']);
+
+    $job = new ProcessPaymentSubmission($entry->id);
+    $job->handle(app(IsolatedPaymentExecutor::class));
+    $job->handle(app(IsolatedPaymentExecutor::class));
+
+    expect($entry->fresh()->state)->toBe('unknown')
+        ->and($submissions)->toBe(1)
+        ->and($entry->fresh()->attempts)->toBe(1)
+        ->and($entry->fresh()->attempts()->count())->toBe(1)
+        ->and($entry->fresh()->attempts()->firstOrFail()->response_snapshot['detail']['error'])->toContain('response lost')
+        ->and($entry->fresh()->result['payments_submitted'])->toBeNull()
+        ->and($entry->fresh()->evidence()['payments_submitted'])->toBeNull()
+        ->and($entry->fresh()->reservation->isReleased())->toBeFalse();
+});
+
+test('duplicate queue delivery never reopens an in-flight or uncertain submission', function (string $state): void {
+    [$entry] = executorEntry();
+    $entry->update(['state' => $state]);
+    $transport = scriptedTransport(
+        fn (): TransportAcceptance => throw new RuntimeException('Duplicate delivery reached signer.'),
+        fn (): TransportResolution => TransportResolution::pending(),
+    );
+    $transport->shouldNotReceive('submit');
+    $transport->shouldNotReceive('estimate');
+    config(['eduflow.submission.enabled' => true, 'lepton.default' => 'circle',
+        'eduflow.submission.transport' => 'circle_agent_wallet']);
+
+    (new ProcessPaymentSubmission($entry->id))->handle(app(IsolatedPaymentExecutor::class));
+
+    expect($entry->fresh()->state)->toBe($state)
+        ->and($entry->fresh()->attempts)->toBe(0);
+})->with(['running', 'unknown', 'accepted', 'submitted']);
+
+test('an uncertain payment with a known hash is observed again and never redispatched', function (): void {
+    [$entry] = executorEntry();
+    $entry->update(['state' => 'unknown', 'result' => ['provider_reference' => '0x'.str_repeat('f', 64)]]);
+    stubArc(settledReceiptFor($entry));
+    config(['eduflow.submission.enabled' => true, 'queue.default' => 'database']);
+    Bus::fake();
+
+    expect(app(PaymentSubmissionDispatch::class)->dispatch())->toBe(0);
+    $this->artisan('eduflow:reconcile-payment-submissions')->assertSuccessful();
+
+    Bus::assertNotDispatched(ProcessPaymentSubmission::class);
+    expect($entry->fresh()->state)->toBe('completed');
+});
+
+test('a started submission cannot be rewound to queued even before a provider handle exists', function (): void {
+    [$entry] = executorEntry();
+    $entry->update(['state' => 'running', 'attempts' => 1]);
+
+    expect(fn () => $entry->update(['state' => 'queued']))->toThrow(LogicException::class);
+});
+
+test('uncertain submission without an identifier cannot starve a newer accepted transfer', function (): void {
+    [$lost, $c] = executorEntry();
+    $lost->update(['state' => 'unknown']);
+    $this->travel(31)->seconds();
+    $c['hold'] = reserveSecondAuthorizationBill($c);
+    $authorization = app(ReviewVendorPayment::class)->handle($c['reviewer'], $c['drafts'][1], paymentAuthorizationInput($c, index: 1));
+    $entry = PaymentSubmissionOutbox::query()->where('payment_authorization_id', $authorization->id)->firstOrFail();
+    $entry->update(['state' => 'accepted', 'provider_handle' => '116c7ce7-8f2f-53ac-8b06-f18aac151ce3']);
+    scriptedTransport(fn (): TransportAcceptance => throw new RuntimeException('Reconciliation must not submit.'),
+        fn (): TransportResolution => TransportResolution::completed('0x'.str_repeat('f', 64)));
+    stubArc(settledReceiptFor($entry));
+    config(['eduflow.submission.transport' => 'circle_agent_wallet']);
+
+    $this->artisan('eduflow:reconcile-payment-submissions', ['--limit' => 1])->assertSuccessful();
+
+    expect($lost->fresh()->state)->toBe('unknown')->and($entry->fresh()->state)->toBe('completed');
 });

@@ -60,9 +60,9 @@ class PaymentSubmissionsTable
                     ->label('Workflow stage')
                     ->wrap()
                     ->placeholder('not yet dispatched')
-                    ->toggleable(isToggledHiddenByDefault: true),
+                    ->toggleable(),
 
-                TextColumn::make('invoice.reference')
+                TextColumn::make('intent.invoice.reference')
                     ->label('Bill')
                     ->searchable()
                     ->toggleable(),

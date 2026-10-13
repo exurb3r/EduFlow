@@ -99,7 +99,7 @@ class TreasuryOverviewWidget extends BaseWidget
             (string) $authorizations->sum(),
         )
             ->description(sprintf(
-                '%d approved · %d rejected · %d held. An approval is an authorization record only: it expires, it cannot execute, and no executor ships in this build.',
+                '%d approved · %d rejected · %d held. Approval is time-limited authority, not proof of payment. Background submission and verified settlement remain separate.',
                 $authorizations->get('approve_payment', 0),
                 $authorizations->get('reject_payment', 0),
                 $authorizations->get('hold_payment', 0),

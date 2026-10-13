@@ -116,6 +116,7 @@ final readonly class StudentBillPaymentQuote
         private ArcSettlementVerifier $verifier,
         private BillPaymentPolicy $policy,
         private StudentBillPaymentDispatcher $dispatcher,
+        private StudentBillReceiptIntake $intake,
     ) {}
 
     /**
@@ -489,6 +490,8 @@ final readonly class StudentBillPaymentQuote
                 $bill->update(['paid_base_units' => BigInteger::of($bill->paid_base_units)->plus($applied)->toInt()]);
                 $bill->syncStatus();
             }
+
+            $this->intake->wakeAfterCommit($stored->id);
 
             return $stored->refresh();
         }, 3);

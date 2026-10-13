@@ -21,6 +21,7 @@ use App\Filament\Pages\FinanceDashboard;
 use App\Filament\Pages\FinanceSupervisor;
 use App\Filament\Pages\PaymentReviews;
 use App\Filament\Resources\AssistanceRequests\AssistanceRequestResource;
+use App\Filament\Resources\PaymentSubmissions\PaymentSubmissionResource;
 use App\Filament\Resources\Students\StudentResource;
 use App\Filament\Resources\TuitionAccounts\TuitionAccountResource;
 use Filament\Auth\MultiFactor\App\AppAuthentication;
@@ -89,6 +90,7 @@ class FinancePanelProvider extends PanelProvider
                 StudentResource::class,
                 TuitionAccountResource::class,
                 AssistanceRequestResource::class,
+                PaymentSubmissionResource::class,
             ])
             ->middleware([
                 EncryptCookies::class,

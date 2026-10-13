@@ -47,6 +47,8 @@ expect()->extend('toBeOne', fn () => $this->toBe(1));
 |
 */
 
+require_once __DIR__.'/Helpers/ArcSubmission.php';
+require_once __DIR__.'/Helpers/PaymentAuthorization.php';
 require_once __DIR__.'/Helpers/TuitionConsent.php';
 require_once __DIR__.'/Helpers/StudentBillFixtures.php';
 

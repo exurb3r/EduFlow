@@ -9,6 +9,7 @@ use App\Enums\CurrencyCode;
 use App\Models\CollectionBatch;
 use App\Models\Organization;
 use App\Models\PaymentIntent;
+use App\Models\StudentBillPayment;
 use App\Models\StudentTuitionPayment;
 use App\Models\User;
 use App\Services\FinanceWorkflows;
@@ -165,7 +166,7 @@ final readonly class CaptureCollectionBatch
      */
     private function assertNotADigitalMovement(array $data): void
     {
-        if (($data['source_stream'] ?? null) === CollectionBatch::TUITION_PORTAL_STREAM) {
+        if (in_array($data['source_stream'] ?? null, [CollectionBatch::TUITION_PORTAL_STREAM, CollectionBatch::BILL_PORTAL_STREAM], true)) {
             throw ValidationException::withMessages(['source_stream' => 'This channel records payments already settled on chain. Reconcile them from Student payments so the same money is not counted twice.']);
         }
 
@@ -177,7 +178,9 @@ final readonly class CaptureCollectionBatch
 
         $treasury = (string) config('lepton.arc.treasury');
 
-        if ($this->settledMovements($treasury)->where('tx_hash', $reference)->exists()) {
+        if ($this->settledMovements($treasury)->where('tx_hash', $reference)->exists()
+            || StudentBillPayment::query()->where('simulated', false)->where('tx_verified_on_chain', true)
+                ->where('recipient_address', $treasury)->where('tx_hash', $reference)->exists()) {
             throw ValidationException::withMessages(['source_reference' => 'This reference is a settled student payment, not a new cash arrival. Reconcile it from Student payments so the same money is not counted twice.']);
         }
     }

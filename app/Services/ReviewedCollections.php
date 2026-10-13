@@ -8,6 +8,7 @@ use App\Models\BudgetSnapshot;
 use App\Models\CollectionBatch;
 use App\Models\CollectionBatchReview;
 use App\Models\PaymentIntent;
+use App\Models\StudentBillPayment;
 use App\Models\StudentTuitionPayment;
 use App\Models\StudentTuitionPaymentAttempt;
 use Brick\Math\BigInteger;
@@ -58,6 +59,20 @@ final class ReviewedCollections
     /** Historical verification flags alone must not promote digital receipts into planning cash. */
     private function requireVerifiedMovement(CollectionBatch $batch): void
     {
+        if ($batch->student_bill_payment_id !== null) {
+            $payment = StudentBillPayment::query()->find($batch->student_bill_payment_id);
+            if (! $payment instanceof StudentBillPayment || ! $payment->hasValidSettlement() || ! $payment->isAllocated()
+                || $payment->organization_id !== $batch->organization_id || $payment->chain !== StudentBillPayment::CHAIN
+                || $payment->settlement_verified_at === null || $payment->settlement_verified_at->isFuture()
+                || $payment->executed_at === null || $payment->executed_at->isFuture()
+                || $payment->applied_base_units < 0 || $payment->overpayment_base_units < 0
+                || ! BigInteger::of($payment->applied_base_units)->plus($payment->overpayment_base_units)->isEqualTo($payment->amount_base_units)) {
+                throw ValidationException::withMessages(['collection_review_ids' => 'Digital bill receipts require matching immutable consent, verified Arc-testnet proof and exact allocation. A verification flag alone cannot supply planning cash.']);
+            }
+
+            return;
+        }
+
         $payment = StudentTuitionPayment::query()->find($batch->student_tuition_payment_id);
         $attempt = $payment instanceof StudentTuitionPayment && is_string($payment->request_key)
             ? StudentTuitionPaymentAttempt::query()->where('request_key', $payment->request_key)->first() : null;

@@ -22,6 +22,7 @@ use App\Filament\Pages\PaymentReviews;
 use App\Filament\Resources\AssistanceRequests\AssistanceRequestResource;
 use App\Filament\Resources\AssistanceRequests\Pages\ListAssistanceRequests;
 use App\Filament\Resources\AssistanceRequests\Pages\ViewAssistanceRequest;
+use App\Filament\Resources\PaymentSubmissions\PaymentSubmissionResource;
 use App\Filament\Resources\Students\StudentResource;
 use App\Filament\Resources\TuitionAccounts\TuitionAccountResource;
 use App\Models\AssistanceRequest;
@@ -85,7 +86,7 @@ test('navigation badge reflects pending requests count', function (): void {
 test('finance panel exposes the supervisor dashboard, workflow pages and no plugins or clusters', function (): void {
     $panel = Filament::getPanel('finance');
 
-    expect($panel->getResources())->toBe([StudentResource::class, TuitionAccountResource::class, AssistanceRequestResource::class])
+    expect($panel->getResources())->toBe([StudentResource::class, TuitionAccountResource::class, AssistanceRequestResource::class, PaymentSubmissionResource::class])
         ->and($panel->getPages())->toBe([FinanceDashboard::class, FinanceSupervisor::class, Collections::class, PaymentReviews::class])
         ->and($panel->getClusters())->toBeEmpty()
         ->and($panel->getWidgets())->toEqualCanonicalizing([
