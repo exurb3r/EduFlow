@@ -84,6 +84,7 @@ use Yukazakiri\Lepton\Support\Amounts;
  * @property-read Student $student
  * @property-read StudentBill $studentBill
  * @property-read StudentWallet $studentWallet
+ * @property Carbon|null $created_at
  */
 class StudentBillPayment extends Model
 {

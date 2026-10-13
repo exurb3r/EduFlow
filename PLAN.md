@@ -2989,16 +2989,25 @@ returns null unless exactly one organization exists), so the boundary for "is th
   binding digital movements remain readable history but must be freshly captured as v3 before
   financial use, because they lack the new overlap evidence. No records are migrated or corrected.
 
+**Live inbound settlement demonstrated 2026-10-13.** The bill lane ran end to end on real
+ARC-TESTNET: 5.000000 USDC from a generated student wallet to the treasury, `0xa8e7aeff…`,
+verified on chain and allocated against the bill. Juan's wallet moved 20.0 → 15.0 and the
+treasury 64.9 → 69.9 — **exactly 5.0 in each direction, zero fee**, which confirmed the
+relayed-sponsorship finding on an inbound transfer as well as the three outbound ones. The
+bill moved `open` → `paid` and **no `Transaction` row was written**, so a testnet receipt is
+still not institutional revenue. This is the first genuinely verified student payment in the
+project; §17 step 12 remains undemonstrated for the **outbound** vendor lane.
+
 **Still open in B2/B3:** an explicit institution-scoped,
 approved planning context mapping incoming receipts to an existing allocation/closed bill set;
 receipt/review-triggered successor-plan capture; supervisor-side Collections source/attention
-views, investigation ownership surfaces and Jev advice. A receipt review cannot refresh an
+views and investigation ownership surfaces. A receipt review cannot refresh an
 already bound plan here: snapshots bind reviews only after approval, and both snapshots and
 reviews are immutable. Automatically selecting a budget or widening its bill set would invent
 authority. This slice therefore wakes the plan on its staff-authorized capture and does not
 claim receipt approval alone produces a new proposal. Async provider observation, no-resend
-recovery and automatic receipt import moved to the slices above; the student-side history view
-exists, the staff-side one does not.
+recovery, automatic receipt import and the student-side bill screen with advisory
+classification now exist; the staff-side approval surface does not.
 
 All verification uses isolated factories/stubs. Runtime flags, live funds, wallet provisioning,
 official tuition records and existing operational financial history are not modified by this slice.
@@ -3401,7 +3410,8 @@ claims. Current routes and page actions establish the following, not universal a
 | Aggregate collection capture and independent source review | **Finance records → Collections** (`/admin/collections`) | **Collections** (`/finance/collections`) | Cashier-friendly three-step capture with private receipt/report upload and independent review; `Reconcile student payment` imports a verified movement as a source-linked receipt exactly once (B1), and an off-by-default unattended intake can do the same for movements that carry verified attempt proof |
 | Student wallet balance/provenance and wallet generation | **Student Services → Students → View student**, wallet widget | No corresponding wallet-management screen registered | Operator-generated Circle wallets; generation/control/consent permissions and slot recovery need §14.10 review. Balance is a read, not a tuition receipt |
 | Direct student tuition quote/pay | Generic **Transactions** may show `tuition_revenue`; **Tuition Accounts** may reflect its current posting; no dedicated tuition-attempt/reconciliation inbox | Eligible posted payments can be manually reconciled in Collections; approved receipt reviews can be selected in Finance Supervisor budget capture | Student entry is `/student/dashboard` Pay Now plus `/student/wallet`. Immutable quote/consent, expiring fee ceiling, chain/purpose/stop guards and provider-handle no-resend recovery exist (B0 slice). Submission stays off by default and the installed Circle CLI cannot enforce a fee ceiling, so the rail refuses before invoking a signer. Generic confirmed status is not proof |
-| Student tuition receipt history and intake exceptions | No dedicated resource found | No dedicated queue found | `StudentTuitionPayment` records exist; `/payments` still lists assistance/refunds. Student-side attempt history now exists on the student dashboard and at `GET student/tuition/attempts`; staff-side shared Collections source/attention views are planned, not shipped |
+| Student tuition receipt history and intake exceptions | No dedicated resource found | No dedicated queue found | `StudentTuitionPayment` records exist; `/payments` still lists assistance/refunds. Student-side attempt history now exists on the student dashboard and at `GET student/tuition/attempts` |
+| Non-tuition student bills, advisory classification and payment progress | No dedicated resource found | No dedicated queue found | **`/student/bills` shipped**: bill list, exact-amount quote, digest-bound consent, live submission state polled from persisted rows only, and Jev's advisory read fetched on demand. Classification is display-only and cannot authorise a spend; no GET can submit. Staff-side approval surface is still absent, so an escalated bill has no queue to land in |
 | Closed-set budget capture, background run evidence and plan review | No dedicated admin screen | **Finance Supervisor** (`/finance/finance-supervisor`) | Schema v3 supports selected independently reviewed movement receipts, zero typed opening funds when counting them, and after-commit planning wake. Staff still captures the closed set; no automatic receipt-to-budget routing. Accepting a plan never grants payment authority |
 | Invoice source review, beneficiary approval, draft preparation and funding/reservation | Legacy invoice CRUD is available, not the complete safe workflow | Several authenticated HTTP actions exist; complete operator wizard absent | Need linked source/destination/policy/budget/funding screens rather than scripts or fabricated reviewers |
 | Reviewed capacity release and funding rollover | No screen | No screen | Backend actions/tests exist; authorization/unknown outcomes cannot be discarded to free capacity |

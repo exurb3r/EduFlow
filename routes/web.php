@@ -17,6 +17,7 @@ use App\Http\Controllers\PaymentIntentChangeController;
 use App\Http\Controllers\PaymentReservationController;
 use App\Http\Controllers\PaymentReviewerEnrollmentController;
 use App\Http\Controllers\StudentAssistanceController;
+use App\Http\Controllers\StudentBillController;
 use App\Http\Controllers\StudentDashboardController;
 use App\Http\Controllers\StudentPaymentsController;
 use App\Http\Controllers\StudentTuitionPaymentController;
@@ -50,6 +51,15 @@ Route::middleware(['auth', 'verified'])->group(function (): void {
     Route::post('student/tuition/quote', [StudentTuitionPaymentController::class, 'quote'])->middleware('throttle:20,1')->name('student.tuition.quote');
     Route::post('student/tuition/pay', [StudentTuitionPaymentController::class, 'store'])->middleware('throttle:5,1')->name('student.tuition.pay');
     Route::get('student/tuition/attempts', [StudentTuitionPaymentController::class, 'index'])->middleware('throttle:60,1')->name('student.tuition.attempts');
+
+    // Non-tuition bills. The quote/consent pair is the only route here that can
+    // create anything, and neither can reach a signer: a GET cannot dispatch and
+    // a POST cannot send, so a refresh button can never spend money.
+    Route::get('student/bills', [StudentBillController::class, 'index'])->name('student.bills');
+    Route::get('student/bills/status', [StudentBillController::class, 'status'])->middleware('throttle:60,1')->name('student.bills.status');
+    Route::post('student/bills/classify', [StudentBillController::class, 'classify'])->middleware('throttle:20,1')->name('student.bills.classify');
+    Route::post('student/bills/quote', [StudentBillController::class, 'quote'])->middleware('throttle:20,1')->name('student.bills.quote');
+    Route::post('student/bills/consent', [StudentBillController::class, 'consent'])->middleware('throttle:5,1')->name('student.bills.consent');
     Route::patch('wallet', [StudentWalletController::class, 'update'])->name('wallet.update');
 });
 
