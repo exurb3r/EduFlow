@@ -7,6 +7,7 @@ use App\Filament\Pages\Auth\EditProfile;
 use App\Filament\Pages\Collections;
 use App\Filament\Pages\Dashboard;
 use App\Filament\Pages\PaymentReviews;
+use App\Filament\Pages\TreasuryWallet;
 use BezhanSalleh\FilamentShield\FilamentShieldPlugin;
 use Filament\Actions\Action;
 use Filament\Auth\MultiFactor\App\AppAuthentication;
@@ -77,6 +78,7 @@ class AdminPanelProvider extends PanelProvider
                 Dashboard::class,
                 Collections::class,
                 PaymentReviews::class,
+                TreasuryWallet::class,
             ])
             ->discoverWidgets(in: app_path('Filament/Widgets'), for: 'App\Filament\Widgets')
             ->widgets([

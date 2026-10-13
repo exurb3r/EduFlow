@@ -51,17 +51,21 @@ class StudentDashboardController extends Controller
         if ($account) {
             $totalBase = (int) $account->total_amount;
             $paidBase = (int) $account->paid_amount;
-            $remainingBase = (int) $account->remainingAmount();
+            $heldBase = (int) $account->heldAmount();
+            $effectiveRemainingBase = (int) $account->effectiveRemainingAmount();
 
             $tuitionAccountData = [
                 'id' => $account->getKey(),
                 'term' => $account->academicTerm->name,
                 'total_amount' => (string) $account->total_amount,
                 'paid_amount' => (string) $account->paid_amount,
-                'remaining_amount' => (string) $account->remainingAmount(),
-                'remaining_amount_fiat' => $converter->formatDual($remainingBase, $displayCurrency),
+                'held_amount' => (string) $heldBase,
+                'remaining_amount' => (string) $effectiveRemainingBase,
+                'unadjusted_remaining_amount' => (string) $account->remainingAmount(),
+                'remaining_amount_fiat' => $converter->formatDual($effectiveRemainingBase, $displayCurrency),
                 'total_amount_fiat' => $converter->formatDual($totalBase, $displayCurrency),
                 'paid_amount_fiat' => $converter->formatDual($paidBase, $displayCurrency),
+                'held_amount_fiat' => $converter->formatDual($heldBase, $displayCurrency),
             ];
         }
 

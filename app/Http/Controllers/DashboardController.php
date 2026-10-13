@@ -84,7 +84,7 @@ class DashboardController extends Controller
      * record (or without a single current-term account) receive null tuition
      * data instead of an invented balance.
      *
-     * @return array{tuitionAccount: array{term: string, total_amount: string, paid_amount: string, remaining_amount: string, remaining_amount_fiat: string, total_amount_fiat: string, paid_amount_fiat: string}|null, wallet: array{address: string|null}, totals: array{confirmed: float, currency: string}, recentTransactions: list<array{id: int, type: string, type_label: string, amount: float, currency: string, status: string, status_label: string, tx_hash: string|null, network: string, executed_at: string|null}>}
+     * @return array{tuitionAccount: array{term: string, total_amount: string, paid_amount: string, held_amount: string, remaining_amount: string, unadjusted_remaining_amount: string, remaining_amount_fiat: string, total_amount_fiat: string, paid_amount_fiat: string, held_amount_fiat: string}|null, wallet: array{address: string|null}, totals: array{confirmed: float, currency: string}, recentTransactions: list<array{id: int, type: string, type_label: string, amount: float, currency: string, status: string, status_label: string, tx_hash: string|null, network: string, executed_at: string|null}>}
      */
     private function buildFinanceSummary(User $user, CurrencyConverter $converter): array
     {
@@ -100,16 +100,20 @@ class DashboardController extends Controller
             if ($account !== null) {
                 $totalBase = (int) $account->total_amount;
                 $paidBase = (int) $account->paid_amount;
-                $remainingBase = (int) $account->remainingAmount();
+                $heldBase = (int) $account->heldAmount();
+                $effectiveRemainingBase = (int) $account->effectiveRemainingAmount();
 
                 $tuitionAccountData = [
                     'term' => $account->academicTerm->name,
                     'total_amount' => (string) $account->total_amount,
                     'paid_amount' => (string) $account->paid_amount,
-                    'remaining_amount' => (string) $account->remainingAmount(),
-                    'remaining_amount_fiat' => $converter->formatDual($remainingBase, $displayCurrency),
+                    'held_amount' => (string) $heldBase,
+                    'remaining_amount' => (string) $effectiveRemainingBase,
+                    'unadjusted_remaining_amount' => (string) $account->remainingAmount(),
+                    'remaining_amount_fiat' => $converter->formatDual($effectiveRemainingBase, $displayCurrency),
                     'total_amount_fiat' => $converter->formatDual($totalBase, $displayCurrency),
                     'paid_amount_fiat' => $converter->formatDual($paidBase, $displayCurrency),
+                    'held_amount_fiat' => $converter->formatDual($heldBase, $displayCurrency),
                 ];
             }
         }

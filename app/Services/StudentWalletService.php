@@ -8,6 +8,7 @@ use App\DTOs\StudentWalletSnapshot;
 use App\DTOs\WalletReadState;
 use App\Models\Student;
 use Illuminate\Contracts\Cache\Factory;
+use Illuminate\Support\Facades\Http;
 use InvalidArgumentException;
 use Throwable;
 use Yukazakiri\Lepton\Contracts\ArcNetworkGateway;
@@ -141,7 +142,30 @@ class StudentWalletService
             );
         }
 
-        $wei = $this->safe(fn (): mixed => $this->arc->rpc('eth_getBalance', [$address, 'latest']));
+        $wei = null;
+
+        $rpc = $this->safe(fn (): string => $this->arc->rpcUrl()) ?: config('lepton.arc.rpc_url');
+
+        if (is_string($rpc) && filter_var($rpc, FILTER_VALIDATE_URL) !== false) {
+            try {
+                $response = Http::timeout(5)->post($rpc, [
+                    'jsonrpc' => '2.0',
+                    'id' => 1,
+                    'method' => 'eth_getBalance',
+                    'params' => [$address, 'latest'],
+                ]);
+
+                if ($response->successful() && is_string($response->json('result'))) {
+                    $wei = $response->json('result');
+                }
+            } catch (Throwable) {
+                // Fall back to CLI gateway below
+            }
+        }
+
+        if ($wei === null) {
+            $wei = $this->safe(fn (): mixed => $this->arc->rpc('eth_getBalance', [$address, 'latest']));
+        }
 
         if (! is_string($wei) || ! str_starts_with($wei, '0x')) {
             return $this->unavailable(

@@ -31,6 +31,8 @@ class StudentTuitionPaymentController extends Controller
 
     public function quote(Request $request): JsonResponse
     {
+        set_time_limit(120);
+
         [$student, $account] = $this->resolve($request);
 
         $validated = $request->validate([
@@ -43,6 +45,8 @@ class StudentTuitionPaymentController extends Controller
 
     public function store(Request $request): JsonResponse
     {
+        set_time_limit(120);
+
         [$student, $account] = $this->resolve($request);
 
         $validated = $request->validate([
