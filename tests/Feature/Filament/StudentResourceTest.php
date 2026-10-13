@@ -4,10 +4,18 @@ declare(strict_types=1);
 
 use App\Filament\Resources\Students\Pages\CreateStudent;
 use App\Filament\Resources\Students\Pages\EditStudent;
+use App\Filament\Resources\Students\Pages\ViewStudent;
+use App\Filament\Resources\Students\RelationManagers\AssistanceRequestsRelationManager;
+use App\Filament\Resources\Students\RelationManagers\StudentBillsRelationManager;
+use App\Filament\Resources\Students\RelationManagers\TuitionAccountsRelationManager;
 use App\Filament\Resources\Students\StudentResource;
+use App\Filament\Resources\Students\Widgets\StudentProfileSummaryWidget;
+use App\Filament\Resources\Students\Widgets\StudentsStatsWidget;
 use App\Filament\Resources\TuitionAccounts\Pages\CreateTuitionAccount;
 use App\Models\AcademicTerm;
+use App\Models\AssistanceRequest;
 use App\Models\Student;
+use App\Models\StudentBill;
 use App\Models\TuitionAccount;
 use App\Models\User;
 use Filament\Actions\DeleteAction;
@@ -226,4 +234,131 @@ test('a student is only deletable once their financial history is gone', functio
     $account->delete();
 
     expect($student->fresh()->deletionBlockedReason())->toBeNull();
+});
+
+test('staff can open the view student page and see academic profile and wallet', function (string $role, string $panel): void {
+    $this->actingAs(User::factory()->create()->assignRole($role));
+    filament()->setCurrentPanel($panel);
+
+    $student = Student::factory()->create([
+        'program' => 'BS Information Technology',
+        'year_level' => 3,
+        'enrollment_status' => 'enrolled',
+        'academic_status' => 'qualified',
+        'attendance_rate' => '96.50',
+    ]);
+
+    $this->get(StudentResource::getUrl('view', ['record' => $student->getKey()], panel: $panel))
+        ->assertSuccessful();
+
+    Livewire::test(ViewStudent::class, ['record' => $student->getKey()])
+        ->assertSuccessful()
+        ->assertSee($student->user->name)
+        ->assertSee($student->student_number)
+        ->assertSee('BS Information Technology')
+        ->assertSee('Year 3')
+        ->assertSee('96.5%');
+})->with([
+    ['super_admin', 'admin'],
+    ['super_admin', 'finance'],
+    ['admin', 'finance'],
+    ['finance_officer', 'finance'],
+]);
+
+test('student profile summary widget renders student metrics', function (): void {
+    $this->actingAs(User::factory()->create()->assignRole('finance_officer'));
+    filament()->setCurrentPanel('finance');
+
+    $student = Student::factory()->create();
+
+    Livewire::test(StudentProfileSummaryWidget::class, ['record' => $student])
+        ->assertSuccessful()
+        ->assertSee($student->user->name)
+        ->assertSee($student->student_number)
+        ->assertSee('Academic Curriculum')
+        ->assertSee('Outstanding Tuition');
+});
+
+test('students stats widget renders directory counters', function (): void {
+    $this->actingAs(User::factory()->create()->assignRole('finance_officer'));
+    filament()->setCurrentPanel('finance');
+
+    Student::factory()->count(3)->create();
+
+    Livewire::test(StudentsStatsWidget::class)
+        ->assertSuccessful()
+        ->assertSee('Total Students')
+        ->assertSee('Active Enrolled')
+        ->assertSee('Qualified Standing');
+});
+
+test('staff can create a tuition account directly from the view student page', function (): void {
+    $this->actingAs(User::factory()->create()->assignRole('finance_officer'));
+    filament()->setCurrentPanel('finance');
+
+    $student = Student::factory()->create();
+    $term = AcademicTerm::factory()->create();
+
+    Livewire::test(ViewStudent::class, ['record' => $student->getKey()])
+        ->mountAction('createTuitionAccount')
+        ->set('mountedActions.0.data.academic_term_id', $term->getKey())
+        ->set('mountedActions.0.data.total_amount', '450.00')
+        ->set('mountedActions.0.data.paid_amount', '50.00')
+        ->callMountedAction()
+        ->assertHasNoActionErrors();
+
+    expect(TuitionAccount::query()->where('student_id', $student->id)->count())->toBe(1);
+
+    $account = TuitionAccount::query()->where('student_id', $student->id)->firstOrFail();
+    expect($account->total_amount)->toBe(450000000)
+        ->and($account->paid_amount)->toBe(50000000)
+        ->and($account->remainingAmount())->toBe(400000000);
+});
+
+test('student relation managers render related accounts, requests, and bills', function (): void {
+    $this->actingAs(User::factory()->create()->assignRole('finance_officer'));
+    filament()->setCurrentPanel('finance');
+
+    $student = Student::factory()->create();
+    $term = AcademicTerm::factory()->create();
+
+    $account = TuitionAccount::factory()->for($student)->for($term)->create([
+        'total_amount' => 300000000,
+        'paid_amount' => 100000000,
+    ]);
+
+    $request = AssistanceRequest::factory()->for($student->user)->create([
+        'student_id' => $student->id,
+        'subject' => 'Emergency book grant',
+    ]);
+
+    $bill = StudentBill::factory()->for($student)->create([
+        'description' => 'Laboratory Equipment Fee',
+        'amount_base_units' => 50000000,
+        'paid_base_units' => 0,
+    ]);
+
+    Livewire::test(TuitionAccountsRelationManager::class, [
+        'ownerRecord' => $student,
+        'pageClass' => ViewStudent::class,
+    ])
+        ->assertSuccessful()
+        ->assertCanSeeTableRecords([$account])
+        ->assertSee('300.00 USDC');
+
+    Livewire::test(AssistanceRequestsRelationManager::class, [
+        'ownerRecord' => $student,
+        'pageClass' => ViewStudent::class,
+    ])
+        ->assertSuccessful()
+        ->assertCanSeeTableRecords([$request])
+        ->assertSee('Emergency book grant');
+
+    Livewire::test(StudentBillsRelationManager::class, [
+        'ownerRecord' => $student,
+        'pageClass' => ViewStudent::class,
+    ])
+        ->assertSuccessful()
+        ->assertCanSeeTableRecords([$bill])
+        ->assertSee('Laboratory Equipment Fee');
 });

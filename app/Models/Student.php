@@ -129,6 +129,41 @@ class Student extends Model
             && preg_match(self::PAYOUT_ADDRESS_PATTERN, $this->payout_address) === 1;
     }
 
+    public function enrollmentStatusColor(): string
+    {
+        return match ($this->enrollment_status) {
+            'enrolled' => 'success',
+            'on_leave' => 'warning',
+            'graduated' => 'info',
+            default => 'gray',
+        };
+    }
+
+    public function academicStatusColor(): string
+    {
+        return match ($this->academic_status) {
+            'qualified' => 'success',
+            'probation' => 'warning',
+            'suspended', 'dismissed' => 'danger',
+            default => 'gray',
+        };
+    }
+
+    public function totalTuitionBalance(): int
+    {
+        return (int) $this->tuitionAccounts->sum(fn (TuitionAccount $account): int => $account->remainingAmount());
+    }
+
+    public function totalTuitionPaid(): int
+    {
+        return (int) $this->tuitionAccounts->sum(fn (TuitionAccount $account): int => $account->paid_amount);
+    }
+
+    public function totalTuitionOwed(): int
+    {
+        return (int) $this->tuitionAccounts->sum(fn (TuitionAccount $account): int => $account->total_amount);
+    }
+
     /**
      * The payout address decides where money goes, so every change to it is
      * logged with who made it. A re-pointed destination is the one edit this
