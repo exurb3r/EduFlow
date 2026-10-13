@@ -15,6 +15,7 @@ use App\Models\PaymentReservation;
 use App\Models\PaymentReviewerEnrollment;
 use App\Models\User;
 use App\Services\InstallationInstitution;
+use App\Services\MandateSupervision;
 use BackedEnum;
 use Filament\Actions\Action;
 use Filament\Forms\Components\Checkbox;
@@ -113,6 +114,46 @@ class PaymentReviews extends Page implements HasTable
     public function getSubheading(): ?string
     {
         return 'Check the bill, recipient and exact amount. Record an independent decision; this page never sends money.';
+    }
+
+    /**
+     * What the standing-mandate lane decided, and what the model merely suggested.
+     *
+     * Read-only by construction: this section has no action, no button and no
+     * binding that can create a reservation, an authorization or a payment. An
+     * occurrence that evaluated to `escalate` still needs one, reviewed exactly
+     * as any other payment above.
+     *
+     * Its only purpose is to stop a real gap: the scanner writes a disposition
+     * and a full set of checks for every due occurrence, and until now nothing
+     * rendered them — so a recurring bill needing a person was recorded with a
+     * precise reason and then invisible.
+     *
+     * @return array{occurrences: list<array<string, mixed>>, counts: array<string, int>}
+     */
+    #[Computed]
+    public function mandateOverview(): array
+    {
+        Gate::forUser($this->actor())->authorize('create', PaymentIntent::class);
+
+        return app(MandateSupervision::class)->occurrenceOverview();
+    }
+
+    /**
+     * The model's advisory read of which bills might deserve a mandate.
+     *
+     * Null whenever the provider is off, unconfigured or unreachable, and the
+     * view says so in words rather than showing an empty list that could be
+     * read as "the AI looked and found nothing".
+     *
+     * @return array<string, mixed>|null
+     */
+    #[Computed]
+    public function advisoryRanking(): ?array
+    {
+        Gate::forUser($this->actor())->authorize('create', PaymentIntent::class);
+
+        return app(MandateSupervision::class)->advisoryRanking();
     }
 
     /** @return array{awaiting: int, approved: int, held_or_rejected: int, released: int} */

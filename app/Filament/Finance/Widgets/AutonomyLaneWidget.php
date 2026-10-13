@@ -6,6 +6,8 @@ namespace App\Filament\Finance\Widgets;
 
 use App\DTOs\Money;
 use App\Models\FinancePolicyActivation;
+use App\Models\MandateOccurrence;
+use App\Models\RecurringMandate;
 use App\Services\InstallationInstitution;
 use App\Services\MandateOutcomeMetrics;
 use App\Services\RecordRetrospectiveAgreement;
@@ -59,10 +61,38 @@ class AutonomyLaneWidget extends BaseWidget
         $activation = FinancePolicyActivation::current($institution->id);
         $policy = $activation?->policyVersion;
 
-        $mandateStat = Stat::make('Recurring mandate', 'None approved')
-            ->description('Zero allowance. No mandate owner, expiry, due window, frequency or cumulative limit is on record, so no occurrence can run unattended.')
-            ->descriptionIcon(Heroicon::NoSymbol)
-            ->color('gray');
+        // Read the real records rather than reporting a fixed "None approved".
+        // A hardcoded zero is indistinguishable from a lane that has genuinely
+        // never run, which is exactly the ambiguity §16.6 flags as dashboard
+        // audit debt: "not built yet" and "built, never triggered" are different
+        // facts and a supervisor has to be able to tell them apart.
+        $mandates = RecurringMandate::query()->where('organization_id', $institution->id)->get();
+        // Counted on the mandate's own lifecycle state rather than the review row's
+        // decision string, so this agrees with MandateOutcomeMetrics instead of
+        // inventing a second way to ask "is this mandate live?".
+        $approvedMandates = $mandates->filter(
+            fn (RecurringMandate $mandate): bool => $mandate->state === 'approved'
+        );
+        $occurrenceCounts = MandateOccurrence::query()
+            ->where('organization_id', $institution->id)
+            ->selectRaw('disposition, COUNT(*) AS aggregate')
+            ->groupBy('disposition')
+            ->pluck('aggregate', 'disposition');
+
+        $mandateStat = Stat::make('Recurring mandate', $mandates->isEmpty()
+            ? 'None approved'
+            : sprintf('%d of %d approved', $approvedMandates->count(), $mandates->count()))
+            ->description($mandates->isEmpty()
+                ? 'Zero allowance. No mandate owner, expiry, due window, frequency or cumulative limit is on record, so no occurrence can run unattended.'
+                : sprintf(
+                    '%d occurrence(s) evaluated: %d released automatically, %d waiting on a person, %d blocked.',
+                    (int) ($occurrenceCounts->get('release', 0) + $occurrenceCounts->get('escalate', 0) + $occurrenceCounts->get('blocked', 0)),
+                    (int) $occurrenceCounts->get('release', 0),
+                    (int) $occurrenceCounts->get('escalate', 0),
+                    (int) $occurrenceCounts->get('blocked', 0),
+                ))
+            ->descriptionIcon($mandates->isEmpty() ? Heroicon::NoSymbol : Heroicon::CalendarDays)
+            ->color($mandates->isEmpty() ? 'gray' : 'info');
 
         $perPayment = Stat::make('Per-payment ceiling', $policy !== null
             ? Money::formatExact($policy->max_auto_payment_base_units, 'USDC')

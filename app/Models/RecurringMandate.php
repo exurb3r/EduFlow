@@ -56,6 +56,7 @@ use Throwable;
  * @property int $prepared_by
  * @property array<string, mixed> $snapshot
  * @property string $snapshot_digest
+ * @property-read Vendor $vendor
  * @property-read RecurringMandateReview|null $review
  * @property-read Collection<int, MandateOccurrence> $occurrences
  */

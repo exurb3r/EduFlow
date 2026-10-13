@@ -100,6 +100,123 @@
 
     </section>
 
+    @php
+        $mandate = $this->mandateOverview();
+        $advisory = $this->advisoryRanking();
+    @endphp
+
+    <x-filament::section collapsible icon="heroicon-o-calendar-days">
+        <x-slot name="heading">Recurring mandate lane</x-slot>
+        <x-slot name="description">
+            What deterministic policy decided for each due occurrence, and what the model merely
+            suggested. Read only — nothing here approves or submits anything.
+        </x-slot>
+
+        <div class="fi-payment-metric-grid">
+            <div class="fi-payment-metric" data-slot="frame-panel">
+                <span>Released automatically</span>
+                <strong>{{ $mandate['counts']['release'] ?? 0 }}</strong>
+            </div>
+            <div class="fi-payment-metric" data-slot="frame-panel">
+                <span>Waiting on you</span>
+                <strong>{{ $mandate['counts']['escalate'] ?? 0 }}</strong>
+            </div>
+            <div class="fi-payment-metric" data-slot="frame-panel">
+                <span>Blocked</span>
+                <strong>{{ $mandate['counts']['blocked'] ?? 0 }}</strong>
+            </div>
+        </div>
+
+        @if (count($mandate['occurrences']) === 0)
+            <p class="fi-payment-detail-notes">
+                No recurring occurrence has been evaluated yet. A mandate must be independently
+                approved before any occurrence can run, and the initial allowance is zero.
+            </p>
+        @else
+            <ul class="fi-payment-detail-notes" role="list">
+                @foreach ($mandate['occurrences'] as $occurrence)
+                    <li>
+                        <x-filament::badge
+                            :color="match ($occurrence['disposition']) {
+                                'release' => 'success',
+                                'escalate' => 'warning',
+                                default => 'danger',
+                            }"
+                        >{{ str_replace('_', ' ', $occurrence['disposition']) }}</x-filament::badge>
+
+                        <strong>
+                            {{ $occurrence['obligation_reference'] ?? ('Occurrence #' . $occurrence['id']) }}
+                        </strong>
+                        @if ($occurrence['vendor_name'])
+                            &mdash; {{ $occurrence['vendor_name'] }}
+                        @endif
+                        @if ($occurrence['due_at'])
+                            &mdash; due {{ \Illuminate\Support\Carbon::parse($occurrence['due_at'])->toDayDateTimeString() }}
+                        @endif
+
+                        @if (! $occurrence['evidence_valid'])
+                            <x-filament::badge color="danger">Evidence does not re-derive</x-filament::badge>
+                        @endif
+
+                        @if ($occurrence['reason'])
+                            <p>{{ $occurrence['reason'] }}</p>
+                        @endif
+
+                        @if (count($occurrence['failed_checks']) > 0)
+                            <ul role="list">
+                                @foreach ($occurrence['failed_checks'] as $failed)
+                                    <li>
+                                        <code>{{ $failed['check'] }}</code>
+                                        ({{ $failed['severity'] }}) &mdash; {{ $failed['reason'] }}
+                                    </li>
+                                @endforeach
+                            </ul>
+                        @endif
+
+                        <p>
+                            {{ $occurrence['passed_check_count'] }} check(s) passed.
+                            An <code>escalate</code> disposition is not a payment: it still needs a
+                            reservation and an independent payment review.
+                        </p>
+                    </li>
+                @endforeach
+            </ul>
+        @endif
+
+        <x-filament::section collapsible collapsed icon="heroicon-o-sparkles">
+            <x-slot name="heading">Jev's advisory read</x-slot>
+
+            @if ($advisory === null)
+                <p class="fi-payment-detail-notes">
+                    Advisory classification is unavailable: AI may be switched off, unconfigured, or
+                    the provider did not answer. Nothing about a recurring payment depends on it —
+                    the deterministic checks above decide alone.
+                </p>
+            @else
+                <p class="fi-payment-detail-notes">
+                    Advisory only. The model may rank which bills deserve a reviewer's attention; it
+                    cannot approve, authorize, widen a limit or choose a payee.
+                </p>
+                @if ($advisory['narrative'])
+                    <p class="fi-payment-detail-notes">{{ $advisory['narrative'] }}</p>
+                @endif
+                <ul class="fi-payment-detail-notes" role="list">
+                    @foreach ($advisory['candidates'] as $candidate)
+                        <li>
+                            <x-filament::badge color="gray">advisory</x-filament::badge>
+                            {{ $candidate['reference'] ?? ('Bill #' . ($candidate['bill_id'] ?? '?')) }}
+                            — recurs {{ round(($candidate['recurring_likelihood'] ?? 0) * 100) }}%,
+                            amount {{ ($candidate['stable_amount'] ?? false) ? 'looks stable' : 'varies' }}.
+                            @if (! empty($candidate['rationale']))
+                                <p>{{ $candidate['rationale'] }}</p>
+                            @endif
+                        </li>
+                    @endforeach
+                </ul>
+            @endif
+        </x-filament::section>
+    </x-filament::section>
+
     <x-filament::section collapsible collapsed icon="heroicon-o-lock-closed">
         <x-slot name="heading">Review history and recovery rules</x-slot>
         <div class="fi-payment-detail-notes">
