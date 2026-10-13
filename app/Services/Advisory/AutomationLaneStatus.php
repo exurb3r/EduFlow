@@ -28,7 +28,7 @@ final readonly class AutomationLaneStatus
         return [
             'owed' => $this->count(PaymentSubmissionOutbox::DISPATCHABLE_STATES),
             'in_flight' => $this->count(PaymentSubmissionOutbox::IN_FLIGHT_STATES),
-            'unresolved' => $this->count(['unknown', 'blocked', 'failed']),
+            'unresolved' => $this->count(['running', 'unknown', 'blocked', 'failed']),
             'verified' => $this->count(['completed']),
         ];
     }

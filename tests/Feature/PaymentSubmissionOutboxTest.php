@@ -57,6 +57,15 @@ test('an approved payment is durably owed before anything is dispatched', functi
     ])->and(Transaction::query()->count())->toBe(0);
 });
 
+test('submission job uses the durable finance queue and waits for commit', function (): void {
+    config(['eduflow.submission.queue_connection' => 'database', 'eduflow.submission.queue' => 'finance-submission']);
+    $job = new ProcessPaymentSubmission(1);
+
+    expect($job->connection)->toBe('database')
+        ->and($job->queue)->toBe('finance-submission')
+        ->and($job->afterCommit)->toBeTrue();
+});
+
 test('the submission identity is stable so a replay cannot mint a second owed payment', function (): void {
     $c = paymentAuthorizationContext();
     $input = paymentAuthorizationInput($c);

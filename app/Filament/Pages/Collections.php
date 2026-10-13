@@ -11,6 +11,7 @@ use App\DTOs\Money;
 use App\Enums\CurrencyCode;
 use App\Models\CollectionBatch;
 use App\Models\CollectionBatchReview;
+use App\Models\StudentBillPayment;
 use App\Models\StudentTuitionPayment;
 use App\Models\User;
 use App\Services\InstallationInstitution;
@@ -30,6 +31,7 @@ use Filament\Pages\Page;
 use Filament\Schemas\Components\Component;
 use Filament\Schemas\Components\Section;
 use Filament\Schemas\Components\Utilities\Get;
+use Filament\Schemas\Components\Utilities\Set;
 use Filament\Schemas\Components\Wizard\Step;
 use Filament\Schemas\Concerns\RestrictsFileUploadsToSchemaComponents;
 use Filament\Schemas\Schema;
@@ -258,22 +260,27 @@ class Collections extends Page implements HasTable
             ->modalDescription('Student payments that already settled into this treasury. Reconciling records them for review; it does not receive new money.')
             ->modalSubmitActionLabel('Reconcile for review')
             ->form([
+                Select::make('payment_kind')->label('Payment source')->options(['tuition' => 'Tuition', 'bill' => 'Other student bills'])
+                    ->default('tuition')->required()->live()
+                    ->afterStateUpdated(function (Set $set): void {
+                        $set('payment_id', null);
+                    }),
                 Select::make('payment_id')
                     ->label('Verified student payment')
-                    ->options(fn (): array => $this->reconcilablePaymentOptions())
+                    ->options(fn (Get $get): array => $this->reconcilablePaymentOptions((string) ($get('payment_kind') ?? 'tuition')))
                     ->required()
                     ->live(),
                 TextEntry::make('movement_detail')
                     ->label('What this records')
-                    ->state(fn (Get $get): string => $this->paymentReconciliationDetail($get('payment_id')))
+                    ->state(fn (Get $get): string => $this->paymentReconciliationDetail($get('payment_id'), (string) ($get('payment_kind') ?? 'tuition')))
                     ->wrap(),
             ])
             ->action(function (array $data, Schema $schema, ImportTuitionPaymentAsCollection $import): void {
                 Gate::forUser(Auth::user())->authorize('create', CollectionBatch::class);
 
-                $payment = StudentTuitionPayment::query()->find($data['payment_id'] ?? null);
+                $payment = $this->reconciliationPayment($data['payment_id'] ?? null, $data['payment_kind'] ?? 'tuition');
 
-                if (! $payment instanceof StudentTuitionPayment) {
+                if ($payment === null) {
                     Notification::make()->title('Nothing to reconcile')->body('That payment is no longer available to reconcile.')->danger()->send();
 
                     return;
@@ -297,15 +304,18 @@ class Collections extends Page implements HasTable
      *
      * @return array<string, string>
      */
-    private function reconcilablePaymentOptions(): array
+    private function reconcilablePaymentOptions(string $kind = 'tuition'): array
     {
         $treasury = (string) config('lepton.arc.treasury');
 
-        return app(ImportTuitionPaymentAsCollection::class)
-            ->eligiblePayments($treasury)
+        $import = app(ImportTuitionPaymentAsCollection::class);
+        $query = $kind === 'bill' ? $import->eligibleBillPayments($treasury) : $import->eligiblePayments($treasury);
+
+        return $query
             ->limit(50)
             ->get()
-            ->mapWithKeys(fn (StudentTuitionPayment $payment): array => [
+            ->filter(fn (StudentTuitionPayment|StudentBillPayment $payment): bool => ! $payment instanceof StudentBillPayment || $payment->hasValidSettlement())
+            ->mapWithKeys(fn (StudentTuitionPayment|StudentBillPayment $payment): array => [
                 (string) $payment->getKey() => sprintf(
                     '%s — student %d, %s',
                     $payment->amount(),
@@ -323,15 +333,11 @@ class Collections extends Page implements HasTable
      * spendable figure, because the two are not the same promise: one is
      * receipts, the other is money owed back to a student.
      */
-    private function paymentReconciliationDetail(mixed $paymentId): string
+    private function paymentReconciliationDetail(mixed $paymentId, string $kind = 'tuition'): string
     {
-        if (! is_numeric($paymentId)) {
-            return 'Choose a payment to see its exact amounts.';
-        }
+        $payment = $this->reconciliationPayment($paymentId, $kind);
 
-        $payment = StudentTuitionPayment::query()->find((int) $paymentId);
-
-        if (! $payment instanceof StudentTuitionPayment) {
+        if ($payment === null) {
             return 'Choose a payment to see its exact amounts.';
         }
 
@@ -340,8 +346,22 @@ class Collections extends Page implements HasTable
             : '';
 
         return 'Received by the treasury: '.$payment->amount()
-            .'. Applied to tuition: '.$payment->applied().'.'.$held
+            .($payment instanceof StudentBillPayment ? '. Applied to student bill: ' : '. Applied to tuition: ')
+            .$payment->applied().'.'.$held
             .' Reconcile rather than recording it again.';
+    }
+
+    private function reconciliationPayment(mixed $paymentId, string $kind): StudentTuitionPayment|StudentBillPayment|null
+    {
+        if (! is_numeric($paymentId) || ! in_array($kind, ['tuition', 'bill'], true)) {
+            return null;
+        }
+
+        $import = app(ImportTuitionPaymentAsCollection::class);
+        $treasury = (string) config('lepton.arc.treasury');
+
+        return ($kind === 'bill' ? $import->eligibleBillPayments($treasury) : $import->eligiblePayments($treasury))
+            ->whereKey((int) $paymentId)->first();
     }
 
     /** @return list<Step> */

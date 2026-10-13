@@ -27,7 +27,7 @@ class PaymentDecisionChart extends ChartWidget
 
     protected ?string $heading = 'Human payment decisions';
 
-    protected ?string $description = 'Every recorded authorization, by decision. An approval is an authorization record only: it expires within five minutes, it requires a fresh step-up check, and it still cannot execute because no executor ships.';
+    protected ?string $description = 'Every recorded authorization, by decision. Approval expires within five minutes and requires fresh authentication. A separately enabled worker rechecks exact authority before submission; only verified settlement proves payment.';
 
     protected ?string $emptyStateHeading = 'No payment authorization recorded';
 

@@ -22,7 +22,7 @@ class DispatchStudentBillPayments extends Command
 
     public function handle(StudentBillPaymentDispatcher $dispatcher): int
     {
-        if (! config('eduflow.student_bills.enabled', false)) {
+        if (! config('eduflow.student_bills.enabled', false) && ! config('eduflow.student_bills.observe_enabled', false)) {
             $this->warn('Bill payment submission is disabled; consent is retained and staff reconciliation remains available.');
 
             return self::SUCCESS;

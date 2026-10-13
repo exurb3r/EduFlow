@@ -2,9 +2,9 @@
 
 declare(strict_types=1);
 
-use App\Actions\ReviewVendorPayment;
 use App\Enums\TransactionType;
 use App\Jobs\ProcessPaymentSubmission;
+use App\Models\Organization;
 use App\Models\PaymentIntent;
 use App\Models\PaymentSubmissionAttempt;
 use App\Models\PaymentSubmissionOutbox;
@@ -17,10 +17,7 @@ use Brick\Math\BigInteger;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Str;
 use Illuminate\Validation\ValidationException;
-use Mockery\MockInterface;
-use Yukazakiri\Lepton\Contracts\ArcNetworkGateway;
 use Yukazakiri\Lepton\Contracts\WalletGateway;
-use Yukazakiri\Lepton\DTOs\BalanceResult;
 use Yukazakiri\Lepton\DTOs\TransferResult;
 
 /**
@@ -33,112 +30,6 @@ use Yukazakiri\Lepton\DTOs\TransferResult;
  * failure is never fabrication, that inclusion is not finality, and that a
  * mismatched amount is a mismatch even when everything else lines up.
  */
-/**
- * @param  array{chain?:string, chain_id?:int, sender?:string, recipient?:string, amount_base_units?:int, max_fee_base_units?:int}  $overrides
- * @return array{chain:string, chain_id:int, sender:string, recipient:string, amount_base_units:int, max_fee_base_units:int}
- */
-function verifierExpected(array $overrides = []): array
-{
-    return $overrides + [
-        'chain' => 'ARC-TESTNET',
-        'chain_id' => 5042002,
-        'sender' => '0x'.str_repeat('1', 40),
-        'recipient' => '0x'.str_repeat('2', 40),
-        'amount_base_units' => 25_000000,
-        'max_fee_base_units' => 1_000000,
-    ];
-}
-
-function hexQty(int|string|BigInteger $value): string
-{
-    return '0x'.(is_string($value) ? $value : BigInteger::of($value)->toBase(16));
-}
-
-/**
- * @param  array<string, mixed>  $responses
- */
-function stubArc(array $responses, string $expectation = 'any'): ArcNetworkGateway&MockInterface
-{
-    $arc = Mockery::mock(ArcNetworkGateway::class);
-
-    if (! $arc instanceof ArcNetworkGateway) {
-        throw new RuntimeException('Mockery did not build an Arc gateway.');
-    }
-
-    $arc->shouldReceive('chainCode')->andReturn('ARC-TESTNET');
-    $arc->shouldReceive('chainId')->andReturn(5042002);
-    $arc->shouldReceive('rpcUrl')->andReturn('https://rpc.testnet.arc.network');
-    mockExpectation($arc, 'explorerUrl')->andReturnUsing(fn (string $hash): string => 'https://explorer.testnet.arc.network/tx/'.$hash);
-    mockExpectation($arc, 'rpc')->andReturnUsing(function (string $method, array $params) use ($responses): mixed {
-        if (! array_key_exists($method, $responses)) {
-            throw new RuntimeException('Unexpected Arc read: '.$method);
-        }
-
-        $value = $responses[$method];
-
-        if ($value instanceof Throwable) {
-            throw $value;
-        }
-
-        return $value;
-    });
-
-    app()->instance(ArcNetworkGateway::class, $arc);
-
-    return $arc;
-}
-
-/** A committed, successful native-value receipt for the authorized movement. */
-function settledReceipt(array $overrides = []): array
-{
-    return $overrides + [
-        'eth_getTransactionReceipt' => [
-            'transactionHash' => '0x'.str_repeat('f', 64),
-            'blockNumber' => '0x64',
-            'status' => '0x1',
-            'gasUsed' => hexQty(21000),
-            'effectiveGasPrice' => hexQty(1_000000000),
-            'logs' => [],
-        ],
-        'eth_getTransactionByHash' => [
-            'from' => '0x'.str_repeat('1', 40),
-            'to' => '0x'.str_repeat('2', 40),
-            'value' => hexQty(BigInteger::of(25_000000)->multipliedBy(BigInteger::of('1000000000000'))),
-            'blockNumber' => '0x64',
-        ],
-        'eth_getBlockByNumber' => ['number' => '0x64', 'hash' => '0x'.str_repeat('a', 64), 'timestamp' => '0x65'],
-    ];
-}
-
-/**
- * A committed, successful native-value receipt for an actual owed payment.
- *
- * The chain reads have to describe the movement that was actually authorized,
- * so the fixture is built from the entry rather than from hardcoded values —
- * otherwise the test would pass a predicate that is only ever asked about a
- * payment nobody made.
- */
-function settledReceiptFor(PaymentSubmissionOutbox $entry, array $overrides = []): array
-{
-    $responses = settledReceipt();
-    $responses['eth_getTransactionByHash']['from'] = $entry->snapshot['source_address'];
-    $responses['eth_getTransactionByHash']['to'] = $entry->snapshot['recipient_address'];
-    $responses['eth_getTransactionByHash']['value'] = hexQty(
-        BigInteger::of((int) $entry->snapshot['amount_base_units'])->multipliedBy(BigInteger::of('1000000000000')),
-    );
-
-    // Gas is priced at the floor so the fee lands under whatever ceiling the
-    // reviewer actually approved for this payment. Fee enforcement has its own
-    // tests that set the price deliberately.
-    $responses['eth_getTransactionReceipt']['effectiveGasPrice'] = '0x1';
-
-    foreach ($overrides as $method => $value) {
-        $responses[$method] = $value;
-    }
-
-    return $responses;
-}
-
 // ---------------------------------------------------------------------------
 // The settlement predicate
 // ---------------------------------------------------------------------------
@@ -411,53 +302,6 @@ test('a native interface amount is read at eighteen decimals, not truncated', fu
 // The isolated executor
 // ---------------------------------------------------------------------------
 
-/**
- * @return array{0: PaymentSubmissionOutbox, 1: array<string, mixed>}
- */
-function executorEntry(): array
-{
-    $c = paymentAuthorizationContext();
-    $authorization = app(ReviewVendorPayment::class)->handle($c['reviewer'], $c['drafts'][0], paymentAuthorizationInput($c));
-
-    $entry = PaymentSubmissionOutbox::query()
-        ->where('payment_authorization_id', $authorization->id)
-        ->firstOrFail();
-
-    return [$entry, $c];
-}
-
-function executorGateway(?Throwable $throws = null, bool $fake = false): WalletGateway&MockInterface
-{
-    $wallets = Mockery::mock(WalletGateway::class);
-
-    if (! $wallets instanceof WalletGateway) {
-        throw new RuntimeException('Mockery did not build a wallet gateway.');
-    }
-
-    mockExpectation($wallets, 'transfer')->andReturnUsing(
-        function (string $from, string $to, int $amount, array $options = []) use ($throws, $fake): TransferResult {
-            if ($throws instanceof Throwable) {
-                throw $throws;
-            }
-
-            return new TransferResult(
-                txHash: '0x'.str_repeat('f', 64),
-                fromAddress: $from,
-                toAddress: $to,
-                amountBaseUnits: $amount,
-                chain: (string) $options['chain'],
-                isFake: $fake,
-                explorerUrl: 'https://explorer.testnet.arc.network/tx/'.str_repeat('f', 64),
-            );
-        },
-    );
-    $wallets->shouldReceive('balance')->andReturn(new BalanceResult('0x'.str_repeat('1', 40), 100_000000, 'ARC-TESTNET'));
-
-    app()->instance(WalletGateway::class, $wallets);
-
-    return $wallets;
-}
-
 test('the executor refuses to run while the submission runtime is off', function (): void {
     [$entry] = executorEntry();
     executorGateway();
@@ -713,7 +557,7 @@ test('an unreachable rail leaves the payment unknown and never settled or comple
     // not installed. That is exactly the condition this covers: the provider
     // cannot answer, and the honest result is "unknown, reconcile me" -- not
     // submitted, not failed, and above all not completed.
-    $c = mandateContext();
+    Organization::factory()->create();
     $wallets = Mockery::mock(WalletGateway::class);
 
     if (! $wallets instanceof WalletGateway) {

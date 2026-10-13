@@ -53,6 +53,7 @@ use TypeError;
  * @property-read InvoiceVersionReview|null $invoiceVersionReview
  * @property-read PaymentReservation|null $reservation
  * @property-read PaymentAuthorization|null $authorization
+ * @property-read PaymentSubmissionOutbox|null $submission
  */
 class PaymentIntent extends Model
 {
@@ -428,5 +429,11 @@ class PaymentIntent extends Model
     public function authorization(): HasOne
     {
         return $this->hasOne(PaymentAuthorization::class, 'payment_intent_id');
+    }
+
+    /** @return HasOne<PaymentSubmissionOutbox, $this> */
+    public function submission(): HasOne
+    {
+        return $this->hasOne(PaymentSubmissionOutbox::class, 'payment_intent_id');
     }
 }
