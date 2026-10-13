@@ -15,17 +15,13 @@ import {
     Radio,
     ReceiptText,
     RefreshCw,
-    Sparkles,
     TriangleAlert,
     Wallet,
 } from 'lucide-react';
 import { useRef, useState } from 'react';
 import { toast } from 'sonner';
 
-import { AskEduFlow } from '@/components/ask-eduflow';
-import { RequestStatus } from '@/components/financial-aid';
 import { StudentPaymentTracker } from '@/components/student-payment-tracker';
-import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import {
     Dialog,
@@ -44,12 +40,7 @@ import {
 import { Input } from '@/components/ui/input';
 import InputError from '@/components/input-error';
 import { Label } from '@/components/ui/label';
-import {
-    formatAidLabel,
-    formatSubmittedAt,
-    formatUsdc,
-} from '@/lib/financial-aid';
-import { show } from '@/routes/assistance';
+import { formatUsdc } from '@/lib/financial-aid';
 import { index as financialAssistanceIndex } from '@/routes/financial-assistance';
 import { index as paymentsIndex } from '@/routes/payments';
 import { dashboard } from '@/routes/student';
@@ -115,9 +106,6 @@ function formatBalance(balance: string): string {
 export default function StudentDashboard({
     student,
     tuitionAccount,
-    requests,
-    currency,
-    suggestedQuestions,
     wallet,
     totals,
     recentTransactions,
@@ -429,20 +417,6 @@ export default function StudentDashboard({
                             </div>
 
                             <div className="flex flex-wrap items-center gap-3">
-                                <button
-                                    type="button"
-                                    onClick={() => setMonitorDrawerOpen(true)}
-                                    className="clay-focus inline-flex h-11 shrink-0 items-center gap-2 rounded-full border border-[var(--clay-border)] bg-[var(--clay-surface)] px-5 text-sm font-semibold text-[var(--clay-text)] transition-all hover:-translate-y-0.5 hover:bg-[var(--clay-surface-soft)] active:translate-y-0 active:scale-[0.98]"
-                                >
-                                    <Radio className="size-4 text-emerald-400 animate-pulse" />
-                                    <span>Rail Monitor</span>
-                                    {hasInFlight && (
-                                        <span className="rounded-full bg-amber-500/20 px-2 py-0.5 text-[10px] font-bold text-amber-300">
-                                            In flight
-                                        </span>
-                                    )}
-                                </button>
-
                                 <button
                                     type="button"
                                     onClick={openPay}
@@ -943,28 +917,14 @@ export default function StudentDashboard({
 
                             {/* -- Tuition balance, now the supporting card -- */}
                             <div className="clay-card p-5 sm:p-6">
-                                <div className="flex items-start justify-between gap-4">
-                                    <div>
-                                        <p className="bulletin-eyebrow">
-                                            Outstanding tuition
-                                        </p>
-                                        {tuitionAccount?.term && (
-                                            <p className="clay-meta mt-1">
-                                                {tuitionAccount.term}
-                                            </p>
-                                        )}
-                                    </div>
-                                    <button
-                                        type="button"
-                                        onClick={() =>
-                                            setMonitorDrawerOpen(true)
-                                        }
-                                        className="clay-focus inline-flex items-center gap-1.5 rounded-full border border-[var(--clay-border)] bg-[var(--clay-surface-soft)] px-3 py-1 text-xs font-semibold text-[var(--clay-text)] transition-colors hover:bg-[var(--clay-surface)]"
-                                    >
-                                        <Radio className="size-3 text-emerald-400 animate-pulse" />
-                                        <span>Rail monitor</span>
-                                    </button>
-                                </div>
+                                <p className="bulletin-eyebrow">
+                                    Outstanding tuition
+                                </p>
+                                {tuitionAccount?.term && (
+                                    <p className="clay-meta mt-1">
+                                        {tuitionAccount.term}
+                                    </p>
+                                )}
 
                                 {tuitionAccount ? (
                                     <>
@@ -1147,7 +1107,7 @@ export default function StudentDashboard({
                         {/* -- Quick actions -- */}
                         <nav
                             aria-label="Quick actions"
-                            className="grid grid-cols-2 gap-3 sm:grid-cols-4"
+                            className="grid grid-cols-1 gap-3 sm:grid-cols-3"
                         >
                             <button
                                 type="button"
@@ -1171,36 +1131,18 @@ export default function StudentDashboard({
                                     label: 'Financial aid',
                                     icon: ArrowDownLeft,
                                 },
-                                {
-                                    href: '#ask-eduflow',
-                                    label: 'Ask EduFlow',
-                                    icon: Sparkles,
-                                },
-                            ].map(({ href, label, icon: Icon }) =>
-                                href.startsWith('#') ? (
-                                    <a
-                                        key={label}
-                                        href={href}
-                                        className="clay-card clay-press flex flex-col items-start gap-3 p-4 text-sm font-medium transition-transform hover:-translate-y-0.5"
-                                    >
-                                        <span className="clay-icon-chip size-9">
-                                            <Icon className="size-4" />
-                                        </span>
-                                        {label}
-                                    </a>
-                                ) : (
-                                    <Link
-                                        key={label}
-                                        href={href}
-                                        className="clay-card clay-press flex flex-col items-start gap-3 p-4 text-sm font-medium transition-transform hover:-translate-y-0.5"
-                                    >
-                                        <span className="clay-icon-chip size-9">
-                                            <Icon className="size-4" />
-                                        </span>
-                                        {label}
-                                    </Link>
-                                ),
-                            )}
+                            ].map(({ href, label, icon: Icon }) => (
+                                <Link
+                                    key={label}
+                                    href={href}
+                                    className="clay-card clay-press flex flex-col items-start gap-3 p-4 text-sm font-medium transition-transform hover:-translate-y-0.5"
+                                >
+                                    <span className="clay-icon-chip size-9">
+                                        <Icon className="size-4" />
+                                    </span>
+                                    {label}
+                                </Link>
+                            ))}
                         </nav>
 
                         {/* -- Recent transactions -- */}
@@ -1809,129 +1751,6 @@ export default function StudentDashboard({
                                     )}
                                 </DialogContent>
                             </Dialog>
-                        </section>
-
-                        {/* -- Ask EduFlow -- */}
-                        <section id="ask-eduflow">
-                            <AskEduFlow
-                                suggestedQuestions={suggestedQuestions}
-                                displayCurrency={currency?.display}
-                                rateDescription={currency?.rate_description}
-                            />
-                        </section>
-
-                        {/* -- Assistance requests -- */}
-                        <section
-                            aria-labelledby="requests-heading"
-                            className="space-y-4"
-                        >
-                            <div className="flex items-baseline justify-between gap-4">
-                                <h2 id="requests-heading" className="clay-h2">
-                                    Your assistance requests
-                                </h2>
-                                <span className="clay-meta">
-                                    {requests.length} total
-                                </span>
-                            </div>
-
-                            {requests.length === 0 ? (
-                                <div className="clay-card p-8 text-center">
-                                    <p className="clay-title">
-                                        No assistance cases on file.
-                                    </p>
-                                    <p className="clay-body mx-auto mt-1.5 max-w-md">
-                                        When the school evaluates you for
-                                        support, the decision and its
-                                        explanation appear here.
-                                    </p>
-                                </div>
-                            ) : (
-                                <ul className="flex flex-col gap-3">
-                                    {requests.map((request, index) => (
-                                        <li
-                                            key={request.id}
-                                            className="clay-card clay-rise p-4 sm:p-5"
-                                            style={
-                                                {
-                                                    '--stagger': Math.min(
-                                                        index,
-                                                        8,
-                                                    ),
-                                                } as React.CSSProperties
-                                            }
-                                        >
-                                            <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
-                                                <div className="min-w-0 space-y-2">
-                                                    <div className="flex flex-wrap items-center gap-2">
-                                                        <Link
-                                                            href={show({
-                                                                assistanceRequest:
-                                                                    request.id,
-                                                            })}
-                                                            className="clay-focus inline-flex items-center gap-2 rounded-sm font-semibold underline-offset-4 hover:underline"
-                                                        >
-                                                            {formatAidLabel(
-                                                                request.type,
-                                                            )}{' '}
-                                                            assistance{' '}
-                                                            <span className="text-[var(--clay-text-muted)]">
-                                                                #{request.id}
-                                                            </span>
-                                                            <ArrowRight
-                                                                aria-hidden="true"
-                                                                className="size-4"
-                                                            />
-                                                        </Link>
-
-                                                        {request.is_split && (
-                                                            <Badge
-                                                                variant="secondary"
-                                                                className="gap-1 border border-[var(--status-pending)]/40 bg-[var(--status-pending)]/10 text-[10px] text-[var(--status-pending)]"
-                                                            >
-                                                                <Sparkles className="size-2.5" />
-                                                                Autonomous Split
-                                                            </Badge>
-                                                        )}
-                                                    </div>
-                                                    <p className="clay-meta">
-                                                        Submitted{' '}
-                                                        <time
-                                                            dateTime={
-                                                                request.submitted_at
-                                                            }
-                                                        >
-                                                            {formatSubmittedAt(
-                                                                request.submitted_at,
-                                                            )}
-                                                        </time>
-                                                    </p>
-                                                </div>
-                                                <div className="flex flex-wrap items-center justify-between gap-4 sm:justify-end">
-                                                    <div className="text-right">
-                                                        <span className="tabular-nums font-semibold">
-                                                            {formatUsdc(
-                                                                request.requested_amount,
-                                                            )}
-                                                        </span>
-                                                        {request.is_split && (
-                                                            <p className="clay-meta">
-                                                                {formatUsdc(
-                                                                    request.auto_approved_amount,
-                                                                )}{' '}
-                                                                auto · remainder
-                                                                pending
-                                                            </p>
-                                                        )}
-                                                    </div>
-                                                    <RequestStatus
-                                                        status={request.status}
-                                                    />
-                                                </div>
-                                            </div>
-                                        </li>
-                                    ))}
-                                </ul>
-                            )}
                         </section>
                     </div>
 
