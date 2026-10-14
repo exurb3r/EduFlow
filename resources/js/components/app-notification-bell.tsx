@@ -3,6 +3,7 @@ import { Bell, Check, Inbox } from 'lucide-react';
 import { useEffect, useRef, useState } from 'react';
 import { toast } from 'sonner';
 
+import { cn } from '@/lib/utils';
 import {
     index as notificationsIndex,
     markAllRead,
@@ -35,7 +36,11 @@ function relativeTime(raw: string): string {
     return `${Math.round(minutes / (60 * 24))}d ago`;
 }
 
-export function AppNotificationBell() {
+export function AppNotificationBell({
+    className,
+}: {
+    className?: string;
+} = {}) {
     const { props } = usePage();
     const summary = props.notificationSummary;
 
@@ -148,7 +153,7 @@ export function AppNotificationBell() {
     return (
         <div
             ref={rootRef}
-            className="relative flex items-center"
+            className={cn('relative flex items-center', className)}
             onMouseEnter={openNow}
             onMouseLeave={scheduleClose}
         >

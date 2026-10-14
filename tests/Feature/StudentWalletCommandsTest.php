@@ -73,9 +73,13 @@ test('the fund command drips the faucet for a named student', function (): void 
 
     $funding = $student->wallet->fresh()->fundings()->latest('id')->first();
 
+    $notification = $student->user->notifications()->first();
+
     expect($funding)->not->toBeNull()
         ->and($funding->status->value)->toBe('funded')
-        ->and($funding->amount())->toBe('20.0 USDC');
+        ->and($funding->amount())->toBe('20.0 USDC')
+        ->and($notification)->not->toBeNull()
+        ->and($notification?->getAttribute('data')['title'])->toBe('Received 20.00 USDC');
 });
 
 test('the fund command accepts a student number', function (): void {
