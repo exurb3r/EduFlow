@@ -8,7 +8,7 @@ test('skills design landing page returns successful response and renders inertia
     $response = $this->get('/skills/design');
 
     $response->assertOk();
-    $response->assertInertia(fn (Assert $page) => $page
+    $response->assertInertia(fn (Assert $page): Assert => $page
         ->component('skills/design')
         ->has('canRegister')
     );

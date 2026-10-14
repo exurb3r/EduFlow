@@ -79,43 +79,37 @@ const PRESETS: Preset[] = [
 const FAQS = [
     {
         question: 'What do these two skills actually do inside an agent?',
-        answer:
-            'They inject hard aesthetic constraints into the agent reasoning loop. The front end design skill stops generic purple gradients and predictable cards. The landing page skill enforces mathematical spacing tokens, zero hyphens in prose, nested corner radius formulas, and single action conversion architecture.',
+        answer: 'They inject hard aesthetic constraints into the agent reasoning loop. The front end design skill stops generic purple gradients and predictable cards. The landing page skill enforces mathematical spacing tokens, zero hyphens in prose, nested corner radius formulas, and single action conversion architecture.',
     },
     {
         question: 'Which agent harnesses and environments support them?',
-        answer:
-            'Both skills work in Antigravity, Claude Code, Cursor, OpenCode, and any tool that reads skill markdown files. Simply drop them into your project skills folder or load them into system prompts.',
+        answer: 'Both skills work in Antigravity, Claude Code, Cursor, OpenCode, and any tool that reads skill markdown files. Simply drop them into your project skills folder or load them into system prompts.',
     },
     {
-        question: 'Why does the landing page skill strictly forbid hyphens in text?',
-        answer:
-            'Hyphenated prose often indicates rushed or robotic writing. Eliminating hyphens forces the model to craft cleaner sentences, improve cadence, and produce copy that reads with human conviction.',
+        question:
+            'Why does the landing page skill strictly forbid hyphens in text?',
+        answer: 'Hyphenated prose often indicates rushed or robotic writing. Eliminating hyphens forces the model to craft cleaner sentences, improve cadence, and produce copy that reads with human conviction.',
     },
     {
-        question: 'How do the skills prevent generic artificial intelligence aesthetics?',
-        answer:
-            'The skill instructions explicitly ban overused font families like Arial and Inter, purple gradients on white canvases, and cookie cutter card grids. Instead, the agent must commit to an extreme aesthetic register before generating code.',
+        question:
+            'How do the skills prevent generic artificial intelligence aesthetics?',
+        answer: 'The skill instructions explicitly ban overused font families like Arial and Inter, purple gradients on white canvases, and cookie cutter card grids. Instead, the agent must commit to an extreme aesthetic register before generating code.',
     },
     {
         question: 'Does the generated code work with React and Tailwind CSS?',
-        answer:
-            'Yes. Every generated snippet uses standard Tailwind utility classes, modern React components, semantic HTML elements, and accessible keyboard focus states.',
+        answer: 'Yes. Every generated snippet uses standard Tailwind utility classes, modern React components, semantic HTML elements, and accessible keyboard focus states.',
     },
     {
         question: 'What happens when my prompt conflicts with a visual rule?',
-        answer:
-            'The visual system rules take priority over framework defaults. However, your explicit user instructions always win if you intentionally request a specific override.',
+        answer: 'The visual system rules take priority over framework defaults. However, your explicit user instructions always win if you intentionally request a specific override.',
     },
     {
         question: 'Are these skills open source and free to use?',
-        answer:
-            'Both skills are completely open source under the MIT license. You can inspect the rules, adapt them for your team, and share them across your repositories.',
+        answer: 'Both skills are completely open source under the MIT license. You can inspect the rules, adapt them for your team, and share them across your repositories.',
     },
     {
         question: 'How does the nested corner radius formula work in code?',
-        answer:
-            'When an element sits inside another card and the gap is under thirty two pixels, the inner radius equals the outer radius minus the gap. This keeps the corners concentric and visually unified.',
+        answer: 'When an element sits inside another card and the gap is under thirty two pixels, the inner radius equals the outer radius minus the gap. This keeps the corners concentric and visually unified.',
     },
 ];
 
@@ -137,7 +131,9 @@ const TAGLINE_WORDS = [
 
 export default function DesignSkillsLanding() {
     const [selectedPreset, setSelectedPreset] = useState<Preset>(PRESETS[0]);
-    const [activeSkill, setActiveSkill] = useState<'frontend' | 'landing'>('frontend');
+    const [activeSkill, setActiveSkill] = useState<'frontend' | 'landing'>(
+        'frontend',
+    );
     const [copiedInstall, setCopiedInstall] = useState(false);
     const [copiedPrompt, setCopiedPrompt] = useState(false);
     const [revealedWordCount, setRevealedWordCount] = useState<number>(0);
@@ -172,7 +168,7 @@ export default function DesignSkillsLanding() {
                     }, 80);
                 }
             },
-            { threshold: 0.3 }
+            { threshold: 0.3 },
         );
 
         if (taglineRef.current) {
@@ -189,7 +185,10 @@ export default function DesignSkillsLanding() {
             {/* B7 Fluid Island Navigation Bar */}
             <nav className="fixed top-0 left-0 right-0 z-50 flex justify-center p-4">
                 <div className="mt-2 flex w-max items-center justify-between gap-6 rounded-full border border-[#313131] bg-[#1F1F1F]/90 px-6 py-2.5 backdrop-blur-3xl shadow-lg transition-colors duration-200 ease-[cubic-bezier(0.32,0.72,0,1)]">
-                    <Link href="/" className="flex items-center gap-2 text-sm font-semibold text-white">
+                    <Link
+                        href="/"
+                        className="flex items-center gap-2 text-sm font-semibold text-white"
+                    >
                         <Sparkles className="size-4 text-[#F3F3F3]" />
                         <span>Design Skills</span>
                     </Link>
@@ -273,7 +272,10 @@ export default function DesignSkillsLanding() {
                         style={{ textWrap: 'pretty' }}
                         className="mt-6 max-w-[680px] text-base text-[#9B9B9B] sm:text-lg leading-relaxed"
                     >
-                        Hook your agent up with two rigorous design skills. Eliminate purple gradients, ban vague copy, snap typography to mathematical scales, and generate distinctive production front ends.
+                        Hook your agent up with two rigorous design skills.
+                        Eliminate purple gradients, ban vague copy, snap
+                        typography to mathematical scales, and generate
+                        distinctive production front ends.
                     </p>
 
                     {/* Single Primary Action + Risk Reversal */}
@@ -319,7 +321,9 @@ export default function DesignSkillsLanding() {
                                 <span className="size-2.5 rounded-full bg-[#313131]" />
                                 <span className="size-2.5 rounded-full bg-[#313131]" />
                                 <span className="size-2.5 rounded-full bg-[#313131]" />
-                                <span className="font-mono text-white ml-2">agent skill execution loop</span>
+                                <span className="font-mono text-white ml-2">
+                                    agent skill execution loop
+                                </span>
                             </div>
                             <div className="flex items-center gap-2 font-mono">
                                 <span className="text-emerald-400">ACTIVE</span>
@@ -337,19 +341,31 @@ export default function DesignSkillsLanding() {
                                 <ul className="mt-3 flex flex-col gap-2 text-xs text-[#9B9B9B]">
                                     <li className="flex items-center gap-2">
                                         <span className="text-red-400">✕</span>
-                                        <span>Defaults to Inter or Roboto everywhere</span>
+                                        <span>
+                                            Defaults to Inter or Roboto
+                                            everywhere
+                                        </span>
                                     </li>
                                     <li className="flex items-center gap-2">
                                         <span className="text-red-400">✕</span>
-                                        <span>Predictable purple gradient on light background</span>
+                                        <span>
+                                            Predictable purple gradient on light
+                                            background
+                                        </span>
                                     </li>
                                     <li className="flex items-center gap-2">
                                         <span className="text-red-400">✕</span>
-                                        <span>Vague copy: streamline, elevate, unleash</span>
+                                        <span>
+                                            Vague copy: streamline, elevate,
+                                            unleash
+                                        </span>
                                     </li>
                                     <li className="flex items-center gap-2">
                                         <span className="text-red-400">✕</span>
-                                        <span>Arbitrary font sizes and mismatched radii</span>
+                                        <span>
+                                            Arbitrary font sizes and mismatched
+                                            radii
+                                        </span>
                                     </li>
                                 </ul>
                             </div>
@@ -362,20 +378,40 @@ export default function DesignSkillsLanding() {
                                 </div>
                                 <ul className="mt-3 flex flex-col gap-2 text-xs text-[#9B9B9B]">
                                     <li className="flex items-center gap-2">
-                                        <span className="text-emerald-400">✓</span>
-                                        <span className="text-white">Commits to bold aesthetic direction first</span>
+                                        <span className="text-emerald-400">
+                                            ✓
+                                        </span>
+                                        <span className="text-white">
+                                            Commits to bold aesthetic direction
+                                            first
+                                        </span>
                                     </li>
                                     <li className="flex items-center gap-2">
-                                        <span className="text-emerald-400">✓</span>
-                                        <span className="text-white">Strict typography scale and zero hyphens in prose</span>
+                                        <span className="text-emerald-400">
+                                            ✓
+                                        </span>
+                                        <span className="text-white">
+                                            Strict typography scale and zero
+                                            hyphens in prose
+                                        </span>
                                     </li>
                                     <li className="flex items-center gap-2">
-                                        <span className="text-emerald-400">✓</span>
-                                        <span className="text-white">Nested corner radii formula: inner equals outer minus gap</span>
+                                        <span className="text-emerald-400">
+                                            ✓
+                                        </span>
+                                        <span className="text-white">
+                                            Nested corner radii formula: inner
+                                            equals outer minus gap
+                                        </span>
                                     </li>
                                     <li className="flex items-center gap-2">
-                                        <span className="text-emerald-400">✓</span>
-                                        <span className="text-white">One offer, one audience, single primary action</span>
+                                        <span className="text-emerald-400">
+                                            ✓
+                                        </span>
+                                        <span className="text-white">
+                                            One offer, one audience, single
+                                            primary action
+                                        </span>
                                     </li>
                                 </ul>
                             </div>
@@ -418,12 +454,18 @@ export default function DesignSkillsLanding() {
                         style={{ textWrap: 'pretty' }}
                         className="mt-8 max-w-[680px] text-sm text-[#9B9B9B] leading-relaxed"
                     >
-                        Every interface generated by an artificial intelligence model should exhibit intentional taste. Choose an extreme aesthetic and execute with mathematical restraint.
+                        Every interface generated by an artificial intelligence
+                        model should exhibit intentional taste. Choose an
+                        extreme aesthetic and execute with mathematical
+                        restraint.
                     </p>
                 </section>
 
                 {/* A4 & A5 Benefits Section (Outcome Driven) */}
-                <section id="benefits" className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
+                <section
+                    id="benefits"
+                    className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8"
+                >
                     <div className="mb-12 flex flex-col items-center text-center">
                         <span className="text-xs font-semibold uppercase tracking-widest text-[#9B9B9B]">
                             OUTCOME DRIVEN ADVANTAGES
@@ -438,7 +480,9 @@ export default function DesignSkillsLanding() {
                             style={{ textWrap: 'pretty' }}
                             className="mt-4 max-w-[680px] text-sm text-[#9B9B9B]"
                         >
-                            Equip your agent with rules that enforce commercial clarity, rigorous layout math, and unforgettable aesthetics.
+                            Equip your agent with rules that enforce commercial
+                            clarity, rigorous layout math, and unforgettable
+                            aesthetics.
                         </p>
                     </div>
 
@@ -452,10 +496,15 @@ export default function DesignSkillsLanding() {
                                 Radical Aesthetic Direction
                             </h3>
                             <p className="mt-2 text-sm text-[#9B9B9B] leading-relaxed">
-                                Never converge on the same predictable layout. The skill forces the agent to commit to an aesthetic register, whether brutalist raw, minimal editorial, or retro futuristic, creating memorable user experiences.
+                                Never converge on the same predictable layout.
+                                The skill forces the agent to commit to an
+                                aesthetic register, whether brutalist raw,
+                                minimal editorial, or retro futuristic, creating
+                                memorable user experiences.
                             </p>
                             <div className="mt-4 border-t border-[#313131] pt-4 text-xs font-mono text-[#9B9B9B]">
-                                Rule: Avoid common font choices and cookie cutter templates
+                                Rule: Avoid common font choices and cookie
+                                cutter templates
                             </div>
                         </div>
 
@@ -468,10 +517,14 @@ export default function DesignSkillsLanding() {
                                 Mathematical Visual System
                             </h3>
                             <p className="mt-2 text-sm text-[#9B9B9B] leading-relaxed">
-                                Every font size snaps to the Tailwind typography scale. Every corner radius follows concentric nesting geometry. No arbitrary pixel sizes or random spacing values pollute your codebase.
+                                Every font size snaps to the Tailwind typography
+                                scale. Every corner radius follows concentric
+                                nesting geometry. No arbitrary pixel sizes or
+                                random spacing values pollute your codebase.
                             </p>
                             <div className="mt-4 border-t border-[#313131] pt-4 text-xs font-mono text-[#9B9B9B]">
-                                Formula: Inner radius equals outer radius minus gap
+                                Formula: Inner radius equals outer radius minus
+                                gap
                             </div>
                         </div>
 
@@ -484,10 +537,15 @@ export default function DesignSkillsLanding() {
                                 Conversion Architecture
                             </h3>
                             <p className="mt-2 text-sm text-[#9B9B9B] leading-relaxed">
-                                A landing page wins one intent. The skill enforces single primary call to action structure, specific proof points next to claims, structured objection handling, and clear risk reversals.
+                                A landing page wins one intent. The skill
+                                enforces single primary call to action
+                                structure, specific proof points next to claims,
+                                structured objection handling, and clear risk
+                                reversals.
                             </p>
                             <div className="mt-4 border-t border-[#313131] pt-4 text-xs font-mono text-[#9B9B9B]">
-                                Architecture: One offer, one audience, single primary action
+                                Architecture: One offer, one audience, single
+                                primary action
                             </div>
                         </div>
 
@@ -500,7 +558,10 @@ export default function DesignSkillsLanding() {
                                 Production Grade Code Output
                             </h3>
                             <p className="mt-2 text-sm text-[#9B9B9B] leading-relaxed">
-                                Real accessible HTML structure, no text hyphens, balanced headings, zero orphaned words, and custom cubic bezier easing curves make generated interfaces immediately shippable.
+                                Real accessible HTML structure, no text hyphens,
+                                balanced headings, zero orphaned words, and
+                                custom cubic bezier easing curves make generated
+                                interfaces immediately shippable.
                             </p>
                             <div className="mt-4 border-t border-[#313131] pt-4 text-xs font-mono text-[#9B9B9B]">
                                 Physics: Custom cubic bezier mass physics easing
@@ -510,7 +571,10 @@ export default function DesignSkillsLanding() {
                 </section>
 
                 {/* How It Works Section (3 Steps) */}
-                <section id="workflow" className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
+                <section
+                    id="workflow"
+                    className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8"
+                >
                     <div className="mb-12 flex flex-col items-center text-center">
                         <span className="text-xs font-semibold uppercase tracking-widest text-[#9B9B9B]">
                             SETUP PROCESS
@@ -525,39 +589,57 @@ export default function DesignSkillsLanding() {
 
                     <div className="grid grid-cols-1 gap-6 md:grid-cols-3">
                         <div className="rounded-2xl border border-[#313131] bg-[#1F1F1F] p-6">
-                            <span className="text-2xl font-bold font-mono text-white">01</span>
+                            <span className="text-2xl font-bold font-mono text-white">
+                                01
+                            </span>
                             <h3 className="mt-3 text-lg font-bold text-white">
                                 Place Skills in Workspace
                             </h3>
                             <p className="mt-2 text-xs text-[#9B9B9B] leading-relaxed">
-                                Add the markdown skills to your project folder under skills or your agent harness configuration. The agent discovers them automatically.
+                                Add the markdown skills to your project folder
+                                under skills or your agent harness
+                                configuration. The agent discovers them
+                                automatically.
                             </p>
                         </div>
 
                         <div className="rounded-2xl border border-[#313131] bg-[#1F1F1F] p-6">
-                            <span className="text-2xl font-bold font-mono text-white">02</span>
+                            <span className="text-2xl font-bold font-mono text-white">
+                                02
+                            </span>
                             <h3 className="mt-3 text-lg font-bold text-white">
                                 Provide Context and Tone
                             </h3>
                             <p className="mt-2 text-xs text-[#9B9B9B] leading-relaxed">
-                                Tell the agent your product purpose, target audience, and chosen aesthetic direction. The agent checks visual guidelines before writing code.
+                                Tell the agent your product purpose, target
+                                audience, and chosen aesthetic direction. The
+                                agent checks visual guidelines before writing
+                                code.
                             </p>
                         </div>
 
                         <div className="rounded-2xl border border-[#313131] bg-[#1F1F1F] p-6">
-                            <span className="text-2xl font-bold font-mono text-white">03</span>
+                            <span className="text-2xl font-bold font-mono text-white">
+                                03
+                            </span>
                             <h3 className="mt-3 text-lg font-bold text-white">
                                 Receive Production Interfaces
                             </h3>
                             <p className="mt-2 text-xs text-[#9B9B9B] leading-relaxed">
-                                The agent outputs real working React, Tailwind, and accessible components crafted with distinctive typography and mathematical restraint.
+                                The agent outputs real working React, Tailwind,
+                                and accessible components crafted with
+                                distinctive typography and mathematical
+                                restraint.
                             </p>
                         </div>
                     </div>
                 </section>
 
                 {/* Interactive Studio & Playground */}
-                <section id="studio" className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
+                <section
+                    id="studio"
+                    className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8"
+                >
                     <div className="mb-10 flex flex-col items-center text-center">
                         <span className="text-xs font-semibold uppercase tracking-widest text-[#9B9B9B]">
                             INTERACTIVE PLAYGROUND
@@ -572,7 +654,9 @@ export default function DesignSkillsLanding() {
                             style={{ textWrap: 'pretty' }}
                             className="mt-3 max-w-[680px] text-sm text-[#9B9B9B]"
                         >
-                            Select a design flavor below to preview the creative direction and inspect prompt snippets ready for your agent.
+                            Select a design flavor below to preview the creative
+                            direction and inspect prompt snippets ready for your
+                            agent.
                         </p>
                     </div>
 
@@ -605,7 +689,8 @@ export default function DesignSkillsLanding() {
                             </div>
 
                             <span className="text-xs font-mono text-[#9B9B9B]">
-                                ACTIVE FLAVOR: {selectedPreset.name.toUpperCase()}
+                                ACTIVE FLAVOR:{' '}
+                                {selectedPreset.name.toUpperCase()}
                             </span>
                         </div>
 
@@ -637,16 +722,28 @@ export default function DesignSkillsLanding() {
                             <div className="flex flex-col gap-4 lg:col-span-5">
                                 <div className="rounded-xl border border-[#313131] bg-[#181818] p-4 text-xs flex flex-col gap-3">
                                     <div className="flex justify-between border-b border-[#313131] pb-2">
-                                        <span className="text-[#9B9B9B]">Aesthetic Register:</span>
-                                        <span className="font-semibold text-white">{selectedPreset.name}</span>
+                                        <span className="text-[#9B9B9B]">
+                                            Aesthetic Register:
+                                        </span>
+                                        <span className="font-semibold text-white">
+                                            {selectedPreset.name}
+                                        </span>
                                     </div>
                                     <div className="flex justify-between border-b border-[#313131] pb-2">
-                                        <span className="text-[#9B9B9B]">Typography Intent:</span>
-                                        <span className="text-white">{selectedPreset.displayFont}</span>
+                                        <span className="text-[#9B9B9B]">
+                                            Typography Intent:
+                                        </span>
+                                        <span className="text-white">
+                                            {selectedPreset.displayFont}
+                                        </span>
                                     </div>
                                     <div className="flex justify-between border-b border-[#313131] pb-2">
-                                        <span className="text-[#9B9B9B]">Palette Contrast:</span>
-                                        <span className="text-white">{selectedPreset.colorAccent}</span>
+                                        <span className="text-[#9B9B9B]">
+                                            Palette Contrast:
+                                        </span>
+                                        <span className="text-white">
+                                            {selectedPreset.colorAccent}
+                                        </span>
                                     </div>
                                     <p className="text-[#9B9B9B] leading-relaxed pt-1">
                                         {selectedPreset.description}
@@ -654,12 +751,22 @@ export default function DesignSkillsLanding() {
                                 </div>
 
                                 <div className="rounded-xl border border-[#313131] bg-[#181818] p-4 text-xs flex flex-col gap-2">
-                                    <span className="font-semibold text-white">Skill Rules Applied:</span>
+                                    <span className="font-semibold text-white">
+                                        Skill Rules Applied:
+                                    </span>
                                     <div className="flex flex-wrap gap-1.5 text-[11px] text-[#9B9B9B]">
-                                        <span className="rounded bg-[#272727] px-2 py-0.5">no hyphens in copy</span>
-                                        <span className="rounded bg-[#272727] px-2 py-0.5">nested radii math</span>
-                                        <span className="rounded bg-[#272727] px-2 py-0.5">B1 scale snapping</span>
-                                        <span className="rounded bg-[#272727] px-2 py-0.5">custom easing</span>
+                                        <span className="rounded bg-[#272727] px-2 py-0.5">
+                                            no hyphens in copy
+                                        </span>
+                                        <span className="rounded bg-[#272727] px-2 py-0.5">
+                                            nested radii math
+                                        </span>
+                                        <span className="rounded bg-[#272727] px-2 py-0.5">
+                                            B1 scale snapping
+                                        </span>
+                                        <span className="rounded bg-[#272727] px-2 py-0.5">
+                                            custom easing
+                                        </span>
                                     </div>
                                 </div>
                             </div>
@@ -667,7 +774,9 @@ export default function DesignSkillsLanding() {
                             <div className="flex flex-col justify-between rounded-xl border border-[#313131] bg-[#181818] p-4 lg:col-span-7">
                                 <div>
                                     <div className="flex items-center justify-between border-b border-[#313131] pb-2 text-xs">
-                                        <span className="font-mono text-white">READY TO USE AGENT PROMPT</span>
+                                        <span className="font-mono text-white">
+                                            READY TO USE AGENT PROMPT
+                                        </span>
                                         <button
                                             type="button"
                                             onClick={handleCopyPrompt}
@@ -693,7 +802,10 @@ export default function DesignSkillsLanding() {
                                 </div>
 
                                 <div className="mt-4 flex items-center justify-between text-xs text-[#9B9B9B] pt-2 border-t border-[#313131]">
-                                    <span>Pass this directly to your coding agent session</span>
+                                    <span>
+                                        Pass this directly to your coding agent
+                                        session
+                                    </span>
                                     <button
                                         type="button"
                                         onClick={handleCopyPrompt}
@@ -708,7 +820,10 @@ export default function DesignSkillsLanding() {
                 </section>
 
                 {/* FAQ Section (8 Questions) */}
-                <section id="faq" className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
+                <section
+                    id="faq"
+                    className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8"
+                >
                     <div className="mb-12 flex flex-col items-center text-center">
                         <span className="text-xs font-semibold uppercase tracking-widest text-[#9B9B9B]">
                             COMMON QUESTIONS
@@ -749,14 +864,17 @@ export default function DesignSkillsLanding() {
                             style={{ textWrap: 'balance' }}
                             className="mx-auto mt-3 max-w-[680px] text-3xl font-bold text-white sm:text-5xl"
                         >
-                            Build Distinctive User Interfaces Without The Generic Slop
+                            Build Distinctive User Interfaces Without The
+                            Generic Slop
                         </h2>
 
                         <p
                             style={{ textWrap: 'pretty' }}
                             className="mx-auto mt-4 max-w-[680px] text-sm text-[#9B9B9B]"
                         >
-                            Free and open source under the MIT license. Add both skills to your agent directory in seconds and start shipping interfaces with intentional personality.
+                            Free and open source under the MIT license. Add both
+                            skills to your agent directory in seconds and start
+                            shipping interfaces with intentional personality.
                         </p>
 
                         <div className="mt-8 flex flex-wrap items-center justify-center gap-4">
@@ -785,12 +903,20 @@ export default function DesignSkillsLanding() {
             <footer className="border-t border-[#313131] bg-[#131209] py-12 text-xs text-[#9B9B9B]">
                 <div className="mx-auto flex max-w-7xl flex-col items-center justify-between gap-6 px-4 sm:flex-row sm:px-6 lg:px-8">
                     <div className="flex flex-col gap-1 text-center sm:text-left">
-                        <span className="font-semibold text-white">Agent Design Skills Hub</span>
-                        <span>Open source tooling for high converting interfaces and front end design.</span>
+                        <span className="font-semibold text-white">
+                            Agent Design Skills Hub
+                        </span>
+                        <span>
+                            Open source tooling for high converting interfaces
+                            and front end design.
+                        </span>
                     </div>
 
                     <div className="flex items-center gap-6">
-                        <Link href="/" className="hover:text-white transition-colors">
+                        <Link
+                            href="/"
+                            className="hover:text-white transition-colors"
+                        >
                             EduFlow App
                         </Link>
                         <a
