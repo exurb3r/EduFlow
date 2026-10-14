@@ -10,6 +10,8 @@ use App\Filament\Support\LinkedHeading;
 use App\Models\AgentDecision;
 use App\Models\PaymentIntent;
 use App\Services\InstallationInstitution;
+use Filament\Actions\Action;
+use Filament\Support\Icons\Heroicon;
 use Filament\Tables\Columns\TextColumn;
 use Filament\Tables\Table;
 use Filament\Widgets\TableWidget;
@@ -109,6 +111,13 @@ class EvidenceTimelineWidget extends TableWidget
                     ->limit(60)->wrap()
                     ->color('gray')
                     ->tooltip(fn (PaymentIntent $record): ?string => $this->advisory($record)),
+            ])
+            ->recordActions([
+                Action::make('examinePayment')
+                    ->label('Review')
+                    ->icon(Heroicon::ArrowRightCircle)
+                    ->color('primary')
+                    ->url(fn (): string => PaymentReviews::getUrl(panel: 'finance')),
             ])
             ->defaultSort('id', 'desc');
     }

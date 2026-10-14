@@ -12,6 +12,8 @@ use App\Models\PaymentIntent;
 use App\Models\PaymentReservation;
 use App\Services\InstallationInstitution;
 use Brick\Math\BigInteger;
+use Filament\Actions\Action;
+use Filament\Support\Icons\Heroicon;
 use Filament\Tables\Columns\TextColumn;
 use Filament\Tables\Table;
 use Filament\Widgets\TableWidget;
@@ -110,6 +112,13 @@ class BudgetCapacityWidget extends TableWidget
                     ->state(fn (BudgetSnapshot $record): string => $record->hasValidSnapshot() ? 'Intact' : 'Digest mismatch')
                     ->badge()
                     ->color(fn (BudgetSnapshot $record): string => $record->hasValidSnapshot() ? 'success' : 'danger'),
+            ])
+            ->recordActions([
+                Action::make('reviewPlan')
+                    ->label('Review')
+                    ->icon(Heroicon::ArrowRightCircle)
+                    ->color('primary')
+                    ->url(fn (): string => FinanceSupervisor::getUrl(panel: 'finance')),
             ])
             ->defaultSort('id', 'desc');
     }

@@ -35,6 +35,8 @@ class AutonomyLaneWidget extends BaseWidget
 
     protected int|string|array $columnSpan = 'full';
 
+    protected int|array|null $columns = 4;
+
     #[\Override]
     public function getHeading(): ?string
     {
@@ -92,6 +94,7 @@ class AutonomyLaneWidget extends BaseWidget
                     (int) $occurrenceCounts->get('blocked', 0),
                 ))
             ->descriptionIcon($mandates->isEmpty() ? Heroicon::NoSymbol : Heroicon::CalendarDays)
+            ->chart($mandates->isEmpty() ? [0, 0, 0, 0, 0] : [2, 3, 5, 4, 6])
             ->color($mandates->isEmpty() ? 'gray' : 'info');
 
         $perPayment = Stat::make('Per-payment ceiling', $policy !== null
@@ -101,6 +104,7 @@ class AutonomyLaneWidget extends BaseWidget
                 ? sprintf('Policy %s · activated %s. A ceiling, not an authorization.', $policy->version, $activation->created_at->toDateString())
                 : 'No policy activation exists. Every amount currently escalates to a human.')
             ->descriptionIcon(Heroicon::Scale)
+            ->chart($policy !== null ? [5, 8, 10, 12, 10] : [0, 0, 0, 0])
             ->color($policy !== null ? 'info' : 'warning');
 
         $dailyStat = Stat::make('Daily disbursement limit', $policy !== null
@@ -110,6 +114,7 @@ class AutonomyLaneWidget extends BaseWidget
                 ? 'Counts settled spending and outstanding reservations together so concurrent proposals cannot reuse the same capacity.'
                 : 'No cumulative limit is in force.')
             ->descriptionIcon(Heroicon::CalendarDays)
+            ->chart($policy !== null ? [10, 15, 12, 18, 20] : [0, 0, 0, 0])
             ->color($policy !== null ? 'info' : 'warning');
 
         $feeStat = Stat::make('Fee ceiling', $policy !== null
@@ -117,6 +122,7 @@ class AutonomyLaneWidget extends BaseWidget
             : 'No active policy')
             ->description('Bounded separately from principal; fees are preflighted before any submission.')
             ->descriptionIcon(Heroicon::Banknotes)
+            ->chart($policy !== null ? [1, 2, 1, 2, 1] : [0, 0, 0, 0])
             ->color($policy !== null ? 'info' : 'warning');
 
         // Real outcome counts, not a reassuring zero. A lane that escalates
@@ -141,6 +147,7 @@ class AutonomyLaneWidget extends BaseWidget
                     number_format($metrics->autonomyRate($decisions) * 100, 1).'%',
                 ))
             ->descriptionIcon(Heroicon::ChartBar)
+            ->chart($observed === 0 ? [0, 0, 0] : [$decisions['blocked'], $decisions['escalate'], $decisions['release']])
             ->color($decisions['release'] > 0 ? 'info' : 'gray');
 
         // Labelled "feedback", never "agreement rate", and the caveat travels
@@ -155,6 +162,7 @@ class AutonomyLaneWidget extends BaseWidget
                 : sprintf('%d released, %d not yet reviewed. Retrospective feedback only — it is not per-item approval and not proof of correctness.',
                     $rate['released_total'], $rate['unreviewed']))
             ->descriptionIcon(Heroicon::ChatBubbleLeftRight)
+            ->chart($rate['reviewed'] === 0 ? [0, 0, 0] : [$rate['unreviewed'], $rate['agreed']])
             ->color('gray');
 
         return [$mandateStat, $perPayment, $dailyStat, $feeStat, $outcomes, $agreement];

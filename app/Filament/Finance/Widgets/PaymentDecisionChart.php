@@ -46,10 +46,40 @@ class PaymentDecisionChart extends ChartWidget
         return 'bar';
     }
 
+    protected ?string $maxHeight = '280px';
+
     #[\Override]
     public function getHeading(): string|Htmlable|null
     {
         return LinkedHeading::make($this->heading, PaymentReviews::getUrl(panel: 'finance'));
+    }
+
+    /**
+     * @return array<string, mixed>
+     */
+    #[\Override]
+    protected function getOptions(): array
+    {
+        return [
+            'plugins' => [
+                'legend' => [
+                    'display' => false,
+                ],
+            ],
+            'scales' => [
+                'y' => [
+                    'beginAtZero' => true,
+                    'ticks' => [
+                        'precision' => 0,
+                    ],
+                ],
+                'x' => [
+                    'grid' => [
+                        'display' => false,
+                    ],
+                ],
+            ],
+        ];
     }
 
     /**
