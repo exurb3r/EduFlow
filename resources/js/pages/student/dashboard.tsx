@@ -1232,9 +1232,10 @@ export default function StudentDashboard({
                                                 type="submit"
                                                 disabled={
                                                     paying ||
+                                                    quoting ||
+                                                    !payQuote ||
                                                     Boolean(inFlightAttempt) ||
-                                                    (Boolean(payQuote) &&
-                                                        !consent)
+                                                    !consent
                                                 }
                                                 data-loading={paying}
                                                 className="clay-focus rounded-full bg-[var(--clay-primary)] font-semibold text-[var(--clay-primary-foreground)]"
