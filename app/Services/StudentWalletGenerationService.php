@@ -8,6 +8,7 @@ use App\Enums\StudentWalletFundingStatus;
 use App\Models\Student;
 use App\Models\StudentWallet;
 use App\Models\StudentWalletFunding;
+use App\Notifications\FundsReceivedNotification;
 use Illuminate\Support\Facades\DB;
 use RuntimeException;
 use Yukazakiri\Lepton\Support\LeptonCliException;
@@ -138,7 +139,7 @@ class StudentWalletGenerationService
         $txHash = is_array($response) ? ($response['data']['txHash'] ?? $response['data']['transactionHash'] ?? null) : null;
         $amount = $this->dripAmount($response);
 
-        return $this->record(
+        $funding = $this->record(
             $wallet,
             $chain,
             StudentWalletFundingStatus::FUNDED,
@@ -146,6 +147,16 @@ class StudentWalletGenerationService
             null,
             $amount,
         );
+
+        $amountUsdc = number_format($amount / 1_000_000, 2);
+        $student->user->notify(new FundsReceivedNotification(
+            amount: $amountUsdc,
+            description: "Top-up of {$amountUsdc} USDC from Arc testnet faucet.",
+            txHash: is_string($txHash) ? $txHash : null,
+            source: 'faucet',
+        ));
+
+        return $funding;
     }
 
     /**
