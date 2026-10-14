@@ -143,7 +143,6 @@ class LeptonNetworkWidget extends BaseWidget
                 ? 'Block '.number_format($status['block'] ?? 0).' · chain id '.$status['chain_id'].' · '.($status['rpc_host'] ?? 'rpc')
                 : 'Live chain reads unavailable')
             ->descriptionIcon('heroicon-m-signal')
-            ->chart([3, 7, 5, 8, 6, 9, 10])
             ->color($isMainnet ? 'warning' : 'success');
 
         if ($status['address_url']) {
@@ -161,7 +160,6 @@ class LeptonNetworkWidget extends BaseWidget
                 ? 'Live via RPC · ledger '.number_format((float) $status['ledger_balance'], 2).' USDC'
                 : ($status['error'] ?? 'Chain read failed'))
             ->descriptionIcon('heroicon-m-banknotes')
-            ->chart([5, 8, 12, 10, 15, 14, 18])
             ->color($status['live_available'] ? 'success' : 'gray');
 
         if ($status['in_sync'] !== null) {
@@ -172,7 +170,6 @@ class LeptonNetworkWidget extends BaseWidget
         $treasuryStat = Stat::make('Agent Wallet', $this->shortAddress($status['treasury_address']))
             ->description($status['treasury_address'] ?? 'Set LEPTON_TREASURY_ADDRESS')
             ->descriptionIcon('heroicon-m-wallet')
-            ->chart([2, 2, 2, 2, 2])
             ->color($status['treasury_address'] ? 'primary' : 'danger');
 
         $driverStat = Stat::make('Lepton Driver', $status['driver'])
@@ -180,7 +177,6 @@ class LeptonNetworkWidget extends BaseWidget
                 ? 'Fake driver: no real USDC moves'
                 : 'Circle CLI + arc-canteen')
             ->descriptionIcon('heroicon-m-command-line')
-            ->chart($status['is_fake'] ? [1, 2, 1, 2, 1] : [3, 5, 6, 8, 9])
             ->color($status['is_fake'] ? 'warning' : 'info');
 
         return [$networkStat, $balanceStat, $treasuryStat, $driverStat];
