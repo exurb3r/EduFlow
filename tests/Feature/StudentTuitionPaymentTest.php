@@ -118,11 +118,13 @@ test('a payment is only recorded once the chain says the exact amount moved', fu
     expect($a->fresh()->posted_at)->not->toBeNull()->and($c['account']->fresh()->paid_amount)->toBe(5_000000);
 
     $notification = $c['student']->user->notifications()->first();
-    expect($notification)->not->toBeNull()
-        ->and($notification->data['title'])->toBe('Tuition payment of 5.00 USDC sent')
-        ->and($notification->data['amount'])->toBe('5.00')
-        ->and($notification->data['tx_hash'])->toBe('0x'.str_repeat('f', 64))
-        ->and($notification->data['type'])->toBe('tuition_payment');
+    expect($notification)->not->toBeNull();
+    /** @var array<string, mixed> $data */
+    $data = $notification?->getAttribute('data') ?? [];
+    expect($data['title'])->toBe('Tuition payment of 5.00 USDC sent')
+        ->and($data['amount'])->toBe('5.00')
+        ->and($data['tx_hash'])->toBe('0x'.str_repeat('f', 64))
+        ->and($data['type'])->toBe('tuition_payment');
 });
 
 test('a transaction that exists but moved the wrong amount records nothing', function (): void {
@@ -172,11 +174,13 @@ test('a debt that shrinks after the payer confirmed lands the remainder as an ov
     expect($receipt->applied_base_units)->toBe(2_000000)->and($receipt->overpayment_base_units)->toBe(3_000000);
 
     $notification = $c['student']->user->notifications()->first();
-    expect($notification)->not->toBeNull()
-        ->and($notification->data['amount'])->toBe('5.00')
-        ->and($notification->data['applied_amount'])->toBe('2.00')
-        ->and($notification->data['overpayment_amount'])->toBe('3.00')
-        ->and($notification->data['message'])->toContain('overpayment credit');
+    expect($notification)->not->toBeNull();
+    /** @var array<string, mixed> $data */
+    $data = $notification?->getAttribute('data') ?? [];
+    expect($data['amount'])->toBe('5.00')
+        ->and($data['applied_amount'])->toBe('2.00')
+        ->and($data['overpayment_amount'])->toBe('3.00')
+        ->and($data['message'])->toContain('overpayment credit');
 });
 
 test('a rehearsal without a payment provider records no debt and no ledger row', function (): void {

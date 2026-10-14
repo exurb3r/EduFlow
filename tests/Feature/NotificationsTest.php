@@ -152,7 +152,6 @@ test('tuition payment success notification stores sent amount, term and metadata
         txHash: '0x1234567890abcdef',
         term: 'Fall 2026',
         appliedAmount: '5.00',
-        overpaymentAmount: null,
     ));
 
     $notification = $user->notifications()->firstOrFail();

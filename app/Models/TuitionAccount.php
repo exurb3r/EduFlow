@@ -62,9 +62,7 @@ class TuitionAccount extends Model
             ->get()
             ->filter(function (StudentTuitionPaymentAttempt $attempt): bool {
                 if ($attempt->submission_started_at === null) {
-                    if ($attempt->stage === 'needs_operator_review'
-                        || $attempt->stage === 'preflight_blocked'
-                        || $attempt->stage === 'quote_expired_unsubmitted') {
+                    if (in_array($attempt->stage, ['needs_operator_review', 'preflight_blocked', 'quote_expired_unsubmitted'], true)) {
                         return false;
                     }
 

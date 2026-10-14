@@ -322,24 +322,21 @@ final readonly class StudentTuitionPaymentProcessor
                 return;
             }
 
-            $user = $payment->student?->user;
-            if (! $user instanceof User) {
-                return;
-            }
+            $user = $payment->student->user;
 
             $amountUsdc = number_format($payment->amount_base_units / 1_000_000, 2);
             $appliedUsdc = number_format($payment->applied_base_units / 1_000_000, 2);
-            $termName = $payment->tuitionAccount?->academicTerm?->name;
+            $termName = $payment->tuitionAccount->academicTerm->name;
             $overpaymentUsdc = $payment->overpayment_base_units > 0
                 ? number_format($payment->overpayment_base_units / 1_000_000, 2)
                 : null;
 
             if ($overpaymentUsdc !== null) {
-                $description = $termName !== null && $termName !== ''
+                $description = $termName !== ''
                     ? "Tuition payment of {$amountUsdc} USDC settled on Arc Testnet ({$appliedUsdc} USDC applied to {$termName}, {$overpaymentUsdc} USDC overpayment credit)."
                     : "Tuition payment of {$amountUsdc} USDC settled on Arc Testnet ({$appliedUsdc} USDC applied, {$overpaymentUsdc} USDC overpayment credit).";
             } else {
-                $description = $termName !== null && $termName !== ''
+                $description = $termName !== ''
                     ? "Tuition payment of {$amountUsdc} USDC settled on Arc Testnet for {$termName}."
                     : "Tuition payment of {$amountUsdc} USDC settled on Arc Testnet.";
             }
