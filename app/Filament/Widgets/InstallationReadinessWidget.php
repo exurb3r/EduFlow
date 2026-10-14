@@ -70,7 +70,6 @@ class InstallationReadinessWidget extends BaseWidget
                 : sprintf('Initialised %s · %s · %s', $installed, $institution->currency, config('app.timezone')))
             ->descriptionIcon('heroicon-o-academic-cap')
             ->color('primary')
-            ->chart([3, 5, 4, 7, 6, 8, 9])
             ->extraAttributes(['class' => 'cursor-pointer hover:shadow-sm transition-shadow'])
             ->url(ApplicationDetailsSettingsPage::getUrl());
 
@@ -80,7 +79,6 @@ class InstallationReadinessWidget extends BaseWidget
                 : 'Ambiguous institution context. Dashboards, the wallet doctor and settlement refuse to guess.')
             ->descriptionIcon('heroicon-o-building-library')
             ->color($organizationCount === 1 ? 'success' : 'danger')
-            ->chart($organizationCount === 1 ? [1, 1, 1, 1, 1, 1, 1] : [3, 1, 4, 2, 5, 2, 4])
             ->extraAttributes(['class' => 'cursor-pointer hover:shadow-sm transition-shadow'])
             ->url(ApplicationDetailsSettingsPage::getUrl());
 
@@ -94,7 +92,6 @@ class InstallationReadinessWidget extends BaseWidget
             ->description('Conservative defaults are intentional. Registration and impersonation should stay off until the school chooses otherwise.')
             ->descriptionIcon('heroicon-o-lock-closed')
             ->color($openGates === [] ? 'success' : 'warning')
-            ->chart($openGates === [] ? [1, 1, 1, 1, 1, 1] : [2, 4, 3, 5, 4, 6])
             ->extraAttributes(['class' => 'cursor-pointer hover:shadow-sm transition-shadow'])
             ->url(ApplicationFeaturesSettingsPage::getUrl());
 
@@ -109,7 +106,6 @@ class InstallationReadinessWidget extends BaseWidget
             ))
             ->descriptionIcon('heroicon-o-sparkles')
             ->color($ai instanceof AiSettings && $ai->advisory_enabled ? 'info' : 'gray')
-            ->chart([2, 3, 5, 4, 6, 8, 7])
             ->extraAttributes(['class' => 'cursor-pointer hover:shadow-sm transition-shadow'])
             ->url(AiProviderResource::getUrl('index'));
 
@@ -125,14 +121,12 @@ class InstallationReadinessWidget extends BaseWidget
                 ? 'Fake driver: no wallet, no chain, no real funds. Safe for demonstration, never for finance.'
                 : ($bound ? 'Treasury bound to the configured agent wallet' : 'Treasury address does not match the configured agent wallet'))
             ->descriptionIcon('heroicon-o-circle-stack')
-            ->chart($status['is_fake'] ? [1, 2, 1, 2, 1, 2] : [4, 7, 6, 9, 8, 12])
             ->color($status['is_fake'] ? 'warning' : ($bound ? 'success' : 'danger'));
 
         $runtimeStat = Stat::make('Background runtime', config('eduflow.background_finance.enabled') ? 'Enabled' : 'Disabled')
             ->description('Background planning is a supervised service. Nothing here submits, authorizes or settles a payment.')
             ->descriptionIcon('heroicon-o-cog-6-tooth')
             ->color(config('eduflow.background_finance.enabled') ? 'info' : 'gray')
-            ->chart(config('eduflow.background_finance.enabled') ? [2, 4, 5, 7, 6, 8, 9] : [0, 0, 0, 0, 0])
             ->extraAttributes(['class' => 'cursor-pointer hover:shadow-sm transition-shadow'])
             ->url(FinanceDashboard::getUrl(panel: 'finance'));
 

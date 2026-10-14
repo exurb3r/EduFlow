@@ -129,7 +129,6 @@ class Dashboard extends BaseDashboard
                             'admin' => 'Administrator',
                             'finance_officer' => 'Finance officer',
                             'user' => 'Standard user',
-                            'student' => 'Student',
                         ])
                         ->default('finance_officer')
                         ->required(),
@@ -138,8 +137,7 @@ class Dashboard extends BaseDashboard
                         ->password()
                         ->revealable()
                         ->required()
-                        ->minLength(8)
-                        ->default('Password123!'),
+                        ->minLength(8),
                 ])
                 ->action(function (array $data): void {
                     $user = User::query()->create([

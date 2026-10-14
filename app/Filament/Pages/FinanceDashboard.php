@@ -132,6 +132,7 @@ class FinanceDashboard extends BaseDashboard
                     ->icon(Heroicon::ArrowPath)
                     ->color('warning')
                     ->requiresConfirmation()
+                    ->hidden(fn (): bool => ! (Auth::user() instanceof User && Auth::user()->hasRole('super_admin')))
                     ->modalHeading('Synchronize ledger from Arc chain?')
                     ->modalDescription('Polls the configured Lepton Arc network gateway and updates the ledger treasury balance to match.')
                     ->action(function (): void {
@@ -175,82 +176,82 @@ class FinanceDashboard extends BaseDashboard
                     ->modalHeading('Financial supervisory overview')
                     ->modalDescription('Current status of collections, proposals, active holds and Arc settlement rail.')
                     ->infolist([
-                            InfoSection::make('Pending Decisions')
-                                ->schema([
-                                    InfoGrid::make(3)->schema([
-                                        TextEntry::make('unreviewed_collections')
-                                            ->label('Unreviewed Receipt Batches')
-                                            ->badge()
-                                            ->color('warning')
-                                            ->state(function (): int {
-                                                $institution = app(InstallationInstitution::class)->current();
-
-                                                return $institution === null ? 0 : CollectionBatch::query()
-                                                    ->where('organization_id', $institution->id)
-                                                    ->whereDoesntHave('reviews')
-                                                    ->count();
-                                            }),
-                                        TextEntry::make('waiting_proposals')
-                                            ->label('Proposals Awaiting Review')
-                                            ->badge()
-                                            ->color('warning')
-                                            ->state(function (): int {
-                                                $institution = app(InstallationInstitution::class)->current();
-
-                                                return $institution === null ? 0 : FinanceWorkflowRun::query()
-                                                    ->where('organization_id', $institution->id)
-                                                    ->where('state', 'waiting_for_review')
-                                                    ->count();
-                                            }),
-                                        TextEntry::make('reserved_holds')
-                                            ->label('Active Payment Holds')
-                                            ->badge()
-                                            ->color('primary')
-                                            ->state(function (): int {
-                                                $institution = app(InstallationInstitution::class)->current();
-
-                                                return $institution === null ? 0 : PaymentReservation::query()
-                                                    ->where('organization_id', $institution->id)
-                                                    ->where('state', 'held')
-                                                    ->count();
-                                            }),
-                                    ]),
-                                ]),
-                            InfoSection::make('Settlement Rail Telemetry')
-                                ->schema([
+                        InfoSection::make('Pending Decisions')
+                            ->schema([
                                 InfoGrid::make(3)->schema([
-                                    TextEntry::make('rail_driver')
-                                            ->label('Lepton Driver')
-                                            ->badge()
-                                            ->state(function (): string {
-                                                $institution = app(InstallationInstitution::class)->current();
-                                                $status = app(LeptonTreasuryService::class)->status($institution?->primaryWallet());
+                                    TextEntry::make('unreviewed_collections')
+                                        ->label('Unreviewed Receipt Batches')
+                                        ->badge()
+                                        ->color('warning')
+                                        ->state(function (): int {
+                                            $institution = app(InstallationInstitution::class)->current();
 
-                                                return $status['driver'].($status['is_fake'] ? ' (Simulation)' : '');
-                                            }),
-                                    TextEntry::make('chain_block')
-                                            ->label('Target Chain & Block')
-                                            ->badge()
-                                            ->color('info')
-                                            ->state(function (): string {
-                                                $institution = app(InstallationInstitution::class)->current();
-                                                $status = app(LeptonTreasuryService::class)->status($institution?->primaryWallet());
+                                            return $institution === null ? 0 : CollectionBatch::query()
+                                                ->where('organization_id', $institution->id)
+                                                ->whereDoesntHave('reviews')
+                                                ->count();
+                                        }),
+                                    TextEntry::make('waiting_proposals')
+                                        ->label('Proposals Awaiting Review')
+                                        ->badge()
+                                        ->color('warning')
+                                        ->state(function (): int {
+                                            $institution = app(InstallationInstitution::class)->current();
 
-                                                return strtoupper((string) $status['chain']).' · Block '.number_format((float) ($status['block'] ?? 0));
-                                            }),
-                                    TextEntry::make('active_policy')
-                                            ->label('Active Spending Policy')
-                                            ->badge()
-                                            ->color('success')
-                                            ->state(function (): string {
-                                                $institution = app(InstallationInstitution::class)->current();
-                                                $activation = $institution === null ? null : FinancePolicyActivation::current($institution->id);
+                                            return $institution === null ? 0 : FinanceWorkflowRun::query()
+                                                ->where('organization_id', $institution->id)
+                                                ->where('state', 'waiting_for_review')
+                                                ->count();
+                                        }),
+                                    TextEntry::make('reserved_holds')
+                                        ->label('Active Payment Holds')
+                                        ->badge()
+                                        ->color('primary')
+                                        ->state(function (): int {
+                                            $institution = app(InstallationInstitution::class)->current();
 
-                                                return $activation?->policyVersion?->version ?? 'No active policy';
-                                            }),
+                                            return $institution === null ? 0 : PaymentReservation::query()
+                                                ->where('organization_id', $institution->id)
+                                                ->where('state', 'held')
+                                                ->count();
+                                        }),
                                 ]),
                             ]),
-                        ])
+                        InfoSection::make('Settlement Rail Telemetry')
+                            ->schema([
+                                InfoGrid::make(3)->schema([
+                                    TextEntry::make('rail_driver')
+                                        ->label('Lepton Driver')
+                                        ->badge()
+                                        ->state(function (): string {
+                                            $institution = app(InstallationInstitution::class)->current();
+                                            $status = app(LeptonTreasuryService::class)->status($institution?->primaryWallet());
+
+                                            return $status['driver'].($status['is_fake'] ? ' (Simulation)' : '');
+                                        }),
+                                    TextEntry::make('chain_block')
+                                        ->label('Target Chain & Block')
+                                        ->badge()
+                                        ->color('info')
+                                        ->state(function (): string {
+                                            $institution = app(InstallationInstitution::class)->current();
+                                            $status = app(LeptonTreasuryService::class)->status($institution?->primaryWallet());
+
+                                            return strtoupper((string) $status['chain']).' · Block '.number_format((float) ($status['block'] ?? 0));
+                                        }),
+                                    TextEntry::make('active_policy')
+                                        ->label('Active Spending Policy')
+                                        ->badge()
+                                        ->color('success')
+                                        ->state(function (): string {
+                                            $institution = app(InstallationInstitution::class)->current();
+                                            $activation = $institution === null ? null : FinancePolicyActivation::current($institution->id);
+
+                                            return $activation?->policyVersion?->version ?? 'No active policy';
+                                        }),
+                                ]),
+                            ]),
+                    ])
                     ->modalSubmitAction(false)
                     ->modalCancelActionLabel('Close'),
 
