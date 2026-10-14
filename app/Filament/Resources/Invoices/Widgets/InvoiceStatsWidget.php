@@ -18,7 +18,7 @@ class InvoiceStatsWidget extends BaseWidget
         $totalAmount = (float) Invoice::query()->sum('amount');
 
         $settledQuery = Invoice::query()->whereIn('status', ['auto_paid', 'paid']);
-        $settledCount = $settledQuery->count();
+        $settledQuery->count();
         $settledAmount = (float) $settledQuery->sum('amount');
 
         $pendingQuery = Invoice::query()->whereIn('status', ['pending', 'escalated', 'held']);

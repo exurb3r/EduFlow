@@ -589,6 +589,102 @@ parameters:
 			path: app/Filament/Resources/FeatureFlag/FeatureFlagResource.php
 
 		-
+			rawMessage: Expression on left side of ?? is not nullable.
+			identifier: nullCoalesce.expr
+			count: 1
+			path: app/Filament/Resources/Invoices/Pages/EditInvoice.php
+
+		-
+			rawMessage: Expression on left side of ?? is not nullable.
+			identifier: nullCoalesce.expr
+			count: 1
+			path: app/Filament/Resources/Invoices/Pages/ViewInvoice.php
+
+		-
+			rawMessage: Using nullsafe property access on non-nullable type App\Models\Vendor. Use -> instead.
+			identifier: nullsafe.neverNull
+			count: 4
+			path: app/Filament/Resources/Invoices/Pages/ViewInvoice.php
+
+		-
+			rawMessage: Expression on left side of ?? is not nullable.
+			identifier: nullCoalesce.expr
+			count: 1
+			path: app/Filament/Resources/Invoices/Schemas/InvoiceInfolist.php
+
+		-
+			rawMessage: Using nullsafe property access "?->provider_tx_hash" on left side of ?? is unnecessary. Use -> instead.
+			identifier: nullsafe.neverNull
+			count: 1
+			path: app/Filament/Resources/Invoices/Schemas/InvoiceInfolist.php
+
+		-
+			rawMessage: Using nullsafe property access on non-nullable type App\Models\Vendor. Use -> instead.
+			identifier: nullsafe.neverNull
+			count: 3
+			path: app/Filament/Resources/Invoices/Schemas/InvoiceInfolist.php
+
+		-
+			rawMessage: Anonymous function never returns null so it can be removed from the return type.
+			identifier: return.unusedType
+			count: 1
+			path: app/Filament/Resources/Invoices/Tables/InvoicesTable.php
+
+		-
+			rawMessage: If condition is always true.
+			identifier: if.alwaysTrue
+			count: 1
+			path: app/Filament/Resources/Invoices/Tables/InvoicesTable.php
+
+		-
+			rawMessage: Left side of && is always true.
+			identifier: booleanAnd.leftAlwaysTrue
+			count: 2
+			path: app/Filament/Resources/Invoices/Tables/InvoicesTable.php
+
+		-
+			rawMessage: Unreachable statement - code above always terminates.
+			identifier: deadCode.unreachable
+			count: 1
+			path: app/Filament/Resources/Invoices/Tables/InvoicesTable.php
+
+		-
+			rawMessage: Using nullsafe property access "?->email" on left side of ?? is unnecessary. Use -> instead.
+			identifier: nullsafe.neverNull
+			count: 1
+			path: app/Filament/Resources/Invoices/Tables/InvoicesTable.php
+
+		-
+			rawMessage: Using nullsafe property access on non-nullable type App\Models\Vendor. Use -> instead.
+			identifier: nullsafe.neverNull
+			count: 2
+			path: app/Filament/Resources/Invoices/Tables/InvoicesTable.php
+
+		-
+			rawMessage: Right side of && is always true.
+			identifier: booleanAnd.rightAlwaysTrue
+			count: 1
+			path: app/Filament/Resources/Invoices/Widgets/InvoiceOverviewWidget.php
+
+		-
+			rawMessage: Ternary operator condition is always true.
+			identifier: ternary.alwaysTrue
+			count: 1
+			path: app/Filament/Resources/Invoices/Widgets/InvoiceOverviewWidget.php
+
+		-
+			rawMessage: Using nullsafe property access on non-nullable type App\Models\Vendor. Use -> instead.
+			identifier: nullsafe.neverNull
+			count: 1
+			path: app/Filament/Resources/Invoices/Widgets/InvoiceOverviewWidget.php
+
+		-
+			rawMessage: 'Call to an undefined method Illuminate\Contracts\Auth\Factory::user().'
+			identifier: method.notFound
+			count: 1
+			path: app/Filament/Resources/Students/Pages/ViewStudent.php
+
+		-
 			rawMessage: Access to an undefined property Illuminate\Database\Eloquent\Model::$network.
 			identifier: property.notFound
 			count: 1
@@ -617,6 +713,66 @@ parameters:
 			identifier: argument.type
 			count: 2
 			path: app/Filament/Resources/Transactions/Pages/ViewTransaction.php
+
+		-
+			rawMessage: Caught class App\Filament\Resources\TuitionAccounts\Pages\Throwable not found.
+			identifier: class.notFound
+			count: 1
+			path: app/Filament/Resources/TuitionAccounts/Pages/ViewTuitionAccount.php
+
+		-
+			rawMessage: Access to an undefined property App\Models\User::$student.
+			identifier: property.notFound
+			count: 3
+			path: app/Filament/Resources/Users/Pages/EditUser.php
+
+		-
+			rawMessage: Access to an undefined property App\Models\User::$roles.
+			identifier: property.notFound
+			count: 1
+			path: app/Filament/Resources/Users/Pages/ViewUser.php
+
+		-
+			rawMessage: Access to an undefined property App\Models\User::$student.
+			identifier: property.notFound
+			count: 4
+			path: app/Filament/Resources/Users/Pages/ViewUser.php
+
+		-
+			rawMessage: Access to an undefined property App\Models\User::$student.
+			identifier: property.notFound
+			count: 16
+			path: app/Filament/Resources/Users/UserResource.php
+
+		-
+			rawMessage: 'Call to an undefined method Illuminate\Database\Eloquent\Model::assignRole().'
+			identifier: method.notFound
+			count: 1
+			path: app/Filament/Resources/Users/UserResource.php
+
+		-
+			rawMessage: Access to an undefined property App\Models\User::$passkeys.
+			identifier: property.notFound
+			count: 1
+			path: app/Filament/Resources/Users/Widgets/UserProfileSummaryWidget.php
+
+		-
+			rawMessage: Access to an undefined property App\Models\User::$roles.
+			identifier: property.notFound
+			count: 1
+			path: app/Filament/Resources/Users/Widgets/UserProfileSummaryWidget.php
+
+		-
+			rawMessage: Access to an undefined property App\Models\User::$student.
+			identifier: property.notFound
+			count: 1
+			path: app/Filament/Resources/Users/Widgets/UserProfileSummaryWidget.php
+
+		-
+			rawMessage: Using nullsafe property access "?->payout_address" on left side of ?? is unnecessary. Use -> instead.
+			identifier: nullsafe.neverNull
+			count: 1
+			path: app/Filament/Resources/Users/Widgets/UserProfileSummaryWidget.php
 
 		-
 			rawMessage: 'Parameter #2 $context of method App\Services\AskEduFlow::query() expects array{tuition_balance_base_units?: int, display_currency?: string, student_name?: string}, array{tuition_balance_base_units: mixed, display_currency: string, student_name: mixed, student_number: mixed} given.'
@@ -1315,12 +1471,6 @@ parameters:
 			path: tests/Feature/DatabaseSeederTest.php
 
 		-
-			rawMessage: 'Call to an undefined static method App\Models\AcademicTerm::exists().'
-			identifier: staticMethod.notFound
-			count: 1
-			path: tests/Feature/DatabaseSeederTest.php
-
-		-
 			rawMessage: 'Call to an undefined static method App\Models\AssistanceRequest::count().'
 			identifier: staticMethod.notFound
 			count: 1
@@ -1339,19 +1489,7 @@ parameters:
 			path: tests/Feature/DatabaseSeederTest.php
 
 		-
-			rawMessage: 'Call to an undefined static method App\Models\Student::where().'
-			identifier: staticMethod.notFound
-			count: 1
-			path: tests/Feature/DatabaseSeederTest.php
-
-		-
 			rawMessage: 'Call to an undefined static method App\Models\TuitionAccount::count().'
-			identifier: staticMethod.notFound
-			count: 1
-			path: tests/Feature/DatabaseSeederTest.php
-
-		-
-			rawMessage: 'Call to an undefined static method App\Models\TuitionAccount::where().'
 			identifier: staticMethod.notFound
 			count: 1
 			path: tests/Feature/DatabaseSeederTest.php
@@ -1873,6 +2011,48 @@ parameters:
 			path: tests/Feature/Filament/EduFlowCommandCenterTest.php
 
 		-
+			rawMessage: 'Access to an undefined property Illuminate\Database\Eloquent\Collection<int, Illuminate\Database\Eloquent\Model>|Illuminate\Database\Eloquent\Model::$id.'
+			identifier: property.notFound
+			count: 11
+			path: tests/Feature/Filament/InvoiceResourceTest.php
+
+		-
+			rawMessage: 'Call to an undefined method Illuminate\Testing\TestResponse::fillForm().'
+			identifier: method.notFound
+			count: 1
+			path: tests/Feature/Filament/InvoiceResourceTest.php
+
+		-
+			rawMessage: 'Call to an undefined method Illuminate\Testing\TestResponse::set().'
+			identifier: method.notFound
+			count: 1
+			path: tests/Feature/Filament/InvoiceResourceTest.php
+
+		-
+			rawMessage: 'Call to an undefined method Livewire\Features\SupportTesting\Testable::callAction().'
+			identifier: method.notFound
+			count: 1
+			path: tests/Feature/Filament/InvoiceResourceTest.php
+
+		-
+			rawMessage: 'Call to an undefined static method App\Models\Invoice::create().'
+			identifier: staticMethod.notFound
+			count: 1
+			path: tests/Feature/Filament/InvoiceResourceTest.php
+
+		-
+			rawMessage: 'Call to an undefined static method Spatie\Permission\Models\Permission::firstOrCreate().'
+			identifier: staticMethod.notFound
+			count: 1
+			path: tests/Feature/Filament/InvoiceResourceTest.php
+
+		-
+			rawMessage: 'Call to an undefined static method Spatie\Permission\Models\Role::firstOrCreate().'
+			identifier: staticMethod.notFound
+			count: 1
+			path: tests/Feature/Filament/InvoiceResourceTest.php
+
+		-
 			rawMessage: 'Call to an undefined method Livewire\Features\SupportTesting\Testable::fillForm().'
 			identifier: method.notFound
 			count: 6
@@ -1903,6 +2083,12 @@ parameters:
 			path: tests/Feature/Filament/StudentResourceTest.php
 
 		-
+			rawMessage: 'Call to an undefined method Illuminate\Testing\TestResponse::set().'
+			identifier: method.notFound
+			count: 1
+			path: tests/Feature/Filament/StudentResourceTest.php
+
+		-
 			rawMessage: 'Call to an undefined method Livewire\Features\SupportTesting\Testable::callAction().'
 			identifier: method.notFound
 			count: 2
@@ -1917,7 +2103,7 @@ parameters:
 		-
 			rawMessage: 'Call to an undefined method Livewire\Features\SupportTesting\Testable::mountAction().'
 			identifier: method.notFound
-			count: 1
+			count: 3
 			path: tests/Feature/Filament/StudentResourceTest.php
 
 		-
@@ -1939,6 +2125,12 @@ parameters:
 			path: tests/Feature/Filament/TuitionAccountResourceTest.php
 
 		-
+			rawMessage: 'Call to an undefined method Illuminate\Testing\TestResponse::set().'
+			identifier: method.notFound
+			count: 1
+			path: tests/Feature/Filament/TuitionAccountResourceTest.php
+
+		-
 			rawMessage: 'Call to an undefined method Livewire\Features\SupportTesting\Testable::fillForm().'
 			identifier: method.notFound
 			count: 4
@@ -1955,6 +2147,42 @@ parameters:
 			identifier: staticMethod.notFound
 			count: 1
 			path: tests/Feature/Filament/TuitionAccountResourceTest.php
+
+		-
+			rawMessage: 'Access to an undefined property App\Models\User|Illuminate\Database\Eloquent\Collection<int, App\Models\User>::$student.'
+			identifier: property.notFound
+			count: 1
+			path: tests/Feature/Filament/UserResourceTest.php
+
+		-
+			rawMessage: 'Call to an undefined method Illuminate\Testing\TestResponse::set().'
+			identifier: method.notFound
+			count: 1
+			path: tests/Feature/Filament/UserResourceTest.php
+
+		-
+			rawMessage: 'Call to an undefined method Livewire\Features\SupportTesting\Testable::callAction().'
+			identifier: method.notFound
+			count: 2
+			path: tests/Feature/Filament/UserResourceTest.php
+
+		-
+			rawMessage: 'Call to an undefined method Livewire\Features\SupportTesting\Testable::mountAction().'
+			identifier: method.notFound
+			count: 1
+			path: tests/Feature/Filament/UserResourceTest.php
+
+		-
+			rawMessage: 'Call to an undefined static method Spatie\Permission\Models\Permission::firstOrCreate().'
+			identifier: staticMethod.notFound
+			count: 1
+			path: tests/Feature/Filament/UserResourceTest.php
+
+		-
+			rawMessage: 'Call to an undefined static method Spatie\Permission\Models\Role::firstOrCreate().'
+			identifier: staticMethod.notFound
+			count: 1
+			path: tests/Feature/Filament/UserResourceTest.php
 
 		-
 			rawMessage: 'Call to an undefined static method App\Models\Budget::create().'

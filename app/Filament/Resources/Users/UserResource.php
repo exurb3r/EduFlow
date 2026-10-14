@@ -67,6 +67,7 @@ class UserResource extends Resource
         return 'warning';
     }
 
+    #[\Override]
     public static function getNavigationBadgeTooltip(): ?string
     {
         return 'Users awaiting email verification';

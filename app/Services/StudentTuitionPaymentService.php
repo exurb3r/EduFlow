@@ -51,7 +51,6 @@ final readonly class StudentTuitionPaymentService
         $institution = $this->institutions->require();
         $recipient = $this->recipientAddress();
         $simulated = $this->isSimulated();
-        $this->balances->forget($student);
         $balance = $this->balances->snapshot($student);
         if ($balance->state !== WalletReadState::OK || ! is_string($balance->balance) || $balance->isFake !== $simulated) {
             throw ValidationException::withMessages(['amount_base_units' => 'Wallet balance is unavailable or its driver differs; no payment can be quoted.']);

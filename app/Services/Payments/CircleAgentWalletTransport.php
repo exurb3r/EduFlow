@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Services\Payments;
 
+use Illuminate\Support\Facades\Cache;
 use RuntimeException;
 use Symfony\Component\Process\Process;
 use Throwable;
@@ -123,6 +124,13 @@ final readonly class CircleAgentWalletTransport implements FeeBoundedPaymentTran
      */
     public function estimate(array $request): ?array
     {
+        $cacheKey = 'circle_wallet_fee_estimate_'.md5((string) ($request['chain'] ?? ''));
+
+        $cached = Cache::get($cacheKey);
+        if (is_array($cached)) {
+            return $cached;
+        }
+
         $quoted = $this->run([
             'wallet', 'transfer', $request['to'],
             '--amount', Amounts::toCliAmount((int) $request['amount_base_units'], $this->usdcDecimals),
@@ -132,7 +140,13 @@ final readonly class CircleAgentWalletTransport implements FeeBoundedPaymentTran
             '--output', 'json',
         ]);
 
-        return is_array($quoted) ? $quoted : null;
+        if (is_array($quoted)) {
+            Cache::put($cacheKey, $quoted, 60);
+
+            return $quoted;
+        }
+
+        return null;
     }
 
     public function resolve(string $handle, array $request): TransportResolution

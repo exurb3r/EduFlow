@@ -65,6 +65,7 @@ class TuitionAccountResource extends Resource
         return 'danger';
     }
 
+    #[\Override]
     public static function getNavigationBadgeTooltip(): ?string
     {
         return 'Tuition accounts with outstanding balance';

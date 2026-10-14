@@ -27,6 +27,7 @@ use App\Services\MandateReleaseEvaluator;
 use Brick\Math\BigInteger;
 use Carbon\CarbonImmutable;
 use Illuminate\Auth\Access\AuthorizationException;
+use Illuminate\Support\Carbon;
 use Illuminate\Support\Str;
 use Illuminate\Validation\ValidationException;
 use Spatie\Permission\Models\Role;
@@ -552,12 +553,17 @@ test('the evaluator needs no model, provider or session to run', function (): vo
     approveMandate($c, $mandate);
     $fresh = $mandate->fresh();
 
-    $before = app(MandateReleaseEvaluator::class)->evaluate($fresh, releasingFacts($c, $fresh));
+    Carbon::setTestNow(now());
+    try {
+        $before = app(MandateReleaseEvaluator::class)->evaluate($fresh, releasingFacts($c, $fresh));
 
-    // Two calls with identical facts agree exactly, because the disposition is
-    // a function of the evidence and nothing else.
-    expect(app(MandateReleaseEvaluator::class)->evaluate($fresh, releasingFacts($c, $fresh)))->toBe($before)
-        ->and($before['disposition'])->toBe('release');
+        // Two calls with identical facts agree exactly, because the disposition is
+        // a function of the evidence and nothing else.
+        expect(app(MandateReleaseEvaluator::class)->evaluate($fresh, releasingFacts($c, $fresh)))->toBe($before)
+            ->and($before['disposition'])->toBe('release');
+    } finally {
+        Carbon::setTestNow();
+    }
 });
 
 test('a nonzero ceiling is refused while the allowance is disabled, and a zero one is not', function (): void {

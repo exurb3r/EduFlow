@@ -211,6 +211,10 @@ export function StudentPaymentTracker({
             title: '2. Relayer Preflight',
             description: step2Desc,
             status: step2Status,
+            meta:
+                step2Status === 'in_progress'
+                    ? 'Backend queue worker processing'
+                    : null,
         };
 
         // Step 3: Arc Relayer Dispatch
@@ -242,7 +246,9 @@ export function StudentPaymentTracker({
             status: step3Status,
             meta: a.provider_handle
                 ? `Handle: ${a.provider_handle.slice(0, 8)}…`
-                : null,
+                : step3Status === 'in_progress'
+                  ? 'Circle relayer dispatching'
+                  : null,
         };
 
         // Step 4: Arc Settlement Proof
@@ -262,7 +268,11 @@ export function StudentPaymentTracker({
             title: '4. Arc On-Chain Proof',
             description: step4Desc,
             status: step4Status,
-            meta: a.tx_hash ? shortHash(a.tx_hash) : null,
+            meta: a.tx_hash
+                ? shortHash(a.tx_hash)
+                : step4Status === 'in_progress'
+                  ? 'Awaiting block RPC verification'
+                  : null,
         };
 
         // Step 5: Tuition Allocation
@@ -283,7 +293,9 @@ export function StudentPaymentTracker({
             meta:
                 BigInt(a.applied_base_units || 0) > 0n
                     ? `${formatUsdc(a.applied_base_units)} credited`
-                    : null,
+                    : step5Status === 'in_progress'
+                      ? 'Ledger allocation updating'
+                      : null,
         };
 
         return [step1, step2, step3, step4, step5];
@@ -306,7 +318,7 @@ export function StudentPaymentTracker({
                         </span>
                         <span className="flex items-center gap-1 rounded-full bg-[var(--clay-surface-soft)] px-2 py-0.5 text-[10px] font-semibold text-[var(--clay-text-muted)]">
                             <RefreshCw className="size-2.5 animate-spin text-[var(--clay-primary-bright)]" />
-                            8s poll
+                            {isInFlight ? '2.5s live rail sync' : '8s sync'}
                         </span>
                     </div>
                     <h3 className="clay-h2 mt-1 text-base sm:text-lg">

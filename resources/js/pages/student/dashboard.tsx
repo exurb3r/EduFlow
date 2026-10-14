@@ -26,7 +26,7 @@ import {
     TriangleAlert,
     Wallet,
 } from 'lucide-react';
-import { useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { toast } from 'sonner';
 
 import { StudentPaymentTracker } from '@/components/student-payment-tracker';
@@ -148,6 +148,7 @@ type TuitionQuote = {
     network_fee: string;
     total: string;
     max_amount_base_units: number;
+    amount_base_units?: number;
     balance: string | null;
     chain: string;
     request_digest: string;
@@ -181,21 +182,6 @@ export default function StudentDashboard({
     const remainingBase = Number(tuitionAccount?.remaining_amount ?? 0);
     const remainingUsdc = remainingBase / 1_000_000;
     const canPay = hasWallet && remainingBase > 0;
-    const inFlightAttempt = tuitionAttempts?.find(
-        (a) =>
-            ([
-                'prepared',
-                'submitting',
-                'accepted',
-                'awaiting_verification',
-                'unknown',
-            ].includes(a.state) &&
-                a.stage !== 'needs_operator_review' &&
-                a.stage !== 'preflight_blocked' &&
-                a.stage !== 'quote_expired_unsubmitted') ||
-            (a.state === 'verified' && !a.posted),
-    );
-    const hasInFlight = Boolean(inFlightAttempt);
     const [payOpen, setPayOpen] = useState(false);
     const [payAmount, setPayAmount] = useState('');
     const [payQuote, setPayQuote] = useState<TuitionQuote | null>(null);
@@ -220,6 +206,7 @@ export default function StudentDashboard({
     const inFlightQuotePromiseRef = useRef<Promise<TuitionQuote | null> | null>(
         null,
     );
+
     const activeReceipt = receipt
         ? (tuitionAttempts.find(
               (a) =>
@@ -229,6 +216,52 @@ export default function StudentDashboard({
                   ),
           ) ?? receipt)
         : null;
+
+    const inFlightAttempt =
+        tuitionAttempts?.find(
+            (a) =>
+                ([
+                    'prepared',
+                    'submitting',
+                    'accepted',
+                    'awaiting_verification',
+                    'unknown',
+                ].includes(a.state) &&
+                    a.stage !== 'needs_operator_review' &&
+                    a.stage !== 'preflight_blocked' &&
+                    a.stage !== 'quote_expired_unsubmitted') ||
+                (a.state === 'verified' && !a.posted),
+        ) ??
+        (activeReceipt &&
+        (([
+            'prepared',
+            'submitting',
+            'accepted',
+            'awaiting_verification',
+            'unknown',
+        ].includes(activeReceipt.state) &&
+            activeReceipt.stage !== 'needs_operator_review' &&
+            activeReceipt.stage !== 'preflight_blocked' &&
+            activeReceipt.stage !== 'quote_expired_unsubmitted') ||
+            (activeReceipt.state === 'verified' && !activeReceipt.posted))
+            ? activeReceipt
+            : null);
+    const hasInFlight = Boolean(inFlightAttempt);
+
+    const trackerAttempts = useMemo(() => {
+        if (!receipt) {
+            return tuitionAttempts;
+        }
+        const alreadyPresent = tuitionAttempts.some(
+            (a) =>
+                a.id === receipt.id ||
+                Boolean(a.request_key && a.request_key === receipt.request_key),
+        );
+        if (alreadyPresent) {
+            return tuitionAttempts;
+        }
+        return [receipt, ...tuitionAttempts];
+    }, [receipt, tuitionAttempts]);
     const [txFilter, setTxFilter] = useState<'all' | 'inbound' | 'outbound'>(
         'all',
     );
@@ -424,12 +457,40 @@ export default function StudentDashboard({
         ),
     );
 
+    const buildInstantQuote = useCallback(
+        (baseUnits: number): TuitionQuote => ({
+            network_fee: '0.000000',
+            total: (baseUnits / 1_000_000).toFixed(2),
+            max_amount_base_units: remainingBase,
+            amount_base_units: baseUnits,
+            balance: snapshot?.balance ?? null,
+            chain: 'ARC-TESTNET',
+            request_digest: '',
+            consent_text:
+                'I consent to the transfer of USDC on Arc Testnet for tuition.',
+            expires_at: '',
+            fee_ceiling_base_units: 0,
+        }),
+        [remainingBase, snapshot?.balance],
+    );
+
     const openPay = () => {
-        isInitialOpenRef.current = true;
-        setPayAmount((defaultPayBaseUnits / 1_000_000).toFixed(2));
-        setPayQuote(null);
+        const defaultAmount = (defaultPayBaseUnits / 1_000_000).toFixed(2);
+        setPayAmount(defaultAmount);
+
+        const currentQuoteValid =
+            payQuote &&
+            payQuote.amount_base_units === defaultPayBaseUnits &&
+            Boolean(payQuote.request_key) &&
+            payQuote.expires_at &&
+            new Date(payQuote.expires_at).getTime() > Date.now();
+
+        if (!currentQuoteValid) {
+            isInitialOpenRef.current = true;
+            setPayQuote(buildInstantQuote(defaultPayBaseUnits));
+            setRequestKey(null);
+        }
         setConsent(false);
-        setRequestKey(null);
         setPayError(null);
         setReceipt(null);
         setPayOpen(true);
@@ -459,7 +520,7 @@ export default function StudentDashboard({
 
         const isInitial = isInitialOpenRef.current;
         isInitialOpenRef.current = false;
-        const delay = isInitial ? 0 : 450;
+        const delay = isInitial ? 0 : 200;
 
         const timer = setTimeout(() => {
             void requestQuote(baseUnits);
@@ -565,6 +626,22 @@ export default function StudentDashboard({
         return promise;
     };
 
+    // Background prefetch the default quote so opening the modal has zero delay
+    useEffect(() => {
+        if (
+            !tuitionAccount?.id ||
+            defaultPayBaseUnits <= 0 ||
+            !canPay ||
+            hasInFlight
+        ) {
+            return;
+        }
+
+        if (!payQuote && !payOpen) {
+            void requestQuote(defaultPayBaseUnits);
+        }
+    }, [defaultPayBaseUnits, canPay, hasInFlight]);
+
     const submitPay = async () => {
         const baseUnits = parseBaseUnits(payAmount);
         if (baseUnits === null) {
@@ -582,7 +659,12 @@ export default function StudentDashboard({
         let currentQuote = payQuote;
         let currentKey = requestKey;
 
-        if (!currentQuote || !currentKey) {
+        const isCurrentQuoteMatching =
+            currentQuote &&
+            currentQuote.amount_base_units === baseUnits &&
+            currentKey;
+
+        if (!isCurrentQuoteMatching) {
             setPaying(true);
             setPayError(null);
 
@@ -655,7 +737,12 @@ export default function StudentDashboard({
                 return;
             }
 
+            setPayOpen(false);
             setReceipt(payload);
+            setMonitorDrawerOpen(true);
+            toast.success('Tuition payment submitted', {
+                description: 'Tracking live progress on Arc Testnet rail…',
+            });
 
             // The wallet balance and paid figures both changed on-chain.
             router.reload({
@@ -760,7 +847,6 @@ export default function StudentDashboard({
                                 setPayOpen(open);
                                 if (!open) {
                                     setReceipt(null);
-                                    setMonitorDrawerOpen(false);
                                 }
                             }}
                         >
@@ -1047,10 +1133,20 @@ export default function StudentDashboard({
                                                         className="clay-focus rounded-full border-[var(--clay-border)] text-xs font-semibold"
                                                         onClick={() => {
                                                             setReceipt(null);
-                                                            setPayQuote(null);
                                                             setConsent(false);
                                                             setRequestKey(null);
                                                             isInitialOpenRef.current = true;
+                                                            setPayAmount(
+                                                                (
+                                                                    defaultPayBaseUnits /
+                                                                    1_000_000
+                                                                ).toFixed(2),
+                                                            );
+                                                            setPayQuote(
+                                                                buildInstantQuote(
+                                                                    defaultPayBaseUnits,
+                                                                ),
+                                                            );
                                                         }}
                                                     >
                                                         Make another payment
@@ -1128,13 +1224,57 @@ export default function StudentDashboard({
                                                 max={remainingUsdc}
                                                 value={payAmount}
                                                 onChange={(event) => {
-                                                    setPayAmount(
-                                                        event.target.value,
-                                                    );
-                                                    setPayQuote(null);
-                                                    setRequestKey(null);
+                                                    const val =
+                                                        event.target.value;
+                                                    setPayAmount(val);
                                                     setConsent(false);
                                                     setPayError(null);
+                                                    const units =
+                                                        parseBaseUnits(val);
+                                                    if (
+                                                        units !== null &&
+                                                        units > 0
+                                                    ) {
+                                                        setPayQuote((prev) => ({
+                                                            network_fee:
+                                                                '0.000000',
+                                                            total: (
+                                                                units /
+                                                                1_000_000
+                                                            ).toFixed(2),
+                                                            max_amount_base_units:
+                                                                remainingBase,
+                                                            amount_base_units:
+                                                                units,
+                                                            balance:
+                                                                snapshot?.balance ??
+                                                                null,
+                                                            chain: 'ARC-TESTNET',
+                                                            request_digest:
+                                                                prev?.amount_base_units ===
+                                                                units
+                                                                    ? prev.request_digest
+                                                                    : '',
+                                                            consent_text:
+                                                                prev?.amount_base_units ===
+                                                                units
+                                                                    ? prev.consent_text
+                                                                    : 'I consent to the transfer of USDC on Arc Testnet for tuition.',
+                                                            expires_at:
+                                                                prev?.amount_base_units ===
+                                                                units
+                                                                    ? prev.expires_at
+                                                                    : '',
+                                                            fee_ceiling_base_units: 0,
+                                                            request_key:
+                                                                prev?.amount_base_units ===
+                                                                units
+                                                                    ? prev.request_key
+                                                                    : undefined,
+                                                        }));
+                                                    } else {
+                                                        setPayQuote(null);
+                                                    }
                                                 }}
                                                 className="clay-field clay-focus tabular-nums shadow-none"
                                                 required
@@ -1143,9 +1283,9 @@ export default function StudentDashboard({
                                                 message={payError ?? undefined}
                                             />
                                             <p className="clay-meta">
-                                                Your wallet pays the amount plus
-                                                the network fee, which comes out
-                                                of the same balance.
+                                                Arc Testnet tuition payments are
+                                                relayer-sponsored: 0.00 USDC gas
+                                                fee charged to your wallet.
                                             </p>
                                         </div>
 
@@ -1172,7 +1312,7 @@ export default function StudentDashboard({
                                                         {quoting && (
                                                             <span className="inline-flex items-center gap-1 text-[11px] font-normal text-[var(--clay-primary)]">
                                                                 <Loader2 className="size-2.5 animate-spin" />
-                                                                updating
+                                                                securing lock…
                                                             </span>
                                                         )}
                                                     </dt>
@@ -2341,7 +2481,7 @@ export default function StudentDashboard({
                             <div className="p-5 sm:p-6 pt-10 sm:pt-10">
                                 <StudentPaymentTracker
                                     className="border-0 bg-transparent shadow-none p-0 sm:p-0"
-                                    attempts={tuitionAttempts}
+                                    attempts={trackerAttempts}
                                     tuitionAccount={tuitionAccount}
                                     walletBalance={snapshot?.balance}
                                     onOpenPay={() => {

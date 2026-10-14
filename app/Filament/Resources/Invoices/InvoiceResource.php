@@ -43,6 +43,7 @@ class InvoiceResource extends Resource
         return 'warning';
     }
 
+    #[\Override]
     public static function getNavigationBadgeTooltip(): ?string
     {
         return 'Invoices awaiting financial review or payment';
