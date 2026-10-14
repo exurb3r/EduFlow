@@ -285,10 +285,11 @@ touch database/database.sqlite
 php artisan migrate:fresh --seed
 ```
 
-`migrate:fresh --seed` gives you the organization, the wallets, the budgets, the policy
-versions, six invoices, two vendors' worth of vendor records, and one pending student
-aid request. These are legacy developer fixtures, not college collection records or the
-new collections-to-budget workflow.
+`migrate:fresh --seed` now seeds only roles and (in local/testing) developer accounts.
+It no longer creates the legacy organization, wallets, budgets, invoices, vendors or
+assistance requests: those records and any treasury transactions now come through the
+Circle/Lepton agent path (CLI/testnet), not through the database. Student assistance
+remains an upcoming feature.
 
 Start the app:
 

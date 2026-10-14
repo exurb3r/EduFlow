@@ -18,14 +18,12 @@ class DatabaseSeeder extends Seeder
         ]);
 
         if (app()->environment(['local', 'testing'])) {
-            // The financial seeders attach budgets and a treasury to the
-            // organization; the assistance request hangs off the student that
-            // EducationDemoSeeder creates.
+            // Demo users (including the password `password`) are retained for
+            // local testing only. Financial demo data, wallets, transactions,
+            // budgets, invoices and assistance requests now come from the
+            // Circle/Lepton testnet path, not the database.
             $this->call([
                 DemoUsersSeeder::class,
-                EduFlowFinancialSeeder::class,
-                EducationDemoSeeder::class,
-                EduFlowPlanSeeder::class,
             ]);
         }
     }
