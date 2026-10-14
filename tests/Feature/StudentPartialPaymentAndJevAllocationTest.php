@@ -159,9 +159,7 @@ test('student partially pays 5 USDC of 200 USDC tuition, then JEV classifies and
 
     // 11. Configure JEV classification engine
     config(['eduflow.institution_policy.classification_engine' => 'jev']);
-    Classification::fake(function (ClassificationPrompt $prompt): array {
-        return ['category' => new ChoiceAnswer('supplier-invoices', ['supplier-invoices' => 0.95], confidence: 0.95)];
-    });
+    Classification::fake(fn (ClassificationPrompt $prompt): array => ['category' => new ChoiceAnswer('supplier-invoices', ['supplier-invoices' => 0.95], confidence: 0.95)]);
 
     // 12. Run receipt allocation proposal
     $holdsBefore = PaymentReservation::query()->count();
@@ -234,9 +232,7 @@ test('admin can inspect the 5 USDC partial tuition collection in evaluations pag
 
     // JEV classifies the collection as incoming tuition receipt
     config(['eduflow.institution_policy.classification_engine' => 'jev']);
-    Classification::fake(function (ClassificationPrompt $prompt): array {
-        return ['category' => new ChoiceAnswer('tuition-receipts', ['tuition-receipts' => 0.95], confidence: 0.95)];
-    });
+    Classification::fake(fn (ClassificationPrompt $prompt): array => ['category' => new ChoiceAnswer('tuition-receipts', ['tuition-receipts' => 0.95], confidence: 0.95)]);
 
     // Execute the evaluation job
     app()->call([(new EvaluateInstitutionPolicy($run->id)), 'handle']);
