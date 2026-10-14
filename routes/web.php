@@ -10,6 +10,7 @@ use App\Http\Controllers\ChatHistoryController;
 use App\Http\Controllers\CollectionBatchController;
 use App\Http\Controllers\FinanceApprovalController;
 use App\Http\Controllers\FundingWindowController;
+use App\Http\Controllers\InstitutionPolicyController;
 use App\Http\Controllers\InvoiceVersionController;
 use App\Http\Controllers\NotificationController;
 use App\Http\Controllers\PaymentAuthorizationController;
@@ -38,6 +39,11 @@ Route::get('/skills/design', fn () => Inertia::render('skills/design', [
 Route::get('dashboard', [StudentDashboardController::class, 'index'])->middleware(['auth', 'verified'])->name('dashboard');
 
 Route::middleware(['auth', 'verified'])->group(function (): void {
+    Route::get('finance/policies', [InstitutionPolicyController::class, 'index'])->name('finance.policies.index');
+    Route::post('finance/policies/import', [InstitutionPolicyController::class, 'import'])->middleware('throttle:5,1')->name('finance.policies.import');
+    Route::post('finance/policies', [InstitutionPolicyController::class, 'store'])->middleware('throttle:20,1')->name('finance.policies.store');
+    Route::post('finance/policies/{institutionPolicyVersion}/assess', [InstitutionPolicyController::class, 'assess'])->middleware('throttle:5,1')->name('finance.policies.assess');
+    Route::post('finance/policies/{institutionPolicyVersion}/publish', [InstitutionPolicyController::class, 'publish'])->middleware('throttle:5,1')->name('finance.policies.publish');
     Route::get('student/dashboard', [StudentDashboardController::class, 'show'])->name('student.dashboard');
     Route::post('assistance-requests', [AssistanceRequestController::class, 'store'])->name('assistance-requests.store');
     Route::get('assistance/create', [AssistanceRequestController::class, 'create'])->name('assistance.create');
