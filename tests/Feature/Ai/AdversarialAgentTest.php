@@ -14,6 +14,9 @@ use App\Models\AssistanceRequest;
 use App\Models\Organization;
 use App\Models\Student;
 use Database\Seeders\DatabaseSeeder;
+use Database\Seeders\EducationDemoSeeder;
+use Database\Seeders\EduFlowFinancialSeeder;
+use Database\Seeders\EduFlowPlanSeeder;
 use Laravel\Ai\Tools\Request;
 
 /**
@@ -165,7 +168,7 @@ function recordDecisionFor(AssistanceRequest $request): AgentDecision
 it('records advisory triage without ever writing a status or amount', function (): void {
     config(['lepton.default' => 'fake']);
 
-    $this->seed(DatabaseSeeder::class);
+    $this->seed([DatabaseSeeder::class, EduFlowFinancialSeeder::class, EducationDemoSeeder::class, EduFlowPlanSeeder::class]);
 
     $request = AssistanceRequest::factory()->create([
         'student_id' => Student::firstOrFail()->id,
@@ -204,7 +207,7 @@ it('records advisory triage without ever writing a status or amount', function (
 });
 
 it('refuses to record a triage note that fails sanitisation', function (): void {
-    $this->seed(DatabaseSeeder::class);
+    $this->seed([DatabaseSeeder::class, EduFlowFinancialSeeder::class, EducationDemoSeeder::class, EduFlowPlanSeeder::class]);
 
     $request = AssistanceRequest::factory()->create([
         'student_id' => Student::firstOrFail()->id,
@@ -227,7 +230,7 @@ it('refuses to record a triage note that fails sanitisation', function (): void 
 });
 
 it('will not record triage against a request that has no decision yet', function (): void {
-    $this->seed(DatabaseSeeder::class);
+    $this->seed([DatabaseSeeder::class, EduFlowFinancialSeeder::class, EducationDemoSeeder::class, EduFlowPlanSeeder::class]);
 
     $request = AssistanceRequest::factory()->create([
         'student_id' => Student::firstOrFail()->id,

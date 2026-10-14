@@ -9,6 +9,9 @@ use App\Models\Invoice;
 use App\Models\Organization;
 use App\Services\FinancialPolicyEngine;
 use Database\Seeders\DatabaseSeeder;
+use Database\Seeders\EducationDemoSeeder;
+use Database\Seeders\EduFlowFinancialSeeder;
+use Database\Seeders\EduFlowPlanSeeder;
 
 /**
  * The demo has to settle for real on Arc testnet, which caps a funded agent
@@ -37,7 +40,7 @@ function evaluateSeededInvoices(): array
 }
 
 it('keeps every seeded scenario inside what the testnet faucet can fund', function (): void {
-    $this->seed(DatabaseSeeder::class);
+    $this->seed([DatabaseSeeder::class, EduFlowFinancialSeeder::class, EducationDemoSeeder::class, EduFlowPlanSeeder::class]);
 
     $org = Organization::firstOrFail();
     $wallet = $org->primaryWallet();
@@ -63,7 +66,7 @@ it('keeps every seeded scenario inside what the testnet faucet can fund', functi
 });
 
 it('drives a different policy branch for every seeded invoice', function (): void {
-    $this->seed(DatabaseSeeder::class);
+    $this->seed([DatabaseSeeder::class, EduFlowFinancialSeeder::class, EducationDemoSeeder::class, EduFlowPlanSeeder::class]);
 
     expect(evaluateSeededInvoices())->toBe([
         'INV-FIBER-30' => AgentDecisionType::AUTO_APPROVE,
@@ -76,7 +79,7 @@ it('drives a different policy branch for every seeded invoice', function (): voi
 });
 
 it('covers all four reachable policy decisions across the seeded scenarios', function (): void {
-    $this->seed(DatabaseSeeder::class);
+    $this->seed([DatabaseSeeder::class, EduFlowFinancialSeeder::class, EducationDemoSeeder::class, EduFlowPlanSeeder::class]);
 
     // Pure enums cannot go through array_unique(), so compare on names.
     $branches = collect(evaluateSeededInvoices())
@@ -94,7 +97,7 @@ it('covers all four reachable policy decisions across the seeded scenarios', fun
 });
 
 it('seeds a bounded split so the assistance demo has something to narrate', function (): void {
-    $this->seed(DatabaseSeeder::class);
+    $this->seed([DatabaseSeeder::class, EduFlowFinancialSeeder::class, EducationDemoSeeder::class, EduFlowPlanSeeder::class]);
 
     $policy = AssistancePolicyVersion::active();
     $request = AssistanceRequest::firstOrFail();
@@ -106,12 +109,12 @@ it('seeds a bounded split so the assistance demo has something to narrate', func
 });
 
 it('re-seeding converges on the same thresholds instead of drifting', function (): void {
-    $this->seed(DatabaseSeeder::class);
+    $this->seed([DatabaseSeeder::class, EduFlowFinancialSeeder::class, EducationDemoSeeder::class, EduFlowPlanSeeder::class]);
     $before = Organization::firstOrFail()->only([
         'minimum_reserve', 'max_auto_payment', 'max_daily_disbursement', 'human_approval_threshold',
     ]);
 
-    $this->seed(DatabaseSeeder::class);
+    $this->seed([DatabaseSeeder::class, EduFlowFinancialSeeder::class, EducationDemoSeeder::class, EduFlowPlanSeeder::class]);
     $after = Organization::firstOrFail()->only([
         'minimum_reserve', 'max_auto_payment', 'max_daily_disbursement', 'human_approval_threshold',
     ]);

@@ -16,6 +16,9 @@ use App\Models\Transaction;
 use App\Models\TuitionAccount;
 use App\Services\CircleWalletService;
 use Database\Seeders\DatabaseSeeder;
+use Database\Seeders\EducationDemoSeeder;
+use Database\Seeders\EduFlowFinancialSeeder;
+use Database\Seeders\EduFlowPlanSeeder;
 use Illuminate\JsonSchema\JsonSchemaTypeFactory;
 use Laravel\Ai\Approvals\Approval;
 use Laravel\Ai\Approvals\Decision;
@@ -44,7 +47,7 @@ function approvalVerdict(DisburseAssistance $tool, Request $request): Approval|b
 beforeEach(function (): void {
     config(['lepton.default' => 'fake']);
 
-    $this->seed(DatabaseSeeder::class);
+    $this->seed([DatabaseSeeder::class, EduFlowFinancialSeeder::class, EducationDemoSeeder::class, EduFlowPlanSeeder::class]);
 
     $this->student = Student::firstOrFail();
     $this->term = AcademicTerm::firstOrFail();

@@ -9,6 +9,9 @@ use App\Models\Organization;
 use App\Models\User;
 use App\Services\FinancialPolicyEngine;
 use Database\Seeders\DatabaseSeeder;
+use Database\Seeders\EducationDemoSeeder;
+use Database\Seeders\EduFlowFinancialSeeder;
+use Database\Seeders\EduFlowPlanSeeder;
 use Illuminate\Contracts\Console\Kernel;
 
 /**
@@ -17,7 +20,7 @@ use Illuminate\Contracts\Console\Kernel;
  * fail if the code drifts away from the documentation.
  */
 beforeEach(function (): void {
-    $this->seed(DatabaseSeeder::class);
+    $this->seed([DatabaseSeeder::class, EduFlowFinancialSeeder::class, EducationDemoSeeder::class, EduFlowPlanSeeder::class]);
     $this->org = Organization::firstOrFail();
 });
 
