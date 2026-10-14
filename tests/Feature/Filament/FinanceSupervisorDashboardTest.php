@@ -20,6 +20,7 @@ use App\Filament\Finance\Widgets\BudgetHeadroomChart;
 use App\Filament\Finance\Widgets\CollectionsOverviewWidget;
 use App\Filament\Finance\Widgets\CollectionsTrendChart;
 use App\Filament\Finance\Widgets\EvidenceTimelineWidget;
+use App\Filament\Finance\Widgets\FinanceAffordabilityWidget;
 use App\Filament\Finance\Widgets\OperationsHealthWidget;
 use App\Filament\Finance\Widgets\PaymentDecisionChart;
 use App\Filament\Finance\Widgets\WorkflowRunStateChart;
@@ -281,6 +282,7 @@ test('finance panel root is the supervisor dashboard and renders every required 
 
     expect(FinanceDashboard::getUrl(panel: 'finance'))->toBe(url('/finance'))
         ->and(Filament::getPanel('finance')->getWidgets())->toEqualCanonicalizing([
+            FinanceAffordabilityWidget::class,
             ApprovalInboxWidget::class,
             CollectionsOverviewWidget::class,
             CollectionsTrendChart::class,
@@ -295,6 +297,7 @@ test('finance panel root is the supervisor dashboard and renders every required 
             OperationsHealthWidget::class,
         ])
         ->and(bootedFinanceDashboard(Livewire::actingAs($c['reviewer'])->test(FinanceDashboard::class))->getWidgets())->toBe([
+            FinanceAffordabilityWidget::class,
             ApprovalInboxWidget::class,
             CollectionsOverviewWidget::class,
             CollectionsTrendChart::class,

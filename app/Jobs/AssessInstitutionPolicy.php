@@ -86,7 +86,7 @@ class AssessInstitutionPolicy implements ShouldQueue
             } else {
                 $result = $interpreter->interpret($policy, $assessment->kind, $assessment->input);
             }
-            $description = $providers->describe();
+            $description = $assessment->kind === 'authoring' ? $providers->describe() : $interpreter->classificationProvider();
             $assessment->update(['state' => 'completed', 'result' => $result, 'result_digest' => PaymentIntent::digest($result),
                 'provider' => $description['name'], 'model' => $description['model'], 'completed_at' => now(), 'last_error' => null]);
         } catch (Throwable $exception) {

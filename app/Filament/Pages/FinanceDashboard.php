@@ -12,6 +12,7 @@ use App\Filament\Finance\Widgets\BudgetHeadroomChart;
 use App\Filament\Finance\Widgets\CollectionsOverviewWidget;
 use App\Filament\Finance\Widgets\CollectionsTrendChart;
 use App\Filament\Finance\Widgets\EvidenceTimelineWidget;
+use App\Filament\Finance\Widgets\FinanceAffordabilityWidget;
 use App\Filament\Finance\Widgets\OperationsHealthWidget;
 use App\Filament\Finance\Widgets\PaymentDecisionChart;
 use App\Filament\Finance\Widgets\WorkflowRunStateChart;
@@ -22,6 +23,7 @@ use App\Models\FinancePolicyVersion;
 use App\Models\FinanceWorkflowRun;
 use App\Models\PaymentIntent;
 use App\Models\PaymentReservation;
+use App\Models\PaymentReservationReleaseReview;
 use App\Models\User;
 use App\Services\InstallationInstitution;
 use App\Services\LeptonTreasuryService;
@@ -109,6 +111,8 @@ class FinanceDashboard extends BaseDashboard
     protected function getHeaderActions(): array
     {
         return [
+            Action::make('billsAndFunding')->label('Bills & funding')->icon(Heroicon::Wallet)
+                ->url(fn (): string => TreasuryWallet::getUrl(panel: 'finance')),
             Action::make('captureCollections')
                 ->label('Record receipts')
                 ->icon(Heroicon::Banknotes)
@@ -213,7 +217,7 @@ class FinanceDashboard extends BaseDashboard
 
                                             return $institution === null ? 0 : PaymentReservation::query()
                                                 ->where('organization_id', $institution->id)
-                                                ->where('state', 'held')
+                                                ->whereNotIn('id', PaymentReservationReleaseReview::query()->select('payment_reservation_id')->where('decision', 'approve_release'))
                                                 ->count();
                                         }),
                                 ]),
@@ -276,6 +280,7 @@ class FinanceDashboard extends BaseDashboard
     public function getWidgets(): array
     {
         return [
+            FinanceAffordabilityWidget::class,
             ApprovalInboxWidget::class,
             CollectionsOverviewWidget::class,
             CollectionsTrendChart::class,

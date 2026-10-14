@@ -12,6 +12,7 @@ use App\Filament\Finance\Widgets\BudgetHeadroomChart;
 use App\Filament\Finance\Widgets\CollectionsOverviewWidget;
 use App\Filament\Finance\Widgets\CollectionsTrendChart;
 use App\Filament\Finance\Widgets\EvidenceTimelineWidget;
+use App\Filament\Finance\Widgets\FinanceAffordabilityWidget;
 use App\Filament\Finance\Widgets\OperationsHealthWidget;
 use App\Filament\Finance\Widgets\PaymentDecisionChart;
 use App\Filament\Finance\Widgets\WorkflowRunStateChart;
@@ -20,6 +21,7 @@ use App\Filament\Pages\Collections;
 use App\Filament\Pages\FinanceDashboard;
 use App\Filament\Pages\FinanceSupervisor;
 use App\Filament\Pages\PaymentReviews;
+use App\Filament\Pages\TreasuryWallet;
 use App\Filament\Resources\AssistanceRequests\AssistanceRequestResource;
 use App\Filament\Resources\PaymentSubmissions\PaymentSubmissionResource;
 use App\Filament\Resources\Students\StudentResource;
@@ -84,8 +86,10 @@ class FinancePanelProvider extends PanelProvider
                 FinanceSupervisor::class,
                 Collections::class,
                 PaymentReviews::class,
+                TreasuryWallet::class,
             ])
             ->widgets([
+                FinanceAffordabilityWidget::class,
                 ApprovalInboxWidget::class,
                 CollectionsOverviewWidget::class,
                 CollectionsTrendChart::class,

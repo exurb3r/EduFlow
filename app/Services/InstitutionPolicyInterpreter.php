@@ -6,6 +6,7 @@ namespace App\Services;
 
 use App\Ai\Agents\InstitutionPolicyAnalyst;
 use App\Models\InstitutionPolicyVersion;
+use App\Services\Advisory\JevPolicyClassifier;
 use App\Services\Ai\AiProviderResolver;
 use App\Settings\AiSettings;
 use Illuminate\Support\Facades\Validator;
@@ -15,7 +16,20 @@ use Laravel\Ai\Responses\StructuredAgentResponse;
 
 final readonly class InstitutionPolicyInterpreter
 {
-    public function __construct(private AiSettings $settings, private AiProviderResolver $providers) {}
+    public function __construct(private AiSettings $settings, private AiProviderResolver $providers, private JevPolicyClassifier $jev) {}
+
+    /** @return array{name:?string, model:?string} */
+    public function classificationProvider(): array
+    {
+        if (config('eduflow.institution_policy.classification_engine') === 'jev') {
+            $name = (string) config('ai.default_for_classification', 'typesafe');
+
+            return ['name' => $name, 'model' => config('ai.providers.'.$name.'.models.classification.default', $name === 'typesafe' ? 'jev-latest' : null)];
+        }
+        $description = $this->providers->describe();
+
+        return ['name' => $description['name'], 'model' => $description['model']];
+    }
 
     /** @param array<string, mixed> $evidence
      * @return array<string, mixed>
@@ -24,6 +38,11 @@ final readonly class InstitutionPolicyInterpreter
     {
         if (! $this->settings->mayCallProvider()) {
             throw ValidationException::withMessages(['ai' => 'AI advisory is disabled or provider disclosure has not been accepted. No policy data was sent.']);
+        }
+        if ($kind === 'classification' && config('eduflow.institution_policy.classification_engine') === 'jev') {
+            $result = $this->sanitize($policy, $this->jev->classify($policy, $evidence, $remainingSeconds), $kind);
+
+            return [...$result, 'jev_called' => true];
         }
         $provider = $this->providers->resolve();
         if ($provider === null) {

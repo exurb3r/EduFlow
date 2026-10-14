@@ -58,7 +58,7 @@ class EvaluateInstitutionPolicy implements ShouldQueue
             $evaluation->checkpoint('evidence_checks', 'Checking institution, source evidence and active policy revision.');
             $actor = User::query()->findOrFail($evaluation->requested_by);
             $publication = $this->assertEvidence($evaluation, $actor, $policies, $evaluations);
-            $description = $providers->describe();
+            $description = $interpreter->classificationProvider();
             $evaluation->update(['provider' => $description['name'], 'model' => $description['model']]);
 
             if ($evaluation->source_type === 'budget_snapshot') {

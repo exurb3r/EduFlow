@@ -108,6 +108,10 @@ final class DefaultInstitutionPolicy
             'text' => 'A recorded transaction or hash alone does not prove collected cash. Digital collections require verified settlement and independent receipt review. Restricted receipts, refundable overpayments, protected reserve and existing commitments remain unavailable for general spending. Re-evaluation creates new advice and never changes receipts, tuition balances or prior approvals.'];
         $template['clauses'][] = ['id' => 'network-fees', 'title' => 'Who pays network fees',
             'text' => 'Network fees and tuition are separate. Sponsored network fees are not deducted from tuition credited to a student. Institution-paid network fees require their own bounded financial controls. Never assume every Arc transfer is sponsored, and never interpret this policy as payment authorization.'];
+        $template['clauses'][] = ['id' => 'bill-affordability', 'title' => 'Bills before discretionary allocations',
+            'text' => 'Propose only intact independently approved supplier invoices within the reviewed budget context. Never treat the ledger, forecast tuition, an unverified receipt, a budget allocation or an AI answer as available wallet cash. Rank by saved category order, then approved invoices before budget lines. Pay an invoice in full only when its exact amount fits cumulative cash and budget headroom; otherwise hold it. No automatic invoice installments or percentage splits are authorized.'];
+        $template['clauses'][] = ['id' => 'pilot', 'title' => 'Testnet tuition pilot',
+            'text' => 'The operator may designate an existing testnet tuition account for a 5 USDC payment demonstration after explicit payer consent and a named independent recovery owner. Faucet funding is testnet minting, not institution revenue. Verified pilot tuition is testnet evidence only, never official revenue or permission to pay vendors. A prior unresolved attempt blocks replacement payments until investigated.'];
 
         $budgets = Budget::query()->where('organization_id', $institution->id)->where('status', 'active')
             ->orderBy('id')->limit(20)->get()->unique('category');
