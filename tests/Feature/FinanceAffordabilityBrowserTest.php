@@ -84,3 +84,16 @@ test('missing policy displays unknown spendable balance and an explicit pre-prot
     visit(TreasuryWallet::getUrl(panel: 'finance'))->assertSee('Even before protections')->assertSee('50.000002 USDC')
         ->assertSee('None published')->assertSee('Exact amount unavailable')->assertNoJavaScriptErrors();
 })->group('browser');
+
+test('finance overview dashboard renders affordability widget', function (): void {
+    $this->withVite();
+    Vite::useHotFile(storage_path('framework/testing-no-vite-hot'));
+    $context = financeAffordabilityBrowserContext();
+    $this->actingAs($context['reviewer']);
+    $page = visit('/finance')->assertSee('Can we cover our bills?')
+        ->assertSee('Observed Arc balance')
+        ->assertSee('69.900000 USDC')
+        ->assertSee('Bills & funding')
+        ->assertNoJavaScriptErrors();
+    $page->screenshot(fullPage: false, filename: 'finance-overview-dashboard');
+})->group('browser');
