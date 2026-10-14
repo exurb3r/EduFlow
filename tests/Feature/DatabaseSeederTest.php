@@ -31,10 +31,8 @@ test('database seeder creates the default roles', function (): void {
     }
 
     expect(Role::query()->where('name', RoleEnums::USER->value)->where('guard_name', 'web')->exists())->toBeTrue()
-        ->and(User::query()->where('email', 'juan@eduflow.test')->exists())->toBeTrue()
-        ->and(Student::where('student_number', 'DEMO-JUAN')->exists())->toBeTrue()
-        ->and(AcademicTerm::exists())->toBeTrue()
-        ->and(TuitionAccount::where('total_amount', 300000000)->where('paid_amount', 0)->exists())->toBeTrue();
+        ->and(User::query()->where('email', 'admin@admin.com')->exists())->toBeTrue()
+        ->and(AssistanceRequest::query()->count())->toBe(0);
 });
 
 test('database seeding outside demo environments creates roles but no users or demo records', function (string $environment): void {

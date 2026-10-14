@@ -19,6 +19,9 @@ use App\Models\Transaction;
 use App\Models\User;
 use App\Settings\AiSettings;
 use Database\Seeders\DatabaseSeeder;
+use Database\Seeders\EducationDemoSeeder;
+use Database\Seeders\EduFlowFinancialSeeder;
+use Database\Seeders\EduFlowPlanSeeder;
 use Illuminate\Auth\Access\AuthorizationException;
 use Illuminate\Support\Str;
 use Laravel\Ai\Approvals\Decision;
@@ -131,7 +134,7 @@ function pausedConversation(User $owner, AssistanceRequest $request, string $too
 beforeEach(function (): void {
     config(['lepton.default' => 'fake']);
 
-    $this->seed(DatabaseSeeder::class);
+    $this->seed([DatabaseSeeder::class, EduFlowFinancialSeeder::class, EducationDemoSeeder::class, EduFlowPlanSeeder::class]);
 
     enableSettlementProposals();
     configureProvider();
