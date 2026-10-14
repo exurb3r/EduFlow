@@ -10,6 +10,7 @@ use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasOne;
 use Illuminate\Database\Eloquent\Relations\MorphTo;
+use Illuminate\Support\Carbon;
 
 /**
  * @property int $id
@@ -28,6 +29,8 @@ use Illuminate\Database\Eloquent\Relations\MorphTo;
  * @property string $status
  * @property-read Organization $organization
  * @property-read Approval|null $approval
+ * @property Carbon $created_at
+ * @property Carbon $updated_at
  */
 class AgentDecision extends Model
 {

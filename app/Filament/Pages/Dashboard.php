@@ -218,7 +218,7 @@ class Dashboard extends BaseDashboard
                             InfoGrid::make(2)->schema([
                                 TextEntry::make('current_institution')
                                     ->label('Institution Context')
-                                    ->state(fn (): string => app(InstallationInstitution::class)->current()?->name ?? 'Not configured'),
+                                    ->state(fn (): string => ($__institution = app(InstallationInstitution::class)->current()) === null ? 'Not configured' : $__institution->name),
                                 TextEntry::make('students_enrolled')
                                     ->label('Enrolled Students')
                                     ->state(fn (): string => (string) Student::query()->count()),

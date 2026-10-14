@@ -132,7 +132,7 @@ class FinanceDashboard extends BaseDashboard
                     ->icon(Heroicon::ArrowPath)
                     ->color('warning')
                     ->requiresConfirmation()
-                    ->hidden(fn (): bool => ! (Auth::user() instanceof User && Auth::user()->hasRole('super_admin')))
+                    ->hidden(fn (): bool => ! Auth::user() instanceof User || ! Auth::user()->hasRole('super_admin'))
                     ->modalHeading('Synchronize ledger from Arc chain?')
                     ->modalDescription('Polls the configured Lepton Arc network gateway and updates the ledger treasury balance to match.')
                     ->action(function (): void {
@@ -247,7 +247,9 @@ class FinanceDashboard extends BaseDashboard
                                             $institution = app(InstallationInstitution::class)->current();
                                             $activation = $institution === null ? null : FinancePolicyActivation::current($institution->id);
 
-                                            return $activation?->policyVersion?->version ?? 'No active policy';
+                                            return ! $activation instanceof FinancePolicyActivation || $activation->policyVersion === null
+                                                ? 'No active policy'
+                                                : $activation->policyVersion->version;
                                         }),
                                 ]),
                             ]),
