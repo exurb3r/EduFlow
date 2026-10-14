@@ -33,6 +33,8 @@ class OperationsHealthWidget extends BaseWidget
 
     protected int|string|array $columnSpan = 'full';
 
+    protected int|array|null $columns = 4;
+
     #[\Override]
     public function getHeading(): ?string
     {
@@ -63,6 +65,7 @@ class OperationsHealthWidget extends BaseWidget
         $runtimeStat = Stat::make('Background runtime', $enabled ? 'Enabled' : 'Disabled')
             ->description(sprintf('%s planning queue "%s" on the %s connection. Payment submission uses a separate runtime and queue.', $enabled ? 'Durable' : 'Off —', $queue, $connection))
             ->descriptionIcon(Heroicon::Cog6Tooth)
+            ->chart($enabled ? [2, 3, 5, 4, 6, 7] : [0, 0, 0, 0, 0])
             ->color($enabled ? 'success' : 'warning');
 
         [$queueDepth, $queueOldest] = $this->queueDepth($queue, $connection);
@@ -72,6 +75,7 @@ class OperationsHealthWidget extends BaseWidget
                 ? ($queueOldest === null ? 'No queued work waiting' : 'Oldest waiting '.$queueOldest)
                 : 'Depth is not observable on the '.$connection.' connection')
             ->descriptionIcon(Heroicon::QueueList)
+            ->chart([$queueDepth, max(0, $queueDepth - 1), $queueDepth])
             ->color($queueDepth > 0 ? 'info' : 'gray');
 
         $heartbeat = FinanceWorkflowRun::query()
@@ -84,6 +88,7 @@ class OperationsHealthWidget extends BaseWidget
                 ? 'No worker has claimed a run on this installation'
                 : sprintf('Run #%d last checked in %s UTC · %s', $heartbeat->id, $heartbeat->heartbeat_at->toDateTimeString(), $heartbeat->state))
             ->descriptionIcon(Heroicon::OutlinedHeart)
+            ->chart($heartbeat?->heartbeat_at === null ? [0, 0, 0] : [1, 2, 1, 2, 1])
             ->color($this->heartbeatColour($heartbeat));
 
         $staleWindows = FundingWindow::query()
@@ -95,6 +100,7 @@ class OperationsHealthWidget extends BaseWidget
         $fundingStat = Stat::make('Stale funding evidence', (string) $staleWindows)
             ->description('Windows hold block-bound capacity for at most fifteen minutes and do not roll over unattended. Expiry is never silently refreshed.')
             ->descriptionIcon(Heroicon::ExclamationTriangle)
+            ->chart($staleWindows > 0 ? [1, 2, 3] : [0, 0, 0])
             ->color($staleWindows > 0 ? 'warning' : 'success');
 
         $user = Auth::user();
@@ -103,6 +109,7 @@ class OperationsHealthWidget extends BaseWidget
         $notificationStat = Stat::make('Notifications awaiting you', (string) $unread)
             ->description('Work items are persisted before an alert is sent, so a failed delivery never loses the task. Reading or dismissing one approves nothing.')
             ->descriptionIcon(Heroicon::BellAlert)
+            ->chart([$unread, $unread, $unread])
             ->color($unread > 0 ? 'info' : 'gray');
 
         $status = app(LeptonTreasuryService::class)->status($institution->primaryWallet());
@@ -112,6 +119,7 @@ class OperationsHealthWidget extends BaseWidget
                 ? sprintf('%s driver · %s chain %s · block %s', $status['driver'], strtoupper((string) $status['chain']), (string) $status['chain_id'], number_format((float) ($status['block'] ?? 0)))
                 : ($status['error'] ?? 'Circle session is not established for this chain'))
             ->descriptionIcon(Heroicon::Signal)
+            ->chart($status['live_available'] ? [2, 4, 3, 5, 6] : [1, 0, 0, 0])
             ->color(match (true) {
                 $status['is_fake'] => 'warning',
                 $status['live_available'] => 'success',
@@ -135,7 +143,9 @@ class OperationsHealthWidget extends BaseWidget
                 $failed,
             ))
             ->descriptionIcon(Heroicon::MagnifyingGlass)
+            ->chart([$unresolved, $failed, $unresolved + $failed])
             ->color($unresolved + $failed > 0 ? 'warning' : 'success')
+            ->extraAttributes(['class' => 'cursor-pointer hover:shadow-sm transition-shadow'])
             ->url(PaymentReviews::getUrl(panel: 'finance'));
 
         return [$runtimeStat, $queueStat, $heartbeatStat, $fundingStat, $notificationStat, $providerStat, $outcomeStat];

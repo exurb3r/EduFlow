@@ -49,10 +49,29 @@ class WorkflowRunStateChart extends ChartWidget
         return 'doughnut';
     }
 
+    protected ?string $maxHeight = '280px';
+
     #[\Override]
     public function getHeading(): string|Htmlable|null
     {
         return LinkedHeading::make($this->heading, FinanceSupervisor::getUrl(panel: 'finance'));
+    }
+
+    /**
+     * @return array<string, mixed>
+     */
+    #[\Override]
+    protected function getOptions(): array
+    {
+        return [
+            'plugins' => [
+                'legend' => [
+                    'display' => true,
+                    'position' => 'bottom',
+                ],
+            ],
+            'cutout' => '65%',
+        ];
     }
 
     /**

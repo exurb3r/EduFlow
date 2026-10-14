@@ -37,6 +37,8 @@ class CollectionsTrendChart extends ChartWidget
 
     protected ?string $emptyStateDescription = 'A cashier-entered batch appears here once recorded. Unreviewed batches are reported money, not cash.';
 
+    protected ?string $maxHeight = '320px';
+
     /** @var array<string, string> */
     protected array $colors = [
         'Reviewed — can fund a plan' => '#10b981',
@@ -55,6 +57,34 @@ class CollectionsTrendChart extends ChartWidget
     public function getHeading(): string|Htmlable|null
     {
         return LinkedHeading::make($this->heading, Collections::getUrl(panel: 'finance'));
+    }
+
+    /**
+     * @return array<string, mixed>
+     */
+    #[\Override]
+    protected function getOptions(): array
+    {
+        return [
+            'plugins' => [
+                'legend' => [
+                    'display' => true,
+                    'position' => 'top',
+                ],
+            ],
+            'scales' => [
+                'y' => [
+                    'stacked' => true,
+                    'beginAtZero' => true,
+                ],
+                'x' => [
+                    'stacked' => true,
+                    'grid' => [
+                        'display' => false,
+                    ],
+                ],
+            ],
+        ];
     }
 
     /**

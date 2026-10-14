@@ -17,18 +17,27 @@ use App\Filament\Finance\Widgets\PaymentDecisionChart;
 use App\Filament\Finance\Widgets\WorkflowRunStateChart;
 use App\Filament\Finance\Widgets\WorkflowRunWidget;
 use App\Models\CollectionBatch;
+use App\Models\FinancePolicyActivation;
 use App\Models\FinanceWorkflowRun;
 use App\Models\PaymentIntent;
+use App\Models\PaymentReservation;
 use App\Models\User;
 use App\Services\InstallationInstitution;
 use App\Services\LeptonTreasuryService;
 use BackedEnum;
 use Filament\Actions\Action;
+use Filament\Actions\ActionGroup;
+use Filament\Facades\Filament;
+use Filament\Infolists\Components\TextEntry;
+use Filament\Notifications\Notification;
 use Filament\Pages\Dashboard as BaseDashboard;
+use Filament\Schemas\Components\Grid as InfoGrid;
+use Filament\Schemas\Components\Section as InfoSection;
 use Filament\Support\Icons\Heroicon;
 use Filament\Widgets\Widget;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Gate;
+use Throwable;
 use UnitEnum;
 
 /**
@@ -116,6 +125,144 @@ class FinanceDashboard extends BaseDashboard
                 ->icon(Heroicon::ClipboardDocumentCheck)
                 ->color('gray')
                 ->url(fn (): string => PaymentReviews::getUrl(panel: 'finance')),
+
+            ActionGroup::make([
+                Action::make('syncRail')
+                    ->label('Sync Arc balance')
+                    ->icon(Heroicon::ArrowPath)
+                    ->color('warning')
+                    ->requiresConfirmation()
+                    ->modalHeading('Synchronize ledger from Arc chain?')
+                    ->modalDescription('Polls the configured Lepton Arc network gateway and updates the ledger treasury balance to match.')
+                    ->action(function (): void {
+                        $institution = app(InstallationInstitution::class)->current();
+                        $wallet = $institution?->primaryWallet();
+
+                        if (! $wallet) {
+                            Notification::make()->title('No institution wallet configured')->danger()->send();
+
+                            return;
+                        }
+
+                        try {
+                            $live = app(LeptonTreasuryService::class)->syncBalance($wallet);
+
+                            if ($live === null) {
+                                Notification::make()
+                                    ->title('Sync failed')
+                                    ->body('Could not read a live balance from Lepton Arc gateway.')
+                                    ->danger()
+                                    ->send();
+
+                                return;
+                            }
+
+                            Notification::make()
+                                ->title('Treasury synchronized')
+                                ->body('Ledger balance updated to '.number_format($live, 2).' USDC from chain.')
+                                ->success()
+                                ->send();
+                        } catch (Throwable $e) {
+                            report($e);
+                            Notification::make()->title('Sync error')->body($e->getMessage())->danger()->send();
+                        }
+                    }),
+
+                Action::make('executiveBrief')
+                    ->label('Supervisory brief')
+                    ->icon(Heroicon::DocumentChartBar)
+                    ->color('gray')
+                    ->modalHeading('Financial supervisory overview')
+                    ->modalDescription('Current status of collections, proposals, active holds and Arc settlement rail.')
+                    ->infolist([
+                            InfoSection::make('Pending Decisions')
+                                ->schema([
+                                    InfoGrid::make(3)->schema([
+                                        TextEntry::make('unreviewed_collections')
+                                            ->label('Unreviewed Receipt Batches')
+                                            ->badge()
+                                            ->color('warning')
+                                            ->state(function (): int {
+                                                $institution = app(InstallationInstitution::class)->current();
+
+                                                return $institution === null ? 0 : CollectionBatch::query()
+                                                    ->where('organization_id', $institution->id)
+                                                    ->whereDoesntHave('reviews')
+                                                    ->count();
+                                            }),
+                                        TextEntry::make('waiting_proposals')
+                                            ->label('Proposals Awaiting Review')
+                                            ->badge()
+                                            ->color('warning')
+                                            ->state(function (): int {
+                                                $institution = app(InstallationInstitution::class)->current();
+
+                                                return $institution === null ? 0 : FinanceWorkflowRun::query()
+                                                    ->where('organization_id', $institution->id)
+                                                    ->where('state', 'waiting_for_review')
+                                                    ->count();
+                                            }),
+                                        TextEntry::make('reserved_holds')
+                                            ->label('Active Payment Holds')
+                                            ->badge()
+                                            ->color('primary')
+                                            ->state(function (): int {
+                                                $institution = app(InstallationInstitution::class)->current();
+
+                                                return $institution === null ? 0 : PaymentReservation::query()
+                                                    ->where('organization_id', $institution->id)
+                                                    ->where('state', 'held')
+                                                    ->count();
+                                            }),
+                                    ]),
+                                ]),
+                            InfoSection::make('Settlement Rail Telemetry')
+                                ->schema([
+                                InfoGrid::make(3)->schema([
+                                    TextEntry::make('rail_driver')
+                                            ->label('Lepton Driver')
+                                            ->badge()
+                                            ->state(function (): string {
+                                                $institution = app(InstallationInstitution::class)->current();
+                                                $status = app(LeptonTreasuryService::class)->status($institution?->primaryWallet());
+
+                                                return $status['driver'].($status['is_fake'] ? ' (Simulation)' : '');
+                                            }),
+                                    TextEntry::make('chain_block')
+                                            ->label('Target Chain & Block')
+                                            ->badge()
+                                            ->color('info')
+                                            ->state(function (): string {
+                                                $institution = app(InstallationInstitution::class)->current();
+                                                $status = app(LeptonTreasuryService::class)->status($institution?->primaryWallet());
+
+                                                return strtoupper((string) $status['chain']).' · Block '.number_format((float) ($status['block'] ?? 0));
+                                            }),
+                                    TextEntry::make('active_policy')
+                                            ->label('Active Spending Policy')
+                                            ->badge()
+                                            ->color('success')
+                                            ->state(function (): string {
+                                                $institution = app(InstallationInstitution::class)->current();
+                                                $activation = $institution === null ? null : FinancePolicyActivation::current($institution->id);
+
+                                                return $activation?->policyVersion?->version ?? 'No active policy';
+                                            }),
+                                ]),
+                            ]),
+                        ])
+                    ->modalSubmitAction(false)
+                    ->modalCancelActionLabel('Close'),
+
+                Action::make('openAdmin')
+                    ->label('Admin console')
+                    ->icon(Heroicon::AdjustmentsHorizontal)
+                    ->color('gray')
+                    ->url(fn (): string => Filament::getPanel('admin')->getUrl()),
+            ])
+                ->label('Supervisory tools')
+                ->icon(Heroicon::EllipsisVertical)
+                ->color('gray'),
         ];
     }
 

@@ -7,7 +7,13 @@ namespace App\Filament\Widgets;
 use App\Filament\Resources\AgentDecisions\AgentDecisionResource;
 use App\Filament\Support\LinkedHeading;
 use App\Models\AgentDecision;
+use Filament\Actions\Action;
+use Filament\Infolists\Components\TextEntry;
+use Filament\Schemas\Components\Grid as InfoGrid;
+use Filament\Schemas\Components\Section as InfoSection;
+use Filament\Support\Icons\Heroicon;
 use Filament\Tables\Columns\TextColumn;
+use Filament\Tables\Filters\SelectFilter;
 use Filament\Tables\Table;
 use Filament\Widgets\TableWidget as BaseWidget;
 
@@ -32,6 +38,11 @@ class AgentActivityFeedWidget extends BaseWidget
             ->heading(LinkedHeading::make('Legacy assistance decision log', AgentDecisionResource::getUrl('index')))
             ->description(self::LEGACY_NOTICE)
             ->query(AgentDecision::query()->latest())
+            ->defaultPaginationPageOption(5)
+            ->paginationPageOptions([5, 10, 25])
+            ->emptyStateHeading('No assistance decisions recorded')
+            ->emptyStateDescription('When assistance requests are evaluated, autonomous agent logs will appear here.')
+            ->emptyStateIcon(Heroicon::CpuChip)
             ->columns([
                 TextColumn::make('created_at')
                     ->label('Timestamp')
@@ -40,7 +51,8 @@ class AgentActivityFeedWidget extends BaseWidget
                 TextColumn::make('action_type')
                     ->label('Action')
                     ->badge()
-                    ->color('gray'),
+                    ->color('gray')
+                    ->searchable(),
                 TextColumn::make('decision')
                     ->label('Verdict')
                     ->badge(),
@@ -58,6 +70,7 @@ class AgentActivityFeedWidget extends BaseWidget
                 TextColumn::make('reasoning_summary')
                     ->label('Recorded summary')
                     ->limit(65)
+                    ->searchable()
                     ->tooltip(fn ($record) => $record->reasoning_summary),
                 TextColumn::make('status')
                     ->label('Ledger outcome')
@@ -69,6 +82,54 @@ class AgentActivityFeedWidget extends BaseWidget
                         'rejected' => 'gray',
                         default => 'info',
                     }),
+            ])
+            ->filters([
+                SelectFilter::make('decision')
+                    ->options([
+                        'approve' => 'Approve',
+                        'reject' => 'Reject',
+                        'escalate' => 'Escalate',
+                        'hold' => 'Hold',
+                    ]),
+                SelectFilter::make('status')
+                    ->options([
+                        'executed' => 'Executed',
+                        'escalated' => 'Escalated',
+                        'held' => 'Held',
+                        'rejected' => 'Rejected',
+                    ]),
+            ])
+            ->recordActions([
+                Action::make('inspect')
+                    ->label('Inspect')
+                    ->icon(Heroicon::Eye)
+                    ->color('gray')
+                    ->modalHeading(fn (AgentDecision $record): string => "Decision #{$record->id} — {$record->action_type}")
+                    ->modalDescription(fn (AgentDecision $record): string => "Recorded at {$record->created_at->toIso8601String()}")
+                    ->infolist([
+                        InfoSection::make('Evaluation Outcome')
+                            ->schema([
+                                InfoGrid::make(3)->schema([
+                                    TextEntry::make('decision')->badge(),
+                                    TextEntry::make('status')->badge(),
+                                    TextEntry::make('policy_checked')->badge()->color('info'),
+                                ]),
+                                InfoGrid::make(2)->schema([
+                                    TextEntry::make('requested_amount')
+                                        ->formatStateUsing(fn ($state): string => number_format((float) $state, 2).' USDC'),
+                                    TextEntry::make('approved_amount')
+                                        ->formatStateUsing(fn ($state): string => number_format((float) $state, 2).' USDC'),
+                                ]),
+                            ]),
+                        InfoSection::make('Agent Reasoning')
+                            ->schema([
+                                TextEntry::make('reasoning_summary')
+                                    ->label('Recorded Reasoning Summary')
+                                    ->prose(),
+                            ]),
+                    ])
+                    ->modalSubmitAction(false)
+                    ->modalCancelActionLabel('Close'),
             ]);
     }
 }

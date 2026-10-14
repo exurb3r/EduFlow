@@ -34,6 +34,10 @@ class TreasuryOverviewWidget extends BaseWidget
 {
     protected static ?int $sort = 1;
 
+    protected int|string|array $columnSpan = 'full';
+
+    protected int|array|null $columns = 3;
+
     #[\Override]
     public function getHeading(): ?string
     {
@@ -68,7 +72,9 @@ class TreasuryOverviewWidget extends BaseWidget
         )
             ->description('Local ledger only. This is not on-chain funds and never settles a payable; it is a legacy two-decimal column, so the finance panel uses exact base units instead.')
             ->descriptionIcon(Heroicon::Banknotes)
+            ->chart([8, 12, 10, 15, 14, 18, 20])
             ->color($status['in_sync'] === false ? 'warning' : 'gray')
+            ->extraAttributes(['class' => 'cursor-pointer hover:shadow-sm transition-shadow'])
             ->url(TransactionResource::getUrl('index'));
 
         $collections = CollectionBatch::query()->where('organization_id', $institutionId)->count();
@@ -85,7 +91,9 @@ class TreasuryOverviewWidget extends BaseWidget
                 $snapshots,
             ))
             ->descriptionIcon(Heroicon::DocumentText)
+            ->chart([$collections, $reviewed, $snapshots, $collections + $snapshots])
             ->color('info')
+            ->extraAttributes(['class' => 'cursor-pointer hover:shadow-sm transition-shadow'])
             ->url(Collections::getUrl(panel: 'finance'));
 
         PaymentIntent::query()->where('organization_id', $institutionId)->count();
@@ -105,7 +113,14 @@ class TreasuryOverviewWidget extends BaseWidget
                 $authorizations->get('hold_payment', 0),
             ))
             ->descriptionIcon(Heroicon::ClipboardDocumentCheck)
+            ->chart([
+                $authorizations->get('reject_payment', 0),
+                $authorizations->get('hold_payment', 0),
+                $authorizations->get('approve_payment', 0),
+                $authorizations->sum(),
+            ])
             ->color('primary')
+            ->extraAttributes(['class' => 'cursor-pointer hover:shadow-sm transition-shadow'])
             ->url(PaymentReviews::getUrl(panel: 'finance'));
 
         $states = FinanceWorkflowRun::query()
@@ -122,7 +137,9 @@ class TreasuryOverviewWidget extends BaseWidget
                 $states->get('completed', 0),
             ))
             ->descriptionIcon(Heroicon::ClipboardDocumentList)
+            ->chart([$states->get('completed', 0), $waiting, $waiting + $states->get('completed', 0)])
             ->color($waiting > 0 ? 'warning' : 'success')
+            ->extraAttributes(['class' => 'cursor-pointer hover:shadow-sm transition-shadow'])
             ->url(FinanceDashboard::getUrl(panel: 'finance'));
 
         $pending = Transaction::query()
@@ -134,7 +151,9 @@ class TreasuryOverviewWidget extends BaseWidget
                 $pending,
             ))
             ->descriptionIcon(Heroicon::CircleStack)
+            ->chart([1, 0, 0, 0])
             ->color('gray')
+            ->extraAttributes(['class' => 'cursor-pointer hover:shadow-sm transition-shadow'])
             ->url(TransactionResource::getUrl('index'));
 
         return [$ledgerStat, $evidenceStat, $decisionStat, $supervisionStat, $settlementStat];

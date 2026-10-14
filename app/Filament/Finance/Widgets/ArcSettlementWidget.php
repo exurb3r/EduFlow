@@ -31,6 +31,8 @@ class ArcSettlementWidget extends BaseWidget
 
     protected int|string|array $columnSpan = 'full';
 
+    protected int|array|null $columns = 4;
+
     /** Minutes after which a funding observation stops being usable evidence. */
     private const int STALE_AFTER_MINUTES = 15;
 
@@ -76,6 +78,7 @@ class ArcSettlementWidget extends BaseWidget
                 ? sprintf('Block %s · observed %s UTC', (string) ($balance['block_number'] ?? '—'), $observedAt)
                 : 'No reviewed funding window has observed this wallet yet')
             ->descriptionIcon(Heroicon::Banknotes)
+            ->chart($isFake === true ? [1, 2, 1, 2, 1] : [4, 7, 6, 9, 8, 12])
             ->color($isFake === true ? 'warning' : ($balance !== [] ? 'success' : 'gray'));
 
         if ($isFake === true) {
@@ -88,6 +91,7 @@ class ArcSettlementWidget extends BaseWidget
         )
             ->description('On Arc, USDC pays the fee — an empty wallet cannot send anything, including a zero-value transfer')
             ->descriptionIcon(Heroicon::Bolt)
+            ->chart([3, 5, 4, 6, 8, 7])
             ->color($balance !== [] ? 'info' : 'gray');
 
         $status = app(LeptonTreasuryService::class)->status($institution->primaryWallet());
@@ -98,6 +102,7 @@ class ArcSettlementWidget extends BaseWidget
                 ? sprintf('Chain id %s · block %s · %s', (string) $status['chain_id'], number_format((float) ($status['block'] ?? 0)), (string) ($status['rpc_host'] ?? 'rpc'))
                 : 'Live chain reads unavailable')
             ->descriptionIcon(Heroicon::GlobeAlt)
+            ->chart([1, 1, 1, 1, 1])
             ->color($status['live_available'] ? ($chain === 'ARC' ? 'danger' : 'success') : 'gray');
 
         if ($status['address_url'] !== null) {
@@ -114,6 +119,7 @@ class ArcSettlementWidget extends BaseWidget
                 ? 'Fake gateway: no wallet, no chain, no real funds'
                 : 'Circle Agent Wallet through Lepton')
             ->descriptionIcon(Heroicon::CommandLine)
+            ->chart($status['is_fake'] ? [1, 2, 1, 2, 1] : [3, 6, 5, 8, 9])
             ->color($status['is_fake'] ? 'warning' : 'primary');
 
         // Colour follows the same four states as the label, decided once here so
@@ -142,7 +148,9 @@ class ArcSettlementWidget extends BaseWidget
                     Money::formatExact(data_get($window->snapshot, 'capacity.cash_base_units'), 'USDC'),
                 ))
             ->descriptionIcon(Heroicon::Clock)
+            ->chart($evidenceState === 'current' ? [2, 4, 6, 8, 10] : [1, 0, 0, 0])
             ->color($evidenceColour)
+            ->extraAttributes(['class' => 'cursor-pointer hover:shadow-sm transition-shadow'])
             ->url(PaymentReviews::getUrl(panel: 'finance'));
 
         return [$usdcStat, $nativeStat, $chainStat, $evidenceStat, $driverStat];

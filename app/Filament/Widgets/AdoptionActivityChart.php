@@ -41,6 +41,8 @@ class AdoptionActivityChart extends ChartWidget
 
     protected ?string $emptyStateDescription = 'Receipts, budget evidence, background runs and payment reviews all land here as the school begins using the installation.';
 
+    protected ?string $maxHeight = '320px';
+
     #[\Override]
     protected function getType(): string
     {
@@ -51,6 +53,35 @@ class AdoptionActivityChart extends ChartWidget
     public function getHeading(): string|Htmlable|null
     {
         return LinkedHeading::make($this->heading, ActivityLogResource::getUrl('index'));
+    }
+
+    /**
+     * @return array<string, mixed>
+     */
+    #[\Override]
+    protected function getOptions(): array
+    {
+        return [
+            'plugins' => [
+                'legend' => [
+                    'display' => true,
+                    'position' => 'top',
+                ],
+            ],
+            'scales' => [
+                'y' => [
+                    'beginAtZero' => true,
+                    'ticks' => [
+                        'precision' => 0,
+                    ],
+                ],
+                'x' => [
+                    'grid' => [
+                        'display' => false,
+                    ],
+                ],
+            ],
+        ];
     }
 
     /**
