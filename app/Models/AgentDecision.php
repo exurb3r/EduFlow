@@ -27,6 +27,8 @@ use Illuminate\Support\Carbon;
  * @property float $approved_amount
  * @property bool $requires_approval
  * @property string $status
+ * @property Carbon|null $created_at
+ * @property Carbon|null $updated_at
  * @property-read Organization $organization
  * @property-read Approval|null $approval
  * @property Carbon $created_at

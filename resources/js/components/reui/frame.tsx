@@ -1,6 +1,6 @@
 import { cva, type VariantProps } from 'class-variance-authority';
 
-import { cn } from 'cn';
+import { cn } from '@/lib/utils';
 
 /**
  * Frame sets --frame-panel-bg and --frame-panel-border-color; FramePanel reads

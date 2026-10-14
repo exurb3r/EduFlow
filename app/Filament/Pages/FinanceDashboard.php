@@ -18,6 +18,7 @@ use App\Filament\Finance\Widgets\WorkflowRunStateChart;
 use App\Filament\Finance\Widgets\WorkflowRunWidget;
 use App\Models\CollectionBatch;
 use App\Models\FinancePolicyActivation;
+use App\Models\FinancePolicyVersion;
 use App\Models\FinanceWorkflowRun;
 use App\Models\PaymentIntent;
 use App\Models\PaymentReservation;
@@ -246,10 +247,9 @@ class FinanceDashboard extends BaseDashboard
                                         ->state(function (): string {
                                             $institution = app(InstallationInstitution::class)->current();
                                             $activation = $institution === null ? null : FinancePolicyActivation::current($institution->id);
+                                            $policyVersion = $activation?->policyVersion;
 
-                                            return ! $activation instanceof FinancePolicyActivation || $activation->policyVersion === null
-                                                ? 'No active policy'
-                                                : $activation->policyVersion->version;
+                                            return $policyVersion instanceof FinancePolicyVersion ? $policyVersion->version : 'No active policy';
                                         }),
                                 ]),
                             ]),

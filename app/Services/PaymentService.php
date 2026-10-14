@@ -10,6 +10,7 @@ use App\Models\StudentAssistanceRequest;
 use App\Models\Transaction;
 use App\Models\User;
 use App\Models\Wallet;
+use App\Notifications\FundsReceivedNotification;
 use Illuminate\Support\Str;
 
 /**
@@ -50,7 +51,7 @@ final class PaymentService
             $wallet->update(['balance' => 0]);
         }
 
-        return Transaction::create([
+        $tx = Transaction::create([
             'organization_id' => $organization->id,
             'wallet_id' => $wallet->id,
             'type' => 'student_assistance',
@@ -69,5 +70,15 @@ final class PaymentService
             ],
             'executed_at' => now(),
         ]);
+
+        $amountUsdc = number_format($amount, 2);
+        $studentRecord->user->notify(new FundsReceivedNotification(
+            amount: $amountUsdc,
+            description: "Financial assistance grant of {$amountUsdc} USDC received.",
+            txHash: $tx->provider_tx_hash,
+            source: 'student_assistance',
+        ));
+
+        return $tx;
     }
 }
