@@ -7,6 +7,7 @@ namespace App\Http\Controllers;
 use App\Http\Requests\StoreInstitutionPolicyRequest;
 use App\Jobs\AssessInstitutionPolicy;
 use App\Models\InstitutionPolicyAssessment;
+use App\Models\InstitutionPolicyPublication;
 use App\Models\InstitutionPolicyVersion;
 use App\Models\PaymentIntent;
 use App\Services\InstallationInstitution;
@@ -39,12 +40,21 @@ class InstitutionPolicyController extends Controller
         $institution = $institutions->require();
         $versions = InstitutionPolicyVersion::query()->where('organization_id', $institution->id)->latest('id')->limit(100)->get();
         $current = $workspace->current();
+        // Automated advice is shown in its own section. Mixing it into the
+        // playground list would let a background bill classification answer
+        // for the description the reviewer typed, which they never saw.
         $advice = InstitutionPolicyAssessment::query()->where('organization_id', $institution->id)->whereNull('requested_by')->latest('id')->limit(50)->get();
+        // The playground answers "what did the agent make of MY description",
+        // so it is scoped to the signed-in author. Another reviewer's run
+        // describes evidence this person never typed.
+        $playground = InstitutionPolicyAssessment::query()->where('organization_id', $institution->id)
+            ->where('requested_by', $request->user()->id)->latest('id')->limit(50)->get();
 
         return Inertia::render('finance/policies/index', ['institution' => ['id' => $institution->id, 'name' => $institution->name],
             'versions' => $versions->map(fn (InstitutionPolicyVersion $version): array => $version->only(['id', 'title', 'created_by', 'content', 'content_digest', 'created_at']))->all(),
-            'current' => $current?->only(['institution_policy_version_id', 'publication_digest', 'approved_by']),
-            'assessments' => InstitutionPolicyAssessment::query()->where('organization_id', $institution->id)->latest('id')->limit(50)->get(),
+            'current' => $current instanceof InstitutionPolicyPublication ? [...$current->only(['institution_policy_version_id', 'publication_digest', 'approved_by']),
+                'controls_active' => $current->hasActiveControls()] : null,
+            'assessments' => $playground,
             'planAdvice' => $advice,
             'financeUrl' => url('/finance'),
             'queueReady' => in_array(config('queue.connections.'.config('eduflow.background_finance.queue_connection', 'database').'.driver'), ['database', 'redis'], true)

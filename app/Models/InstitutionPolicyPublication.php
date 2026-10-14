@@ -55,6 +55,20 @@ class InstitutionPolicyPublication extends Model
         }
     }
 
+    /**
+     * Whether this publication's own controls are the ones currently in force.
+     *
+     * A separately activated FinancePolicyVersion makes this publication's
+     * limits stale while its clauses and categories stay published. The
+     * distinction matters because one governs which controls payments are
+     * measured against and the other governs what the model may cite, so
+     * neither answer alone describes the institution correctly.
+     */
+    public function hasActiveControls(): bool
+    {
+        return FinancePolicyActivation::current($this->organization_id)?->id === $this->finance_policy_activation_id;
+    }
+
     public function hasValidHistory(): bool
     {
         $history = self::query()->where('organization_id', $this->organization_id)->where('id', '<=', $this->id)

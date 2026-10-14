@@ -89,6 +89,16 @@ final readonly class InstitutionPolicyWorkspace
         }, 3);
     }
 
+    /**
+     * The head of the publication chain.
+     *
+     * This is the newest independently published policy, NOT necessarily the
+     * one whose controls payments currently use. `eduflow:activate-finance-policy`
+     * can activate a different FinancePolicyVersion out of band, and when it
+     * does this publication is superseded by its own controls. Callers that
+     * gate money must check `hasActiveControls()` rather than treat this as
+     * active; callers that gate further publication want the chain head.
+     */
     public function current(): ?InstitutionPolicyPublication
     {
         $publication = InstitutionPolicyPublication::query()->where('organization_id', $this->institutions->require()->id)->latest('id')->first();
@@ -97,6 +107,21 @@ final readonly class InstitutionPolicyWorkspace
         }
 
         return $publication;
+    }
+
+    /**
+     * The published policy whose controls are actually in force.
+     *
+     * Null when nothing is published, or when the chain head's controls were
+     * superseded by a separately activated finance policy. Advisory work treats
+     * null as "no institution policy in force" rather than falling back to the
+     * stale head.
+     */
+    public function active(): ?InstitutionPolicyPublication
+    {
+        $current = $this->current();
+
+        return $current?->hasActiveControls() === true ? $current : null;
     }
 
     public function publish(User $reviewer, InstitutionPolicyVersion $version, string $digest, ?string $expectedCurrent, string $reason): InstitutionPolicyPublication

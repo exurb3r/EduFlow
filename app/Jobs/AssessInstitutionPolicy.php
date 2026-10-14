@@ -4,7 +4,6 @@ declare(strict_types=1);
 
 namespace App\Jobs;
 
-use App\Models\FinancePolicyActivation;
 use App\Models\FinanceWorkflowRun;
 use App\Models\InstitutionPolicyAssessment;
 use App\Models\InstitutionPolicyPublication;
@@ -55,9 +54,9 @@ class AssessInstitutionPolicy implements ShouldQueue
                 throw new \RuntimeException('Policy or evidence integrity changed.');
             }
             if (isset($assessment->input['publication_digest'])) {
-                $current = InstitutionPolicyPublication::query()->where('organization_id', $assessment->organization_id)->latest('id')->first();
-                if ($current === null || ! $current->hasValidHistory() || $current->publication_digest !== $assessment->input['publication_digest']
-                    || FinancePolicyActivation::current($assessment->organization_id)?->id !== $current->finance_policy_activation_id) {
+                $published = InstitutionPolicyPublication::query()->where('organization_id', $assessment->organization_id)->latest('id')->first();
+                if (! $published instanceof InstitutionPolicyPublication || ! $published->hasValidHistory()
+                    || $published->publication_digest !== $assessment->input['publication_digest'] || ! $published->hasActiveControls()) {
                     throw new \RuntimeException('Published policy changed before advisory assessment.');
                 }
                 $bill = InvoiceVersion::query()->where('organization_id', $assessment->organization_id)->find($assessment->input['invoice_version_id'] ?? null);

@@ -2,15 +2,21 @@
 
 declare(strict_types=1);
 
+use App\Actions\ActivateFinancePolicy;
+use App\Actions\CreateFinancePolicyVersion;
 use App\Ai\Agents\InstitutionPolicyAnalyst;
+use App\DTOs\Money;
+use App\Enums\CurrencyCode;
 use App\Jobs\AssessInstitutionPolicy;
 use App\Models\BudgetSnapshot;
 use App\Models\FinancePolicyActivation;
+use App\Models\FinancePolicyVersion;
 use App\Models\FinanceWorkflowRun;
 use App\Models\InstitutionPolicyAssessment;
 use App\Models\InstitutionPolicyPublication;
 use App\Models\InstitutionPolicyVersion;
 use App\Models\Organization;
+use App\Models\PaymentIntent;
 use App\Models\Transaction;
 use App\Models\User;
 use App\Services\Ai\AiProviderResolver;
@@ -235,6 +241,84 @@ test('assessment identity is durable and duplicate queue delivery invokes provid
     InstitutionPolicyAnalyst::assertPromptedTimes(1);
     Bus::assertDispatchedTimes(AssessInstitutionPolicy::class, 1);
     expect(InstitutionPolicyAssessment::query()->findOrFail($id)->hasValidResult())->toBeTrue();
+});
+
+test('separately activated finance policy marks the published policy controls as superseded', function (): void {
+    $c = institutionPolicyContext();
+    app(AiSettings::class)->advisory_enabled = true;
+    app(AiSettings::class)->disclosure_accepted = true;
+    InstitutionPolicyAnalyst::fake([institutionPolicyAnswer(), institutionPolicyAnswer()]);
+    assessInstitutionPolicy($c);
+    assessInstitutionPolicy($c, 'examples');
+    $publication = app(InstitutionPolicyWorkspace::class)->publish($c['reviewer'], $c['policy'], $c['policy']->content_digest, null, 'Initial policy.');
+    $workspace = app(InstitutionPolicyWorkspace::class);
+    expect($workspace->current()?->id)->toBe($publication->id)->and($workspace->active()?->id)->toBe($publication->id)
+        ->and($publication->hasActiveControls())->toBeTrue();
+    app(CreateFinancePolicyVersion::class)->handle($c['maker'], 'out-of-band', Money::fromDecimal('1', CurrencyCode::USDC),
+        new Money(0, CurrencyCode::USDC), new Money(0, CurrencyCode::USDC), new Money(1_000000, CurrencyCode::USDC));
+    $outOfBand = FinancePolicyVersion::query()->where('version', 'out-of-band')->sole();
+    app(ActivateFinancePolicy::class)->handle($c['reviewer'], $outOfBand, FinancePolicyActivation::current($publication->organization_id)?->id);
+    expect($publication->fresh()->hasValidEvidence())->toBeTrue()->and($publication->fresh()->hasActiveControls())->toBeFalse()
+        ->and($workspace->current()?->id)->toBe($publication->id)->and($workspace->active())->toBeNull();
+    $this->actingAs($c['maker'])->get(route('finance.policies.index'))
+        ->assertInertia(fn (AssertableInertia $page): AssertableInertia => $page->component('finance/policies/index')
+            ->where('current.controls_active', false)->where('current.institution_policy_version_id', $publication->institution_policy_version_id));
+});
+
+test('out of band activation stops plan advice and background assessment', function (): void {
+    $finance = paymentAuthorizationContext(withFunding: false);
+    config(['queue.connections.database.retry_after' => 360]);
+    $workspace = app(InstitutionPolicyWorkspace::class);
+    $policy = $workspace->save($finance['maker'], institutionPolicyInput());
+    $c = ['maker' => $finance['maker'], 'reviewer' => $finance['reviewer'], 'policy' => $policy];
+    app(AiSettings::class)->advisory_enabled = true;
+    app(AiSettings::class)->disclosure_accepted = true;
+    InstitutionPolicyAnalyst::fake(array_fill(0, 3, institutionPolicyAnswer()));
+    assessInstitutionPolicy($c);
+    assessInstitutionPolicy($c, 'examples');
+    $workspace->publish($finance['reviewer'], $policy, $policy->content_digest, null, 'Policy checked.');
+    config(['eduflow.background_finance.enabled' => true, 'eduflow.institution_policy.advice_enabled' => true]);
+    $snapshot = BudgetSnapshot::query()->firstOrFail();
+    app(FinanceWorkflows::class)->budgetCaptured($snapshot);
+    $run = FinanceWorkflowRun::query()->where('budget_snapshot_id', $snapshot->id)->sole();
+    app(FinanceWorkflows::class)->process($run->id);
+    Bus::fake();
+    app(InstitutionPolicyAdvice::class)->forPlan($run->fresh());
+    Bus::assertDispatchedTimes(AssessInstitutionPolicy::class, 2);
+    $superseding = app(CreateFinancePolicyVersion::class)->handle($finance['maker'], 'supersede', Money::fromDecimal('2', CurrencyCode::USDC),
+        new Money(0, CurrencyCode::USDC), new Money(0, CurrencyCode::USDC), new Money(1_000000, CurrencyCode::USDC));
+    app(ActivateFinancePolicy::class)->handle($finance['reviewer'], $superseding, FinancePolicyActivation::current($policy->organization_id)?->id);
+    app(InstitutionPolicyAdvice::class)->forPlan($run->fresh());
+    Bus::assertDispatchedTimes(AssessInstitutionPolicy::class, 2);
+    $queued = InstitutionPolicyAssessment::query()->where('state', 'queued')->firstOrFail();
+    (new AssessInstitutionPolicy($queued->id))->handle(app(InstitutionPolicyInterpreter::class), app(InstallationInstitution::class), app(AiProviderResolver::class));
+    expect($queued->fresh()->state)->toBe('needs_review')->and($queued->fresh()->result)->toBeNull();
+});
+
+test('playground shows only the signed in author assessments while automated advice stays separate', function (): void {
+    $c = institutionPolicyContext();
+    app(AiSettings::class)->advisory_enabled = true;
+    app(AiSettings::class)->disclosure_accepted = true;
+    InstitutionPolicyAnalyst::fake([institutionPolicyAnswer()]);
+    $mine = $this->actingAs($c['maker'])->postJson(route('finance.policies.assess', $c['policy']),
+        ['kind' => 'classification', 'request_key' => (string) Str::uuid(), 'expected_digest' => $c['policy']->content_digest, 'description' => 'My chemistry consumables'])
+        ->assertSuccessful()->json('data.id');
+    Bus::fake();
+    $billAdvice = InstitutionPolicyAssessment::query()->create(['organization_id' => $c['policy']->organization_id,
+        'institution_policy_version_id' => $c['policy']->id, 'requested_by' => null, 'request_key' => (string) Str::uuid(),
+        'kind' => 'classification', 'input' => ['description' => 'Automated vendor bill'], 'input_digest' => PaymentIntent::digest(['description' => 'Automated vendor bill']),
+        'policy_digest' => $c['policy']->content_digest]);
+    $otherReviewer = User::factory()->create()->assignRole(Role::findOrCreate('finance_officer', 'web'));
+    $theirs = $this->actingAs($otherReviewer)->postJson(route('finance.policies.assess', $c['policy']),
+        ['kind' => 'classification', 'request_key' => (string) Str::uuid(), 'expected_digest' => $c['policy']->content_digest, 'description' => 'Someone else description'])
+        ->assertSuccessful()->json('data.id');
+    $this->actingAs($c['maker'])->get(route('finance.policies.index'))
+        ->assertInertia(fn (AssertableInertia $page): AssertableInertia => $page->component('finance/policies/index')
+            ->has('assessments', 1)->has('planAdvice', 1)
+            ->where('assessments.0.id', $mine)->where('assessments.0.input.description', 'My chemistry consumables')
+            ->where('planAdvice.0.id', $billAdvice->id)
+            ->missing('assessments.1')->where('planAdvice.0.input.description', 'Automated vendor bill'));
+    expect(InstitutionPolicyAssessment::query()->findOrFail($theirs)->requested_by)->toBe($otherReviewer->id);
 });
 
 test('AI output cannot smuggle spending permission or erase unknown classification', function (): void {

@@ -128,6 +128,7 @@ type Props = {
         institution_policy_version_id: number;
         publication_digest: string;
         approved_by: number;
+        controls_active: boolean;
     } | null;
     assessments: Assessment[];
     planAdvice: Assessment[];
@@ -523,11 +524,15 @@ export default function InstitutionPolicies({
                         <div className="flex items-center gap-2">
                             <Badge
                                 variant={
-                                    current ? 'success-light' : 'warning-light'
+                                    current?.controls_active
+                                        ? 'success-light'
+                                        : 'warning-light'
                                 }
                             >
                                 {current
-                                    ? 'Published policy'
+                                    ? current.controls_active
+                                        ? 'Published policy'
+                                        : 'Published policy · controls superseded'
                                     : 'No active policy'}
                             </Badge>
                             <Button
@@ -1423,6 +1428,22 @@ export default function InstitutionPolicies({
                                     title="Review & publish"
                                     description="Independent approval of exact tested policy."
                                 >
+                                    {current && !current.controls_active && (
+                                        <Alert variant="warning">
+                                            <AlertTitle>
+                                                Published controls superseded
+                                            </AlertTitle>
+                                            <AlertDescription>
+                                                A separate finance policy was
+                                                activated after this policy was
+                                                published, so these limits no
+                                                longer govern payments. The
+                                                clauses and categories stay
+                                                published; publish a revision to
+                                                restore institution control.
+                                            </AlertDescription>
+                                        </Alert>
+                                    )}
                                     <div className="flex flex-wrap gap-2">
                                         <Badge
                                             variant={

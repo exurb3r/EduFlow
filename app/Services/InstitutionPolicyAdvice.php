@@ -5,7 +5,6 @@ declare(strict_types=1);
 namespace App\Services;
 
 use App\Jobs\AssessInstitutionPolicy;
-use App\Models\FinancePolicyActivation;
 use App\Models\FinanceWorkflowRun;
 use App\Models\InstitutionPolicyAssessment;
 use App\Models\InstitutionPolicyPublication;
@@ -26,9 +25,8 @@ final readonly class InstitutionPolicyAdvice
         if (! config('eduflow.institution_policy.advice_enabled', false) || $run->kind !== 'budget_plan' || ! $run->hasValidResult()) {
             return;
         }
-        $publication = $this->workspace->current();
-        if (! $publication instanceof InstitutionPolicyPublication || $publication->organization_id !== $run->organization_id
-            || FinancePolicyActivation::current($run->organization_id)?->id !== $publication->finance_policy_activation_id) {
+        $publication = $this->workspace->active();
+        if (! $publication instanceof InstitutionPolicyPublication || $publication->organization_id !== $run->organization_id) {
             return;
         }
         $version = $publication->version;
