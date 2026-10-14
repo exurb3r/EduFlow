@@ -155,7 +155,10 @@ commands; they are not a ready-made college pilot or permission to use legacy ex
 - [What you'll see](#what-youll-see)
 - [Requirements](#requirements)
 - [Setup](#setup)
-- [Authenticate your agent wallet](#authenticate-your-agent-wallet)
+- [Development setup (local)](#development-setup-local)
+- [Self-hosted (production) setup](#self-hosted-production-setup)
+- [Lepton agent package (Circle + Arc)](#lepton-agent-package-circle--arc)
+- [Authenticate your agent wallet](#authenticate-your-agent-wallet)"""
 - [Fund the wallet](#fund-the-wallet)
 - [Run the demo](#run-the-demo)
 - [The seeded scenarios](#the-seeded-scenarios)
@@ -297,6 +300,178 @@ composer run dev
 ```
 
 That runs the PHP server, Vite, and the queue worker together. Open the printed URL.
+
+### Development setup (local)
+
+Use this for everyday development. It assumes the **disposable local demo** commands above
+(SQLite, seeded demo data, hot-reload):
+
+**Option A — one command (recommended for a fresh clone):**
+
+```bash
+composer run setup
+```
+
+This installs PHP/JS deps, generates `APP_KEY`, enables the `Blog` module, migrates +
+seeds, builds frontend assets, and generates Filament Shield permissions.
+
+**Option B — manual:**
+
+```bash
+composer install
+npm install
+
+# 2. Environment
+cp .env.example .env
+php artisan key:generate
+
+# 3. Database (SQLite, zero config)
+touch database/database.sqlite
+php artisan module:enable Blog --no-interaction
+php artisan migrate:fresh --seed
+php artisan module:migrate --force --no-interaction
+
+# 4. Frontend build (or `npm run dev` for HMR during development)
+npm run build   # or: npm run dev
+
+# 5. Run everything (app server + queue + logs + Vite)
+composer run dev
+```
+
+- `composer run dev` starts `php artisan serve`, `queue:listen`, `pail`, and Vite together.
+- Keep `LEPTON_DRIVER=fake` while developing without Circle credentials:
+  ```env
+  LEPTON_DRIVER=fake
+  ```
+- Run tests: `composer test` (lint + Pest). Run lint only: `composer lint`.
+- Re-run `php artisan lepton:doctor` after changing `.env`.
+
+### Self-hosted (production) setup
+
+EduFlow is self-hostable. Do **not** use `migrate:fresh --seed` on a real instance; it destroys data.
+Use the idempotent installer instead.
+
+1. **Server prerequisites.** Install PHP 8.4+/8.5 with extensions (`pdo`, `mbstring`, `openssl`,
+   `curl`, `fileinfo`, `dom`, `xml`, `zip`, `bcmath`), Composer, Node.js 20.18+, and (for treasury
+   features) the Circle CLI + `uv` + `arc-canteen` (see
+   [Lepton agent package (Circle + Arc)](#lepton-agent-package-circle--arc)).
+2. **Application code.**
+   ```bash
+   git clone https://github.com/koamishin/EduFlow.git /var/www/eduflow
+   cd /var/www/eduflow
+   composer install --no-dev --optimize-autoloader
+   npm ci
+   npm run build
+   ```
+3. **Environment.**
+   ```bash
+   cp .env.example .env
+   php artisan key:generate
+   ```
+   Set at minimum:
+   ```env
+   APP_NAME="Your School"
+   APP_ENV=production
+   APP_DEBUG=false
+   APP_URL=https://eduflow.example.org
+
+   DB_CONNECTION=pgsql        # or mysql
+   DB_HOST=127.0.0.1
+   DB_PORT=5432
+   DB_DATABASE=eduflow
+   DB_USERNAME=eduflow
+   DB_PASSWORD=change-me
+
+   QUEUE_CONNECTION=database   # or redis
+   SESSION_DRIVER=database      # or redis
+   CACHE_STORE=database         # or redis
+   ```
+4. **Database & storage.**
+   ```bash
+   php artisan module:enable Blog --no-interaction
+   php artisan migrate --force
+   php artisan module:migrate --force --no-interaction
+   php artisan storage:link
+   ```
+5. **School identity and first administrator** (idempotent; safe to repeat as a no-op):
+   ```bash
+   php artisan eduflow:install --institution="Pilot School" --country=PH --timezone=Asia/Manila --currency=PHP --no-interaction
+   php artisan eduflow:bootstrap-admin --name="School Operator" --email="operator@school.example"
+   ```
+   Bootstrap prompts for a password interactively (hidden). Verify the admin email and
+   configure MFA before opening access.
+6. **Optimise for production.**
+   ```bash
+   php artisan config:cache
+   php artisan route:cache
+   php artisan view:cache
+   php artisan event:cache
+   ```
+7. **Process management.** Run a long-lived queue worker (and scheduler) under Supervisor/systemd:
+   ```bash
+   php artisan queue:work --sleep=3 --tries=3
+   php artisan schedule:work
+   ```
+   The included Docker image (`docker/Dockerfile`) runs FrankenPHP + Octane + Supervisor
+   (queue, scheduler, horizon/pulse when installed). See `docker/start-container`.
+8. **Revenue/agent config.** Set `LEPTON_TREASURY_ADDRESS`, `LEPTON_CHAIN`, and the finance
+   env flags only after reviewing [Configuration](#configuration) and the release-safety notes.
+
+> **Never** regenerate `APP_KEY`, reset the database, or delete financial records as
+> credential cleanup. Preview builds use the `preview` tag only; official releases come from
+> `main` after CI. See `docs/getting-started/installation.mdx` and `docker/Dockerfile`.
+
+### Lepton agent package (Circle + Arc)
+
+This application depends on [`yukazakiri/lepton-agent`](https://github.com/yukazakiri/lepton-agent)
+ (`composer require yukazakiri/lepton-agent`, already declared in `composer.json`). It bridges
+Circle Agent Wallets and the Arc network behind injected contracts; application code never
+shells out to `circle`/`arc-canteen` directly.
+
+**What it needs on the host:**
+- `circle` CLI (`npm i -g @circle-fin/cli`) — Circle owns the agent session; the package stores no
+  credentials.
+- `arc-canteen` (`uv tool install arc-canteen && arc-canteen login`) — RPC + optional funded testnet wallet.
+- A Circle **agent** wallet (Circle MPC), not a local wallet, so Circle can sign.
+
+**Authentication (OTP, mainnet/testnet independent):**
+```bash
+# send OTP (request ID printed)
+php artisan lepton:login you@example.com
+# complete
+php artisan lepton:login --request=<id> --otp=B1X-123456
+php artisan lepton:login --status
+```
+
+**Configure `.env`:**
+```env
+LEPTON_DRIVER=circle            # circle = real; fake = in-memory (default under testing)
+LEPTON_CIRCLE_BIN=circle
+LEPTON_ARC_BIN=arc-canteen
+LEPTON_CHAIN=ARC-TESTNET
+LEPTON_CHAIN_ID=5042002
+LEPTON_TREASURY_ADDRESS=0x...   # Circle agent wallet address
+LEPTON_RPC_URL=                 # optional override
+LEPTON_DRY_RUN=false
+LEPTON_ALLOW_RAW_CIRCLE=false
+```
+
+**Verify:**
+```bash
+php artisan lepton:doctor       # binaries, session, treasury, chain reads, ledger parity
+php artisan lepton:status --address=0x...
+```
+
+**Key rules** (from the package; do not violate):
+- Amounts are integer base units; USDC = 6 decimals, Arc native = 18 decimals. Use
+  `Yukazakiri\Lepton\Support\Amounts`, never floats or `hexdec()`.
+- A transaction hash is a claim, not proof — verify with `eth_getTransactionByHash`.
+- Prefer Circle agent wallet addresses; local wallets make transfers fail.
+- Mainnet and testnet sessions are independent.
+
+For full API (transfers, balances, x402, Gateway, bridges, testing with the fake
+driver), see `vendor/yukazakiri/lepton-agent/README.md` or the package docs.
+"""
 
 ### Demo accounts
 
