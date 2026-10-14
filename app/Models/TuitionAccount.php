@@ -61,7 +61,13 @@ class TuitionAccount extends Model
             ->whereNull('posted_at')
             ->get()
             ->filter(function (StudentTuitionPaymentAttempt $attempt): bool {
-                if ($attempt->state === 'prepared' && $attempt->submission_started_at === null) {
+                if ($attempt->submission_started_at === null) {
+                    if ($attempt->stage === 'needs_operator_review'
+                        || $attempt->stage === 'preflight_blocked'
+                        || $attempt->stage === 'quote_expired_unsubmitted') {
+                        return false;
+                    }
+
                     $intent = StudentTuitionPaymentIntent::query()->find($attempt->student_tuition_payment_intent_id);
                     if ($intent instanceof StudentTuitionPaymentIntent
                         && isset($intent->snapshot['expires_at'])

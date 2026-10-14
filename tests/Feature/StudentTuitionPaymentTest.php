@@ -116,6 +116,13 @@ test('a payment is only recorded once the chain says the exact amount moved', fu
     expect(StudentTuitionPayment::query()->count())->toBe(0);
     $p->process($a->id);
     expect($a->fresh()->posted_at)->not->toBeNull()->and($c['account']->fresh()->paid_amount)->toBe(5_000000);
+
+    $notification = $c['student']->user->notifications()->first();
+    expect($notification)->not->toBeNull()
+        ->and($notification->data['title'])->toBe('Tuition payment of 5.00 USDC sent')
+        ->and($notification->data['amount'])->toBe('5.00')
+        ->and($notification->data['tx_hash'])->toBe('0x'.str_repeat('f', 64))
+        ->and($notification->data['type'])->toBe('tuition_payment');
 });
 
 test('a transaction that exists but moved the wrong amount records nothing', function (): void {
@@ -163,6 +170,13 @@ test('a debt that shrinks after the payer confirmed lands the remainder as an ov
     $p->process($a->id);
     $receipt = StudentTuitionPayment::query()->sole();
     expect($receipt->applied_base_units)->toBe(2_000000)->and($receipt->overpayment_base_units)->toBe(3_000000);
+
+    $notification = $c['student']->user->notifications()->first();
+    expect($notification)->not->toBeNull()
+        ->and($notification->data['amount'])->toBe('5.00')
+        ->and($notification->data['applied_amount'])->toBe('2.00')
+        ->and($notification->data['overpayment_amount'])->toBe('3.00')
+        ->and($notification->data['message'])->toContain('overpayment credit');
 });
 
 test('a rehearsal without a payment provider records no debt and no ledger row', function (): void {
@@ -187,4 +201,59 @@ test('an unreadable chain is an unresolved attempt, not a claim that no payment 
     $p->process($a->id);
     $p->process($a->id);
     expect($a->fresh()->settlement_verdict)->toBe('unreadable')->and(StudentTuitionPayment::query()->count())->toBe(0);
+});
+
+test('an unsubmitted held attempt does not reduce tuition effective remaining amount and auto-clears on new payment', function (): void {
+    $c = consentContext();
+    $a = confirmConsent($c);
+
+    // Simulate preflight block placing attempt into operator review
+    $a->update([
+        'stage' => 'needs_operator_review',
+        'last_error' => 'Preflight blocked. Original institution and real Arc testnet rail required; no mainnet or fake fallback.',
+        'leased_until' => null,
+        'next_attempt_at' => null,
+    ]);
+
+    // Funds are immediately returned to the student tuition balance
+    expect($c['account']->heldAmount())->toBe(0)
+        ->and($c['account']->effectiveRemainingAmount())->toBe($c['account']->remainingAmount());
+
+    // Paying again automatically clears the unsubmitted hold and does not throw unresolved payment exception
+    $newAttempt = confirmConsent($c);
+    expect($a->fresh()->state)->toBe('failed')
+        ->and($a->fresh()->stage)->toBe('preflight_blocked')
+        ->and($newAttempt->id)->not->toBe($a->id);
+});
+
+test('an unsubmitted expired attempt auto-clears on status poll', function (): void {
+    $c = consentContext();
+    $a = confirmConsent($c);
+
+    // Fast-forward beyond the 120-second consent window
+    $this->travel(3)->minutes();
+
+    $response = $this->actingAs($c['student']->user)
+        ->getJson(route('student.tuition.attempts'));
+
+    $response->assertOk();
+    expect($a->fresh()->state)->toBe('failed')
+        ->and($a->fresh()->stage)->toBe('quote_expired_unsubmitted');
+});
+
+test('a student can explicitly clear an unsubmitted hold', function (): void {
+    $c = consentContext();
+    $a = confirmConsent($c);
+
+    $a->update([
+        'stage' => 'needs_operator_review',
+        'last_error' => 'Preflight blocked.',
+    ]);
+
+    $response = $this->actingAs($c['student']->user)
+        ->postJson(route('student.tuition.attempts.clear', $a));
+
+    $response->assertOk();
+    expect($a->fresh()->state)->toBe('failed')
+        ->and($a->fresh()->stage)->toBe('quote_expired_unsubmitted');
 });

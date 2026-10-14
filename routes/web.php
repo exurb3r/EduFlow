@@ -55,6 +55,7 @@ Route::middleware(['auth', 'verified'])->group(function (): void {
     Route::post('student/tuition/quote', [StudentTuitionPaymentController::class, 'quote'])->middleware('throttle:20,1')->name('student.tuition.quote');
     Route::post('student/tuition/pay', [StudentTuitionPaymentController::class, 'store'])->middleware('throttle:5,1')->name('student.tuition.pay');
     Route::get('student/tuition/attempts', [StudentTuitionPaymentController::class, 'index'])->middleware('throttle:60,1')->name('student.tuition.attempts');
+    Route::post('student/tuition/attempts/{attempt}/clear', [StudentTuitionPaymentController::class, 'clearHold'])->middleware('throttle:10,1')->name('student.tuition.attempts.clear');
 
     // Non-tuition bills. The quote/consent pair is the only route here that can
     // create anything, and neither can reach a signer: a GET cannot dispatch and

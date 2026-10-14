@@ -183,13 +183,16 @@ export default function StudentDashboard({
     const canPay = hasWallet && remainingBase > 0;
     const inFlightAttempt = tuitionAttempts?.find(
         (a) =>
-            [
+            ([
                 'prepared',
                 'submitting',
                 'accepted',
                 'awaiting_verification',
                 'unknown',
-            ].includes(a.state) ||
+            ].includes(a.state) &&
+                a.stage !== 'needs_operator_review' &&
+                a.stage !== 'preflight_blocked' &&
+                a.stage !== 'quote_expired_unsubmitted') ||
             (a.state === 'verified' && !a.posted),
     );
     const hasInFlight = Boolean(inFlightAttempt);
@@ -273,9 +276,14 @@ export default function StudentDashboard({
 
         const now = Date.now();
         for (const n of notificationSummary.recent) {
+            const lower = n.title.toLowerCase();
             if (
                 n.readAt === null &&
-                n.title.toLowerCase().includes('received')
+                (lower.includes('received') ||
+                    lower.includes('tuition') ||
+                    lower.includes('sent') ||
+                    lower.includes('payment') ||
+                    lower.includes('transfer'))
             ) {
                 const parsedTime = new Date(n.createdAt).getTime();
                 const isRecent =
@@ -651,7 +659,12 @@ export default function StudentDashboard({
 
             // The wallet balance and paid figures both changed on-chain.
             router.reload({
-                only: ['tuitionAttempts', 'tuitionAccount', 'wallet'],
+                only: [
+                    'tuitionAttempts',
+                    'tuitionAccount',
+                    'wallet',
+                    'notificationSummary',
+                ],
             });
         } catch {
             setPayError(
@@ -803,19 +816,23 @@ export default function StudentDashboard({
                                                 <>
                                                     <Loader2 className="size-5 shrink-0 animate-spin text-[var(--status-pending)]" />
                                                     <p className="clay-title text-[var(--status-pending)]">
-                                                        {activeReceipt.state ===
-                                                        'prepared'
-                                                            ? 'Payment recorded — processing transfer…'
+                                                        {activeReceipt.stage ===
+                                                            'needs_operator_review' ||
+                                                        activeReceipt.requires_investigation
+                                                            ? 'Preflight blocked — funds returned to balance'
                                                             : activeReceipt.state ===
-                                                                'submitting'
-                                                              ? 'Submitting to Arc network…'
+                                                                'prepared'
+                                                              ? 'Payment recorded — processing transfer…'
                                                               : activeReceipt.state ===
-                                                                  'accepted'
-                                                                ? 'Accepted by network — awaiting block…'
+                                                                  'submitting'
+                                                                ? 'Submitting to Arc network…'
                                                                 : activeReceipt.state ===
-                                                                    'awaiting_verification'
-                                                                  ? 'On chain — verifying movement…'
-                                                                  : activeReceipt.state_label}
+                                                                    'accepted'
+                                                                  ? 'Accepted by network — awaiting block…'
+                                                                  : activeReceipt.state ===
+                                                                      'awaiting_verification'
+                                                                    ? 'On chain — verifying movement…'
+                                                                    : activeReceipt.state_label}
                                                     </p>
                                                 </>
                                             )}
@@ -836,6 +853,14 @@ export default function StudentDashboard({
                                                         <span className="inline-flex items-center gap-1.5 font-semibold text-[var(--status-resolved)]">
                                                             <Check className="size-3.5" />
                                                             Verified on chain
+                                                        </span>
+                                                    ) : activeReceipt.stage ===
+                                                          'needs_operator_review' ||
+                                                      activeReceipt.requires_investigation ? (
+                                                        <span className="inline-flex items-center gap-1.5 font-semibold text-amber-500">
+                                                            <TriangleAlert className="size-3.5" />
+                                                            Hold returned to
+                                                            balance
                                                         </span>
                                                     ) : activeReceipt.state ===
                                                       'failed' ? (
@@ -2323,6 +2348,7 @@ export default function StudentDashboard({
                                         setMonitorDrawerOpen(false);
                                         openPay();
                                     }}
+                                    onDone={() => setMonitorDrawerOpen(false)}
                                 />
                             </div>
                         </SheetContent>

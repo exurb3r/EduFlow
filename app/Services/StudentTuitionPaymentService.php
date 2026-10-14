@@ -122,13 +122,17 @@ final readonly class StudentTuitionPaymentService
                 ->get()
                 ->each(function (StudentTuitionPaymentAttempt $stale): void {
                     $staleIntent = StudentTuitionPaymentIntent::query()->find($stale->student_tuition_payment_intent_id);
-                    if ($staleIntent instanceof StudentTuitionPaymentIntent
+                    $isExpired = $staleIntent instanceof StudentTuitionPaymentIntent
                         && isset($staleIntent->snapshot['expires_at'])
-                        && Carbon::parse($staleIntent->snapshot['expires_at'])->lte(now())) {
+                        && Carbon::parse($staleIntent->snapshot['expires_at'])->lte(now());
+
+                    if ($isExpired || $stale->stage === 'needs_operator_review' || $stale->stage === 'preflight_blocked') {
                         $stale->update([
                             'state' => 'failed',
-                            'stage' => 'quote_expired_unsubmitted',
-                            'last_error' => 'Consent quote expired before submission. No signer called.',
+                            'stage' => $stale->stage === 'needs_operator_review' || $stale->stage === 'preflight_blocked'
+                                ? 'preflight_blocked'
+                                : 'quote_expired_unsubmitted',
+                            'last_error' => $stale->last_error ?? 'Consent quote expired or unsubmitted hold cleared before submission.',
                             'leased_until' => null,
                             'next_attempt_at' => null,
                         ]);

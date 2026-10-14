@@ -140,6 +140,8 @@ export type TuitionAttempt = {
     posted: boolean;
     applied_base_units: string;
     overpayment_base_units: string;
+    requires_investigation?: boolean;
+    created_at?: string;
 };
 
 export type PaymentTransaction = {
