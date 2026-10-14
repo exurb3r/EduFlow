@@ -13,6 +13,7 @@ use App\Models\StudentTuitionPaymentIntent;
 use App\Models\StudentWallet;
 use App\Models\TuitionAccount;
 use App\Models\User;
+use App\Notifications\TuitionPaymentSuccessNotification;
 use App\Services\Payments\AsyncPaymentTransport;
 use App\Services\Payments\FeeBoundedPaymentTransport;
 use App\Services\Payments\FeeGuarantee;
@@ -306,7 +307,51 @@ final readonly class StudentTuitionPaymentProcessor
             return;
         }
 
+        $this->notifyStudent($paymentId);
         $this->reconcileNow($paymentId);
+    }
+
+    private function notifyStudent(int $paymentId): void
+    {
+        try {
+            $payment = StudentTuitionPayment::query()
+                ->with(['student.user', 'tuitionAccount.academicTerm'])
+                ->find($paymentId);
+
+            if ($payment === null) {
+                return;
+            }
+
+            $user = $payment->student->user;
+
+            $amountUsdc = number_format($payment->amount_base_units / 1_000_000, 2);
+            $appliedUsdc = number_format($payment->applied_base_units / 1_000_000, 2);
+            $termName = $payment->tuitionAccount->academicTerm->name;
+            $overpaymentUsdc = $payment->overpayment_base_units > 0
+                ? number_format($payment->overpayment_base_units / 1_000_000, 2)
+                : null;
+
+            if ($overpaymentUsdc !== null) {
+                $description = $termName !== ''
+                    ? "Tuition payment of {$amountUsdc} USDC settled on Arc Testnet ({$appliedUsdc} USDC applied to {$termName}, {$overpaymentUsdc} USDC overpayment credit)."
+                    : "Tuition payment of {$amountUsdc} USDC settled on Arc Testnet ({$appliedUsdc} USDC applied, {$overpaymentUsdc} USDC overpayment credit).";
+            } else {
+                $description = $termName !== ''
+                    ? "Tuition payment of {$amountUsdc} USDC settled on Arc Testnet for {$termName}."
+                    : "Tuition payment of {$amountUsdc} USDC settled on Arc Testnet.";
+            }
+
+            $user->notify(new TuitionPaymentSuccessNotification(
+                amount: $amountUsdc,
+                description: $description,
+                txHash: $payment->tx_hash,
+                term: $termName,
+                appliedAmount: $appliedUsdc,
+                overpaymentAmount: $overpaymentUsdc,
+            ));
+        } catch (Throwable $exception) {
+            report($exception);
+        }
     }
 
     /**

@@ -1,5 +1,12 @@
 import { Head, Link, router } from '@inertiajs/react';
-import { Bell, Check, ChevronLeft, ChevronRight, Inbox } from 'lucide-react';
+import {
+    Bell,
+    Check,
+    ChevronLeft,
+    ChevronRight,
+    ExternalLink,
+    Inbox,
+} from 'lucide-react';
 import { toast } from 'sonner';
 
 import { Button } from '@/components/ui/button';
@@ -172,6 +179,24 @@ export default function Notifications({
                                                     {body(notification)}
                                                 </p>
                                             )}
+                                            {typeof notification.data
+                                                .tx_hash === 'string' &&
+                                                notification.data.tx_hash && (
+                                                    <div className="mt-2 flex items-center gap-2">
+                                                        <a
+                                                            href={`https://testnet.arcscan.app/tx/${notification.data.tx_hash}`}
+                                                            target="_blank"
+                                                            rel="noopener noreferrer"
+                                                            className="clay-focus inline-flex items-center gap-1 text-xs font-semibold text-[var(--clay-primary-bright)] hover:underline"
+                                                            title="View on Arcscan block explorer"
+                                                        >
+                                                            <span>
+                                                                View on Arcscan
+                                                            </span>
+                                                            <ExternalLink className="size-3" />
+                                                        </a>
+                                                    </div>
+                                                )}
                                             <time className="clay-meta mt-1.5 block">
                                                 {new Date(
                                                     notification.created_at,

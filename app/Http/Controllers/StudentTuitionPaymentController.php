@@ -7,10 +7,12 @@ namespace App\Http\Controllers;
 use App\Models\Student;
 use App\Models\StudentTuitionPayment;
 use App\Models\StudentTuitionPaymentAttempt;
+use App\Models\StudentTuitionPaymentIntent;
 use App\Models\TuitionAccount;
 use App\Services\StudentTuitionPaymentService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
+use Illuminate\Support\Carbon;
 use Yukazakiri\Lepton\Contracts\ArcNetworkGateway;
 
 /**
@@ -78,8 +80,47 @@ class StudentTuitionPaymentController extends Controller
         abort_unless($request->user()?->hasRole('student'), 403);
         $student = $request->user()->student()->firstOrFail();
 
+        StudentTuitionPaymentAttempt::query()
+            ->where('student_id', $student->id)
+            ->where('state', 'prepared')
+            ->whereNull('submission_started_at')
+            ->get()
+            ->each(function (StudentTuitionPaymentAttempt $attempt): void {
+                $intent = StudentTuitionPaymentIntent::query()->find($attempt->student_tuition_payment_intent_id);
+                if ($intent instanceof StudentTuitionPaymentIntent
+                    && isset($intent->snapshot['expires_at'])
+                    && Carbon::parse($intent->snapshot['expires_at'])->lte(now())) {
+                    $attempt->update([
+                        'state' => 'failed',
+                        'stage' => 'quote_expired_unsubmitted',
+                        'last_error' => $attempt->last_error ?? 'Consent quote expired before submission. No signer called.',
+                        'leased_until' => null,
+                        'next_attempt_at' => null,
+                    ]);
+                }
+            });
+
         return response()->json(['data' => StudentTuitionPaymentAttempt::query()->where('student_id', $student->id)
             ->latest('id')->limit(50)->get()->map(fn (StudentTuitionPaymentAttempt $a): array => self::statusData($a))]);
+    }
+
+    public function clearHold(Request $request, StudentTuitionPaymentAttempt $attempt): JsonResponse
+    {
+        abort_unless($request->user()?->hasRole('student'), 403);
+        $student = $request->user()->student()->firstOrFail();
+        abort_unless($attempt->student_id === $student->id, 403);
+
+        if ($attempt->submission_started_at === null && $attempt->state === 'prepared') {
+            $attempt->update([
+                'state' => 'failed',
+                'stage' => 'quote_expired_unsubmitted',
+                'last_error' => 'Unsubmitted hold cleared by student.',
+                'leased_until' => null,
+                'next_attempt_at' => null,
+            ]);
+        }
+
+        return response()->json(self::statusData($attempt->refresh()));
     }
 
     /** @return array<string, mixed> */

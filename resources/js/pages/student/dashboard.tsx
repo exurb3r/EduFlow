@@ -129,6 +129,34 @@ function formatBalance(balance: string): string {
     return `${grouped}.${cents} USDC`;
 }
 
+function parseBaseUnits(amount: string): number | null {
+    if (!/^(?:0|[1-9][0-9]*)(?:\.[0-9]{1,6})?$/.test(amount)) {
+        return null;
+    }
+    const [whole, fraction = ''] = amount.split('.');
+    const exact = BigInt(whole) * 1_000_000n + BigInt(fraction.padEnd(6, '0'));
+    const baseUnits = Number(exact);
+
+    if (!Number.isSafeInteger(baseUnits) || baseUnits <= 0) {
+        return null;
+    }
+
+    return baseUnits;
+}
+
+type TuitionQuote = {
+    network_fee: string;
+    total: string;
+    max_amount_base_units: number;
+    balance: string | null;
+    chain: string;
+    request_digest: string;
+    consent_text: string;
+    expires_at: string;
+    fee_ceiling_base_units: number;
+    request_key?: string;
+};
+
 export default function StudentDashboard({
     student,
     tuitionAccount,
@@ -155,29 +183,22 @@ export default function StudentDashboard({
     const canPay = hasWallet && remainingBase > 0;
     const inFlightAttempt = tuitionAttempts?.find(
         (a) =>
-            [
+            ([
                 'prepared',
                 'submitting',
                 'accepted',
                 'awaiting_verification',
                 'unknown',
-            ].includes(a.state) ||
+            ].includes(a.state) &&
+                a.stage !== 'needs_operator_review' &&
+                a.stage !== 'preflight_blocked' &&
+                a.stage !== 'quote_expired_unsubmitted') ||
             (a.state === 'verified' && !a.posted),
     );
     const hasInFlight = Boolean(inFlightAttempt);
     const [payOpen, setPayOpen] = useState(false);
     const [payAmount, setPayAmount] = useState('');
-    const [payQuote, setPayQuote] = useState<{
-        network_fee: string;
-        total: string;
-        max_amount_base_units: number;
-        balance: string | null;
-        chain: string;
-        request_digest: string;
-        consent_text: string;
-        expires_at: string;
-        fee_ceiling_base_units: number;
-    } | null>(null);
+    const [payQuote, setPayQuote] = useState<TuitionQuote | null>(null);
     const [payError, setPayError] = useState<string | null>(null);
     const [quoting, setQuoting] = useState(false);
     const [paying, setPaying] = useState(false);
@@ -192,6 +213,13 @@ export default function StudentDashboard({
     );
     const [consent, setConsent] = useState(false);
     const [receipt, setReceipt] = useState<TuitionAttempt | null>(null);
+
+    const isInitialOpenRef = useRef(false);
+    const quoteRequestIdRef = useRef(0);
+    const abortControllerRef = useRef<AbortController | null>(null);
+    const inFlightQuotePromiseRef = useRef<Promise<TuitionQuote | null> | null>(
+        null,
+    );
     const activeReceipt = receipt
         ? (tuitionAttempts.find(
               (a) =>
@@ -248,9 +276,14 @@ export default function StudentDashboard({
 
         const now = Date.now();
         for (const n of notificationSummary.recent) {
+            const lower = n.title.toLowerCase();
             if (
                 n.readAt === null &&
-                n.title.toLowerCase().includes('received')
+                (lower.includes('received') ||
+                    lower.includes('tuition') ||
+                    lower.includes('sent') ||
+                    lower.includes('payment') ||
+                    lower.includes('transfer'))
             ) {
                 const parsedTime = new Date(n.createdAt).getTime();
                 const isRecent =
@@ -392,6 +425,7 @@ export default function StudentDashboard({
     );
 
     const openPay = () => {
+        isInitialOpenRef.current = true;
         setPayAmount((defaultPayBaseUnits / 1_000_000).toFixed(2));
         setPayQuote(null);
         setConsent(false);
@@ -401,74 +435,189 @@ export default function StudentDashboard({
         setPayOpen(true);
     };
 
-    const requestQuote = async (baseUnits: number) => {
+    useEffect(() => {
+        if (!payOpen || !tuitionAccount?.id) {
+            if (abortControllerRef.current) {
+                abortControllerRef.current.abort();
+            }
+            setQuoting(false);
+
+            return;
+        }
+
+        const baseUnits = parseBaseUnits(payAmount);
+        if (baseUnits === null) {
+            if (abortControllerRef.current) {
+                abortControllerRef.current.abort();
+            }
+            setQuoting(false);
+
+            return;
+        }
+
+        setQuoting(true);
+
+        const isInitial = isInitialOpenRef.current;
+        isInitialOpenRef.current = false;
+        const delay = isInitial ? 0 : 450;
+
+        const timer = setTimeout(() => {
+            void requestQuote(baseUnits);
+        }, delay);
+
+        return () => {
+            clearTimeout(timer);
+        };
+    }, [payAmount, payOpen, tuitionAccount?.id]);
+
+    useEffect(() => {
+        return () => {
+            if (abortControllerRef.current) {
+                abortControllerRef.current.abort();
+            }
+        };
+    }, []);
+
+    const requestQuote = async (
+        baseUnits: number,
+    ): Promise<TuitionQuote | null> => {
+        if (abortControllerRef.current) {
+            abortControllerRef.current.abort();
+        }
+        const controller = new AbortController();
+        abortControllerRef.current = controller;
+
+        const requestId = ++quoteRequestIdRef.current;
         setQuoting(true);
         setPayError(null);
 
-        try {
-            const response = await fetch(tuitionPayQuote.url(), {
-                method: 'POST',
-                credentials: 'same-origin',
-                headers: {
-                    'Content-Type': 'application/json',
-                    'X-CSRF-TOKEN':
-                        document.querySelector<HTMLMetaElement>(
-                            'meta[name="csrf-token"]',
-                        )?.content ?? '',
-                    Accept: 'application/json',
-                },
-                body: JSON.stringify({
-                    tuition_account_id: tuitionAccount?.id,
-                    amount_base_units: baseUnits,
-                    request_key: requestKey ?? undefined,
-                }),
-            });
+        const promise = (async () => {
+            try {
+                const response = await fetch(tuitionPayQuote.url(), {
+                    method: 'POST',
+                    credentials: 'same-origin',
+                    signal: controller.signal,
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'X-CSRF-TOKEN':
+                            document.querySelector<HTMLMetaElement>(
+                                'meta[name="csrf-token"]',
+                            )?.content ?? '',
+                        Accept: 'application/json',
+                    },
+                    body: JSON.stringify({
+                        tuition_account_id: tuitionAccount?.id,
+                        amount_base_units: baseUnits,
+                    }),
+                });
 
-            const payload = await response.json();
+                const payload = (await response.json()) as
+                    | (TuitionQuote & {
+                          message?: string;
+                          errors?: Record<string, string[]>;
+                      })
+                    | undefined;
 
-            if (!response.ok) {
-                setPayError(
-                    payload?.message ??
-                        'Could not quote this payment on the chain.',
-                );
-                setPayQuote(null);
+                if (requestId !== quoteRequestIdRef.current) {
+                    return null;
+                }
 
-                return;
+                if (!response.ok) {
+                    const message =
+                        payload?.message ??
+                        (payload?.errors
+                            ? Object.values(payload.errors).flat().join(' ')
+                            : null) ??
+                        'Could not quote this payment on the chain.';
+                    setPayError(message);
+                    setPayQuote(null);
+                    setRequestKey(null);
+
+                    return null;
+                }
+
+                const quote = payload as TuitionQuote;
+                setPayQuote(quote);
+                setRequestKey(quote.request_key ?? null);
+
+                return quote;
+            } catch (err: unknown) {
+                if (err instanceof DOMException && err.name === 'AbortError') {
+                    return null;
+                }
+                if (requestId === quoteRequestIdRef.current) {
+                    setPayError('Could not reach the payment network.');
+                    setPayQuote(null);
+                    setRequestKey(null);
+                }
+
+                return null;
+            } finally {
+                if (requestId === quoteRequestIdRef.current) {
+                    setQuoting(false);
+                    inFlightQuotePromiseRef.current = null;
+                }
             }
+        })();
 
-            setPayQuote(payload);
-            setRequestKey(payload.request_key ?? null);
-        } catch {
-            setPayError('Could not reach the payment network.');
-        } finally {
-            setQuoting(false);
-        }
+        inFlightQuotePromiseRef.current = promise;
+
+        return promise;
     };
 
     const submitPay = async () => {
-        if (!/^(?:0|[1-9][0-9]*)(?:\.[0-9]{1,6})?$/.test(payAmount)) {
-            setPayError('Enter exact USDC with at most six decimal places.');
-            return;
-        }
-        const [whole, fraction = ''] = payAmount.split('.');
-        const exact =
-            BigInt(whole) * 1_000_000n + BigInt(fraction.padEnd(6, '0'));
-        const baseUnits = Number(exact);
-
-        if (!Number.isSafeInteger(baseUnits) || baseUnits <= 0) {
-            setPayError('Enter an amount greater than zero.');
+        const baseUnits = parseBaseUnits(payAmount);
+        if (baseUnits === null) {
+            if (!/^(?:0|[1-9][0-9]*)(?:\.[0-9]{1,6})?$/.test(payAmount)) {
+                setPayError(
+                    'Enter exact USDC with at most six decimal places.',
+                );
+            } else {
+                setPayError('Enter an amount greater than zero.');
+            }
 
             return;
         }
 
-        if (!payQuote || !requestKey) {
+        let currentQuote = payQuote;
+        let currentKey = requestKey;
+
+        if (!currentQuote || !currentKey) {
+            setPaying(true);
+            setPayError(null);
+
+            let quotePromise = inFlightQuotePromiseRef.current;
+            if (!quotePromise) {
+                quotePromise = requestQuote(baseUnits);
+            }
+
+            try {
+                const quoteResult = await quotePromise;
+                if (!quoteResult) {
+                    setPaying(false);
+
+                    return;
+                }
+                currentQuote = quoteResult;
+                currentKey = quoteResult.request_key ?? null;
+            } catch {
+                setPaying(false);
+
+                return;
+            }
+        }
+
+        if (!currentQuote || !currentKey) {
+            setPaying(false);
             setPayError('Get a fresh fee quote before sending this payment.');
-            await requestQuote(baseUnits);
 
             return;
         }
+
         if (!consent) {
+            setPaying(false);
             setPayError('Accept this exact pilot quote before confirming.');
+
             return;
         }
 
@@ -490,8 +639,8 @@ export default function StudentDashboard({
                 body: JSON.stringify({
                     tuition_account_id: tuitionAccount?.id,
                     amount_base_units: baseUnits,
-                    request_key: requestKey,
-                    request_digest: payQuote.request_digest,
+                    request_key: currentKey,
+                    request_digest: currentQuote.request_digest,
                     consent: true,
                 }),
             });
@@ -510,7 +659,12 @@ export default function StudentDashboard({
 
             // The wallet balance and paid figures both changed on-chain.
             router.reload({
-                only: ['tuitionAttempts', 'tuitionAccount', 'wallet'],
+                only: [
+                    'tuitionAttempts',
+                    'tuitionAccount',
+                    'wallet',
+                    'notificationSummary',
+                ],
             });
         } catch {
             setPayError(
@@ -662,19 +816,23 @@ export default function StudentDashboard({
                                                 <>
                                                     <Loader2 className="size-5 shrink-0 animate-spin text-[var(--status-pending)]" />
                                                     <p className="clay-title text-[var(--status-pending)]">
-                                                        {activeReceipt.state ===
-                                                        'prepared'
-                                                            ? 'Payment recorded — processing transfer…'
+                                                        {activeReceipt.stage ===
+                                                            'needs_operator_review' ||
+                                                        activeReceipt.requires_investigation
+                                                            ? 'Preflight blocked — funds returned to balance'
                                                             : activeReceipt.state ===
-                                                                'submitting'
-                                                              ? 'Submitting to Arc network…'
+                                                                'prepared'
+                                                              ? 'Payment recorded — processing transfer…'
                                                               : activeReceipt.state ===
-                                                                  'accepted'
-                                                                ? 'Accepted by network — awaiting block…'
+                                                                  'submitting'
+                                                                ? 'Submitting to Arc network…'
                                                                 : activeReceipt.state ===
-                                                                    'awaiting_verification'
-                                                                  ? 'On chain — verifying movement…'
-                                                                  : activeReceipt.state_label}
+                                                                    'accepted'
+                                                                  ? 'Accepted by network — awaiting block…'
+                                                                  : activeReceipt.state ===
+                                                                      'awaiting_verification'
+                                                                    ? 'On chain — verifying movement…'
+                                                                    : activeReceipt.state_label}
                                                     </p>
                                                 </>
                                             )}
@@ -695,6 +853,14 @@ export default function StudentDashboard({
                                                         <span className="inline-flex items-center gap-1.5 font-semibold text-[var(--status-resolved)]">
                                                             <Check className="size-3.5" />
                                                             Verified on chain
+                                                        </span>
+                                                    ) : activeReceipt.stage ===
+                                                          'needs_operator_review' ||
+                                                      activeReceipt.requires_investigation ? (
+                                                        <span className="inline-flex items-center gap-1.5 font-semibold text-amber-500">
+                                                            <TriangleAlert className="size-3.5" />
+                                                            Hold returned to
+                                                            balance
                                                         </span>
                                                     ) : activeReceipt.state ===
                                                       'failed' ? (
@@ -884,6 +1050,7 @@ export default function StudentDashboard({
                                                             setPayQuote(null);
                                                             setConsent(false);
                                                             setRequestKey(null);
+                                                            isInitialOpenRef.current = true;
                                                         }}
                                                     >
                                                         Make another payment
@@ -967,6 +1134,7 @@ export default function StudentDashboard({
                                                     setPayQuote(null);
                                                     setRequestKey(null);
                                                     setConsent(false);
+                                                    setPayError(null);
                                                 }}
                                                 className="clay-field clay-focus tabular-nums shadow-none"
                                                 required
@@ -981,11 +1149,32 @@ export default function StudentDashboard({
                                             </p>
                                         </div>
 
+                                        {!payQuote && quoting && (
+                                            <div className="clay-inset flex items-center justify-between gap-3 p-3.5 text-xs text-[var(--clay-text-muted)] rounded-xl border border-[var(--clay-border)]/50 animate-pulse">
+                                                <div className="flex items-center gap-2">
+                                                    <Loader2 className="size-3.5 animate-spin text-[var(--clay-primary)] shrink-0" />
+                                                    <span>
+                                                        Calculating network fee
+                                                        and ceiling…
+                                                    </span>
+                                                </div>
+                                                <span className="text-[11px] font-mono text-[var(--clay-text-muted)]/70 shrink-0">
+                                                    Arc Testnet
+                                                </span>
+                                            </div>
+                                        )}
+
                                         {payQuote && (
                                             <dl className="clay-inset grid gap-2 p-3 text-sm">
                                                 <div className="flex items-baseline justify-between gap-4">
-                                                    <dt className="clay-meta">
-                                                        Network fee
+                                                    <dt className="clay-meta flex items-center gap-1.5">
+                                                        <span>Network fee</span>
+                                                        {quoting && (
+                                                            <span className="inline-flex items-center gap-1 text-[11px] font-normal text-[var(--clay-primary)]">
+                                                                <Loader2 className="size-2.5 animate-spin" />
+                                                                updating
+                                                            </span>
+                                                        )}
                                                     </dt>
                                                     <dd className="clay-title tabular-nums">
                                                         {payQuote.network_fee}{' '}
@@ -1040,6 +1229,9 @@ export default function StudentDashboard({
                                                                 )}{' '}
                                                                 USDC
                                                             </strong>
+                                                            {quoting && (
+                                                                <Loader2 className="size-2.5 animate-spin text-[var(--clay-primary)] ml-0.5" />
+                                                            )}
                                                         </span>
                                                         <span
                                                             title={`Quote expires: ${payQuote.expires_at}`}
@@ -1066,23 +1258,26 @@ export default function StudentDashboard({
                                                 disabled={
                                                     paying ||
                                                     quoting ||
+                                                    !payQuote ||
                                                     Boolean(inFlightAttempt) ||
-                                                    (!!payQuote && !consent)
+                                                    !consent
                                                 }
-                                                data-loading={paying || quoting}
+                                                data-loading={paying}
                                                 className="clay-focus rounded-full bg-[var(--clay-primary)] font-semibold text-[var(--clay-primary-foreground)]"
                                             >
-                                                {paying || quoting ? (
+                                                {paying ? (
                                                     <Loader2 className="size-4 animate-spin" />
                                                 ) : (
                                                     <ArrowUpRight className="size-4" />
                                                 )}
                                                 {inFlightAttempt
                                                     ? 'Transfer in progress…'
-                                                    : payQuote
-                                                      ? 'Confirm pilot consent'
-                                                      : quoting
-                                                        ? 'Reading the fee…'
+                                                    : paying
+                                                      ? 'Processing…'
+                                                      : payQuote
+                                                        ? consent
+                                                            ? 'Pay Now'
+                                                            : 'Confirm pilot consent'
                                                         : 'Pay Now'}
                                             </Button>
                                             <Button
@@ -2153,6 +2348,7 @@ export default function StudentDashboard({
                                         setMonitorDrawerOpen(false);
                                         openPay();
                                     }}
+                                    onDone={() => setMonitorDrawerOpen(false)}
                                 />
                             </div>
                         </SheetContent>

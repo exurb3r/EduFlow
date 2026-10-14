@@ -2,6 +2,7 @@
 
 use App\Models\User;
 use App\Notifications\FundsReceivedNotification;
+use App\Notifications\TuitionPaymentSuccessNotification;
 
 test('guests are redirected away from the notifications page', function (): void {
     $this->get(route('notifications.index'))->assertRedirect(route('login'));
@@ -139,5 +140,30 @@ test('funds received notification stores received amount and metadata', function
         'amount' => '20.00',
         'tx_hash' => '0x1234567890abcdef',
         'source' => 'faucet',
+    ]);
+});
+
+test('tuition payment success notification stores sent amount, term and metadata', function (): void {
+    $user = User::factory()->create();
+
+    $user->notify(new TuitionPaymentSuccessNotification(
+        amount: '5.00',
+        description: 'Tuition payment of 5.00 USDC settled on Arc Testnet for Fall 2026.',
+        txHash: '0x1234567890abcdef',
+        term: 'Fall 2026',
+        appliedAmount: '5.00',
+    ));
+
+    $notification = $user->notifications()->firstOrFail();
+
+    expect($notification->getAttribute('data'))->toBe([
+        'title' => 'Tuition payment of 5.00 USDC sent',
+        'message' => 'Tuition payment of 5.00 USDC settled on Arc Testnet for Fall 2026.',
+        'amount' => '5.00',
+        'tx_hash' => '0x1234567890abcdef',
+        'term' => 'Fall 2026',
+        'applied_amount' => '5.00',
+        'overpayment_amount' => null,
+        'type' => 'tuition_payment',
     ]);
 });

@@ -8,7 +8,6 @@ import {
     RefreshCw,
     ShieldCheck,
     TriangleAlert,
-    X,
     XCircle,
 } from 'lucide-react';
 import React, { useState } from 'react';
@@ -47,6 +46,7 @@ interface StudentPaymentTrackerProps {
     } | null;
     walletBalance?: string | null;
     onOpenPay?: () => void;
+    onDone?: () => void;
     className?: string;
 }
 
@@ -63,32 +63,55 @@ export function StudentPaymentTracker({
     tuitionAccount,
     walletBalance: _walletBalance,
     onOpenPay,
+    onDone,
     className,
 }: StudentPaymentTrackerProps) {
     const [copied, setCopied] = useState<string | null>(null);
     const [selectedAttemptId, setSelectedAttemptId] = useState<number | null>(
         null,
     );
+    const [dismissedAttemptId, setDismissedAttemptId] = useState<number | null>(
+        () => {
+            try {
+                const stored = sessionStorage.getItem(
+                    'eduflow_dismissed_tuition_attempt',
+                );
 
-    // Pick genuinely in-flight attempt first
+                return stored ? Number(stored) : null;
+            } catch {
+                return null;
+            }
+        },
+    );
+
+    // Pick genuinely in-flight attempt first (exclude unsubmitted held/blocked attempts)
     const inFlightAttempt =
         attempts.find(
             (a) =>
-                [
+                ([
                     'prepared',
                     'submitting',
                     'accepted',
                     'awaiting_verification',
                     'unknown',
-                ].includes(a.state) ||
+                ].includes(a.state) &&
+                    a.stage !== 'needs_operator_review' &&
+                    a.stage !== 'preflight_blocked' &&
+                    a.stage !== 'quote_expired_unsubmitted') ||
                 (a.state === 'verified' && !a.posted),
         ) ?? null;
 
-    // Show in-flight attempt, or an attempt explicitly chosen for inspection
-    const activeAttempt =
+    // Show in-flight attempt, or an attempt explicitly chosen for inspection, or fallback to latest attempt
+    const candidateAttempt =
         inFlightAttempt ??
         (selectedAttemptId !== null
             ? (attempts.find((a) => a.id === selectedAttemptId) ?? null)
+            : (attempts[0] ?? null));
+
+    const activeAttempt =
+        inFlightAttempt ??
+        (candidateAttempt && candidateAttempt.id !== dismissedAttemptId
+            ? candidateAttempt
             : null);
 
     const isInFlight = Boolean(inFlightAttempt);
@@ -103,6 +126,34 @@ export function StudentPaymentTracker({
         activeAttempt &&
         (activeAttempt.stage === 'needs_operator_review' ||
             activeAttempt.state === 'unknown');
+
+    const isSettled =
+        Boolean(activeAttempt) &&
+        !isInFlight &&
+        !isNeedsReview &&
+        !isFailedOrExpired &&
+        Boolean(activeAttempt?.posted || activeAttempt?.state === 'verified');
+
+    const handleDismiss = (attemptId?: number) => {
+        const idToDismiss = attemptId ?? candidateAttempt?.id;
+        if (idToDismiss) {
+            setDismissedAttemptId(idToDismiss);
+            try {
+                sessionStorage.setItem(
+                    'eduflow_dismissed_tuition_attempt',
+                    String(idToDismiss),
+                );
+            } catch {
+                // Ignore storage errors
+            }
+        }
+        setSelectedAttemptId(null);
+    };
+
+    const handleDone = () => {
+        handleDismiss();
+        onDone?.();
+    };
 
     const copyText = (text: string, label: string) => {
         navigator.clipboard.writeText(text);
@@ -129,7 +180,7 @@ export function StudentPaymentTracker({
             if (a.stage === 'needs_operator_review') {
                 step2Status = 'warning';
                 step2Desc =
-                    'Held: Quote expired or preflight blocked before submission';
+                    'Held: Preflight blocked or held before submission. Hold returned to balance.';
             } else {
                 step2Status = 'in_progress';
                 step2Desc =
@@ -266,44 +317,36 @@ export function StudentPaymentTracker({
                     </p>
                 </div>
 
-                {/* State Badge & Dismiss Action */}
+                {/* State Badge */}
                 <div className="flex items-center gap-1.5 shrink-0">
                     {activeAttempt ? (
-                        <>
-                            <Badge
-                                variant="outline"
-                                className={`text-xs font-semibold ${
-                                    isInFlight
-                                        ? 'border-amber-500/30 bg-amber-500/10 text-amber-400 animate-pulse'
-                                        : isNeedsReview
-                                          ? 'border-amber-500/40 bg-amber-500/15 text-amber-300'
-                                          : isFailedOrExpired
-                                            ? 'border-rose-500/30 bg-rose-500/10 text-rose-400'
-                                            : 'border-emerald-500/30 bg-emerald-500/10 text-emerald-400'
-                                }`}
-                            >
-                                {isInFlight
-                                    ? 'In Flight'
+                        <Badge
+                            variant="outline"
+                            className={`text-xs font-semibold ${
+                                isInFlight
+                                    ? 'border-amber-500/30 bg-amber-500/10 text-amber-400 animate-pulse'
                                     : isNeedsReview
-                                      ? 'Needs Review'
+                                      ? 'border-amber-500/40 bg-amber-500/15 text-amber-300'
                                       : isFailedOrExpired
                                         ? activeAttempt.stage ===
                                           'preflight_blocked'
                                             ? 'Preflight Blocked'
                                             : 'Quote Expired'
-                                        : 'Settled'}
-                            </Badge>
-                            {!isInFlight && (
-                                <button
-                                    type="button"
-                                    onClick={() => setSelectedAttemptId(null)}
-                                    className="clay-focus rounded p-1 text-[var(--clay-text-muted)] hover:text-[var(--clay-text)]"
-                                    title="Close and return to rail monitor"
-                                >
-                                    <X className="size-3.5" />
-                                </button>
-                            )}
-                        </>
+                                        : 'Settled'
+                            }
+                            `}
+                        >
+                            {isInFlight
+                                ? 'In Flight'
+                                : isNeedsReview
+                                  ? 'Needs Review'
+                                  : isFailedOrExpired
+                                    ? activeAttempt.stage ===
+                                      'preflight_blocked'
+                                        ? 'Preflight Blocked'
+                                        : 'Quote Expired'
+                                    : 'Settled'}
+                        </Badge>
                     ) : (
                         <Badge
                             variant="outline"
@@ -385,8 +428,32 @@ export function StudentPaymentTracker({
                                 </p>
                                 <p className="text-[10px] text-amber-400/80">
                                     No money moved from your wallet. Unsubmitted
-                                    holds auto-clear once expired.
+                                    hold returned to your account balance.
                                 </p>
+                                {onOpenPay && (
+                                    <div className="mt-2 flex items-center gap-2">
+                                        <Button
+                                            type="button"
+                                            size="sm"
+                                            onClick={() => {
+                                                setSelectedAttemptId(null);
+                                                onOpenPay();
+                                            }}
+                                            className="h-7 rounded-full bg-amber-500/20 px-3 text-[11px] font-semibold text-amber-200 hover:bg-amber-500/30"
+                                        >
+                                            Try Again
+                                        </Button>
+                                        <Button
+                                            type="button"
+                                            variant="ghost"
+                                            size="sm"
+                                            onClick={() => handleDismiss()}
+                                            className="h-7 rounded-full px-2.5 text-[11px] text-[var(--clay-text-muted)] hover:text-[var(--clay-text)]"
+                                        >
+                                            Dismiss
+                                        </Button>
+                                    </div>
+                                )}
                             </div>
                         </div>
                     )}
@@ -425,9 +492,7 @@ export function StudentPaymentTracker({
                                         type="button"
                                         variant="ghost"
                                         size="sm"
-                                        onClick={() =>
-                                            setSelectedAttemptId(null)
-                                        }
+                                        onClick={() => handleDismiss()}
                                         className="h-7 rounded-full px-2.5 text-[11px] text-[var(--clay-text-muted)] hover:text-[var(--clay-text)]"
                                     >
                                         Dismiss
@@ -544,6 +609,43 @@ export function StudentPaymentTracker({
                             receipt is proven.
                         </p>
                     </div>
+
+                    {/* Settled Action: Done & Pay More */}
+                    {isSettled && (
+                        <div className="mt-2 flex flex-col gap-2 rounded-xl border border-emerald-500/20 bg-emerald-500/10 p-3.5">
+                            <div className="flex items-center gap-2">
+                                <Button
+                                    type="button"
+                                    onClick={handleDone}
+                                    className="h-9 flex-1 rounded-full bg-[var(--status-resolved)] text-black font-semibold text-xs hover:opacity-90 shadow-xs"
+                                >
+                                    <Check className="mr-1.5 size-3.5 stroke-[2.5]" />
+                                    Done
+                                </Button>
+                                {tuitionAccount &&
+                                    BigInt(tuitionAccount.remaining_amount) >
+                                        0n &&
+                                    onOpenPay && (
+                                        <Button
+                                            type="button"
+                                            variant="outline"
+                                            onClick={() => {
+                                                handleDone();
+                                                onOpenPay();
+                                            }}
+                                            className="h-9 rounded-full border border-[var(--clay-border)] bg-[var(--clay-surface)] px-4 text-xs font-semibold text-[var(--clay-text)] hover:bg-[var(--clay-surface-soft)]"
+                                        >
+                                            <ArrowUpRight className="mr-1.5 size-3.5" />
+                                            Pay more
+                                        </Button>
+                                    )}
+                            </div>
+                            <p className="text-center text-[11px] text-emerald-300/80">
+                                Payment verified and credited to tuition ledger.
+                                Click Done to return to monitor standby.
+                            </p>
+                        </div>
+                    )}
                 </div>
             ) : (
                 /* Idle State when no payment is currently in flight */
@@ -581,9 +683,17 @@ export function StudentPaymentTracker({
                                 <span>Recent attempt</span>
                                 <button
                                     type="button"
-                                    onClick={() =>
-                                        setSelectedAttemptId(attempts[0].id)
-                                    }
+                                    onClick={() => {
+                                        try {
+                                            sessionStorage.removeItem(
+                                                'eduflow_dismissed_tuition_attempt',
+                                            );
+                                        } catch {
+                                            // Ignore storage errors
+                                        }
+                                        setDismissedAttemptId(null);
+                                        setSelectedAttemptId(attempts[0].id);
+                                    }}
                                     className="clay-focus inline-flex items-center gap-1 font-semibold text-[var(--clay-primary-bright)] hover:underline"
                                 >
                                     #{attempts[0].id} ·{' '}
