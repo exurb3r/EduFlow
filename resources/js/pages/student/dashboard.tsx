@@ -1,4 +1,11 @@
-import { Head, Link, router, useRemember, usePoll } from '@inertiajs/react';
+import {
+    Head,
+    Link,
+    router,
+    usePage,
+    usePoll,
+    useRemember,
+} from '@inertiajs/react';
 import {
     ArrowDownLeft,
     ArrowRight,
@@ -7,6 +14,7 @@ import {
     Check,
     CheckCircle2,
     ChevronRight,
+    Clock,
     Copy,
     ExternalLink,
     Eye,
@@ -18,11 +26,12 @@ import {
     TriangleAlert,
     Wallet,
 } from 'lucide-react';
-import { useRef, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { toast } from 'sonner';
 
 import { StudentPaymentTracker } from '@/components/student-payment-tracker';
 import { Button } from '@/components/ui/button';
+import { Checkbox } from '@/components/ui/checkbox';
 import {
     Dialog,
     DialogContent,
@@ -84,6 +93,23 @@ function shortHash(hash: string): string {
 function formatBaseUnits(baseUnits: string | number): string {
     const units = BigInt(baseUnits);
     return `${(units / 1_000_000n).toLocaleString('en-US')}.${(units % 1_000_000n).toString().padStart(6, '0')}`;
+}
+
+function formatQuoteExpiry(iso: string): string {
+    try {
+        const d = new Date(iso);
+        if (Number.isNaN(d.getTime())) {
+            return iso;
+        }
+
+        return d.toLocaleTimeString([], {
+            hour: 'numeric',
+            minute: '2-digit',
+            second: '2-digit',
+        });
+    } catch {
+        return iso;
+    }
 }
 
 /**
@@ -184,6 +210,117 @@ export default function StudentDashboard({
     const [monitorDrawerOpen, setMonitorDrawerOpen] = useState(false);
     const [isRefreshingTxs, setIsRefreshingTxs] = useState(false);
     const [copiedTxHash, setCopiedTxHash] = useState<string | null>(null);
+
+    const { props } = usePage();
+    const notificationSummary = props.notificationSummary;
+
+    // Track seen notification and transaction IDs to notify on incoming funds
+    const seenNotificationIdsRef = useRef<Set<string>>(
+        new Set(notificationSummary?.recent.map((n) => n.id) ?? []),
+    );
+    const lastToastRef = useRef<{ text: string; time: number } | null>(null);
+    const prevBalanceRef = useRef<string | null>(snapshot?.balance ?? null);
+    const seenTxIdsRef = useRef<Set<string | number>>(
+        new Set(transactions.map((tx) => tx.id)),
+    );
+    const isMountedRef = useRef(false);
+
+    const showReceivedToast = (title: string, description?: string | null) => {
+        const now = Date.now();
+        if (
+            lastToastRef.current &&
+            lastToastRef.current.text === title &&
+            now - lastToastRef.current.time < 5000
+        ) {
+            return;
+        }
+        lastToastRef.current = { text: title, time: now };
+        toast.success(title, {
+            description: description ?? undefined,
+        });
+    };
+
+    // Alert on initial mount for any recent unread received notifications
+    useEffect(() => {
+        if (!notificationSummary?.recent) {
+            return;
+        }
+
+        const now = Date.now();
+        for (const n of notificationSummary.recent) {
+            if (
+                n.readAt === null &&
+                n.title.toLowerCase().includes('received')
+            ) {
+                const parsedTime = new Date(n.createdAt).getTime();
+                const isRecent =
+                    !Number.isNaN(parsedTime) &&
+                    now - parsedTime < 10 * 60 * 1000;
+                if (isRecent && !seenNotificationIdsRef.current.has(n.id)) {
+                    seenNotificationIdsRef.current.add(n.id);
+                    showReceivedToast(n.title, n.body);
+                }
+            }
+        }
+    }, []);
+
+    // Watch for new notifications from background polling
+    useEffect(() => {
+        if (!notificationSummary?.recent) {
+            return;
+        }
+
+        for (const n of notificationSummary.recent) {
+            if (!seenNotificationIdsRef.current.has(n.id)) {
+                seenNotificationIdsRef.current.add(n.id);
+                if (n.readAt === null) {
+                    showReceivedToast(n.title, n.body);
+                }
+            }
+        }
+    }, [notificationSummary]);
+
+    // Watch for new inbound transactions and on-chain balance increases
+    useEffect(() => {
+        if (!isMountedRef.current) {
+            isMountedRef.current = true;
+            return;
+        }
+
+        for (const tx of transactions) {
+            if (!seenTxIdsRef.current.has(tx.id)) {
+                seenTxIdsRef.current.add(tx.id);
+                const isInbound =
+                    tx.direction === 'inbound' ||
+                    tx.type === 'student_assistance' ||
+                    tx.type === 'refund';
+                if (isInbound) {
+                    showReceivedToast(
+                        `Received ${tx.amount} USDC`,
+                        tx.description || 'Payment arrived in your wallet.',
+                    );
+                }
+            }
+        }
+
+        if (snapshot?.balance && prevBalanceRef.current !== null) {
+            try {
+                const prev = parseFloat(prevBalanceRef.current);
+                const current = parseFloat(snapshot.balance);
+                if (current > prev) {
+                    const diff = current - prev;
+                    showReceivedToast(
+                        `Received +${diff.toFixed(2)} USDC`,
+                        'Wallet balance updated on Arc.',
+                    );
+                }
+            } catch {
+                // Ignore parse errors
+            }
+        }
+        prevBalanceRef.current = snapshot?.balance ?? null;
+    }, [snapshot?.balance, transactions]);
+
     const shouldFastPoll =
         hasInFlight ||
         Boolean(
@@ -199,6 +336,7 @@ export default function StudentDashboard({
             'wallet',
             'recentTransactions',
             'totals',
+            'notificationSummary',
         ],
     });
 
@@ -217,7 +355,12 @@ export default function StudentDashboard({
     const refreshTransactions = () => {
         setIsRefreshingTxs(true);
         router.reload({
-            only: ['recentTransactions', 'wallet', 'totals'],
+            only: [
+                'recentTransactions',
+                'wallet',
+                'totals',
+                'notificationSummary',
+            ],
             onFinish: () => {
                 setIsRefreshingTxs(false);
                 toast.success('Transactions refreshed from the chain.');
@@ -862,25 +1005,58 @@ export default function StudentDashboard({
                                         )}
 
                                         {payQuote && (
-                                            <label className="flex items-start gap-3 text-sm">
-                                                <input
-                                                    type="checkbox"
+                                            <label
+                                                htmlFor="pilot_consent"
+                                                className={`group relative flex cursor-pointer items-start gap-3 rounded-xl border p-3.5 transition-all duration-150 select-none hover:-translate-y-0.5 active:translate-y-0 active:scale-[0.995] ${
+                                                    consent
+                                                        ? 'border-[var(--clay-primary-bright)]/60 bg-[var(--clay-surface-soft)] shadow-xs hover:border-[var(--clay-primary-bright)]'
+                                                        : 'border-[var(--clay-border)] bg-[var(--clay-surface-soft)]/50 hover:border-[var(--clay-primary-bright)]/40 hover:bg-[var(--clay-surface-soft)]'
+                                                }`}
+                                            >
+                                                <Checkbox
+                                                    id="pilot_consent"
                                                     checked={consent}
-                                                    onChange={(e) =>
+                                                    onCheckedChange={(
+                                                        checked,
+                                                    ) =>
                                                         setConsent(
-                                                            e.target.checked,
+                                                            checked === true,
                                                         )
                                                     }
+                                                    className="mt-0.5 shrink-0 border-[var(--clay-border)] transition-colors group-hover:border-[var(--clay-primary-bright)]/70 data-[state=checked]:bg-[var(--clay-primary)] data-[state=checked]:border-[var(--clay-primary)] data-[state=checked]:text-[var(--clay-primary-foreground)]"
                                                 />
-                                                <span>
-                                                    {payQuote.consent_text} Fee
-                                                    ceiling:{' '}
-                                                    {formatBaseUnits(
-                                                        payQuote.fee_ceiling_base_units,
-                                                    )}{' '}
-                                                    USDC. Quote expires:{' '}
-                                                    {payQuote.expires_at}.
-                                                </span>
+                                                <div className="flex-1 space-y-2.5 min-w-0">
+                                                    <p className="text-xs sm:text-[13px] leading-relaxed text-[var(--clay-text)] transition-colors group-hover:text-[var(--clay-text)]">
+                                                        {payQuote.consent_text}
+                                                    </p>
+                                                    <div className="flex flex-wrap items-center gap-1.5 pt-1 text-[11px] text-[var(--clay-text-muted)] border-t border-[var(--clay-border)]/60">
+                                                        <span className="inline-flex items-center gap-1 rounded-md border border-[var(--clay-border)] bg-[var(--clay-surface)] px-2 py-0.5 font-mono transition-colors group-hover:border-[var(--clay-border)]/80">
+                                                            <span className="text-[var(--clay-text-muted)]">
+                                                                Fee ceiling:
+                                                            </span>
+                                                            <strong className="text-[var(--clay-text)]">
+                                                                {formatBaseUnits(
+                                                                    payQuote.fee_ceiling_base_units,
+                                                                )}{' '}
+                                                                USDC
+                                                            </strong>
+                                                        </span>
+                                                        <span
+                                                            title={`Quote expires: ${payQuote.expires_at}`}
+                                                            className="inline-flex items-center gap-1 rounded-md border border-[var(--clay-border)] bg-[var(--clay-surface)] px-2 py-0.5 font-mono transition-colors group-hover:border-[var(--clay-border)]/80"
+                                                        >
+                                                            <Clock className="size-3 text-amber-400 shrink-0" />
+                                                            <span className="text-[var(--clay-text-muted)]">
+                                                                Expires:
+                                                            </span>
+                                                            <span className="text-[var(--clay-text)]">
+                                                                {formatQuoteExpiry(
+                                                                    payQuote.expires_at,
+                                                                )}
+                                                            </span>
+                                                        </span>
+                                                    </div>
+                                                </div>
                                             </label>
                                         )}
 

@@ -1,6 +1,7 @@
 <?php
 
 use App\Models\User;
+use App\Notifications\FundsReceivedNotification;
 
 test('guests are redirected away from the notifications page', function (): void {
     $this->get(route('notifications.index'))->assertRedirect(route('login'));
@@ -91,4 +92,52 @@ test('a user can mark all of their notifications as read', function (): void {
 
     expect($user->unreadNotifications()->count())->toBe(0);
     expect($otherNotification->fresh()->read_at)->toBeNull();
+});
+
+test('inertia request to mark all notifications as read redirects back', function (): void {
+    $user = User::factory()->create();
+    $user->notify(makeDatabaseNotification(['title' => 'Test']));
+
+    $this->actingAs($user)
+        ->from(route('student.dashboard'))
+        ->withHeader('X-Inertia', 'true')
+        ->post(route('notifications.mark-all-read'))
+        ->assertRedirect(route('student.dashboard'));
+
+    expect($user->unreadNotifications()->count())->toBe(0);
+});
+
+test('inertia request to mark single notification as read redirects back', function (): void {
+    $user = User::factory()->create();
+    $user->notify(makeDatabaseNotification(['title' => 'Test']));
+    $notification = $user->notifications()->firstOrFail();
+
+    $this->actingAs($user)
+        ->from(route('student.dashboard'))
+        ->withHeader('X-Inertia', 'true')
+        ->post(route('notifications.mark-as-read', (string) $notification->getKey()))
+        ->assertRedirect(route('student.dashboard'));
+
+    expect($notification->fresh()?->getAttribute('read_at'))->not->toBeNull();
+});
+
+test('funds received notification stores received amount and metadata', function (): void {
+    $user = User::factory()->create();
+
+    $user->notify(new FundsReceivedNotification(
+        amount: '20.00',
+        description: 'Top-up from Arc testnet faucet.',
+        txHash: '0x1234567890abcdef',
+        source: 'faucet',
+    ));
+
+    $notification = $user->notifications()->firstOrFail();
+
+    expect($notification->getAttribute('data'))->toBe([
+        'title' => 'Received 20.00 USDC',
+        'message' => 'Top-up from Arc testnet faucet.',
+        'amount' => '20.00',
+        'tx_hash' => '0x1234567890abcdef',
+        'source' => 'faucet',
+    ]);
 });

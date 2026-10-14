@@ -153,7 +153,7 @@ export default function Welcome({ canRegister = false }: WelcomeProps) {
                     }, 55);
                 }
             },
-            { threshold: 0.25 }
+            { threshold: 0.25 },
         );
 
         if (creedRef.current) observer.observe(creedRef.current);
@@ -222,7 +222,10 @@ export default function Welcome({ canRegister = false }: WelcomeProps) {
                     <div className="flex items-center gap-2.5">
                         {auth?.user ? (
                             <Link href={dashboard()}>
-                                <Button size="sm" className="font-mono text-xs font-medium px-4 h-8.5 rounded-md">
+                                <Button
+                                    size="sm"
+                                    className="font-mono text-xs font-medium px-4 h-8.5 rounded-md"
+                                >
                                     Dashboard
                                     <ArrowRight className="size-3 ml-1" />
                                 </Button>
@@ -238,7 +241,10 @@ export default function Welcome({ canRegister = false }: WelcomeProps) {
                                         Staff Portal
                                     </Button>
                                 </Link>
-                                <a href="/finance" className="hidden sm:inline-block">
+                                <a
+                                    href="/finance"
+                                    className="hidden sm:inline-block"
+                                >
                                     <Button
                                         size="sm"
                                         className="bg-[#E30613] text-white hover:bg-[#C20510] font-mono text-xs font-semibold px-4 h-8.5 rounded-md shadow-xs"
@@ -253,14 +259,15 @@ export default function Welcome({ canRegister = false }: WelcomeProps) {
             </header>
 
             <main className="mx-auto max-w-7xl px-4 sm:px-6 py-12 sm:py-20 flex flex-col gap-24 sm:gap-32">
-
                 {/* 1. HERO BROADSHEET: Editorial Typography meets Swiss Mathematical Grid */}
                 <section className="grid grid-cols-1 lg:grid-cols-12 gap-10 lg:gap-12 items-start border-b border-border/80 pb-16 sm:pb-24">
                     <div className="lg:col-span-7 flex flex-col items-start">
                         {/* Kicker badge */}
                         <div className="mb-6 inline-flex items-center gap-2 rounded-full border border-border bg-card px-3.5 py-1 text-xs font-mono text-muted-foreground shadow-2xs">
                             <span className="size-1.5 rounded-full bg-[#E30613]" />
-                            <span className="font-semibold text-foreground">TREASURY GOVERNANCE</span>
+                            <span className="font-semibold text-foreground">
+                                TREASURY GOVERNANCE
+                            </span>
                             <span className="text-border">|</span>
                             <span>HUMAN MONITORED</span>
                         </div>
@@ -272,7 +279,9 @@ export default function Welcome({ canRegister = false }: WelcomeProps) {
                         >
                             Track School Fees.
                             <br />
-                            <span className="italic font-normal">Pay Routine Bills</span>
+                            <span className="italic font-normal">
+                                Pay Routine Bills
+                            </span>
                             <br />
                             With Total Confidence.
                         </h1>
@@ -281,7 +290,11 @@ export default function Welcome({ canRegister = false }: WelcomeProps) {
                             style={{ textWrap: 'pretty' }}
                             className="mt-6 max-w-xl text-base sm:text-lg text-muted-foreground leading-relaxed"
                         >
-                            EduFlow bridges tuition collection to supplier disbursement. Routine bills under your chosen limit disburse automatically. High value requisitions pause for manager review. Your school never overspends.
+                            EduFlow bridges tuition collection to supplier
+                            disbursement. Routine bills under your chosen limit
+                            disburse automatically. High value requisitions
+                            pause for manager review. Your school never
+                            overspends.
                         </p>
 
                         {/* Modern Action Group with shadcn Buttons */}
@@ -335,7 +348,10 @@ export default function Welcome({ canRegister = false }: WelcomeProps) {
                                         Westview Treasury Balance
                                     </CardTitle>
                                 </div>
-                                <Badge variant="outline" className="font-mono text-[10px] tracking-wider uppercase border-border">
+                                <Badge
+                                    variant="outline"
+                                    className="font-mono text-[10px] tracking-wider uppercase border-border"
+                                >
                                     <span className="size-1 rounded-full bg-[#E30613] mr-1" />
                                     BALANCED
                                 </Badge>
@@ -383,28 +399,36 @@ export default function Welcome({ canRegister = false }: WelcomeProps) {
                                                 <span className="size-2 bg-[#E30613] rounded-2xs" />
                                                 <span>Reserve</span>
                                             </span>
-                                            <span className="font-bold text-foreground">$5,000</span>
+                                            <span className="font-bold text-foreground">
+                                                $5,000
+                                            </span>
                                         </div>
                                         <div className="flex items-center justify-between p-2 rounded-sm bg-muted/30 border border-border/50">
                                             <span className="flex items-center gap-1.5">
                                                 <span className="size-2 bg-foreground rounded-2xs" />
                                                 <span>Department</span>
                                             </span>
-                                            <span className="font-bold text-foreground">$15,000</span>
+                                            <span className="font-bold text-foreground">
+                                                $15,000
+                                            </span>
                                         </div>
                                         <div className="flex items-center justify-between p-2 rounded-sm bg-muted/30 border border-border/50">
                                             <span className="flex items-center gap-1.5">
                                                 <span className="size-2 bg-muted-foreground/60 rounded-2xs" />
                                                 <span>Settled</span>
                                             </span>
-                                            <span className="font-bold text-foreground">$3,250</span>
+                                            <span className="font-bold text-foreground">
+                                                $3,250
+                                            </span>
                                         </div>
                                         <div className="flex items-center justify-between p-2 rounded-sm bg-muted/30 border border-border/50">
                                             <span className="flex items-center gap-1.5">
                                                 <span className="size-2 bg-border rounded-2xs" />
                                                 <span>Buffer</span>
                                             </span>
-                                            <span className="font-bold text-foreground">$26,750</span>
+                                            <span className="font-bold text-foreground">
+                                                $26,750
+                                            </span>
                                         </div>
                                     </div>
                                 </div>
@@ -414,7 +438,8 @@ export default function Welcome({ canRegister = false }: WelcomeProps) {
                                 <div className="flex items-center justify-between font-mono text-xs text-muted-foreground">
                                     <span>RULE DISCIPLINE:</span>
                                     <span className="text-foreground font-semibold">
-                                        FIFTY DOLLAR CEILING / ONE SECOND ARC RAIL
+                                        FIFTY DOLLAR CEILING / ONE SECOND ARC
+                                        RAIL
                                     </span>
                                 </div>
                             </CardContent>
@@ -423,7 +448,10 @@ export default function Welcome({ canRegister = false }: WelcomeProps) {
                 </section>
 
                 {/* 2. THREE ESSAYS: Broadsheet Editorial Columns */}
-                <section id="essays" className="flex flex-col gap-10 border-b border-border/80 pb-20 sm:pb-28">
+                <section
+                    id="essays"
+                    className="flex flex-col gap-10 border-b border-border/80 pb-20 sm:pb-28"
+                >
                     <div className="flex flex-col md:flex-row md:items-end justify-between gap-4">
                         <div>
                             <span className="font-mono text-xs uppercase tracking-widest text-[#E30613] block mb-1">
@@ -434,7 +462,9 @@ export default function Welcome({ canRegister = false }: WelcomeProps) {
                             </h2>
                         </div>
                         <p className="max-w-md text-xs sm:text-sm text-muted-foreground leading-relaxed">
-                            Traditional bookkeeping relies on fallible spreadsheets. EduFlow embeds mathematical rules directly into disbursement workflows.
+                            Traditional bookkeeping relies on fallible
+                            spreadsheets. EduFlow embeds mathematical rules
+                            directly into disbursement workflows.
                         </p>
                     </div>
 
@@ -464,7 +494,9 @@ export default function Welcome({ canRegister = false }: WelcomeProps) {
                                 </div>
 
                                 <div className="mt-8 pt-4 border-t border-border/80 flex items-center justify-between font-mono text-xs">
-                                    <span className="text-muted-foreground">METRIC:</span>
+                                    <span className="text-muted-foreground">
+                                        METRIC:
+                                    </span>
                                     <span className="font-bold text-[#E30613]">
                                         {essay.statValue}
                                     </span>
@@ -475,7 +507,10 @@ export default function Welcome({ canRegister = false }: WelcomeProps) {
                 </section>
 
                 {/* 3. SIMULATOR: Living Ledger Bench (Swiss Form + Modern Cards) */}
-                <section id="simulator" className="flex flex-col gap-10 border-b border-border/80 pb-20 sm:pb-28">
+                <section
+                    id="simulator"
+                    className="flex flex-col gap-10 border-b border-border/80 pb-20 sm:pb-28"
+                >
                     <div className="flex flex-col md:flex-row md:items-end justify-between gap-4">
                         <div>
                             <span className="font-mono text-xs uppercase tracking-widest text-[#E30613] block mb-1">
@@ -486,7 +521,9 @@ export default function Welcome({ canRegister = false }: WelcomeProps) {
                             </h2>
                         </div>
                         <p className="max-w-md text-xs sm:text-sm text-muted-foreground leading-relaxed">
-                            Select any pending payable below to observe how the policy engine evaluates departmental ceilings and guards your liquidity.
+                            Select any pending payable below to observe how the
+                            policy engine evaluates departmental ceilings and
+                            guards your liquidity.
                         </p>
                     </div>
 
@@ -505,7 +542,10 @@ export default function Welcome({ canRegister = false }: WelcomeProps) {
                                             setSimulatedPaid(false);
                                         }}
                                         onKeyDown={(e) => {
-                                            if (e.key === 'Enter' || e.key === ' ') {
+                                            if (
+                                                e.key === 'Enter' ||
+                                                e.key === ' '
+                                            ) {
                                                 e.preventDefault();
                                                 setSelectedId(item.id);
                                                 setSimulatedPaid(false);
@@ -520,14 +560,18 @@ export default function Welcome({ canRegister = false }: WelcomeProps) {
                                         <div className="flex items-center justify-between gap-4">
                                             <div className="flex items-start gap-3">
                                                 <div className="flex size-9 shrink-0 items-center justify-center rounded-md border border-border bg-muted/40 text-foreground font-mono text-xs font-bold">
-                                                    {item.category.slice(0, 3).toUpperCase()}
+                                                    {item.category
+                                                        .slice(0, 3)
+                                                        .toUpperCase()}
                                                 </div>
                                                 <div>
                                                     <div className="flex items-center gap-2">
                                                         <span className="font-mono text-[11px] text-muted-foreground">
                                                             {item.code}
                                                         </span>
-                                                        <span className="text-border">·</span>
+                                                        <span className="text-border">
+                                                            ·
+                                                        </span>
                                                         <span className="text-xs text-muted-foreground">
                                                             {item.vendor}
                                                         </span>
@@ -579,7 +623,8 @@ export default function Welcome({ canRegister = false }: WelcomeProps) {
                                             {activeItem.title}
                                         </span>
                                         <span className="font-mono text-xs text-muted-foreground block mt-0.5">
-                                            Sum: {activeItem.amount} ({activeItem.vendor})
+                                            Sum: {activeItem.amount} (
+                                            {activeItem.vendor})
                                         </span>
                                     </div>
 
@@ -596,13 +641,19 @@ export default function Welcome({ canRegister = false }: WelcomeProps) {
                                         <div className="flex justify-between">
                                             <span>AUTO PAY CAP ($50 MAX):</span>
                                             <span className="font-bold text-foreground">
-                                                {activeItem.amountNumber <= 50 ? 'CONFORMANT ✓' : 'EXCEEDED (HOLD)'}
+                                                {activeItem.amountNumber <= 50
+                                                    ? 'CONFORMANT ✓'
+                                                    : 'EXCEEDED (HOLD)'}
                                             </span>
                                         </div>
                                         <div className="flex justify-between">
-                                            <span>EMERGENCY BUFFER ($5K FLOOR):</span>
+                                            <span>
+                                                EMERGENCY BUFFER ($5K FLOOR):
+                                            </span>
                                             <span className="font-bold text-foreground">
-                                                {activeItem.amountNumber === 200 ? 'AT RISK (PAUSED)' : 'PRESERVED ✓'}
+                                                {activeItem.amountNumber === 200
+                                                    ? 'AT RISK (PAUSED)'
+                                                    : 'PRESERVED ✓'}
                                             </span>
                                         </div>
                                         <div className="flex justify-between">
@@ -610,9 +661,10 @@ export default function Welcome({ canRegister = false }: WelcomeProps) {
                                             <span className="font-bold text-[#E30613]">
                                                 {activeItem.amountNumber <= 50
                                                     ? 'AUTOMATIC DISBURSEMENT'
-                                                    : activeItem.amountNumber === 200
-                                                    ? 'DISBURSEMENT PAUSED'
-                                                    : 'MANAGER SIGN OFF REQUIRED'}
+                                                    : activeItem.amountNumber ===
+                                                        200
+                                                      ? 'DISBURSEMENT PAUSED'
+                                                      : 'MANAGER SIGN OFF REQUIRED'}
                                             </span>
                                         </div>
                                     </div>
@@ -620,25 +672,42 @@ export default function Welcome({ canRegister = false }: WelcomeProps) {
                                     {/* Settlement trigger simulation */}
                                     <div className="mt-4 pt-4 border-t border-border/80 flex flex-col gap-2">
                                         <Button
-                                            onClick={() => setSimulatedPaid(true)}
-                                            disabled={simulatedPaid || activeItem.amountNumber === 200}
+                                            onClick={() =>
+                                                setSimulatedPaid(true)
+                                            }
+                                            disabled={
+                                                simulatedPaid ||
+                                                activeItem.amountNumber === 200
+                                            }
                                             className="w-full bg-foreground text-background hover:bg-foreground/90 font-mono text-xs font-semibold uppercase tracking-wider h-10 rounded-md"
                                         >
                                             {simulatedPaid ? (
                                                 <>
                                                     <CheckCircle2 className="size-4 mr-2" />
-                                                    <span>VERIFIED SETTLEMENT PROOF</span>
+                                                    <span>
+                                                        VERIFIED SETTLEMENT
+                                                        PROOF
+                                                    </span>
                                                 </>
-                                            ) : activeItem.amountNumber === 200 ? (
-                                                <span>DISBURSEMENT BLOCKED BY POLICY</span>
+                                            ) : activeItem.amountNumber ===
+                                              200 ? (
+                                                <span>
+                                                    DISBURSEMENT BLOCKED BY
+                                                    POLICY
+                                                </span>
                                             ) : activeItem.amountNumber > 50 ? (
-                                                <span>SEND MANAGER PHONE ALERT</span>
+                                                <span>
+                                                    SEND MANAGER PHONE ALERT
+                                                </span>
                                             ) : (
-                                                <span>SIMULATE AUTOMATIC RELEASE</span>
+                                                <span>
+                                                    SIMULATE AUTOMATIC RELEASE
+                                                </span>
                                             )}
                                         </Button>
                                         <span className="font-mono text-[10px] text-muted-foreground text-center">
-                                            Deterministic code rules govern every balance move.
+                                            Deterministic code rules govern
+                                            every balance move.
                                         </span>
                                     </div>
                                 </CardContent>
@@ -678,7 +747,9 @@ export default function Welcome({ canRegister = false }: WelcomeProps) {
                     </div>
 
                     <p className="mt-8 max-w-xl text-xs sm:text-sm text-muted-foreground font-mono leading-relaxed uppercase">
-                        Every institutional disbursement should occur with mathematical certitude. Eliminate administrative friction while preserving human governance.
+                        Every institutional disbursement should occur with
+                        mathematical certitude. Eliminate administrative
+                        friction while preserving human governance.
                     </p>
                 </section>
 
@@ -694,13 +765,17 @@ export default function Welcome({ canRegister = false }: WelcomeProps) {
                                     style={{ textWrap: 'balance' }}
                                     className="font-serif text-3xl sm:text-5xl lg:text-6xl font-bold tracking-tight leading-[1.02]"
                                 >
-                                    Run Your School Treasury With Total Peace of Mind.
+                                    Run Your School Treasury With Total Peace of
+                                    Mind.
                                 </h2>
                                 <p
                                     style={{ textWrap: 'pretty' }}
                                     className="mt-5 max-w-xl text-sm sm:text-base text-neutral-400 leading-relaxed font-sans"
                                 >
-                                    Free and open source under the MIT license. No subscription bills. You retain absolute custody of institutional capital and oversee every dollar.
+                                    Free and open source under the MIT license.
+                                    No subscription bills. You retain absolute
+                                    custody of institutional capital and oversee
+                                    every dollar.
                                 </p>
                             </div>
 

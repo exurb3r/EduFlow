@@ -10,6 +10,7 @@ use App\Filament\Widgets\InstallationReadinessWidget;
 use App\Filament\Widgets\LeptonNetworkWidget;
 use App\Filament\Widgets\TreasuryOverviewWidget;
 use App\Models\AiProvider;
+use App\Models\Organization;
 use App\Models\Student;
 use App\Models\User;
 use App\Services\InstallationInstitution;
@@ -218,7 +219,11 @@ class Dashboard extends BaseDashboard
                             InfoGrid::make(2)->schema([
                                 TextEntry::make('current_institution')
                                     ->label('Institution Context')
-                                    ->state(fn (): string => app(InstallationInstitution::class)->current()?->name ?? 'Not configured'),
+                                    ->state(function (): string {
+                                        $institution = app(InstallationInstitution::class)->current();
+
+                                        return $institution instanceof Organization ? $institution->name : 'Not configured';
+                                    }),
                                 TextEntry::make('students_enrolled')
                                     ->label('Enrolled Students')
                                     ->state(fn (): string => (string) Student::query()->count()),
