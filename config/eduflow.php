@@ -4,6 +4,10 @@ return [
     // Required outside local/testing; never choose an institution by row order.
     'institution_id' => env('EDUFLOW_INSTITUTION_ID'),
 
+    'institution_policy' => [
+        'advice_enabled' => env('EDUFLOW_INSTITUTION_POLICY_ADVICE', false),
+    ],
+
     'background_finance' => [
         'enabled' => env('EDUFLOW_BACKGROUND_FINANCE', false),
         'receipt_routing_enabled' => env('EDUFLOW_RECEIPT_BUDGET_ROUTING', false),

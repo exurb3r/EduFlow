@@ -7,6 +7,7 @@ namespace App\Filament\Pages;
 use App\Actions\ApproveReceiptBudgetRoute;
 use App\Actions\CaptureBudgetSnapshot;
 use App\Actions\PrepareReceiptBudgetRoute;
+use App\Actions\ProposeReceiptAllocation;
 use App\Actions\ReviewFinancePlan;
 use App\DTOs\Money;
 use App\Enums\CurrencyCode;
@@ -26,10 +27,12 @@ use App\Models\ReceiptPlanTrigger;
 use App\Models\User;
 use App\Services\AcceptedPlanPayments;
 use App\Services\InstallationInstitution;
+use App\Services\InstitutionPolicyWorkspace;
 use BackedEnum;
 use Filament\Actions\Action;
 use Filament\Forms\Components\Checkbox;
 use Filament\Forms\Components\DatePicker;
+use Filament\Forms\Components\Placeholder;
 use Filament\Forms\Components\Select;
 use Filament\Forms\Components\Textarea;
 use Filament\Forms\Components\TextInput;
@@ -254,6 +257,7 @@ class FinanceSupervisor extends Page implements HasTable
     protected function getHeaderActions(): array
     {
         return [
+            $this->proposeAllocationAction(),
             $this->prepareReceiptRouteAction(),
             $this->approveReceiptRouteAction(),
             Action::make('paymentProgress')->label('Payment progress')->icon(Heroicon::QueueList)->color('gray')
@@ -291,6 +295,59 @@ class FinanceSupervisor extends Page implements HasTable
                         ->success()->send();
                 }),
         ];
+    }
+
+    /**
+     * Ask the agent where realised receipt cash should go.
+     *
+     * The result is a proposal an officer reads and then acts on through the
+     * ordinary payment path. There is deliberately no approve button here:
+     * deciding a line is a payment decision, and this action must not be the
+     * place that quietly becomes one.
+     */
+    private function proposeAllocationAction(): Action
+    {
+        return Action::make('proposeAllocation')->label('Propose receipt allocation')->icon(Heroicon::Scale)->color('gray')
+            ->visible(fn (): bool => Gate::forUser(Auth::user())->allows('create', BudgetSnapshot::class))
+            ->modalHeading('Propose how received cash is allocated')->modalWidth('4xl')
+            ->modalSubmitActionLabel('Build proposal')
+            ->modalDescription('The agent classifies each approved invoice and active budget line against the institution\'s published policy and ranks them in the order staff arranged. It proposes amounts only; it reserves nothing, approves nothing and pays nothing.')
+            ->schema([
+                Select::make('snapshot_digest')->label('Realised receipt context')->required()->options(fn (): array => BudgetSnapshot::query()
+                    ->where('organization_id', app(InstallationInstitution::class)->current()?->id)->orderByDesc('id')->limit(100)->get()
+                    ->filter(fn (BudgetSnapshot $snapshot): bool => $snapshot->hasValidSnapshot() && $snapshot->budget->status === 'active')
+                    ->mapWithKeys(fn (BudgetSnapshot $snapshot): array => [$snapshot->snapshot_digest => 'Snapshot #'.$snapshot->id.' · '
+                        .$snapshot->snapshot['department']['name'].' · receipts '.Money::formatExact($snapshot->snapshot['amounts']['realized_receipts'], $snapshot->currency).' '.$snapshot->currency])->all()),
+                Placeholder::make('policy_note')->label('Policy in force')->content(function (): string {
+                    $policy = app(InstitutionPolicyWorkspace::class)->active();
+
+                    return $policy === null
+                        ? 'No published policy with active controls. Publish one before proposing.'
+                        : 'Revision #'.$policy->institution_policy_version_id.' · '.$policy->version->title.' · approved by #'.$policy->approved_by;
+                }),
+            ])
+            ->action(function (array $data, Schema $schema, ProposeReceiptAllocation $propose): void {
+                Gate::forUser(Auth::user())->authorize('create', BudgetSnapshot::class);
+                /** @var BudgetSnapshot $snapshot */
+                $snapshot = BudgetSnapshot::query()->where('organization_id', app(InstallationInstitution::class)->require()->id)
+                    ->where('snapshot_digest', $data['snapshot_digest'])->firstOrFail();
+                try {
+                    $plan = $propose->handle($this->actor(), $snapshot, (string) Str::uuid());
+                } catch (ValidationException $exception) {
+                    $errors = [];
+                    foreach ($exception->errors() as $field => $messages) {
+                        $errors[$schema->getStatePath().'.'.$field] = $messages;
+                    }
+                    Notification::make()->danger()->title('Allocation proposal refused')
+                        ->body(implode(' ', array_merge(...array_values($errors))))->persistent()->send();
+
+                    return;
+                }
+                Notification::make()->success()->title('Allocation proposed, not approved')
+                    ->body(Money::formatExact($plan->proposed_minor_units, $plan->currency).' '.$plan->currency.' proposed across '
+                        .$plan->plan['proposals_awaiting_human_review'].' line(s). Nothing is reserved or paid; review each line before any payment.')
+                    ->persistent()->send();
+            });
     }
 
     private function prepareReceiptRouteAction(): Action

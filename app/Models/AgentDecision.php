@@ -31,6 +31,8 @@ use Illuminate\Support\Carbon;
  * @property Carbon|null $updated_at
  * @property-read Organization $organization
  * @property-read Approval|null $approval
+ * @property Carbon $created_at
+ * @property Carbon $updated_at
  */
 class AgentDecision extends Model
 {

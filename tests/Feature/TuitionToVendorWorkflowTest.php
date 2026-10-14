@@ -11,32 +11,70 @@ use App\Actions\PrepareReceiptBudgetRoute;
 use App\Actions\ReviewCollectionBatch;
 use App\Actions\ReviewFinancePlan;
 use App\Actions\ReviewVendorPayment;
+use App\Ai\Agents\InstitutionPolicyAnalyst;
 use App\DTOs\Money;
 use App\Enums\CurrencyCode;
+use App\Jobs\AssessInstitutionPolicy;
 use App\Jobs\ProcessPaymentSubmission;
 use App\Models\BudgetSnapshot;
 use App\Models\FinanceWorkflowRun;
+use App\Models\InstitutionPolicyAssessment;
+use App\Models\PaymentIntent;
 use App\Models\PaymentSubmissionOutbox;
 use App\Models\ReceiptPlanTrigger;
 use App\Models\StudentTuitionPayment;
 use App\Models\StudentTuitionPaymentAttempt;
 use App\Models\Transaction;
+use App\Models\User;
 use App\Services\AcceptedPlanPayments;
+use App\Services\Ai\AiProviderResolver;
 use App\Services\FinanceReviewAlerts;
 use App\Services\FinanceWorkflows;
+use App\Services\InstallationInstitution;
+use App\Services\InstitutionPolicyInterpreter;
+use App\Services\InstitutionPolicyWorkspace;
 use App\Services\IsolatedPaymentExecutor;
 use App\Services\Payments\TransportAcceptance;
 use App\Services\Payments\TransportResolution;
 use App\Services\StudentBillPaymentQuote;
 use App\Services\StudentTuitionPaymentProcessor;
 use App\Services\StudentTuitionPaymentService;
+use App\Settings\AiSettings;
 use Brick\Math\BigInteger;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Str;
 use Yukazakiri\Lepton\Contracts\ArcNetworkGateway;
 
 test('verified student receipt funds a reviewed proposal and one independently approved vendor submission with visible progress', function (string $source): void {
-    $c = paymentAuthorizationContext(withFunding: false);
+    $publishedPolicy = null;
+    $c = paymentAuthorizationContext(withFunding: false, beforeDrafts: function (User $maker, User $reviewer) use (&$publishedPolicy): void {
+        $input = ['request_key' => (string) Str::uuid(), 'title' => 'Reviewed institution purchasing policy', 'predecessor_id' => null, 'expected_current_digest' => null,
+            'clauses' => [['id' => 'purchases', 'title' => 'IT obligations', 'text' => 'Reviewed IT service bills belong to Technology Operations.']],
+            'categories' => [['id' => 'technology', 'name' => 'Technology Operations', 'description' => 'Approved IT services.',
+                'inclusions' => 'Service invoices', 'exclusions' => 'Personal purchases', 'clause_ids' => ['purchases']]],
+            'examples' => [['description' => 'Approved IT service invoice', 'category_id' => 'technology']],
+            'controls' => ['minimum_reserve' => '10', 'max_auto_payment' => '0', 'max_daily_disbursement' => '500', 'max_fee' => '1'],
+            'priorities' => 'Review near-due approved bills first.', 'clarifications' => []];
+        $workspace = app(InstitutionPolicyWorkspace::class);
+        $policy = $workspace->save($maker, $input);
+        app(AiSettings::class)->advisory_enabled = true;
+        app(AiSettings::class)->disclosure_accepted = true;
+        $answer = ['category_id' => 'technology', 'citations' => [['clause_id' => 'purchases', 'quote' => 'Reviewed IT service bills belong to Technology Operations.']],
+            'explanation' => 'The institution categorizes approved IT service invoices as Technology Operations.',
+            'questions' => [], 'missing_evidence' => [], 'priority' => 'high', 'needs_review' => false];
+        InstitutionPolicyAnalyst::fake([$answer, $answer]);
+        config(['queue.connections.database.retry_after' => 360]);
+        foreach (['authoring', 'examples'] as $kind) {
+            $assessment = InstitutionPolicyAssessment::query()->create(['organization_id' => $policy->organization_id,
+                'institution_policy_version_id' => $policy->id, 'requested_by' => $maker->id, 'request_key' => (string) Str::uuid(),
+                'kind' => $kind, 'input' => [], 'input_digest' => PaymentIntent::digest([]), 'policy_digest' => $policy->content_digest]);
+            (new AssessInstitutionPolicy($assessment->id))->handle(app(InstitutionPolicyInterpreter::class),
+                app(InstallationInstitution::class), app(AiProviderResolver::class));
+        }
+        $workspace->publish($reviewer, $policy, $policy->content_digest, null, 'Authored policy and exact finance controls independently checked.');
+        $publishedPolicy = $policy;
+    });
+    expect($c['drafts'][0]->finance_policy_version_id)->toBe($publishedPolicy->finance_policy_version_id);
     if ($source === 'bill') {
         $payer = billPaymentContext(['balance' => 200_000000], $c['institution']);
         config(['lepton.arc.treasury' => $c['wallet']->address]);

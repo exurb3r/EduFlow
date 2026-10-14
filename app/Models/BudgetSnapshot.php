@@ -24,6 +24,7 @@ use Throwable;
  * @property string $currency
  * @property array<string, mixed> $snapshot
  * @property string $snapshot_digest
+ * @property-read Budget $budget
  */
 class BudgetSnapshot extends Model
 {

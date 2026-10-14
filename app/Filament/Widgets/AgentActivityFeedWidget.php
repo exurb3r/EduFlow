@@ -105,7 +105,7 @@ class AgentActivityFeedWidget extends BaseWidget
                     ->icon(Heroicon::Eye)
                     ->color('gray')
                     ->modalHeading(fn (AgentDecision $record): string => "Decision #{$record->id} — {$record->action_type}")
-                    ->modalDescription(fn (AgentDecision $record): string => 'Recorded at '.($record->created_at?->toIso8601String() ?? 'N/A'))
+                    ->modalDescription(fn (AgentDecision $record): string => "Recorded at {$record->created_at->toIso8601String()}")
                     ->infolist([
                         InfoSection::make('Evaluation Outcome')
                             ->schema([

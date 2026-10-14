@@ -7,6 +7,7 @@ namespace App\Jobs;
 use App\Models\FinanceWorkflowRun;
 use App\Services\FinanceReviewAlerts;
 use App\Services\FinanceWorkflows;
+use App\Services\InstitutionPolicyAdvice;
 use Illuminate\Contracts\Queue\ShouldQueue;
 use Illuminate\Foundation\Queue\Queueable;
 use Throwable;
@@ -33,6 +34,14 @@ class ProcessFinanceWorkflow implements ShouldQueue
     {
         $workflows->process($this->runId);
         $alerts->deliver($this->runId);
+        $run = FinanceWorkflowRun::query()->find($this->runId);
+        if ($run !== null) {
+            try {
+                app(InstitutionPolicyAdvice::class)->forPlan($run);
+            } catch (Throwable $exception) {
+                report($exception);
+            }
+        }
     }
 
     public function failed(?Throwable $exception): void

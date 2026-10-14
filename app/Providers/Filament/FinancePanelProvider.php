@@ -24,6 +24,7 @@ use App\Filament\Resources\AssistanceRequests\AssistanceRequestResource;
 use App\Filament\Resources\PaymentSubmissions\PaymentSubmissionResource;
 use App\Filament\Resources\Students\StudentResource;
 use App\Filament\Resources\TuitionAccounts\TuitionAccountResource;
+use App\Models\InstitutionPolicyVersion;
 use Filament\Auth\MultiFactor\App\AppAuthentication;
 use Filament\Auth\MultiFactor\Email\EmailAuthentication;
 use Filament\Http\Middleware\Authenticate;
@@ -31,6 +32,7 @@ use Filament\Http\Middleware\AuthenticateSession;
 use Filament\Http\Middleware\DisableBladeIconComponents;
 use Filament\Http\Middleware\DispatchServingFilamentEvent;
 use Filament\Navigation\NavigationGroup;
+use Filament\Navigation\NavigationItem;
 use Filament\Panel;
 use Filament\PanelProvider;
 use Filament\Support\Colors\Color;
@@ -39,6 +41,8 @@ use Illuminate\Cookie\Middleware\EncryptCookies;
 use Illuminate\Foundation\Http\Middleware\PreventRequestForgery;
 use Illuminate\Routing\Middleware\SubstituteBindings;
 use Illuminate\Session\Middleware\StartSession;
+use Illuminate\Support\Facades\Auth;
+use Illuminate\Support\Facades\Gate;
 use Illuminate\View\Middleware\ShareErrorsFromSession;
 
 class FinancePanelProvider extends PanelProvider
@@ -65,6 +69,11 @@ class FinancePanelProvider extends PanelProvider
                     ->collapsible(false),
                 NavigationGroup::make('Student Services')
                     ->collapsed(),
+            ])
+            ->navigationItems([
+                NavigationItem::make('Institution policies')->group('Financial Operations')->icon('heroicon-o-book-open')
+                    ->url(fn (): string => route('finance.policies.index'))->sort(4)
+                    ->visible(fn (): bool => Auth::check() && Gate::allows('viewAny', InstitutionPolicyVersion::class)),
             ])
             ->pages([
                 FinanceDashboard::class,

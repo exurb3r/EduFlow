@@ -48,7 +48,7 @@ use function Pest\Laravel\travelTo;
  * other file, so such a test only passes when the whole suite happens to run.
  */
 /** @return array<string, mixed> */
-function paymentAuthorizationContext(string $method = 'filament_app', bool $fake = false, bool $withFunding = true): array
+function paymentAuthorizationContext(string $method = 'filament_app', bool $fake = false, bool $withFunding = true, ?Closure $beforeDrafts = null): array
 {
     travelTo(now()->utc()->startOfSecond());
     config(['eduflow.institution_id' => null, 'eduflow.background_finance.enabled' => false,
@@ -85,6 +85,9 @@ function paymentAuthorizationContext(string $method = 'filament_app', bool $fake
     $policy = app(CreateFinancePolicyVersion::class)->handle($maker, 'review-v1', Money::fromDecimal('10', CurrencyCode::USDC),
         new Money(0, CurrencyCode::USDC), new Money(0, CurrencyCode::USDC), new Money(1_000000, CurrencyCode::USDC));
     app(ActivateFinancePolicy::class)->handle($reviewer, $policy, null);
+    if ($beforeDrafts instanceof Closure) {
+        $beforeDrafts($maker, $reviewer);
+    }
     /** @var Wallet $wallet */
     $wallet = Wallet::query()->create(['organization_id' => $institution->id, 'provider' => 'circle', 'network' => 'arc-testnet',
         'address' => '0x'.str_repeat('1', 40), 'balance' => '999999', 'status' => 'active']);
