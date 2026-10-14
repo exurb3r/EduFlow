@@ -11,6 +11,7 @@ use App\Http\Controllers\CollectionBatchController;
 use App\Http\Controllers\FinanceApprovalController;
 use App\Http\Controllers\FundingWindowController;
 use App\Http\Controllers\InstitutionPolicyController;
+use App\Http\Controllers\InstitutionPolicyEvaluationController;
 use App\Http\Controllers\InvoiceVersionController;
 use App\Http\Controllers\NotificationController;
 use App\Http\Controllers\PaymentAuthorizationController;
@@ -39,6 +40,10 @@ Route::get('/skills/design', fn () => Inertia::render('skills/design', [
 Route::get('dashboard', [StudentDashboardController::class, 'index'])->middleware(['auth', 'verified'])->name('dashboard');
 
 Route::middleware(['auth', 'verified'])->group(function (): void {
+    Route::get('finance/policy-evaluations', [InstitutionPolicyEvaluationController::class, 'index'])->name('finance.policy-evaluations.index');
+    Route::post('finance/policy-evaluations', [InstitutionPolicyEvaluationController::class, 'store'])->middleware('throttle:5,1')->name('finance.policy-evaluations.store');
+    Route::get('finance/policy-evaluations/{institutionPolicyEvaluation}', [InstitutionPolicyEvaluationController::class, 'show'])
+        ->middleware('throttle:60,1')->name('finance.policy-evaluations.show');
     Route::get('finance/policies', [InstitutionPolicyController::class, 'index'])->name('finance.policies.index');
     Route::post('finance/policies/import', [InstitutionPolicyController::class, 'import'])->middleware('throttle:5,1')->name('finance.policies.import');
     Route::post('finance/policies', [InstitutionPolicyController::class, 'store'])->middleware('throttle:20,1')->name('finance.policies.store');

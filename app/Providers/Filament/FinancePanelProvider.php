@@ -24,6 +24,7 @@ use App\Filament\Resources\AssistanceRequests\AssistanceRequestResource;
 use App\Filament\Resources\PaymentSubmissions\PaymentSubmissionResource;
 use App\Filament\Resources\Students\StudentResource;
 use App\Filament\Resources\TuitionAccounts\TuitionAccountResource;
+use App\Models\InstitutionPolicyEvaluation;
 use App\Models\InstitutionPolicyVersion;
 use Filament\Auth\MultiFactor\App\AppAuthentication;
 use Filament\Auth\MultiFactor\Email\EmailAuthentication;
@@ -74,6 +75,9 @@ class FinancePanelProvider extends PanelProvider
                 NavigationItem::make('Institution policies')->group('Financial Operations')->icon('heroicon-o-book-open')
                     ->url(fn (): string => route('finance.policies.index'))->sort(4)
                     ->visible(fn (): bool => Auth::check() && Gate::allows('viewAny', InstitutionPolicyVersion::class)),
+                NavigationItem::make('Policy evaluations')->group('Financial Operations')->icon('heroicon-o-sparkles')
+                    ->url(fn (): string => route('finance.policy-evaluations.index'))->sort(5)
+                    ->visible(fn (): bool => Auth::check() && Gate::allows('viewAny', InstitutionPolicyEvaluation::class)),
             ])
             ->pages([
                 FinanceDashboard::class,

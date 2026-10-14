@@ -413,11 +413,11 @@ it('does not attribute a rejection as an approval', function (): void {
         ->and($request->fresh()->status)->toBe(AssistanceStatus::SUBMITTED);
 });
 
-it('refuses to resume when the operator has no persisted organization', function (): void {
+it('refuses to resume when the configured organization does not exist', function (): void {
     // The container would hand back a blank Organization whose primaryWallet()
     // is null, so the tool would refuse for the wrong reason. The factory
     // reports the actual problem instead.
-    Organization::query()->delete();
+    config(['eduflow.institution_id' => Organization::query()->sole()->id + 1]);
 
     expect(SettlementOperatorFactory::make())->toBeNull()
         ->and(fn (): SettlementOperator => SettlementOperatorFactory::makeOrFail())
