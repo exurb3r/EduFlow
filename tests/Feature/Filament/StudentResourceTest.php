@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 use App\Filament\Resources\Students\Pages\CreateStudent;
 use App\Filament\Resources\Students\Pages\EditStudent;
+use App\Filament\Resources\Students\Pages\ListStudents;
 use App\Filament\Resources\Students\Pages\ViewStudent;
 use App\Filament\Resources\Students\RelationManagers\AssistanceRequestsRelationManager;
 use App\Filament\Resources\Students\RelationManagers\StudentBillsRelationManager;
@@ -361,4 +362,71 @@ test('student relation managers render related accounts, requests, and bills', f
         ->assertSuccessful()
         ->assertCanSeeTableRecords([$bill])
         ->assertSee('Laboratory Equipment Fee');
+});
+
+test('staff can create a student bill directly from the view student page', function (): void {
+    $this->actingAs(User::factory()->create()->assignRole('finance_officer'));
+    filament()->setCurrentPanel('finance');
+
+    $student = Student::factory()->create();
+    $term = AcademicTerm::factory()->create();
+
+    Livewire::test(ViewStudent::class, ['record' => $student->getKey()])
+        ->mountAction('createBill')
+        ->set('mountedActions.0.data.category', 'laboratory')
+        ->set('mountedActions.0.data.academic_term_id', $term->getKey())
+        ->set('mountedActions.0.data.description', 'Chemistry Lab Consumables')
+        ->set('mountedActions.0.data.amount', '45.00')
+        ->callMountedAction()
+        ->assertHasNoActionErrors();
+
+    expect(StudentBill::query()->where('student_id', $student->id)->count())->toBe(1);
+
+    $bill = StudentBill::query()->where('student_id', $student->id)->firstOrFail();
+    expect($bill->amount_base_units)->toBe(45000000)
+        ->and($bill->paid_base_units)->toBe(0)
+        ->and($bill->description)->toBe('Chemistry Lab Consumables');
+});
+
+test('staff can create a tuition account directly from the edit student page', function (): void {
+    $this->actingAs(User::factory()->create()->assignRole('finance_officer'));
+    filament()->setCurrentPanel('finance');
+
+    $student = Student::factory()->create();
+    $term = AcademicTerm::factory()->create();
+
+    Livewire::test(EditStudent::class, ['record' => $student->getKey()])
+        ->mountAction('createTuitionAccount')
+        ->set('mountedActions.0.data.academic_term_id', $term->getKey())
+        ->set('mountedActions.0.data.total_amount', '500.00')
+        ->set('mountedActions.0.data.paid_amount', '100.00')
+        ->callMountedAction()
+        ->assertHasNoActionErrors();
+
+    expect(TuitionAccount::query()->where('student_id', $student->id)->count())->toBe(1);
+
+    $account = TuitionAccount::query()->where('student_id', $student->id)->firstOrFail();
+    expect($account->total_amount)->toBe(500000000)
+        ->and($account->paid_amount)->toBe(100000000);
+});
+
+test('students directory tabs filter records correctly on index page', function (): void {
+    $this->actingAs(User::factory()->create()->assignRole('finance_officer'));
+    filament()->setCurrentPanel('finance');
+
+    $enrolled = Student::factory()->create(['enrollment_status' => 'enrolled', 'academic_status' => 'qualified']);
+    $graduated = Student::factory()->create(['enrollment_status' => 'graduated', 'academic_status' => 'qualified']);
+    $withoutWallet = Student::factory()->withoutPayoutAddress()->create(['enrollment_status' => 'enrolled']);
+
+    Livewire::test(ListStudents::class)
+        ->assertSuccessful()
+        ->set('activeTab', 'enrolled')
+        ->assertCanSeeTableRecords([$enrolled, $withoutWallet])
+        ->assertCanNotSeeTableRecords([$graduated])
+        ->set('activeTab', 'graduated')
+        ->assertCanSeeTableRecords([$graduated])
+        ->assertCanNotSeeTableRecords([$enrolled, $withoutWallet])
+        ->set('activeTab', 'missing_wallet')
+        ->assertCanSeeTableRecords([$withoutWallet])
+        ->assertCanNotSeeTableRecords([$enrolled, $graduated]);
 });

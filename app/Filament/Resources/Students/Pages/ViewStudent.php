@@ -6,21 +6,25 @@ namespace App\Filament\Resources\Students\Pages;
 
 use App\DTOs\Money;
 use App\Enums\CurrencyCode;
+use App\Enums\StudentBillCategory;
 use App\Filament\Resources\Students\StudentResource;
 use App\Filament\Resources\Students\Widgets\StudentProfileSummaryWidget;
 use App\Filament\Resources\Students\Widgets\StudentWalletWidget;
 use App\Filament\Resources\TuitionAccounts\TuitionAccountResource;
 use App\Models\AcademicTerm;
 use App\Models\Student;
+use App\Models\StudentBill;
 use App\Models\TuitionAccount;
 use Filament\Actions\Action;
 use Filament\Actions\EditAction;
+use Filament\Forms\Components\DatePicker;
 use Filament\Forms\Components\Select;
 use Filament\Forms\Components\TextInput;
 use Filament\Notifications\Notification;
 use Filament\Resources\Pages\ViewRecord;
 use Filament\Support\Icons\Heroicon;
 use Illuminate\Support\Facades\Gate;
+use Throwable;
 use Yukazakiri\Lepton\Contracts\ArcNetworkGateway;
 
 class ViewStudent extends ViewRecord
@@ -125,6 +129,75 @@ class ViewStudent extends ViewRecord
                         ->send();
                 }),
 
+            Action::make('createBill')
+                ->label('New charge')
+                ->icon('heroicon-m-receipt-percent')
+                ->color('gray')
+                ->visible(fn (): bool => auth()->user()?->hasAnyRole(['admin', 'finance_officer', 'super_admin']) ?? false)
+                ->modalHeading('Assess Non-Tuition Charge')
+                ->modalDescription('Post an institutional fee (laboratory, registration, examination, or miscellaneous) for this student.')
+                ->modalSubmitActionLabel('Post charge')
+                ->schema([
+                    Select::make('category')
+                        ->label('Charge Category')
+                        ->options([
+                            StudentBillCategory::MISCELLANEOUS->value => StudentBillCategory::MISCELLANEOUS->label(),
+                            StudentBillCategory::LABORATORY->value => StudentBillCategory::LABORATORY->label(),
+                            StudentBillCategory::REGISTRATION->value => StudentBillCategory::REGISTRATION->label(),
+                            StudentBillCategory::EXAMINATION->value => StudentBillCategory::EXAMINATION->label(),
+                        ])
+                        ->native(false)
+                        ->required(),
+
+                    Select::make('academic_term_id')
+                        ->label('Academic Term (optional)')
+                        ->options(fn (): array => AcademicTerm::query()->pluck('name', 'id')->all())
+                        ->searchable()
+                        ->preload(),
+
+                    TextInput::make('description')
+                        ->label('Charge Description')
+                        ->required()
+                        ->maxLength(255)
+                        ->placeholder('e.g. Chemistry Laboratory Consumables Fee'),
+
+                    TextInput::make('amount')
+                        ->label('Amount (USDC)')
+                        ->prefix('USDC')
+                        ->inputMode('decimal')
+                        ->placeholder('45.00')
+                        ->required()
+                        ->numeric()
+                        ->minValue(0.01)
+                        ->maxValue(1000000000)
+                        ->rules(['regex:/^\d+(\.\d{1,6})?$/']),
+
+                    DatePicker::make('due_date')
+                        ->label('Due Date (optional)')
+                        ->native(false),
+                ])
+                ->action(function (array $data): void {
+                    $student = $this->getRecord();
+                    $amountUnits = Money::fromDecimal((string) $data['amount'], CurrencyCode::USDC)->toBaseUnits();
+
+                    $bill = StudentBill::query()->create([
+                        'student_id' => $student->id,
+                        'academic_term_id' => $data['academic_term_id'] ?? null,
+                        'category' => $data['category'],
+                        'description' => $data['description'],
+                        'amount_base_units' => $amountUnits,
+                        'paid_base_units' => 0,
+                        'due_date' => $data['due_date'] ?? null,
+                        'status' => StudentBill::STATUS_OPEN,
+                    ]);
+
+                    Notification::make()
+                        ->title('Student charge issued')
+                        ->body("Issued charge #{$bill->id} for {$student->user->name}.")
+                        ->success()
+                        ->send();
+                }),
+
             Action::make('viewOnArcScan')
                 ->label('Student ArcScan')
                 ->icon(Heroicon::ArrowTopRightOnSquare)
@@ -139,7 +212,7 @@ class ViewStudent extends ViewRecord
 
                     try {
                         return app(ArcNetworkGateway::class)->addressExplorerUrl($address);
-                    } catch (\Throwable) {
+                    } catch (Throwable) {
                         return null;
                     }
                 })
@@ -147,11 +220,12 @@ class ViewStudent extends ViewRecord
 
             Action::make('emailStudent')
                 ->label('Email student')
-                ->icon('heroicon-m-envelope')
+                ->icon(Heroicon::Envelope)
                 ->color('gray')
                 ->url(fn (): string => "mailto:{$this->getRecord()->user->email}"),
 
-            EditAction::make(),
+            EditAction::make()
+                ->icon(Heroicon::PencilSquare),
         ];
     }
 }

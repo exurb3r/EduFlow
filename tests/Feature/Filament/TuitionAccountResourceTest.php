@@ -4,10 +4,12 @@ declare(strict_types=1);
 
 use App\Filament\Resources\TuitionAccounts\Pages\CreateTuitionAccount;
 use App\Filament\Resources\TuitionAccounts\Pages\EditTuitionAccount;
+use App\Filament\Resources\TuitionAccounts\Pages\ListTuitionAccounts;
 use App\Filament\Resources\TuitionAccounts\Pages\ViewTuitionAccount;
 use App\Filament\Resources\TuitionAccounts\RelationManagers\PaymentsRelationManager;
 use App\Filament\Resources\TuitionAccounts\TuitionAccountResource;
 use App\Filament\Resources\TuitionAccounts\Widgets\TuitionAccountOverviewWidget;
+use App\Filament\Resources\TuitionAccounts\Widgets\TuitionAccountsStatsWidget;
 use App\Models\AcademicTerm;
 use App\Models\Student;
 use App\Models\StudentTuitionPayment;
@@ -230,4 +232,49 @@ test('payments relation manager displays settled tuition receipts', function ():
         ->assertSuccessful()
         ->assertCanSeeTableRecords([$payment])
         ->assertSee('75.00 USDC');
+});
+
+test('tuition accounts stats widget renders directory totals', function (): void {
+    $this->actingAs(User::factory()->create()->assignRole('finance_officer'));
+    filament()->setCurrentPanel('finance');
+
+    TuitionAccount::factory()->create([
+        'total_amount' => 500000000,
+        'paid_amount' => 200000000,
+    ]);
+
+    Livewire::test(TuitionAccountsStatsWidget::class)
+        ->assertSuccessful()
+        ->assertSee('Tuition Accounts')
+        ->assertSee('Assessed Tuition')
+        ->assertSee('Settled Payments')
+        ->assertSee('Outstanding Receivables');
+});
+
+test('tuition accounts directory tabs filter records correctly on index page', function (): void {
+    $this->actingAs(User::factory()->create()->assignRole('finance_officer'));
+    filament()->setCurrentPanel('finance');
+
+    $term = AcademicTerm::factory()->create();
+    $student1 = Student::factory()->create();
+    $student2 = Student::factory()->create();
+
+    $debtAccount = TuitionAccount::factory()->for($student1)->for($term)->create([
+        'total_amount' => 500000000,
+        'paid_amount' => 100000000,
+    ]);
+
+    $settledAccount = TuitionAccount::factory()->for($student2)->for($term)->create([
+        'total_amount' => 300000000,
+        'paid_amount' => 300000000,
+    ]);
+
+    Livewire::test(ListTuitionAccounts::class)
+        ->assertSuccessful()
+        ->set('activeTab', 'outstanding')
+        ->assertCanSeeTableRecords([$debtAccount])
+        ->assertCanNotSeeTableRecords([$settledAccount])
+        ->set('activeTab', 'settled')
+        ->assertCanSeeTableRecords([$settledAccount])
+        ->assertCanNotSeeTableRecords([$debtAccount]);
 });

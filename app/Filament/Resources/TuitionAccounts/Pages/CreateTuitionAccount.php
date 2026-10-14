@@ -11,6 +11,18 @@ class CreateTuitionAccount extends CreateRecord
 {
     protected static string $resource = TuitionAccountResource::class;
 
+    #[\Override]
+    public function getSubheading(): ?string
+    {
+        return 'Open a term-scoped tuition ledger for an enrolled student.';
+    }
+
+    #[\Override]
+    protected function getCreatedNotificationTitle(): ?string
+    {
+        return 'Tuition account opened successfully';
+    }
+
     /**
      * @param  array<string, mixed>  $data
      * @return array<string, mixed>

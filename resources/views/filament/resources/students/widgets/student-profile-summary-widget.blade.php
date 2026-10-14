@@ -92,9 +92,18 @@
                         <div class="mt-2 text-base font-bold text-gray-950 dark:text-white">
                             {{ $tuitionBalanceFormatted }}
                         </div>
-                        <p class="mt-1 text-xs text-gray-500 dark:text-gray-400">
-                            {{ $tuitionAccountsCount }} {{ \Illuminate\Support\Str::plural('term account', $tuitionAccountsCount) }} on file
-                        </p>
+                        <div class="mt-2">
+                            <div class="flex items-center justify-between text-xs text-gray-500 dark:text-gray-400">
+                                <span>{{ $tuitionAccountsCount }} {{ \Illuminate\Support\Str::plural('term account', $tuitionAccountsCount) }}</span>
+                                <span class="font-medium text-gray-700 dark:text-gray-300">{{ $tuitionPercent }}% paid</span>
+                            </div>
+                            <div class="mt-1.5 h-1.5 w-full overflow-hidden rounded-full bg-gray-200/70 dark:bg-gray-800">
+                                <div
+                                    class="h-full rounded-full bg-primary-600 transition-all duration-300 dark:bg-primary-500"
+                                    style="width: {{ $tuitionPercent }}%"
+                                ></div>
+                            </div>
+                        </div>
                     </div>
 
                     {{-- Bills Card --}}

@@ -41,6 +41,15 @@ class ViewTuitionAccount extends ViewRecord
     }
 
     #[\Override]
+    public function getSubheading(): ?string
+    {
+        $account = $this->getRecord();
+        $remaining = new Money($account->remainingAmount(), CurrencyCode::USDC)->format(2);
+
+        return "{$account->student->user->name} ({$account->student->student_number}) • Term: {$account->academicTerm->name} • Remaining: {$remaining} USDC";
+    }
+
+    #[\Override]
     protected function getHeaderActions(): array
     {
         return [
@@ -87,13 +96,19 @@ class ViewTuitionAccount extends ViewRecord
 
             Action::make('viewStudent')
                 ->label('Student profile')
-                ->icon('heroicon-m-user')
-                ->color('gray')
+                ->icon(Heroicon::AcademicCap)
+                ->color('primary')
                 ->url(fn (): string => StudentResource::getUrl(
                     'view',
                     ['record' => $this->getRecord()->student_id],
                     panel: filament()->getCurrentPanel()?->getId(),
                 )),
+
+            Action::make('emailStudent')
+                ->label('Email student')
+                ->icon(Heroicon::Envelope)
+                ->color('gray')
+                ->url(fn (): string => "mailto:{$this->getRecord()->student->user->email}"),
 
             Action::make('viewOnArcScan')
                 ->label('Student ArcScan')
@@ -109,13 +124,14 @@ class ViewTuitionAccount extends ViewRecord
 
                     try {
                         return app(ArcNetworkGateway::class)->addressExplorerUrl($address);
-                    } catch (\Throwable) {
+                    } catch (Throwable) {
                         return null;
                     }
                 })
                 ->openUrlInNewTab(),
 
-            EditAction::make(),
+            EditAction::make()
+                ->icon(Heroicon::PencilSquare),
         ];
     }
 }

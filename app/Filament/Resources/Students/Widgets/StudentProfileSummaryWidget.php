@@ -66,6 +66,10 @@ class StudentProfileSummaryWidget extends Widget
         $tuitionPaidUnits = $student->totalTuitionPaid();
         $tuitionOwedUnits = $student->totalTuitionOwed();
 
+        $tuitionPercent = $tuitionOwedUnits > 0
+            ? min(100, (int) round(($tuitionPaidUnits / $tuitionOwedUnits) * 100))
+            : ($tuitionPaidUnits > 0 ? 100 : 0);
+
         $openBills = $student->bills->whereIn('status', ['open', 'partially_paid']);
         $unpaidBillsUnits = (int) $openBills->sum(fn ($b): int => (int) ($b->amount_base_units - $b->paid_base_units));
 
@@ -83,11 +87,13 @@ class StudentProfileSummaryWidget extends Widget
             'academicColor' => $student->academicStatusColor(),
             'attendanceRate' => $student->attendance_rate,
             'walletAddress' => $walletAddress,
+            'hasValidWallet' => $student->hasValidPayoutAddress(),
             'explorerUrl' => $explorerUrl,
             'tuitionAccountsCount' => $student->tuitionAccounts->count(),
             'tuitionBalanceFormatted' => new Money($tuitionBalanceUnits, CurrencyCode::USDC)->format(2).' USDC',
             'tuitionPaidFormatted' => new Money($tuitionPaidUnits, CurrencyCode::USDC)->format(2).' USDC',
             'tuitionOwedFormatted' => new Money($tuitionOwedUnits, CurrencyCode::USDC)->format(2).' USDC',
+            'tuitionPercent' => $tuitionPercent,
             'hasTuitionDebt' => $tuitionBalanceUnits > 0,
             'openBillsCount' => $openBills->count(),
             'unpaidBillsFormatted' => new Money($unpaidBillsUnits, CurrencyCode::USDC)->format(2).' USDC',

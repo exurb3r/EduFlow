@@ -4,7 +4,10 @@ declare(strict_types=1);
 
 namespace App\Filament\Resources\Students\Widgets;
 
+use App\DTOs\Money;
+use App\Enums\CurrencyCode;
 use App\Models\Student;
+use App\Models\TuitionAccount;
 use Filament\Support\Icons\Heroicon;
 use Filament\Widgets\StatsOverviewWidget as BaseWidget;
 use Filament\Widgets\StatsOverviewWidget\Stat;
@@ -20,6 +23,7 @@ class StudentsStatsWidget extends BaseWidget
         $walletsCount = Student::query()
             ->where(function ($query): void {
                 $query->whereNotNull('payout_address')
+                    ->where('payout_address', '!=', '')
                     ->orWhereHas('wallet');
             })
             ->count();
@@ -27,6 +31,9 @@ class StudentsStatsWidget extends BaseWidget
         $enrolledPercentage = $totalStudents > 0
             ? round(($enrolledCount / $totalStudents) * 100, 1)
             : 0;
+
+        $totalRemainingDebt = (int) TuitionAccount::query()->get()->sum(fn ($a): int => $a->remainingAmount());
+        $debtFormatted = (new Money($totalRemainingDebt, CurrencyCode::USDC))->format(2).' USDC';
 
         return [
             Stat::make('Total Students', number_format($totalStudents))
@@ -48,6 +55,11 @@ class StudentsStatsWidget extends BaseWidget
                 ->description('Configured for on-chain disbursement')
                 ->descriptionIcon(Heroicon::Wallet)
                 ->color('info'),
+
+            Stat::make('Outstanding Tuition', $debtFormatted)
+                ->description('Total remaining across all accounts')
+                ->descriptionIcon(Heroicon::Banknotes)
+                ->color($totalRemainingDebt > 0 ? 'warning' : 'success'),
         ];
     }
 }
