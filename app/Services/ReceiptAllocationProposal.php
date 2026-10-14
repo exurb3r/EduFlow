@@ -4,6 +4,8 @@ declare(strict_types=1);
 
 namespace App\Services;
 
+use App\DTOs\Money;
+use App\Enums\CurrencyCode;
 use App\Models\Budget;
 use App\Models\BudgetSnapshot;
 use App\Models\FinancePolicyActivation;
@@ -16,7 +18,9 @@ use App\Models\InvoiceVersionReview;
 use App\Models\PaymentIntent;
 use App\Models\User;
 use Brick\Math\BigInteger;
+use Closure;
 use Illuminate\Support\Collection;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Validation\ValidationException;
 use Ramsey\Uuid\Uuid;
 
@@ -56,7 +60,7 @@ final readonly class ReceiptAllocationProposal
      *
      * @return array<string, mixed>
      */
-    public function build(User $actor, BudgetSnapshot $snapshot): array
+    public function build(User $actor, BudgetSnapshot $snapshot, ?Closure $progress = null, ?string $assessmentNamespace = null): array
     {
         $publication = $this->policies->active();
         if (! $publication instanceof InstitutionPolicyPublication || $publication->organization_id !== $snapshot->organization_id) {
@@ -65,21 +69,29 @@ final readonly class ReceiptAllocationProposal
         if (! $snapshot->hasValidSnapshot() || $snapshot->budget->status !== 'active') {
             throw ValidationException::withMessages(['budget' => 'Allocation requires an intact active budget snapshot.']);
         }
+        if ($snapshot->currency !== 'USDC') {
+            throw ValidationException::withMessages(['currency' => 'Receipt allocation requires exact USDC evidence. No implicit currency conversion is performed.']);
+        }
         // Re-derive rather than trust the stored plan: a proposal built from a
         // stale row would cite evidence that no longer holds.
         $plan = $this->planner->handle($actor, $snapshot);
         $headroom = $snapshot->headroom();
         $policy = $publication->version;
 
-        $targets = $this->collectTargets($snapshot, $plan, $policy);
+        $targets = $this->collectTargets($snapshot, $plan, $policy, $progress, $assessmentNamespace);
         if ($targets === []) {
             throw ValidationException::withMessages(['allocation' => 'No approved invoice or active budget line is available to propose against.']);
         }
 
+        $progress?->__invoke('allocation_checks', 'Checking exact amounts against available budget and received cash.', count($targets), count($targets));
         $lines = [];
         $remainingBudget = BigInteger::of($headroom['budget_minor_units']);
-        $remainingCash = BigInteger::of($headroom['cash_minor_units']);
         $reserve = BigInteger::of(FinancePolicyActivation::current($snapshot->organization_id)?->policyVersion->minimum_reserve_base_units ?? 0);
+        $capturedReserve = BigInteger::of($snapshot->snapshot['amounts']['protected_reserve']);
+        $additionalReserve = $reserve->isGreaterThan($capturedReserve) ? $reserve->minus($capturedReserve) : BigInteger::zero();
+        $cash = BigInteger::of($headroom['cash_minor_units'])->minus($additionalReserve);
+        $remainingCash = $cash->isNegative() ? BigInteger::zero() : $cash;
+        $headroom['cash_minor_units'] = (string) $remainingCash;
 
         foreach ($targets as $target) {
             $asked = BigInteger::of($target['amount_minor_units']);
@@ -122,9 +134,20 @@ final readonly class ReceiptAllocationProposal
         foreach ($lines as $line) {
             $proposed = $proposed->plus($line['proposed_minor_units']);
         }
-        $reserveIntact = $proposed->isLessThanOrEqualTo(
-            BigInteger::of($headroom['cash_minor_units'])->plus($reserve),
-        );
+        $this->planner->handle($actor, $snapshot);
+        foreach ($targets as $target) {
+            if ($target['target_type'] !== 'budget_line') {
+                continue;
+            }
+            $budget = Budget::query()->where('organization_id', $snapshot->organization_id)->find($target['target_id']);
+            if ($budget === null || ! hash_equals($target['evidence_digest'], PaymentIntent::digest(['budget' => $budget->getRawOriginal()]))) {
+                throw ValidationException::withMessages(['budget' => 'A target budget changed during classification. Request a fresh run.']);
+            }
+        }
+        if ($this->policies->active()?->publication_digest !== $publication->publication_digest) {
+            throw ValidationException::withMessages(['policy' => 'Active policy changed during allocation. Request a fresh run.']);
+        }
+        $reserveIntact = $proposed->isLessThanOrEqualTo(BigInteger::of($headroom['cash_minor_units']));
 
         return [
             'schema_version' => 1,
@@ -144,7 +167,7 @@ final readonly class ReceiptAllocationProposal
             'lines' => $lines,
             'proposed_minor_units' => (string) $proposed,
             'unallocated_minor_units' => (string) $remainingCash,
-            'protected_reserve_minor_units' => (string) $reserve,
+            'protected_reserve_minor_units' => (string) ($reserve->isGreaterThan($capturedReserve) ? $reserve : $capturedReserve),
             'reserve_intact' => $reserveIntact,
             'proposals_awaiting_human_review' => count(array_filter($lines, fn (array $line): bool => $line['decision'] === 'propose_human_review')),
             'can_execute' => false,
@@ -160,7 +183,7 @@ final readonly class ReceiptAllocationProposal
      * @param  array<string, mixed>  $plan
      * @return list<array<string, mixed>>
      */
-    private function collectTargets(BudgetSnapshot $snapshot, array $plan, InstitutionPolicyVersion $policy): array
+    private function collectTargets(BudgetSnapshot $snapshot, array $plan, InstitutionPolicyVersion $policy, ?Closure $progress, ?string $assessmentNamespace): array
     {
         $rank = [];
         foreach ($policy->content['categories'] as $index => $category) {
@@ -194,7 +217,7 @@ final readonly class ReceiptAllocationProposal
                 'invoice_version_id' => $version->id, 'budget_category' => $invoice->category,
                 'amount_minor_units' => (string) $version->valuation_base_units,
                 'evidence_digest' => $version->snapshot_digest,
-                'description' => 'Approved supplier invoice '.$invoice->reference.' for '.$invoice->amount.' '.$version->source_currency
+                'description' => 'Approved supplier invoice '.$invoice->reference.' for '.Money::formatExact($version->source_minor_units, $version->source_currency)
                     .' due '.$invoice->due_date.'. Vendor category: '.$invoice->category];
         }
 
@@ -206,7 +229,8 @@ final readonly class ReceiptAllocationProposal
             // at their nominal remaining balance, so a line never proposes more
             // than the captured headroom could cover.
             $headroom = $snapshot->headroom();
-            $ceiling = min((int) round($budget->remaining_amount * 1_000000), (int) $headroom['cash_minor_units'], (int) $headroom['budget_minor_units']);
+            $budgetRemaining = Money::fromDecimal((string) $budget->getRawOriginal('remaining_amount'), CurrencyCode::USDC)->minorUnits;
+            $ceiling = min($budgetRemaining, (int) $headroom['cash_minor_units'], (int) $headroom['budget_minor_units']);
             if ($ceiling <= 0) {
                 continue;
             }
@@ -215,7 +239,7 @@ final readonly class ReceiptAllocationProposal
                 'amount_minor_units' => (string) $ceiling,
                 'evidence_digest' => PaymentIntent::digest(['budget' => $budget->getRawOriginal()]),
                 'description' => 'Active budget line "'.$budget->name.'" in category '.$budget->category
-                    .' with '.$budget->remaining_amount.' remaining. Propose at most the currently fundable amount.'];
+                    .' with '.$budget->getRawOriginal('remaining_amount').' remaining. Propose at most the currently fundable amount.'];
         }
 
         if (count($targets) > self::MAX_TARGETS) {
@@ -223,11 +247,20 @@ final readonly class ReceiptAllocationProposal
         }
 
         $classified = [];
-        foreach ($targets as $target) {
-            $assessment = $this->classify($policy, $snapshot, $target);
+        $deadline = hrtime(true) + 140_000_000_000;
+        $progress?->__invoke('targets_loaded', 'Loaded '.count($targets).' approved invoices and active budget lines.', 0, count($targets));
+        foreach ($targets as $index => $target) {
+            $remainingSeconds = intdiv($deadline - hrtime(true), 1_000_000_000);
+            if ($remainingSeconds < 3) {
+                throw ValidationException::withMessages(['allocation' => 'Evaluation time budget reached. No partial allocation plan accepted.']);
+            }
+            $progress?->__invoke('classifying', 'Checking '.$target['target_name'].' against saved policy clauses.', $index, count($targets));
+            $assessment = $this->classify($policy, $snapshot, $target, $assessmentNamespace, $remainingSeconds);
             $category = $assessment['category_id'] ?? null;
             $classified[] = [...$target, 'assessment' => $assessment,
                 'priority_rank' => $rank[$category] ?? PHP_INT_MAX];
+            $progress?->__invoke('classified', $target['target_name'].': '.(($assessment['needs_review'] ?? true)
+                ? 'needs review; no allocation authority.' : $category.'; policy citations validated.'), $index + 1, count($targets));
         }
 
         // Order is staff's category order first, and the model has no say in ordering
@@ -247,30 +280,34 @@ final readonly class ReceiptAllocationProposal
      * @param  array<string, mixed>  $target
      * @return array<string, mixed>
      */
-    private function classify(InstitutionPolicyVersion $policy, BudgetSnapshot $snapshot, array $target): array
+    private function classify(InstitutionPolicyVersion $policy, BudgetSnapshot $snapshot, array $target, ?string $assessmentNamespace, int $remainingSeconds): array
     {
-        $requestKey = 'eduflow:allocation:'.$policy->content_digest.':'.$snapshot->snapshot_digest.':'.$target['target_type'].':'.$target['target_id'];
-        $assessment = InstitutionPolicyAssessment::query()->where('request_key', Uuid::uuid5(Uuid::NAMESPACE_URL, $requestKey)->toString())->first();
-        if ($assessment !== null && $assessment->hasValidResult()) {
+        $input = ['description' => $target['description'], 'target_type' => $target['target_type'],
+            'evidence_digest' => $target['evidence_digest'], 'policy_digest' => $policy->content_digest];
+        $requestKey = 'eduflow:allocation:'.$policy->content_digest.':'.$snapshot->snapshot_digest.':'.$target['target_type'].':'.$target['target_id']
+            .':'.PaymentIntent::digest($input).':'.($assessmentNamespace ?? 'cached');
+        $assessment = InstitutionPolicyAssessment::query()->firstOrCreate(['request_key' => Uuid::uuid5(Uuid::NAMESPACE_URL, $requestKey)->toString()],
+            ['organization_id' => $policy->organization_id, 'institution_policy_version_id' => $policy->id, 'requested_by' => null,
+                'kind' => 'classification', 'input' => $input, 'input_digest' => PaymentIntent::digest($input), 'policy_digest' => $policy->content_digest]);
+        if ($assessment->hasValidResult()) {
             return $assessment->result;
         }
-        $input = ['description' => $target['description'], 'target_type' => $target['target_type'],
-            'evidence_digest' => $target['evidence_digest'], 'publication_digest' => $policy->content_digest];
-        if ($assessment === null) {
-            $assessment = InstitutionPolicyAssessment::query()->create(['organization_id' => $policy->organization_id,
-                'institution_policy_version_id' => $policy->id, 'requested_by' => null, 'request_key' => Uuid::uuid5(Uuid::NAMESPACE_URL, $requestKey)->toString(),
-                'kind' => 'classification', 'input' => $input, 'input_digest' => PaymentIntent::digest($input),
-                'policy_digest' => $policy->content_digest]);
+        $held = ['category_id' => null, 'needs_review' => true, 'citations' => [],
+            'explanation' => 'Classification unavailable or still processing. Request a fresh evaluation; no amount is proposed.'];
+        $claimed = DB::table($assessment->getTable())->where('id', $assessment->id)->where('state', 'queued')->whereNull('completed_at')->update(['state' => 'running']);
+        if ($claimed !== 1) {
+            return $held;
         }
+        $assessment->refresh();
 
         try {
-            $result = $this->interpreter->interpret($policy, 'classification', $input);
+            $result = $this->interpreter->interpret($policy, 'classification', $input, $remainingSeconds);
         } catch (\Throwable $exception) {
             report($exception);
             $assessment->update(['state' => 'needs_review', 'completed_at' => now(),
                 'last_error' => 'Allocation classification unavailable. This line is held for human review and no amount is proposed.']);
 
-            return ['category_id' => null, 'needs_review' => true, 'citations' => [], 'explanation' => null];
+            return $held;
         }
 
         $assessment->update(['state' => 'completed', 'result' => $result, 'result_digest' => PaymentIntent::digest($result),

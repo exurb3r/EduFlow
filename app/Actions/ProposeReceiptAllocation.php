@@ -10,6 +10,7 @@ use App\Models\ReceiptAllocationPlan;
 use App\Models\User;
 use App\Services\InstallationInstitution;
 use App\Services\ReceiptAllocationProposal;
+use Closure;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Gate;
 use Illuminate\Validation\ValidationException;
@@ -26,7 +27,7 @@ final readonly class ProposeReceiptAllocation
      * stored plan is immutable and non-executable, and a repeat request with
      * the same key returns the original rather than re-proposing.
      */
-    public function handle(User $actor, BudgetSnapshot $snapshot, string $requestKey): ReceiptAllocationPlan
+    public function handle(User $actor, BudgetSnapshot $snapshot, string $requestKey, ?Closure $progress = null, bool $fresh = false): ReceiptAllocationPlan
     {
         Gate::forUser($actor)->authorize('view', $snapshot);
         $institution = $this->institutions->require();
@@ -34,9 +35,18 @@ final readonly class ProposeReceiptAllocation
             throw ValidationException::withMessages(['budget' => 'Allocation planning is scoped to this institution.']);
         }
 
-        return DB::transaction(function () use ($actor, $snapshot, $requestKey, $institution): ReceiptAllocationPlan {
+        $existing = ReceiptAllocationPlan::query()->where('request_key', $requestKey)->first();
+        if ($existing !== null) {
+            if ($existing->organization_id !== $institution->id || $existing->budget_snapshot_id !== $snapshot->id || ! $existing->hasValidPlan()) {
+                throw ValidationException::withMessages(['allocation' => 'Proposal identity already binds different or damaged evidence.']);
+            }
+
+            return $existing;
+        }
+        $plan = $this->proposals->build($actor, $snapshot, $progress, $fresh ? $requestKey : null);
+
+        return DB::transaction(function () use ($actor, $snapshot, $requestKey, $institution, $plan): ReceiptAllocationPlan {
             $snapshot = BudgetSnapshot::query()->where('organization_id', $institution->id)->findOrFail($snapshot->id);
-            $plan = $this->proposals->build($actor, $snapshot);
             $digest = PaymentIntent::digest($plan);
             $existing = ReceiptAllocationPlan::query()->where('request_key', $requestKey)->first();
             if ($existing !== null) {

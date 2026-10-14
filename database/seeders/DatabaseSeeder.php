@@ -26,5 +26,7 @@ class DatabaseSeeder extends Seeder
                 DemoUsersSeeder::class,
             ]);
         }
+
+        $this->call(DefaultInstitutionPolicySeeder::class);
     }
 }

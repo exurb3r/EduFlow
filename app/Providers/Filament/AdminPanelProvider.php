@@ -8,6 +8,8 @@ use App\Filament\Pages\Collections;
 use App\Filament\Pages\Dashboard;
 use App\Filament\Pages\PaymentReviews;
 use App\Filament\Pages\TreasuryWallet;
+use App\Models\InstitutionPolicyEvaluation;
+use App\Models\InstitutionPolicyVersion;
 use BezhanSalleh\FilamentShield\FilamentShieldPlugin;
 use Filament\Actions\Action;
 use Filament\Auth\MultiFactor\App\AppAuthentication;
@@ -17,6 +19,7 @@ use Filament\Http\Middleware\AuthenticateSession;
 use Filament\Http\Middleware\DisableBladeIconComponents;
 use Filament\Http\Middleware\DispatchServingFilamentEvent;
 use Filament\Navigation\NavigationGroup;
+use Filament\Navigation\NavigationItem;
 use Filament\Panel;
 use Filament\PanelProvider;
 use Filament\Support\Colors\Color;
@@ -29,6 +32,7 @@ use Illuminate\Foundation\Http\Middleware\VerifyCsrfToken;
 use Illuminate\Routing\Middleware\SubstituteBindings;
 use Illuminate\Session\Middleware\StartSession;
 use Illuminate\Support\Facades\Blade;
+use Illuminate\Support\Facades\Gate;
 use Illuminate\View\Middleware\ShareErrorsFromSession;
 use RobertBoes\FilamentPasskeys\FilamentPasskeysPlugin;
 
@@ -58,6 +62,14 @@ class AdminPanelProvider extends PanelProvider
                     ->collapsed(),
                 NavigationGroup::make('Settings'),
                 NavigationGroup::make('System'),
+            ])
+            ->navigationItems([
+                NavigationItem::make('Institution policies')->group('Finance records')->icon('heroicon-o-book-open')
+                    ->url(fn (): string => route('finance.policies.index'))->sort(4)
+                    ->visible(fn (): bool => Gate::allows('viewAny', InstitutionPolicyVersion::class)),
+                NavigationItem::make('Policy evaluations')->group('Finance records')->icon('heroicon-o-sparkles')
+                    ->url(fn (): string => route('finance.policy-evaluations.index'))->sort(5)
+                    ->visible(fn (): bool => Gate::allows('viewAny', InstitutionPolicyEvaluation::class)),
             ])
             ->profile(EditProfile::class, isSimple: false)
             ->userMenuItems([

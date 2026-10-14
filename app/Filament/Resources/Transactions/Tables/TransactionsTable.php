@@ -6,6 +6,7 @@ namespace App\Filament\Resources\Transactions\Tables;
 
 use App\Enums\TransactionStatus;
 use App\Enums\TransactionType;
+use App\Models\InstitutionPolicyEvaluation;
 use App\Models\Transaction;
 use App\Services\LeptonReconciliationService;
 use Filament\Actions\Action;
@@ -14,6 +15,7 @@ use Filament\Notifications\Notification;
 use Filament\Tables\Columns\TextColumn;
 use Filament\Tables\Filters\SelectFilter;
 use Filament\Tables\Table;
+use Illuminate\Support\Facades\Gate;
 use Throwable;
 use Yukazakiri\Lepton\Contracts\ArcNetworkGateway;
 
@@ -74,6 +76,9 @@ class TransactionsTable
                     ->options(TransactionStatus::class),
             ])
             ->recordActions([
+                Action::make('reevaluatePolicy')->label('Re-evaluate policy')->icon('heroicon-o-sparkles')->color('gray')
+                    ->visible(fn (): bool => Gate::allows('create', InstitutionPolicyEvaluation::class))
+                    ->url(fn (Transaction $record): string => route('finance.policy-evaluations.index', ['source_type' => 'transaction', 'source_id' => $record->id])),
                 Action::make('verifyOnChain')
                     ->label('Verify against Arc')
                     ->icon('heroicon-m-shield-check')

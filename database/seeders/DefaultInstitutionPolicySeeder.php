@@ -8,6 +8,7 @@ use App\Models\InstitutionPolicyVersion;
 use App\Models\Organization;
 use App\Models\User;
 use App\Services\DefaultInstitutionPolicy;
+use App\Services\InstallationInstitution;
 use App\Services\InstitutionPolicyWorkspace;
 use Illuminate\Database\Seeder;
 use Illuminate\Support\Facades\DB;
@@ -30,7 +31,7 @@ class DefaultInstitutionPolicySeeder extends Seeder
     public function run(): void
     {
         /** @var Organization|null $institution */
-        $institution = Organization::query()->orderBy('id')->first();
+        $institution = app(InstallationInstitution::class)->current();
         if ($institution === null) {
             $this->command?->warn('No institution found; skipping default policy.');
 
@@ -44,15 +45,13 @@ class DefaultInstitutionPolicySeeder extends Seeder
             return;
         }
 
-        config(['eduflow.institution_id' => $institution->id]);
-
         if (InstitutionPolicyVersion::query()->where('organization_id', $institution->id)->exists()) {
             $this->command?->line('An institution policy already exists for this school; default template not applied.');
 
             return;
         }
 
-        $template = DefaultInstitutionPolicy::template();
+        $template = DefaultInstitutionPolicy::forInstitution($institution);
         $template['request_key'] = (string) Str::uuid();
         $template['controls'] = [
             'minimum_reserve' => '0',
@@ -69,7 +68,7 @@ class DefaultInstitutionPolicySeeder extends Seeder
 
     private function author(): ?User
     {
-        return User::query()->whereHas('roles', fn ($query) => $query->whereIn('name', ['finance_officer', 'admin', 'super_admin'])
+        return User::query()->whereNotNull('email_verified_at')->whereHas('roles', fn ($query) => $query->whereIn('name', ['finance_officer', 'admin', 'super_admin'])
             ->where('guard_name', 'web'))->orderBy('id')->first();
     }
 }

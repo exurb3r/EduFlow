@@ -11,6 +11,7 @@ use App\DTOs\Money;
 use App\Enums\CurrencyCode;
 use App\Models\CollectionBatch;
 use App\Models\CollectionBatchReview;
+use App\Models\InstitutionPolicyEvaluation;
 use App\Models\StudentBillPayment;
 use App\Models\StudentTuitionPayment;
 use App\Models\User;
@@ -146,6 +147,9 @@ class Collections extends Page implements HasTable
                 SelectFilter::make('source_stream')->label('Payment channel')->options(fn (): array => $this->channelOptions()),
             ], layout: FiltersLayout::AboveContent)
             ->recordActions([
+                Action::make('reevaluatePolicy')->label('Re-evaluate policy')->icon(Heroicon::Sparkles)->color('gray')
+                    ->visible(fn (): bool => Gate::allows('create', InstitutionPolicyEvaluation::class))
+                    ->url(fn (CollectionBatch $record): string => route('finance.policy-evaluations.index', ['source_type' => 'collection', 'source_id' => $record->id])),
                 Action::make('viewCollectionBatch')->label('Details')->icon(Heroicon::Eye)->color('gray')
                     ->visible(fn (CollectionBatch $record): bool => Gate::forUser(Auth::user())->allows('view', $record))
                     ->modalHeading('Collection details')->modalWidth('3xl')->slideOver()
