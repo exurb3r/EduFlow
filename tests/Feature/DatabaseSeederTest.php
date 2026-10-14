@@ -32,7 +32,7 @@ test('database seeder creates the default roles', function (): void {
 
     expect(Role::query()->where('name', RoleEnums::USER->value)->where('guard_name', 'web')->exists())->toBeTrue()
         ->and(User::query()->where('email', 'admin@admin.com')->exists())->toBeTrue()
-        ->and(AssistanceRequest::count())->toBe(0);
+        ->and(AssistanceRequest::query()->count())->toBe(0);
 });
 
 test('database seeding outside demo environments creates roles but no users or demo records', function (string $environment): void {
