@@ -10,6 +10,7 @@ use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasOne;
 use Illuminate\Database\Eloquent\Relations\MorphTo;
+use Illuminate\Support\Carbon;
 
 /**
  * @property int $id
@@ -26,6 +27,8 @@ use Illuminate\Database\Eloquent\Relations\MorphTo;
  * @property float $approved_amount
  * @property bool $requires_approval
  * @property string $status
+ * @property Carbon|null $created_at
+ * @property Carbon|null $updated_at
  * @property-read Organization $organization
  * @property-read Approval|null $approval
  */

@@ -18,6 +18,7 @@ use App\Filament\Finance\Widgets\WorkflowRunStateChart;
 use App\Filament\Finance\Widgets\WorkflowRunWidget;
 use App\Models\CollectionBatch;
 use App\Models\FinancePolicyActivation;
+use App\Models\FinancePolicyVersion;
 use App\Models\FinanceWorkflowRun;
 use App\Models\PaymentIntent;
 use App\Models\PaymentReservation;
@@ -132,7 +133,7 @@ class FinanceDashboard extends BaseDashboard
                     ->icon(Heroicon::ArrowPath)
                     ->color('warning')
                     ->requiresConfirmation()
-                    ->hidden(fn (): bool => ! (Auth::user() instanceof User && Auth::user()->hasRole('super_admin')))
+                    ->hidden(fn (): bool => ! Auth::user() instanceof User || ! Auth::user()->hasRole('super_admin'))
                     ->modalHeading('Synchronize ledger from Arc chain?')
                     ->modalDescription('Polls the configured Lepton Arc network gateway and updates the ledger treasury balance to match.')
                     ->action(function (): void {
@@ -246,8 +247,9 @@ class FinanceDashboard extends BaseDashboard
                                         ->state(function (): string {
                                             $institution = app(InstallationInstitution::class)->current();
                                             $activation = $institution === null ? null : FinancePolicyActivation::current($institution->id);
+                                            $policyVersion = $activation?->policyVersion;
 
-                                            return $activation?->policyVersion?->version ?? 'No active policy';
+                                            return $policyVersion instanceof FinancePolicyVersion ? $policyVersion->version : 'No active policy';
                                         }),
                                 ]),
                             ]),
