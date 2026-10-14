@@ -284,8 +284,9 @@ final readonly class ReceiptAllocationProposal
     {
         $input = ['description' => $target['description'], 'target_type' => $target['target_type'],
             'evidence_digest' => $target['evidence_digest'], 'policy_digest' => $policy->content_digest];
+        $provider = $this->interpreter->classificationProvider();
         $requestKey = 'eduflow:allocation:'.$policy->content_digest.':'.$snapshot->snapshot_digest.':'.$target['target_type'].':'.$target['target_id']
-            .':'.PaymentIntent::digest($input).':'.($assessmentNamespace ?? 'cached');
+            .':'.PaymentIntent::digest($input).':'.PaymentIntent::digest($provider).':'.($assessmentNamespace ?? 'cached');
         $assessment = InstitutionPolicyAssessment::query()->firstOrCreate(['request_key' => Uuid::uuid5(Uuid::NAMESPACE_URL, $requestKey)->toString()],
             ['organization_id' => $policy->organization_id, 'institution_policy_version_id' => $policy->id, 'requested_by' => null,
                 'kind' => 'classification', 'input' => $input, 'input_digest' => PaymentIntent::digest($input), 'policy_digest' => $policy->content_digest]);
@@ -311,6 +312,7 @@ final readonly class ReceiptAllocationProposal
         }
 
         $assessment->update(['state' => 'completed', 'result' => $result, 'result_digest' => PaymentIntent::digest($result),
+            'provider' => $provider['name'], 'model' => $provider['model'],
             'completed_at' => now(), 'last_error' => null]);
 
         return $result;

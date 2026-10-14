@@ -11,6 +11,7 @@ use App\Filament\Finance\Widgets\BudgetHeadroomChart;
 use App\Filament\Finance\Widgets\CollectionsOverviewWidget;
 use App\Filament\Finance\Widgets\CollectionsTrendChart;
 use App\Filament\Finance\Widgets\EvidenceTimelineWidget;
+use App\Filament\Finance\Widgets\FinanceAffordabilityWidget;
 use App\Filament\Finance\Widgets\OperationsHealthWidget;
 use App\Filament\Finance\Widgets\PaymentDecisionChart;
 use App\Filament\Finance\Widgets\WorkflowRunStateChart;
@@ -19,6 +20,7 @@ use App\Filament\Pages\Collections;
 use App\Filament\Pages\FinanceDashboard;
 use App\Filament\Pages\FinanceSupervisor;
 use App\Filament\Pages\PaymentReviews;
+use App\Filament\Pages\TreasuryWallet;
 use App\Filament\Resources\AssistanceRequests\AssistanceRequestResource;
 use App\Filament\Resources\AssistanceRequests\Pages\ListAssistanceRequests;
 use App\Filament\Resources\AssistanceRequests\Pages\ViewAssistanceRequest;
@@ -87,9 +89,10 @@ test('finance panel exposes the supervisor dashboard, workflow pages and no plug
     $panel = Filament::getPanel('finance');
 
     expect($panel->getResources())->toBe([StudentResource::class, TuitionAccountResource::class, AssistanceRequestResource::class, PaymentSubmissionResource::class])
-        ->and($panel->getPages())->toBe([FinanceDashboard::class, FinanceSupervisor::class, Collections::class, PaymentReviews::class])
+        ->and($panel->getPages())->toBe([FinanceDashboard::class, FinanceSupervisor::class, Collections::class, PaymentReviews::class, TreasuryWallet::class])
         ->and($panel->getClusters())->toBeEmpty()
         ->and($panel->getWidgets())->toEqualCanonicalizing([
+            FinanceAffordabilityWidget::class,
             ApprovalInboxWidget::class,
             CollectionsOverviewWidget::class,
             CollectionsTrendChart::class,
