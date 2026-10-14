@@ -34,6 +34,10 @@ class TreasuryOverviewWidget extends BaseWidget
 {
     protected static ?int $sort = 1;
 
+    protected int|string|array $columnSpan = 'full';
+
+    protected int|array|null $columns = 3;
+
     #[\Override]
     public function getHeading(): ?string
     {
@@ -69,6 +73,7 @@ class TreasuryOverviewWidget extends BaseWidget
             ->description('Local ledger only. This is not on-chain funds and never settles a payable; it is a legacy two-decimal column, so the finance panel uses exact base units instead.')
             ->descriptionIcon(Heroicon::Banknotes)
             ->color($status['in_sync'] === false ? 'warning' : 'gray')
+            ->extraAttributes(['class' => 'cursor-pointer hover:shadow-sm transition-shadow'])
             ->url(TransactionResource::getUrl('index'));
 
         $collections = CollectionBatch::query()->where('organization_id', $institutionId)->count();
@@ -86,6 +91,7 @@ class TreasuryOverviewWidget extends BaseWidget
             ))
             ->descriptionIcon(Heroicon::DocumentText)
             ->color('info')
+            ->extraAttributes(['class' => 'cursor-pointer hover:shadow-sm transition-shadow'])
             ->url(Collections::getUrl(panel: 'finance'));
 
         PaymentIntent::query()->where('organization_id', $institutionId)->count();
@@ -106,6 +112,7 @@ class TreasuryOverviewWidget extends BaseWidget
             ))
             ->descriptionIcon(Heroicon::ClipboardDocumentCheck)
             ->color('primary')
+            ->extraAttributes(['class' => 'cursor-pointer hover:shadow-sm transition-shadow'])
             ->url(PaymentReviews::getUrl(panel: 'finance'));
 
         $states = FinanceWorkflowRun::query()
@@ -123,6 +130,7 @@ class TreasuryOverviewWidget extends BaseWidget
             ))
             ->descriptionIcon(Heroicon::ClipboardDocumentList)
             ->color($waiting > 0 ? 'warning' : 'success')
+            ->extraAttributes(['class' => 'cursor-pointer hover:shadow-sm transition-shadow'])
             ->url(FinanceDashboard::getUrl(panel: 'finance'));
 
         $pending = Transaction::query()
@@ -135,6 +143,7 @@ class TreasuryOverviewWidget extends BaseWidget
             ))
             ->descriptionIcon(Heroicon::CircleStack)
             ->color('gray')
+            ->extraAttributes(['class' => 'cursor-pointer hover:shadow-sm transition-shadow'])
             ->url(TransactionResource::getUrl('index'));
 
         return [$ledgerStat, $evidenceStat, $decisionStat, $supervisionStat, $settlementStat];

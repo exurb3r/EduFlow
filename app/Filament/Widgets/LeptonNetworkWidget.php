@@ -22,6 +22,8 @@ class LeptonNetworkWidget extends BaseWidget
 
     protected int|string|array $columnSpan = 'full';
 
+    protected int|array|null $columns = 4;
+
     /**
      * Chain reconciliation is a widget-level concern, not a per-stat one:
      * Filament stats have no action slot.
@@ -145,7 +147,7 @@ class LeptonNetworkWidget extends BaseWidget
 
         if ($status['address_url']) {
             $networkStat->extraAttributes([
-                'class' => 'cursor-pointer',
+                'class' => 'cursor-pointer hover:shadow-sm transition-shadow',
                 'x-data' => '{}',
                 'x-on:click' => 'window.open('.json_encode($status['address_url']).', \'_blank\')',
             ]);

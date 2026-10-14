@@ -35,6 +35,8 @@ class InstallationReadinessWidget extends BaseWidget
 
     protected int|string|array $columnSpan = 'full';
 
+    protected int|array|null $columns = 3;
+
     #[\Override]
     public function getHeading(): ?string
     {
@@ -68,6 +70,7 @@ class InstallationReadinessWidget extends BaseWidget
                 : sprintf('Initialised %s · %s · %s', $installed, $institution->currency, config('app.timezone')))
             ->descriptionIcon('heroicon-o-academic-cap')
             ->color('primary')
+            ->extraAttributes(['class' => 'cursor-pointer hover:shadow-sm transition-shadow'])
             ->url(ApplicationDetailsSettingsPage::getUrl());
 
         $singleStat = Stat::make('Institution boundary', $organizationCount === 1 ? 'Single institution' : $organizationCount.' organizations')
@@ -76,6 +79,7 @@ class InstallationReadinessWidget extends BaseWidget
                 : 'Ambiguous institution context. Dashboards, the wallet doctor and settlement refuse to guess.')
             ->descriptionIcon('heroicon-o-building-library')
             ->color($organizationCount === 1 ? 'success' : 'danger')
+            ->extraAttributes(['class' => 'cursor-pointer hover:shadow-sm transition-shadow'])
             ->url(ApplicationDetailsSettingsPage::getUrl());
 
         $features = $this->features();
@@ -88,6 +92,7 @@ class InstallationReadinessWidget extends BaseWidget
             ->description('Conservative defaults are intentional. Registration and impersonation should stay off until the school chooses otherwise.')
             ->descriptionIcon('heroicon-o-lock-closed')
             ->color($openGates === [] ? 'success' : 'warning')
+            ->extraAttributes(['class' => 'cursor-pointer hover:shadow-sm transition-shadow'])
             ->url(ApplicationFeaturesSettingsPage::getUrl());
 
         $ai = $this->ai();
@@ -101,6 +106,7 @@ class InstallationReadinessWidget extends BaseWidget
             ))
             ->descriptionIcon('heroicon-o-sparkles')
             ->color($ai instanceof AiSettings && $ai->advisory_enabled ? 'info' : 'gray')
+            ->extraAttributes(['class' => 'cursor-pointer hover:shadow-sm transition-shadow'])
             ->url(AiProviderResource::getUrl('index'));
 
         $status = app(LeptonTreasuryService::class)->status($institution->primaryWallet());
@@ -121,6 +127,7 @@ class InstallationReadinessWidget extends BaseWidget
             ->description('Background planning is a supervised service. Nothing here submits, authorizes or settles a payment.')
             ->descriptionIcon('heroicon-o-cog-6-tooth')
             ->color(config('eduflow.background_finance.enabled') ? 'info' : 'gray')
+            ->extraAttributes(['class' => 'cursor-pointer hover:shadow-sm transition-shadow'])
             ->url(FinanceDashboard::getUrl(panel: 'finance'));
 
         return [$identityStat, $singleStat, $onboardingStat, $railStat, $aiStat, $runtimeStat];

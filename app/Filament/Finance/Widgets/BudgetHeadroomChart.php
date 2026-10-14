@@ -35,6 +35,8 @@ class BudgetHeadroomChart extends ChartWidget
 
     protected ?string $emptyStateDescription = 'A budget snapshot appears here once staff attest the approved allocation and the cash position behind it.';
 
+    protected ?string $maxHeight = '320px';
+
     #[\Override]
     protected function getType(): string
     {
@@ -45,6 +47,32 @@ class BudgetHeadroomChart extends ChartWidget
     public function getHeading(): string|Htmlable|null
     {
         return LinkedHeading::make($this->heading, FinanceSupervisor::getUrl(panel: 'finance'));
+    }
+
+    /**
+     * @return array<string, mixed>
+     */
+    #[\Override]
+    protected function getOptions(): array
+    {
+        return [
+            'plugins' => [
+                'legend' => [
+                    'display' => true,
+                    'position' => 'top',
+                ],
+            ],
+            'scales' => [
+                'y' => [
+                    'beginAtZero' => true,
+                ],
+                'x' => [
+                    'grid' => [
+                        'display' => false,
+                    ],
+                ],
+            ],
+        ];
     }
 
     /**

@@ -31,6 +31,8 @@ class ArcSettlementWidget extends BaseWidget
 
     protected int|string|array $columnSpan = 'full';
 
+    protected int|array|null $columns = 4;
+
     /** Minutes after which a funding observation stops being usable evidence. */
     private const int STALE_AFTER_MINUTES = 15;
 
@@ -143,6 +145,7 @@ class ArcSettlementWidget extends BaseWidget
                 ))
             ->descriptionIcon(Heroicon::Clock)
             ->color($evidenceColour)
+            ->extraAttributes(['class' => 'cursor-pointer hover:shadow-sm transition-shadow'])
             ->url(PaymentReviews::getUrl(panel: 'finance'));
 
         return [$usdcStat, $nativeStat, $chainStat, $evidenceStat, $driverStat];

@@ -35,6 +35,8 @@ class AutonomyLaneWidget extends BaseWidget
 
     protected int|string|array $columnSpan = 'full';
 
+    protected int|array|null $columns = 4;
+
     #[\Override]
     public function getHeading(): ?string
     {

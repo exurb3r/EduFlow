@@ -9,6 +9,8 @@ use App\Filament\Pages\Collections;
 use App\Filament\Support\LinkedHeading;
 use App\Models\CollectionBatch;
 use App\Services\InstallationInstitution;
+use Filament\Actions\Action;
+use Filament\Support\Icons\Heroicon;
 use Filament\Tables\Columns\TextColumn;
 use Filament\Tables\Table;
 use Filament\Widgets\TableWidget;
@@ -86,6 +88,13 @@ class CollectionsOverviewWidget extends TableWidget
                     ->color(fn (object $record): string => (int) $record->held_minor_units > 0 ? 'warning' : 'gray'),
                 $this->unitsColumn('rejected_minor_units', 'Rejected')
                     ->color(fn (object $record): string => (int) $record->rejected_minor_units > 0 ? 'danger' : 'gray'),
+            ])
+            ->recordActions([
+                Action::make('openBatchQueue')
+                    ->label('Review')
+                    ->icon(Heroicon::ArrowRightCircle)
+                    ->color('primary')
+                    ->url(fn (): string => Collections::getUrl(panel: 'finance')),
             ])
             ->defaultSort('currency')
             ->paginated(false);

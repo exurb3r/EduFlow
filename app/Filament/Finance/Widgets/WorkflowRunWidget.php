@@ -9,7 +9,13 @@ use App\Filament\Support\LinkedHeading;
 use App\Models\FinanceWorkflowRun;
 use App\Services\InstallationInstitution;
 use Carbon\CarbonInterface;
+use Filament\Actions\Action;
+use Filament\Infolists\Components\TextEntry;
+use Filament\Schemas\Components\Grid as InfoGrid;
+use Filament\Schemas\Components\Section as InfoSection;
+use Filament\Support\Icons\Heroicon;
 use Filament\Tables\Columns\TextColumn;
+use Filament\Tables\Filters\SelectFilter;
 use Filament\Tables\Table;
 use Filament\Widgets\TableWidget;
 use Illuminate\Database\Eloquent\Builder;
@@ -101,6 +107,58 @@ class WorkflowRunWidget extends TableWidget
                     ->placeholder('None')
                     ->color(fn (FinanceWorkflowRun $record): string => $record->last_error === null ? 'gray' : 'danger')
                     ->toggleable(isToggledHiddenByDefault: true),
+            ])
+            ->filters([
+                SelectFilter::make('state')
+                    ->options([
+                        'queued' => 'Queued',
+                        'running' => 'Running',
+                        'waiting_for_review' => 'Waiting for review',
+                        'completed' => 'Completed',
+                        'blocked' => 'Blocked',
+                        'failed' => 'Failed',
+                        'paused' => 'Paused',
+                    ]),
+            ])
+            ->recordActions([
+                Action::make('inspectRun')
+                    ->label('Inspect')
+                    ->icon(Heroicon::Eye)
+                    ->color('gray')
+                    ->modalHeading(fn (FinanceWorkflowRun $record): string => "Run #{$record->id} — ".(self::WORKERS[$record->kind] ?? $record->kind))
+                    ->modalDescription(fn (FinanceWorkflowRun $record): string => "State: {$record->state} · Trigger: {$record->trigger_key}")
+                    ->infolist([
+                        InfoSection::make('Run State & Attempts')
+                            ->schema([
+                                InfoGrid::make(3)->schema([
+                                    TextEntry::make('kind')
+                                        ->label('Worker')
+                                        ->formatStateUsing(fn (string $state): string => self::WORKERS[$state] ?? $state)
+                                        ->badge(),
+                                    TextEntry::make('state')->badge(),
+                                    TextEntry::make('attempts'),
+                                ]),
+                                InfoGrid::make(2)->schema([
+                                    TextEntry::make('heartbeat_at')
+                                        ->label('Last Heartbeat (UTC)')
+                                        ->dateTime('Y-m-d H:i:s', 'UTC')
+                                        ->placeholder('Never'),
+                                    TextEntry::make('created_at')
+                                        ->label('Triggered At (UTC)')
+                                        ->dateTime('Y-m-d H:i:s', 'UTC'),
+                                ]),
+                            ]),
+                        InfoSection::make('Execution Context')
+                            ->schema([
+                                TextEntry::make('trigger_key')->label('Triggering Event Key'),
+                                TextEntry::make('last_error')
+                                    ->label('Last Recorded Error')
+                                    ->placeholder('None')
+                                    ->prose(),
+                            ]),
+                    ])
+                    ->modalSubmitAction(false)
+                    ->modalCancelActionLabel('Close'),
             ])
             ->defaultSort('id', 'desc')
             ->paginated([5, 10, 25]);

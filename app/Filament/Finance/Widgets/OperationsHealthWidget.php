@@ -33,6 +33,8 @@ class OperationsHealthWidget extends BaseWidget
 
     protected int|string|array $columnSpan = 'full';
 
+    protected int|array|null $columns = 4;
+
     #[\Override]
     public function getHeading(): ?string
     {
@@ -136,6 +138,7 @@ class OperationsHealthWidget extends BaseWidget
             ))
             ->descriptionIcon(Heroicon::MagnifyingGlass)
             ->color($unresolved + $failed > 0 ? 'warning' : 'success')
+            ->extraAttributes(['class' => 'cursor-pointer hover:shadow-sm transition-shadow'])
             ->url(PaymentReviews::getUrl(panel: 'finance'));
 
         return [$runtimeStat, $queueStat, $heartbeatStat, $fundingStat, $notificationStat, $providerStat, $outcomeStat];
