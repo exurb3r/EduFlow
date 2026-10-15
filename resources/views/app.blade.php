@@ -1,5 +1,15 @@
 <!DOCTYPE html>
-<html lang="{{ str_replace('_', '-', app()->getLocale()) }}" @class(['dark' => ($appearance ?? 'system') == 'dark'])>
+@php
+    // The palette class is rendered server-side so a hard refresh does not flash
+    // the default palette before hydration. 'default' adds no class at all.
+    $colorTheme = $colorTheme ?? 'default';
+    $htmlClasses = ['dark' => ($appearance ?? 'system') == 'dark'];
+
+    if ($colorTheme !== 'default') {
+        $htmlClasses['theme-'.$colorTheme] = true;
+    }
+@endphp
+<html lang="{{ str_replace('_', '-', app()->getLocale()) }}" @class($htmlClasses)>
 
 <head>
     <meta charset="utf-8">

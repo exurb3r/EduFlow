@@ -1144,9 +1144,9 @@ export default function StudentDashboard({
                                         }}
                                     >
                                         {inFlightAttempt && (
-                                            <div className="flex items-center justify-between gap-3 rounded-xl border border-amber-500/30 bg-amber-500/10 p-3 text-xs text-amber-300">
+                                            <div className="flex items-center justify-between gap-3 rounded-xl border border-[var(--status-pending)]/30 bg-[var(--status-pending)]/10 p-3 clay-label text-[var(--status-pending)]">
                                                 <div className="flex items-center gap-2 min-w-0">
-                                                    <Loader2 className="size-4 shrink-0 animate-spin text-amber-400" />
+                                                    <Loader2 className="size-4 shrink-0 animate-spin text-[var(--status-pending)]" />
                                                     <span className="truncate">
                                                         Transfer of{' '}
                                                         {formatBaseUnits(
@@ -1163,7 +1163,7 @@ export default function StudentDashboard({
                                                             inFlightAttempt,
                                                         )
                                                     }
-                                                    className="clay-focus shrink-0 font-semibold text-amber-200 underline hover:text-amber-100"
+                                                    className="clay-focus shrink-0 font-semibold text-[var(--status-pending)] underline hover:text-[var(--clay-ink)]"
                                                 >
                                                     View receipt
                                                 </button>
@@ -1338,10 +1338,10 @@ export default function StudentDashboard({
                                                     className="mt-0.5 shrink-0 border-[var(--clay-border)] transition-colors group-hover:border-[var(--clay-primary-bright)]/70 data-[state=checked]:bg-[var(--clay-primary)] data-[state=checked]:border-[var(--clay-primary)] data-[state=checked]:text-[var(--clay-primary-foreground)]"
                                                 />
                                                 <div className="flex-1 space-y-2.5 min-w-0">
-                                                    <p className="text-xs sm:text-[13px] leading-relaxed text-[var(--clay-text)] transition-colors group-hover:text-[var(--clay-text)]">
+                                                    <p className="text-xs sm:text-sm leading-relaxed text-[var(--clay-text)] transition-colors group-hover:text-[var(--clay-text)]">
                                                         {payQuote.consent_text}
                                                     </p>
-                                                    <div className="flex flex-wrap items-center gap-1.5 pt-1 text-[11px] text-[var(--clay-text-muted)] border-t border-[var(--clay-border)]/60">
+                                                    <div className="flex flex-wrap items-center gap-1.5 pt-1 text-2xs text-[var(--clay-text-muted)] border-t border-[var(--clay-border)]/60">
                                                         <span className="inline-flex items-center gap-1 rounded-md border border-[var(--clay-border)] bg-[var(--clay-surface)] px-2 py-0.5 font-mono transition-colors group-hover:border-[var(--clay-border)]/80">
                                                             <span className="text-[var(--clay-text-muted)]">
                                                                 Fee ceiling:
@@ -1360,7 +1360,7 @@ export default function StudentDashboard({
                                                             title={`Quote expires: ${payQuote.expires_at}`}
                                                             className="inline-flex items-center gap-1 rounded-md border border-[var(--clay-border)] bg-[var(--clay-surface)] px-2 py-0.5 font-mono transition-colors group-hover:border-[var(--clay-border)]/80"
                                                         >
-                                                            <Clock className="size-3 text-amber-400 shrink-0" />
+                                                            <Clock className="size-3 text-[var(--status-pending)] shrink-0" />
                                                             <span className="text-[var(--clay-text-muted)]">
                                                                 Expires:
                                                             </span>
@@ -1459,7 +1459,7 @@ export default function StudentDashboard({
 
                                     <div className="flex shrink-0 items-center gap-2">
                                         {snapshot?.is_fake && (
-                                            <span className="rounded-full bg-[var(--clay-surface-soft)] px-2.5 py-1 text-[10px] font-semibold uppercase tracking-wider text-[var(--clay-text-muted)]">
+                                            <span className="rounded-full bg-[var(--clay-surface-soft)] px-2.5 py-1 clay-label text-[var(--clay-text-muted)]">
                                                 Test ledger
                                             </span>
                                         )}
@@ -1512,7 +1512,7 @@ export default function StudentDashboard({
                                     </div>
                                 ) : (
                                     <>
-                                        <p className="bulletin-figure mt-5 text-4xl sm:text-5xl">
+                                        <p className="bulletin-figure mt-5">
                                             {balanceVisible
                                                 ? snapshot?.is_available &&
                                                   snapshot.balance
@@ -1619,7 +1619,7 @@ export default function StudentDashboard({
 
                                 {tuitionAccount ? (
                                     <>
-                                        <p className="bulletin-figure mt-4 text-3xl">
+                                        <p className="clay-figure mt-4">
                                             {balanceVisible
                                                 ? formatUsdc(
                                                       tuitionAccount.remaining_amount,
@@ -1637,7 +1637,7 @@ export default function StudentDashboard({
                                         {Number(
                                             tuitionAccount.held_amount ?? 0,
                                         ) > 0 && (
-                                            <p className="mt-2 text-xs font-medium text-amber-500">
+                                            <p className="mt-2 text-xs font-medium text-[var(--status-pending)]">
                                                 {balanceVisible
                                                     ? `Includes ${formatUsdc(
                                                           tuitionAccount.held_amount!,
@@ -1674,7 +1674,7 @@ export default function StudentDashboard({
                                                     tuitionAccount.held_amount ??
                                                         0,
                                                 ) > 0 && (
-                                                    <p className="mt-1 text-xs text-amber-500">
+                                                    <p className="mt-1 text-xs text-[var(--status-pending)]">
                                                         +
                                                         {formatUsdc(
                                                             tuitionAccount.held_amount!,
@@ -1746,7 +1746,7 @@ export default function StudentDashboard({
                                 </div>
 
                                 {eligibility?.eligible ? (
-                                    <p className="bulletin-figure mt-4 text-4xl sm:text-5xl">
+                                    <p className="bulletin-figure mt-4">
                                         {formatUsdc(
                                             eligibility.eligible_amount_base_units,
                                         )}
@@ -1849,7 +1849,7 @@ export default function StudentDashboard({
                                             EduFlow &middot; Arc Testnet Ledger
                                         </p>
                                         {transactions.length > 0 && (
-                                            <span className="rounded-full bg-[var(--clay-surface-soft)] px-2 py-0.5 text-[10px] font-semibold text-[var(--clay-text-muted)]">
+                                            <span className="rounded-full bg-[var(--clay-surface-soft)] px-2 py-0.5 clay-label text-[var(--clay-text-muted)]">
                                                 {transactions.length} record
                                                 {transactions.length === 1
                                                     ? ''
@@ -1907,11 +1907,11 @@ export default function StudentDashboard({
                                                 }
                                                 className={`clay-focus inline-flex items-center gap-1 rounded-full px-2.5 py-1 text-xs font-semibold transition-colors ${
                                                     txFilter === 'outbound'
-                                                        ? 'bg-[var(--clay-surface)] text-sky-400 shadow-xs'
+                                                        ? 'bg-[var(--clay-surface)] text-[var(--clay-accent)] shadow-xs'
                                                         : 'text-[var(--clay-text-muted)] hover:text-[var(--clay-text)]'
                                                 }`}
                                             >
-                                                <span className="size-1.5 rounded-full bg-sky-400" />
+                                                <span className="size-1.5 rounded-full bg-[var(--clay-accent)]" />
                                                 Paid
                                             </button>
                                         </div>
@@ -2040,7 +2040,7 @@ export default function StudentDashboard({
                                                         className={`clay-icon-chip size-10 shrink-0 ${
                                                             isInbound
                                                                 ? 'border border-[var(--status-resolved)]/20 bg-[var(--status-resolved)]/10 text-[var(--status-resolved)]'
-                                                                : 'border border-sky-500/20 bg-sky-500/10 text-sky-400'
+                                                                : 'border border-[var(--clay-accent)]/20 bg-[var(--clay-accent)]/10 text-[var(--clay-accent)]'
                                                         }`}
                                                     >
                                                         {isInbound ? (
@@ -2057,7 +2057,7 @@ export default function StudentDashboard({
                                                                     tx.type_label}
                                                             </span>
                                                             <span
-                                                                className={`rounded-full px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wider ${statusPillClass(tx.status)}`}
+                                                                className={`rounded-full px-2 py-0.5 clay-label ${statusPillClass(tx.status)}`}
                                                             >
                                                                 {
                                                                     tx.status_label
@@ -2092,7 +2092,7 @@ export default function StudentDashboard({
                                                                                 e,
                                                                             )
                                                                         }
-                                                                        className="clay-meta clay-focus inline-flex items-center gap-1 rounded-sm font-mono text-[11px] transition-colors hover:text-[var(--clay-text)]"
+                                                                        className="clay-meta clay-focus inline-flex items-center gap-1 rounded-sm font-mono text-2xs transition-colors hover:text-[var(--clay-text)]"
                                                                         title="Copy full transaction hash"
                                                                     >
                                                                         {shortHash(
@@ -2185,7 +2185,7 @@ export default function StudentDashboard({
                                                     selectedTx?.direction ===
                                                     'inbound'
                                                         ? 'border border-[var(--status-resolved)]/20 bg-[var(--status-resolved)]/10 text-[var(--status-resolved)]'
-                                                        : 'border border-sky-500/20 bg-sky-500/10 text-sky-400'
+                                                        : 'border border-[var(--clay-accent)]/20 bg-[var(--clay-accent)]/10 text-[var(--clay-accent)]'
                                                 }`}
                                             >
                                                 {selectedTx?.direction ===
@@ -2216,7 +2216,7 @@ export default function StudentDashboard({
                                                     Settlement amount
                                                 </p>
                                                 <p
-                                                    className={`bulletin-figure mt-1 text-3xl sm:text-4xl ${
+                                                    className={`clay-figure mt-1 ${
                                                         selectedTx.direction ===
                                                         'inbound'
                                                             ? 'text-[var(--status-resolved)]'
@@ -2492,10 +2492,10 @@ export default function StudentDashboard({
                         }}
                         title="Open Live Rail Monitor drawer"
                     >
-                        <Radio className="size-3 text-emerald-400 animate-pulse" />
+                        <Radio className="size-3 text-[var(--status-resolved)] animate-pulse" />
                         <span>Rail Monitor</span>
                         {hasInFlight && (
-                            <span className="flex size-2 rounded-full bg-amber-400 animate-ping" />
+                            <span className="flex size-2 rounded-full bg-[var(--status-pending)] animate-ping" />
                         )}
                     </button>
                 </div>

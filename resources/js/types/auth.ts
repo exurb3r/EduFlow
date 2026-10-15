@@ -14,6 +14,9 @@ export type User = {
 
 export type Auth = {
     user: User;
+    /** True when the signed-in user has the `student` role. */
+    isStudent: boolean;
+    impersonating: boolean;
 };
 
 /* @chisel-passkeys */

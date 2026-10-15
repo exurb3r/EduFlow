@@ -1,0 +1,298 @@
+/*
+|--------------------------------------------------------------------------
+| Student — palette variants
+|--------------------------------------------------------------------------
+|
+| Companions to bulletin.css. The `.bulletin` scope defines the Midnight Clay
+| palette, which stays the default; these blocks re-skin those same tokens so
+| the Personalization switch (settings → Appearance) reaches the student
+| portal instead of only the settings chrome.
+|
+| WHY THIS IS A SEPARATE FILE: the shadcn theme files only override
+| --primary/--secondary/--accent/--ring. The student portal never reads those
+| — it reads --clay-* — so without this file selecting "Ocean" re-skins the
+| sidebar and leaves the dashboard untouched.
+|
+| WHY THE SELECTORS ARE `.theme-X .bulletin`: `.bulletin` declares every
+| --clay-* token on itself, and an element's own declaration always beats an
+| inherited one. Targeting `:root.theme-X` (i.e. <html>) therefore changes
+| nothing inside the portal — the value is set on <html> and then overridden
+| by `.bulletin` one level down. Descending into `.bulletin` is what makes the
+| override land.
+|
+| Deliberately UNLAYERED. bulletin.css lives in @layer components, and
+| unlayered rules win over layered ones regardless of specificity, so these
+| overrides win without needing to out-specify `.bulletin` on every selector.
+|
+|--------------------------------------------------------------------------
+| Colour rules these palettes are held to
+|--------------------------------------------------------------------------
+|
+| 1. The ground stays dark and near-neutral. Backgrounds carry a hue tint of
+|    a few percent at most, never a saturated fill. Large areas of high-chroma
+|    colour are the main cause of halation and fatigue on a long reading
+|    session, so tint is spent on borders and text, not on the page itself.
+|
+| 2. Text contrast is measured, not eyeballed, against the surface it sits on:
+|      --clay-ink        12:1   figures and titles
+|      --clay-text       7:1    running copy
+|      --clay-text-muted 4.5:1  secondary copy and labels
+|      --clay-text-faint 4.5:1  11px mono metadata
+|    `--clay-text-faint` previously sat at 4.09:1 and failed AA; it has been
+|    raised across every palette, including Midnight Clay.
+|
+| 3. --clay-accent is a link and focus colour, so it is held to 4.5:1 on both
+|    the card surface and the page ground rather than being allowed to drift
+|    into "looks nice but unreadable".
+|
+| 4. Status colour is reserved. Green / amber / red never become decoration,
+|    and each is tuned per mode so the same word reads at the same weight
+|    everywhere in the portal.
+|
+| 5. The button pair is checked as a unit: --clay-primary-foreground on
+|    --clay-primary must clear 4.5:1, in both directions of the theme.
+|
+| 6. Light mode is the same identity on paper, not a separate design. Ink is
+|    the dark warm brown of the ground rather than neutral grey, so the two
+|    modes read as one brand.
+*/
+
+.theme-rose .bulletin {
+    --clay-bg: #17090d;
+    --clay-bg-deep: #0e0507;
+    --clay-surface: #241016;
+    --clay-surface-hi: #33161e;
+    --clay-surface-soft: #1c0b0f;
+    --clay-surface-deep: #14070a;
+    --clay-shadow-color: 0 0 0;
+
+    --clay-ink: #fbeef0;
+    --clay-text: #f0dfe2;
+    --clay-text-muted: #c3a7ab;
+    --clay-text-faint: #ab9095;
+    --clay-border: #432c33;
+
+    --clay-primary: #f6cfd6;
+    --clay-primary-bright: #fbe0e5;
+    --clay-primary-soft: #4a1a24;
+    --clay-primary-foreground: #3a0f16;
+    --clay-accent: #ff9db0;
+    --clay-accent-soft: #4a1620;
+    --clay-brand-glow: 246 207 214;
+    --clay-accent-glow: 255 157 176;
+
+    --status-pending: #f0ae55;
+    --status-progress: #d8a973;
+    --status-resolved: #62c894;
+    --status-urgent: #f07070;
+
+    --clay-edge: rgb(251 238 240 / 0.07);
+}
+
+html:not(.dark).theme-rose .bulletin {
+    --clay-bg: #fdf3f5;
+    --clay-bg-deep: #f8e6e9;
+    --clay-surface: #fffdfd;
+    --clay-surface-hi: #ffffff;
+    --clay-surface-soft: #fbeef0;
+    --clay-surface-deep: #f5e2e5;
+    --clay-shadow-color: 60 26 32;
+
+    --clay-ink: #2a1216;
+    --clay-text: #3a1a1f;
+    --clay-text-muted: #6a4e54;
+    --clay-text-faint: #7d6167;
+    --clay-border: #eccfd5;
+
+    --clay-primary: #a3243c;
+    --clay-primary-bright: #b82e4a;
+    --clay-primary-soft: #f7e0e4;
+    --clay-primary-foreground: #ffffff;
+    --clay-accent: #94344a;
+    --clay-accent-soft: #fbe9ec;
+
+    --status-pending: #8a5306;
+    --status-progress: #7a5522;
+    --status-resolved: #1d6b40;
+    --status-urgent: #ad2a20;
+}
+
+.theme-ocean .bulletin {
+    --clay-bg: #0a131e;
+    --clay-bg-deep: #060c13;
+    --clay-surface: #121d2a;
+    --clay-surface-hi: #1a2836;
+    --clay-surface-soft: #0d1620;
+    --clay-surface-deep: #080f16;
+    --clay-shadow-color: 0 0 0;
+
+    --clay-ink: #eaf2fa;
+    --clay-text: #dbe7f2;
+    --clay-text-muted: #a3b6c9;
+    --clay-text-faint: #8ba1b6;
+    --clay-border: #2d3a48;
+
+    --clay-primary: #c3e0f7;
+    --clay-primary-bright: #d8ecfc;
+    --clay-primary-soft: #16304a;
+    --clay-primary-foreground: #0a1622;
+    --clay-accent: #8ec8ff;
+    --clay-accent-soft: #12283a;
+    --clay-brand-glow: 195 224 247;
+    --clay-accent-glow: 142 200 255;
+
+    --status-pending: #eaa94a;
+    --status-progress: #c9aa76;
+    --status-resolved: #5cc093;
+    --status-urgent: #eb6f6f;
+
+    --clay-edge: rgb(234 242 250 / 0.07);
+}
+
+html:not(.dark).theme-ocean .bulletin {
+    --clay-bg: #f2f8fd;
+    --clay-bg-deep: #e6eff9;
+    --clay-surface: #ffffff;
+    --clay-surface-hi: #ffffff;
+    --clay-surface-soft: #e8f0f8;
+    --clay-surface-deep: #dae7f2;
+    --clay-shadow-color: 20 40 56;
+
+    --clay-ink: #0e1c2b;
+    --clay-text: #16283a;
+    --clay-text-muted: #45607a;
+    --clay-text-faint: #546e87;
+    --clay-border: #cad8e5;
+
+    --clay-primary: #155a8a;
+    --clay-primary-bright: #0f4a74;
+    --clay-primary-soft: #dceaf6;
+    --clay-primary-foreground: #ffffff;
+    --clay-accent: #12577f;
+    --clay-accent-soft: #e2eef8;
+
+    --status-pending: #7a4a00;
+    --status-progress: #655021;
+    --status-resolved: #16653c;
+    --status-urgent: #a3221c;
+}
+
+.theme-sage-garden .bulletin {
+    --clay-bg: #0a140f;
+    --clay-bg-deep: #060d09;
+    --clay-surface: #12201a;
+    --clay-surface-hi: #1b2d22;
+    --clay-surface-soft: #0d1711;
+    --clay-surface-deep: #080f0b;
+    --clay-shadow-color: 0 0 0;
+
+    --clay-ink: #eaf5ee;
+    --clay-text: #d9eae0;
+    --clay-text-muted: #a6c1b1;
+    --clay-text-faint: #8bab9c;
+    --clay-border: #2d3c35;
+
+    --clay-primary: #cfe8d8;
+    --clay-primary-bright: #e0f2e8;
+    --clay-primary-soft: #163a26;
+    --clay-primary-foreground: #0d2417;
+    --clay-accent: #8fd6ae;
+    --clay-accent-soft: #122a1c;
+    --clay-brand-glow: 207 232 216;
+    --clay-accent-glow: 143 214 174;
+
+    --status-pending: #dda94f;
+    --status-progress: #c2ab74;
+    --status-resolved: #5ec08d;
+    --status-urgent: #e47070;
+
+    --clay-edge: rgb(234 245 238 / 0.07);
+}
+
+html:not(.dark).theme-sage-garden .bulletin {
+    --clay-bg: #f3faf5;
+    --clay-bg-deep: #e8f2eb;
+    --clay-surface: #ffffff;
+    --clay-surface-hi: #ffffff;
+    --clay-surface-soft: #e7f1ea;
+    --clay-surface-deep: #d9e8de;
+    --clay-shadow-color: 24 44 34;
+
+    --clay-ink: #101c15;
+    --clay-text: #18281f;
+    --clay-text-muted: #475e50;
+    --clay-text-faint: #597062;
+    --clay-border: #c9dacf;
+
+    --clay-primary: #1f7a4a;
+    --clay-primary-bright: #17603a;
+    --clay-primary-soft: #d9ecdf;
+    --clay-primary-foreground: #ffffff;
+    --clay-accent: #1b6140;
+    --clay-accent-soft: #e3f1e8;
+
+    --status-pending: #7a4a00;
+    --status-progress: #655021;
+    --status-resolved: #16653c;
+    --status-urgent: #a3221c;
+}
+
+.theme-claude .bulletin {
+    --clay-bg: #160e08;
+    --clay-bg-deep: #0e0805;
+    --clay-surface: #221610;
+    --clay-surface-hi: #2f1e15;
+    --clay-surface-soft: #180f0a;
+    --clay-surface-deep: #110a06;
+    --clay-shadow-color: 0 0 0;
+
+    --clay-ink: #f7efe7;
+    --clay-text: #ece0d4;
+    --clay-text-muted: #c0aa98;
+    --clay-text-faint: #a89280;
+    --clay-border: #41332a;
+
+    --clay-primary: #f6e0c8;
+    --clay-primary-bright: #fbebd8;
+    --clay-primary-soft: #4a2e18;
+    --clay-primary-foreground: #2e1a08;
+    --clay-accent: #ffc07a;
+    --clay-accent-soft: #3a2412;
+    --clay-brand-glow: 246 224 200;
+    --clay-accent-glow: 255 192 122;
+
+    --status-pending: #e8ab52;
+    --status-progress: #c9aa76;
+    --status-resolved: #5cbd8c;
+    --status-urgent: #ea6c64;
+
+    --clay-edge: rgb(247 239 231 / 0.07);
+}
+
+html:not(.dark).theme-claude .bulletin {
+    --clay-bg: #fbf7f0;
+    --clay-bg-deep: #f3ece1;
+    --clay-surface: #fffdfc;
+    --clay-surface-hi: #ffffff;
+    --clay-surface-soft: #f3ebe1;
+    --clay-surface-deep: #e9dece;
+    --clay-shadow-color: 52 38 26;
+
+    --clay-ink: #221710;
+    --clay-text: #33251a;
+    --clay-text-muted: #6a5544;
+    --clay-text-faint: #7c6553;
+    --clay-border: #e0d2c1;
+
+    --clay-primary: #a8541c;
+    --clay-primary-bright: #8a4416;
+    --clay-primary-soft: #f2e2d4;
+    --clay-primary-foreground: #ffffff;
+    --clay-accent: #8c441f;
+    --clay-accent-soft: #f7e9dd;
+
+    --status-pending: #7a4a00;
+    --status-progress: #655021;
+    --status-resolved: #16653c;
+    --status-urgent: #a3221c;
+}

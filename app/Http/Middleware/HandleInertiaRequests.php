@@ -62,6 +62,9 @@ class HandleInertiaRequests extends Middleware
             'auth' => [
                 'user' => $request->user(),
                 'impersonating' => app('impersonate')->isImpersonating(),
+                // Students have no Filament panel, so navigation that only
+                // exists for them (their academic record) branches on this.
+                'isStudent' => $user !== null && $user->hasRole('student'),
             ],
             'notificationSummary' => $user !== null
                 ? DashboardController::buildNotificationSummary($user)

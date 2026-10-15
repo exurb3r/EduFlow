@@ -150,7 +150,7 @@ export default function FinancialAssistance({
                                 <ShieldCheck className="size-3.5" />
                                 Auto limit
                             </p>
-                            <p className="bulletin-figure mt-2 text-2xl sm:text-3xl">
+                            <p className="clay-figure mt-2">
                                 {policy.auto_limit}{' '}
                                 <span className="text-sm font-semibold text-[var(--clay-text-muted)]">
                                     {policy.currency}
@@ -162,7 +162,7 @@ export default function FinancialAssistance({
                                 <Landmark className="size-3.5" />
                                 Fund remaining
                             </p>
-                            <p className="bulletin-figure mt-2 text-2xl text-[var(--clay-accent)] sm:text-3xl">
+                            <p className="clay-figure mt-2 text-[var(--clay-accent)]">
                                 {policy.budget_remaining}{' '}
                                 <span className="text-sm font-semibold text-[var(--clay-text-muted)]">
                                     {policy.currency}
@@ -187,7 +187,7 @@ export default function FinancialAssistance({
 
                     {/* Request form */}
                     <section className="clay-card p-4 sm:p-6">
-                        <h2 className="clay-h2 text-lg">New request</h2>
+                        <h2 className="clay-h2">New request</h2>
                         <form
                             onSubmit={submitRequest}
                             className="mt-4 grid gap-4"
@@ -292,7 +292,7 @@ export default function FinancialAssistance({
                                                 {req.created_at}
                                             </span>
                                             <span
-                                                className={`rounded-full px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wider ${statusPillClass(req.status)}`}
+                                                className={`rounded-full px-2 py-0.5 clay-label ${statusPillClass(req.status)}`}
                                             >
                                                 {req.status_label}
                                             </span>

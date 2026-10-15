@@ -16,6 +16,12 @@
 
 @import './bulletin.css';
 
+/*
+  Palette variants for the student portal. Must follow bulletin.css: these
+  blocks override the .bulletin clay tokens and are unlayered so they win.
+*/
+@import './bulletin-palettes.css';
+
 @source '../../vendor/laravel/framework/src/Illuminate/Pagination/resources/views/*.blade.php';
 @source '../../storage/framework/views/*.php';
 
@@ -26,6 +32,13 @@
         Instrument Sans, ui-sans-serif, system-ui, sans-serif,
         'Apple Color Emoji', 'Segoe UI Emoji', 'Segoe UI Symbol',
         'Noto Color Emoji';
+
+    /*
+      The bulletin scale is scoped to `.bulletin`, so these resolve per-element
+      (inline mode) rather than being baked at build time. text-2xs is the only
+      size the default Tailwind ramp lacks that the portal actually uses.
+    */
+    --text-2xs: var(--text-scale-2xs);
 
     --radius-lg: var(--radius);
     --radius-md: calc(var(--radius) - 2px);

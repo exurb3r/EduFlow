@@ -88,7 +88,7 @@ export default function Payments({
 
                         <div className="clay-card px-5 py-4">
                             <p className="bulletin-eyebrow">Total received</p>
-                            <p className="bulletin-figure mt-1 text-3xl">
+                            <p className="clay-figure mt-1">
                                 {totals.confirmed}{' '}
                                 <span className="text-sm font-semibold text-[var(--clay-text-muted)]">
                                     {totals.currency}
@@ -146,7 +146,7 @@ export default function Payments({
                                                     +{tx.amount} {tx.currency}
                                                 </span>
                                                 <span
-                                                    className={`rounded-full px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wider ${statusPillClass(tx.status)}`}
+                                                    className={`rounded-full px-2 py-0.5 clay-label ${statusPillClass(tx.status)}`}
                                                 >
                                                     {tx.status_label}
                                                 </span>
