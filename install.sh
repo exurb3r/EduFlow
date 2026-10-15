@@ -258,13 +258,14 @@ ok "Generated APP_KEY"
 title "Database"
 DB_CONNECTION=$(ask_choice "Database driver" "pgsql" pgsql mysql sqlite)
 if [ "$DB_CONNECTION" = "sqlite" ]; then
-    DB_HOST=""; DB_PORT=""; DB_DATABASE="database/database.sqlite"; DB_USERNAME=""; DB_PASSWORD=""
+    # Keep SQLite inside the persisted storage volume so it survives container recreation.
+    DB_HOST=""; DB_PORT=""; DB_DATABASE="/app/storage/database.sqlite"; DB_USERNAME=""; DB_PASSWORD=""
 else
-    DB_HOST=$(ask "DB host" "db")
-    DB_PORT=$(ask "DB port" "$([ "$DB_CONNECTION" = pgsql ] && echo 5432 || echo 3306)")
-    DB_DATABASE=$(ask "DB name" "app")
-    DB_USERNAME=$(ask "DB username" "app")
-    DB_PASSWORD=$(ask_secret "DB password" "app")
+    DB_HOST="db"
+    DB_PORT="$([ "$DB_CONNECTION" = pgsql ] && echo 5432 || echo 3306)"
+    DB_DATABASE="app"
+    DB_USERNAME="app"
+    DB_PASSWORD="app"
 fi
 
 # Common environment defaults (production)

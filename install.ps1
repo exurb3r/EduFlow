@@ -187,14 +187,14 @@ Ok "Generated APP_KEY"
 Title "Database"
 $DB_CONNECTION = Ask-Choice "Database driver" "pgsql" @("pgsql", "mysql", "sqlite")
 if ($DB_CONNECTION -eq "sqlite") {
-    $DB_HOST = ""; $DB_PORT = ""; $DB_DATABASE = "database/database.sqlite"; $DB_USERNAME = ""; $DB_PASSWORD = ""
+    # Keep SQLite inside the persisted storage volume so it survives container recreation.
+    $DB_HOST = ""; $DB_PORT = ""; $DB_DATABASE = "/app/storage/database.sqlite"; $DB_USERNAME = ""; $DB_PASSWORD = ""
 } else {
-    $DB_HOST = Ask "DB host" "db"
-    $DB_PORT = Ask "DB port" ($DB_CONNECTION -eq "pgsql" ? "5432" : "3306")
-    $DB_DATABASE = Ask "DB name" "app"
-    $DB_USERNAME = Ask "DB username" "app"
-    $DB_PASSWORD = Read-Secret "DB password"
-    if ([string]::IsNullOrWhiteSpace($DB_PASSWORD)) { $DB_PASSWORD = "app" }
+    $DB_HOST = "db"
+    $DB_PORT = if ($DB_CONNECTION -eq "pgsql") { "5432" } else { "3306" }
+    $DB_DATABASE = "app"
+    $DB_USERNAME = "app"
+    $DB_PASSWORD = "app"
 }
 
 # Cache/session/queue
