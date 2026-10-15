@@ -33,6 +33,8 @@ class WorkflowRunWidget extends TableWidget
 {
     protected static ?int $sort = 4;
 
+    // Full width: the run log is eight columns of evidence, and a dense table
+    // does not survive being halved. See BudgetCapacityWidget.
     protected int|string|array $columnSpan = 'full';
 
     /** A worker that has not checked in for this long is reported as stale. */

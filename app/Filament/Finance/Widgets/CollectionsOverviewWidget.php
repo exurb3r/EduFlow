@@ -29,6 +29,8 @@ class CollectionsOverviewWidget extends TableWidget
 {
     protected static ?int $sort = 1;
 
+    // Full width: ten columns, and a dense table does not survive being halved.
+    // See BudgetCapacityWidget.
     protected int|string|array $columnSpan = 'full';
 
     private const string HEADING = 'Collections by source and currency';
@@ -93,7 +95,7 @@ class CollectionsOverviewWidget extends TableWidget
                 Action::make('openBatchQueue')
                     ->label('Review')
                     ->icon(Heroicon::ArrowRightCircle)
-                    ->color('primary')
+                    ->color('gray')
                     ->url(fn (): string => Collections::getUrl(panel: 'finance')),
             ])
             ->defaultSort('currency')

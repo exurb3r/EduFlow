@@ -23,11 +23,12 @@ class PaymentDecisionChart extends ChartWidget
 {
     protected static ?int $sort = 9;
 
-    protected int|string|array $columnSpan = 'full';
+    // Paired with WorkflowRunStateChart in the overview grid.
+    protected int|string|array $columnSpan = 1;
 
     protected ?string $heading = 'Human payment decisions';
 
-    protected ?string $description = 'Every recorded authorization, by decision. Approval expires within five minutes and requires fresh authentication. A separately enabled worker rechecks exact authority before submission; only verified settlement proves payment.';
+    protected ?string $description = 'Every recorded authorization, by decision. Approval expires within five minutes.';
 
     protected ?string $emptyStateHeading = 'No payment authorization recorded';
 

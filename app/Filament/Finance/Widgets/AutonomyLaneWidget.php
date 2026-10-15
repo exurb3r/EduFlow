@@ -11,7 +11,6 @@ use App\Models\RecurringMandate;
 use App\Services\InstallationInstitution;
 use App\Services\MandateOutcomeMetrics;
 use App\Services\RecordRetrospectiveAgreement;
-use Filament\Support\Icons\Heroicon;
 use Filament\Widgets\StatsOverviewWidget as BaseWidget;
 use Filament\Widgets\StatsOverviewWidget\Stat;
 
@@ -35,7 +34,15 @@ class AutonomyLaneWidget extends BaseWidget
 
     protected int|string|array $columnSpan = 'full';
 
-    protected int|array|null $columns = 4;
+    /**
+     * Six stats. Container queries, not viewport breakpoints — see
+     * ArcSettlementWidget. Six divides evenly at six, three and two, so every
+     * tier is a complete row and no tier leaves a remainder. Six across needs a
+     * 1280px widget, which is the first tier wide enough to hold 200px tiles.
+     *
+     * @var array<string, int>
+     */
+    protected int|array|null $columns = ['@7xl' => 6, '@3xl' => 3, '@xl' => 2, 'default' => 1];
 
     #[\Override]
     public function getHeading(): ?string
@@ -46,7 +53,7 @@ class AutonomyLaneWidget extends BaseWidget
     #[\Override]
     public function getDescription(): ?string
     {
-        return 'Two authorization levels: staff first approve institution policy and any recurring mandate, and only then may eligible occurrences run without a further approval. Neither exists yet, so the initial allowance is zero. A model may propose or explain; it cannot infer that a bill is recurring.';
+        return 'Staff approve policy and mandates first. A model may propose or explain; it cannot infer that a bill is recurring.';
     }
 
     #[\Override]
@@ -81,11 +88,15 @@ class AutonomyLaneWidget extends BaseWidget
             ->groupBy('disposition')
             ->pluck('aggregate', 'disposition');
 
+        // Colour encodes state only. Every limit below is a plain configured fact,
+        // so `info` painted four tiles in a row as if each were a call to
+        // action; `gray` says "configured" and leaves warning for the absence
+        // of a policy, which is the part that needs a human.
         $mandateStat = Stat::make('Recurring mandate', $mandates->isEmpty()
             ? 'None approved'
             : sprintf('%d of %d approved', $approvedMandates->count(), $mandates->count()))
             ->description($mandates->isEmpty()
-                ? 'Zero allowance. No mandate owner, expiry, due window, frequency or cumulative limit is on record, so no occurrence can run unattended.'
+                ? 'No owner, expiry, due window or limit on record'
                 : sprintf(
                     '%d occurrence(s) evaluated: %d released automatically, %d waiting on a person, %d blocked.',
                     (int) ($occurrenceCounts->get('release', 0) + $occurrenceCounts->get('escalate', 0) + $occurrenceCounts->get('blocked', 0)),
@@ -93,8 +104,8 @@ class AutonomyLaneWidget extends BaseWidget
                     (int) $occurrenceCounts->get('escalate', 0),
                     (int) $occurrenceCounts->get('blocked', 0),
                 ))
-            ->descriptionIcon($mandates->isEmpty() ? Heroicon::NoSymbol : Heroicon::CalendarDays)
-            ->color($mandates->isEmpty() ? 'gray' : 'info');
+            // A configured mandate is a fact, not a state.
+            ->color('gray');
 
         $perPayment = Stat::make('Per-payment ceiling', $policy !== null
             ? Money::formatExact($policy->max_auto_payment_base_units, 'USDC')
@@ -102,24 +113,21 @@ class AutonomyLaneWidget extends BaseWidget
             ->description($policy !== null
                 ? sprintf('Policy %s · activated %s. A ceiling, not an authorization.', $policy->version, $activation->created_at->toDateString())
                 : 'No policy activation exists. Every amount currently escalates to a human.')
-            ->descriptionIcon(Heroicon::Scale)
-            ->color($policy !== null ? 'info' : 'warning');
+            ->color($policy !== null ? 'gray' : 'warning');
 
         $dailyStat = Stat::make('Daily disbursement limit', $policy !== null
             ? Money::formatExact($policy->max_daily_disbursement_base_units, 'USDC')
             : 'No active policy')
             ->description($policy !== null
-                ? 'Counts settled spending and outstanding reservations together so concurrent proposals cannot reuse the same capacity.'
+                ? 'Counts reservations, so proposals cannot reuse capacity'
                 : 'No cumulative limit is in force.')
-            ->descriptionIcon(Heroicon::CalendarDays)
-            ->color($policy !== null ? 'info' : 'warning');
+            ->color($policy !== null ? 'gray' : 'warning');
 
         $feeStat = Stat::make('Fee ceiling', $policy !== null
             ? Money::formatExact($policy->max_fee_base_units, 'USDC')
             : 'No active policy')
             ->description('Bounded separately from principal; fees are preflighted before any submission.')
-            ->descriptionIcon(Heroicon::Banknotes)
-            ->color($policy !== null ? 'info' : 'warning');
+            ->color($policy !== null ? 'gray' : 'warning');
 
         // Real outcome counts, not a reassuring zero. A lane that escalates
         // everything must be visible as such: an autonomy rate of 100% and one
@@ -135,15 +143,14 @@ class AutonomyLaneWidget extends BaseWidget
             $decisions['release'], $decisions['escalate'], $decisions['blocked'],
         ))
             ->description($observed === 0
-                ? 'No occurrence has been evaluated yet. Automatic work stays visible here even when it needs no approval notification.'
+                ? 'No occurrence evaluated yet'
                 : sprintf('Released %s USDC, escalated %s USDC. Most common escalation: %s. Rate released %s of observed occurrences.',
                     Money::formatExact($decisions['release_base_units'], 'USDC'),
                     Money::formatExact($decisions['escalate_base_units'], 'USDC'),
                     $top,
                     number_format($metrics->autonomyRate($decisions) * 100, 1).'%',
                 ))
-            ->descriptionIcon(Heroicon::ChartBar)
-            ->color($decisions['release'] > 0 ? 'info' : 'gray');
+            ->color('gray');
 
         // Labelled "feedback", never "agreement rate", and the caveat travels
         // with the number. §18.6 is explicit that this is not approval.
@@ -153,10 +160,9 @@ class AutonomyLaneWidget extends BaseWidget
             ? 'Not reviewed yet'
             : sprintf('%d of %d would agree', $rate['agreed'], $rate['reviewed']))
             ->description($rate['reviewed'] === 0
-                ? 'Released occurrences are sampled and shown to the responsible supervisor afterwards. No sample has been reviewed yet.'
-                : sprintf('%d released, %d not yet reviewed. Retrospective feedback only — it is not per-item approval and not proof of correctness.',
+                ? 'Sampled and shown to a supervisor afterwards. None reviewed yet'
+                : sprintf('%d released, %d unreviewed. Feedback only — not approval',
                     $rate['released_total'], $rate['unreviewed']))
-            ->descriptionIcon(Heroicon::ChatBubbleLeftRight)
             ->color('gray');
 
         return [$mandateStat, $perPayment, $dailyStat, $feeStat, $outcomes, $agreement];

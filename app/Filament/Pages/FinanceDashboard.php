@@ -77,12 +77,13 @@ class FinanceDashboard extends BaseDashboard
 
         $status = app(LeptonTreasuryService::class)->status($institution->primaryWallet());
 
+        // The driver, chain and chain id are omitted because the ArcSettlement band
+        // states all three, and repeating them here made this line wrap
+        // mid-token. "Separation of duties" is the one thing this panel is
+        // for that the bands do not say on their own.
         return sprintf(
-            '%s · %s driver on %s %s%s · exact payment approval and background settlement remain separate',
+            '%s · approval and background settlement stay separate%s',
             $institution->name,
-            $status['driver'],
-            strtoupper((string) $status['chain']),
-            (string) $status['chain_id'],
             $status['is_fake'] ? ' · FAKE DRIVER, simulation only' : '',
         );
     }
@@ -282,6 +283,19 @@ class FinanceDashboard extends BaseDashboard
     }
 
     /**
+     * Overview layout: three full-width fact bands, each separated by a
+     * two-up row so the page never presents as one unbroken wall of tiles.
+     *
+     * The grid in `getColumns()` has always been two wide, but every widget
+     * declared `columnSpan: 'full'`, so the split was never used and the page
+     * rendered as a twelve-band single column. Pairing the charts and tables
+     * halves the vertical run without making any one band narrower than it can
+     * be read at.
+     *
+     * Order is by what a supervisor has to answer first: what is waiting on a
+     * person, where the money is, whether the machinery is running, and only
+     * then what the underlying records show.
+     *
      * @return array<class-string<Widget>>
      */
     #[\Override]
@@ -290,17 +304,17 @@ class FinanceDashboard extends BaseDashboard
         return [
             FinanceAffordabilityWidget::class,
             ApprovalInboxWidget::class,
-            CollectionsOverviewWidget::class,
-            CollectionsTrendChart::class,
-            BudgetCapacityWidget::class,
-            BudgetHeadroomChart::class,
             ArcSettlementWidget::class,
-            WorkflowRunWidget::class,
-            WorkflowRunStateChart::class,
-            AutonomyLaneWidget::class,
-            EvidenceTimelineWidget::class,
-            PaymentDecisionChart::class,
+            BudgetHeadroomChart::class,
+            CollectionsTrendChart::class,
             OperationsHealthWidget::class,
+            WorkflowRunStateChart::class,
+            PaymentDecisionChart::class,
+            AutonomyLaneWidget::class,
+            BudgetCapacityWidget::class,
+            WorkflowRunWidget::class,
+            CollectionsOverviewWidget::class,
+            EvidenceTimelineWidget::class,
         ];
     }
 

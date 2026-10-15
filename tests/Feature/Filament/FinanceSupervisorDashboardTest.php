@@ -46,6 +46,7 @@ use App\Services\FinanceWorkflows;
 use Brick\Math\BigInteger;
 use Filament\Facades\Filament;
 use Filament\Widgets\ChartWidget;
+use Filament\Widgets\StatsOverviewWidget\Stat;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Str;
 use Livewire\Features\SupportTesting\Testable;
@@ -299,21 +300,67 @@ test('finance panel root is the supervisor dashboard and renders every required 
             PaymentDecisionChart::class,
             OperationsHealthWidget::class,
         ])
+        /**
+         * Render order is the order of this list (Filament hands getWidgets()
+         * straight to the grid as its schema), and it is the page's hierarchy:
+         * what is waiting on a person, where the money is, whether the machinery
+         * is running, then the underlying records. Each full-width fact band is
+         * followed by a two-up row so the page never reads as one unbroken wall.
+         */
         ->and(bootedFinanceDashboard(Livewire::actingAs($c['reviewer'])->test(FinanceDashboard::class))->getWidgets())->toBe([
             FinanceAffordabilityWidget::class,
             ApprovalInboxWidget::class,
-            CollectionsOverviewWidget::class,
-            CollectionsTrendChart::class,
-            BudgetCapacityWidget::class,
-            BudgetHeadroomChart::class,
             ArcSettlementWidget::class,
-            WorkflowRunWidget::class,
-            WorkflowRunStateChart::class,
-            AutonomyLaneWidget::class,
-            EvidenceTimelineWidget::class,
-            PaymentDecisionChart::class,
+            BudgetHeadroomChart::class,
+            CollectionsTrendChart::class,
             OperationsHealthWidget::class,
+            WorkflowRunStateChart::class,
+            PaymentDecisionChart::class,
+            AutonomyLaneWidget::class,
+            BudgetCapacityWidget::class,
+            WorkflowRunWidget::class,
+            CollectionsOverviewWidget::class,
+            EvidenceTimelineWidget::class,
         ]);
+});
+
+/**
+ * The overview grid has been two columns wide all along, but every widget
+ * declared `columnSpan: 'full'`, so the split was never used and twelve bands
+ * stacked into one long column.
+ *
+ * Only the four charts pair up. The four record tables stay full width: they
+ * are seven to ten columns of evidence, and measured at rest their tables run
+ * 844px to 1199px wide. Halved into a 676px cell they hid roughly 44% of
+ * themselves behind a horizontal scrollbar. Charts scale to half a row; dense
+ * evidence tables do not.
+ */
+test('overview pairs charts but keeps record tables full width', function (): void {
+    $full = [
+        ApprovalInboxWidget::class,
+        ArcSettlementWidget::class,
+        OperationsHealthWidget::class,
+        AutonomyLaneWidget::class,
+        BudgetCapacityWidget::class,
+        WorkflowRunWidget::class,
+        CollectionsOverviewWidget::class,
+        EvidenceTimelineWidget::class,
+    ];
+
+    foreach ($full as $widget) {
+        expect((new ReflectionClass($widget))->getDefaultProperties()['columnSpan'] ?? null)
+            ->toBe('full', class_basename($widget).' should span the full width');
+    }
+
+    foreach ([
+        BudgetHeadroomChart::class,
+        CollectionsTrendChart::class,
+        WorkflowRunStateChart::class,
+        PaymentDecisionChart::class,
+    ] as $widget) {
+        expect((new ReflectionClass($widget))->getDefaultProperties()['columnSpan'] ?? null)
+            ->toBe(1, class_basename($widget).' should pair up beside its neighbour');
+    }
 });
 
 test('collections chart splits reported money by review state instead of summing it', function (): void {
@@ -663,7 +710,7 @@ test('approval inbox separates the three authorities rather than merging pending
         ->assertSee('Awaiting independent receipt review')
         ->assertSee('Proposals awaiting a plan decision')
         ->assertSee('Reserved payments awaiting authorization')
-        ->assertSee('Cashier receipt review, plan acceptance and payment authorization are different acts');
+        ->assertSee('Three different acts');
 });
 
 test('approval inbox is invisible to a user without supervision authority', function (): void {
@@ -689,7 +736,10 @@ test('automatic lane reports zero allowance instead of an empty or implied manda
         ->assertSuccessful()
         ->assertSee('Automatic payment lane')
         ->assertSee('None approved')
-        ->assertSee('Zero allowance')
+        // The caption names the fact (nothing is on record) rather than
+        // asserting a limit of zero, which would imply a configured ceiling.
+        ->assertSee('No owner, expiry, due window or limit on record')
+        ->assertDontSee('Zero allowance')
         // Real counts, and an empty lane says so rather than implying success.
         ->assertSee('Decisions vs escalated')
         ->assertSee('Nothing yet')
@@ -754,5 +804,43 @@ test('dashboard widgets fail closed without an installation institution', functi
         Livewire::actingAs(User::factory()->create())
             ->test($widget)
             ->assertSuccessful();
+    }
+});
+
+/**
+ * Tile discipline, asserted against REAL data.
+ *
+ * The same rules the presentation test checks, but this fixture actually
+ * populates the institution, so `getStats()` returns the full band rather than
+ * the single "not configured" fallback. Without this, a 117-character caption
+ * and a seven-line tile both pass: the fallback path is short, and it was the
+ * populated branches that ran to nine lines.
+ */
+test('finance stat captions stay caption length with real data', function (): void {
+    $c = financeDashboardContext();
+    Filament::setCurrentPanel(Filament::getPanel('finance'));
+    actingAs($c['reviewer']);
+
+    foreach ([ArcSettlementWidget::class, AutonomyLaneWidget::class, OperationsHealthWidget::class] as $widget) {
+        $method = new ReflectionMethod($widget, 'getStats');
+        $method->setAccessible(true);
+
+        $stats = $method->invoke(new $widget);
+
+        // Guard against the fixture silently degrading to the fallback band,
+        // which is one short stat and would assert nothing useful.
+        expect(count($stats))->toBeGreaterThan(
+            1,
+            class_basename($widget).' returned a single stat, so the real branch was not exercised',
+        );
+
+        foreach ($stats as $stat) {
+            /** @var Stat $stat */
+            expect(mb_strlen((string) $stat->getDescription()))
+                ->toBeLessThanOrEqual(
+                    90,
+                    class_basename($widget).' / '.$stat->getLabel().': caption runs to '.mb_strlen((string) $stat->getDescription()).' characters',
+                );
+        }
     }
 });

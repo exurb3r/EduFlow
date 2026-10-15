@@ -35,7 +35,18 @@ class InstallationReadinessWidget extends BaseWidget
 
     protected int|string|array $columnSpan = 'full';
 
-    protected int|array|null $columns = 3;
+    /**
+     * Three across, not six.
+     *
+     * Six left roughly 180px of content per tile, which is narrower than the
+     * word "Impersonation" — so values broke mid-word, and every tile in the
+     * row stretched to the tallest while the rest sat on dead space. Three
+     * gives each tile enough room for the longest value to wrap at a space,
+     * and divides six stats into two even rows instead of a ragged remainder.
+     *
+     * @var array<string, int>
+     */
+    protected int|array|null $columns = ['@lg' => 3, '@md' => 2, 'default' => 1];
 
     #[\Override]
     public function getHeading(): ?string
@@ -46,7 +57,10 @@ class InstallationReadinessWidget extends BaseWidget
     #[\Override]
     public function getDescription(): ?string
     {
-        return 'One institution per installation. This is not multi-tenancy: two schools run two instances, and shared provider credentials or wallet sessions are never acceptable. Financial execution lives in the finance panel.';
+        // NB: the separator here was a U+FFFD replacement character, not a
+        // dash — a corrupted byte had been written to disk and rendered as
+        // a diamond on the page. Kept as a real em dash.
+        return 'One institution per installation — this is not multi-tenancy. Money moves in the finance panel, never here.';
     }
 
     #[\Override]
@@ -56,8 +70,7 @@ class InstallationReadinessWidget extends BaseWidget
 
         if ($institution === null) {
             return [Stat::make('Installation', 'Not configured')
-                ->description('Run php artisan app:install. A missing or ambiguous institution fails closed rather than defaulting to the first row.')
-                ->descriptionIcon('heroicon-o-exclamation-triangle')
+->description('Run php artisan eduflow:install. Context fails closed.')
                 ->color('danger')];
         }
 
@@ -67,19 +80,17 @@ class InstallationReadinessWidget extends BaseWidget
         $identityStat = Stat::make('Institution', $institution->name)
             ->description($installed === null
                 ? sprintf('%s · %s · %s', $institution->currency, app()->getLocale(), config('app.timezone'))
-                : sprintf('Initialised %s · %s · %s', $installed, $institution->currency, config('app.timezone')))
-            ->descriptionIcon('heroicon-o-academic-cap')
-            ->color('primary')
-            ->extraAttributes(['class' => 'cursor-pointer hover:shadow-sm transition-shadow'])
+                : sprintf('Initialised %s · %s', $installed, $institution->currency))
+            ->color('gray')
+            ->extraAttributes(['class' => 'cursor-pointer'])
             ->url(ApplicationDetailsSettingsPage::getUrl());
 
         $singleStat = Stat::make('Institution boundary', $organizationCount === 1 ? 'Single institution' : $organizationCount.' organizations')
             ->description($organizationCount === 1
-                ? 'Exactly one institution is permitted on this profile. A second is blocked; raw database writes are outside that guard.'
-                : 'Ambiguous institution context. Dashboards, the wallet doctor and settlement refuse to guess.')
-            ->descriptionIcon('heroicon-o-building-library')
+                ? 'Exactly one institution is permitted on this profile.'
+                : 'Ambiguous context. Dashboards and settlement refuse to guess.')
             ->color($organizationCount === 1 ? 'success' : 'danger')
-            ->extraAttributes(['class' => 'cursor-pointer hover:shadow-sm transition-shadow'])
+            ->extraAttributes(['class' => 'cursor-pointer'])
             ->url(ApplicationDetailsSettingsPage::getUrl());
 
         $features = $this->features();
@@ -88,25 +99,24 @@ class InstallationReadinessWidget extends BaseWidget
             'Impersonation' => $features instanceof ApplicationFeaturesSettings && $features->user_impersonation_enabled,
         ]));
 
+        // The value already names whichever gates are open, so the caption
+        // states the policy instead of listing them a second time.
         $onboardingStat = Stat::make('School onboarding', $openGates === [] ? 'Locked down' : 'Open: '.implode(', ', $openGates))
-            ->description('Conservative defaults are intentional. Registration and impersonation should stay off until the school chooses otherwise.')
-            ->descriptionIcon('heroicon-o-lock-closed')
+            ->description('Off unless a school widens them deliberately.')
             ->color($openGates === [] ? 'success' : 'warning')
-            ->extraAttributes(['class' => 'cursor-pointer hover:shadow-sm transition-shadow'])
+            ->extraAttributes(['class' => 'cursor-pointer'])
             ->url(ApplicationFeaturesSettingsPage::getUrl());
 
         $ai = $this->ai();
 
         $aiStat = Stat::make('Advisory AI', $ai instanceof AiSettings && $ai->advisory_enabled ? 'Enabled' : 'Off by default')
             ->description(sprintf(
-                '%s · disclosure %s · settlement proposals %s',
-                AiProvider::query()->where('is_active', true)->count().' active provider(s)',
+                '%d active provider(s) · disclosure %s',
+                AiProvider::query()->where('is_active', true)->count(),
                 $ai instanceof AiSettings && $ai->disclosure_accepted ? 'accepted' : 'not accepted',
-                $ai instanceof AiSettings && $ai->allow_settlement_proposals ? 'ALLOWED' : 'not allowed',
             ))
-            ->descriptionIcon('heroicon-o-sparkles')
-            ->color($ai instanceof AiSettings && $ai->advisory_enabled ? 'info' : 'gray')
-            ->extraAttributes(['class' => 'cursor-pointer hover:shadow-sm transition-shadow'])
+            ->color($ai instanceof AiSettings && $ai->advisory_enabled ? 'success' : 'gray')
+            ->extraAttributes(['class' => 'cursor-pointer'])
             ->url(AiProviderResource::getUrl('index'));
 
         $status = app(LeptonTreasuryService::class)->status($institution->primaryWallet());
@@ -118,16 +128,14 @@ class InstallationReadinessWidget extends BaseWidget
 
         $railStat = Stat::make('Settlement rail', $status['driver'].' · '.strtoupper((string) $status['chain']))
             ->description($status['is_fake']
-                ? 'Fake driver: no wallet, no chain, no real funds. Safe for demonstration, never for finance.'
-                : ($bound ? 'Treasury bound to the configured agent wallet' : 'Treasury address does not match the configured agent wallet'))
-            ->descriptionIcon('heroicon-o-circle-stack')
+                ? 'Fake driver — no chain, no real funds.'
+                : ($bound ? 'Treasury bound to the agent wallet' : 'Treasury address does not match the agent wallet'))
             ->color($status['is_fake'] ? 'warning' : ($bound ? 'success' : 'danger'));
 
         $runtimeStat = Stat::make('Background runtime', config('eduflow.background_finance.enabled') ? 'Enabled' : 'Disabled')
-            ->description('Background planning is a supervised service. Nothing here submits, authorizes or settles a payment.')
-            ->descriptionIcon('heroicon-o-cog-6-tooth')
-            ->color(config('eduflow.background_finance.enabled') ? 'info' : 'gray')
-            ->extraAttributes(['class' => 'cursor-pointer hover:shadow-sm transition-shadow'])
+            ->description('Supervised service. Nothing here settles a payment.')
+            ->color(config('eduflow.background_finance.enabled') ? 'success' : 'gray')
+            ->extraAttributes(['class' => 'cursor-pointer'])
             ->url(FinanceDashboard::getUrl(panel: 'finance'));
 
         return [$identityStat, $singleStat, $onboardingStat, $railStat, $aiStat, $runtimeStat];

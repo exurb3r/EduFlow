@@ -11,7 +11,6 @@ use App\Models\Transaction;
 use App\Models\User;
 use App\Services\InstallationInstitution;
 use App\Services\LeptonTreasuryService;
-use Filament\Support\Icons\Heroicon;
 use Filament\Widgets\StatsOverviewWidget as BaseWidget;
 use Filament\Widgets\StatsOverviewWidget\Stat;
 use Illuminate\Support\Carbon;
@@ -33,7 +32,15 @@ class OperationsHealthWidget extends BaseWidget
 
     protected int|string|array $columnSpan = 'full';
 
-    protected int|array|null $columns = 4;
+    /**
+     * Eight stats, which divide evenly at four and two, so every tier is a
+     * complete row. Container queries, not viewport breakpoints — see
+     * ArcSettlementWidget. Eight across would mean 148px tiles, so the widest
+     * tier is four.
+     *
+     * @var array<string, int>
+     */
+    protected int|array|null $columns = ['@5xl' => 4, '@2xl' => 2, 'default' => 1];
 
     #[\Override]
     public function getHeading(): ?string
@@ -44,7 +51,7 @@ class OperationsHealthWidget extends BaseWidget
     #[\Override]
     public function getDescription(): ?string
     {
-        return 'Background work must survive a closed browser. Polling this page improves visibility only; it never drives execution, and an unread notification never approves, submits, refreshes funding or releases a hold.';
+        return 'Polling improves visibility only. An unread notification never approves, submits or releases a hold.';
     }
 
     #[\Override]
@@ -63,8 +70,7 @@ class OperationsHealthWidget extends BaseWidget
         $queue = (string) config('queue.connections.'.$connection.'.queue', 'default');
 
         $runtimeStat = Stat::make('Background runtime', $enabled ? 'Enabled' : 'Disabled')
-            ->description(sprintf('%s planning queue "%s" on the %s connection. Payment submission uses a separate runtime and queue.', $enabled ? 'Durable' : 'Off —', $queue, $connection))
-            ->descriptionIcon(Heroicon::Cog6Tooth)
+            ->description(sprintf('Planning queue "%s" on %s', $queue, $connection))
             ->color($enabled ? 'success' : 'warning');
 
         [$queueDepth, $queueOldest] = $this->queueDepth($queue, $connection);
@@ -73,8 +79,9 @@ class OperationsHealthWidget extends BaseWidget
             ->description($connection === 'database'
                 ? ($queueOldest === null ? 'No queued work waiting' : 'Oldest waiting '.$queueOldest)
                 : 'Depth is not observable on the '.$connection.' connection')
-            ->descriptionIcon(Heroicon::QueueList)
-            ->color($queueDepth > 0 ? 'info' : 'gray');
+            // Depth is a number, not a state. It was `info`, so a busy queue read as
+            // an alert beside the warning and danger tiles in the same band.
+            ->color('gray');
 
         $heartbeat = FinanceWorkflowRun::query()
             ->where('organization_id', $institution->id)
@@ -85,7 +92,6 @@ class OperationsHealthWidget extends BaseWidget
             ->description($heartbeat?->heartbeat_at === null
                 ? 'No worker has claimed a run on this installation'
                 : sprintf('Run #%d last checked in %s UTC · %s', $heartbeat->id, $heartbeat->heartbeat_at->toDateTimeString(), $heartbeat->state))
-            ->descriptionIcon(Heroicon::OutlinedHeart)
             ->color($this->heartbeatColour($heartbeat));
 
         $staleWindows = FundingWindow::query()
@@ -95,30 +101,40 @@ class OperationsHealthWidget extends BaseWidget
             ->count();
 
         $fundingStat = Stat::make('Stale funding evidence', (string) $staleWindows)
-            ->description('Windows hold block-bound capacity for at most fifteen minutes and do not roll over unattended. Expiry is never silently refreshed.')
-            ->descriptionIcon(Heroicon::ExclamationTriangle)
+            ->description('Capacity expires with its block and never rolls over')
             ->color($staleWindows > 0 ? 'warning' : 'success');
 
         $user = Auth::user();
         $unread = $user instanceof User ? $user->unreadNotifications()->count() : 0;
 
         $notificationStat = Stat::make('Notifications awaiting you', (string) $unread)
-            ->description('Work items are persisted before an alert is sent, so a failed delivery never loses the task. Reading or dismissing one approves nothing.')
-            ->descriptionIcon(Heroicon::BellAlert)
-            ->color($unread > 0 ? 'info' : 'gray');
+            ->description('Persisted before the alert; reading one approves nothing')
+            ->color('gray');
 
         $status = app(LeptonTreasuryService::class)->status($institution->primaryWallet());
 
+        // The full driver error is a setup instruction — "run circle wallet login
+        // <email> --testnet --init" — and ran to nine lines in a stat
+        // caption. The caption says what is wrong; the exact command stays
+        // reachable on hover rather than being truncated away.
+        //
+        // It also deliberately does not restate the driver and chain: the
+        // ArcSettlement band owns both, and repeating them here had the two
+        // bands saying the same thing twice on one screen. This tile answers
+        // one question only — is the session usable.
         $providerStat = Stat::make('Provider session', $status['live_available'] ? 'Reachable' : 'Unavailable')
             ->description($status['live_available']
-                ? sprintf('%s driver · %s chain %s · block %s', $status['driver'], strtoupper((string) $status['chain']), (string) $status['chain_id'], number_format((float) ($status['block'] ?? 0)))
-                : ($status['error'] ?? 'Circle session is not established for this chain'))
-            ->descriptionIcon(Heroicon::Signal)
+                ? 'Session established; signed chain reads are succeeding'
+                : 'Not authenticated for this chain')
             ->color(match (true) {
                 $status['is_fake'] => 'warning',
                 $status['live_available'] => 'success',
                 default => 'danger',
             });
+
+        if (! $status['live_available'] && is_string($status['error'] ?? null) && $status['error'] !== '') {
+            $providerStat->extraAttributes(['title' => $status['error']]);
+        }
 
         $unresolved = Transaction::query()
             ->where('organization_id', $institution->id)
@@ -132,13 +148,11 @@ class OperationsHealthWidget extends BaseWidget
 
         $outcomeStat = Stat::make('Unresolved payment outcomes', (string) ($unresolved + $failed))
             ->description(sprintf(
-                '%d pending · %d failed reconciliation. Null or timed-out lookups stay unresolved and open an investigation case; they are never re-submitted blindly or declared fabricated.',
+                '%d pending, %d failed. A null or timed-out lookup opens a case, never a blind re-send',
                 $unresolved,
                 $failed,
             ))
-            ->descriptionIcon(Heroicon::MagnifyingGlass)
             ->color($unresolved + $failed > 0 ? 'warning' : 'success')
-            ->extraAttributes(['class' => 'cursor-pointer hover:shadow-sm transition-shadow'])
             ->url(PaymentReviews::getUrl(panel: 'finance'));
 
         return [$runtimeStat, $queueStat, $heartbeatStat, $fundingStat, $notificationStat, $providerStat, $outcomeStat];

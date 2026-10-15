@@ -17,7 +17,6 @@ use App\Models\PaymentReservation;
 use App\Models\Transaction;
 use App\Services\InstallationInstitution;
 use App\Services\LeptonTreasuryService;
-use Filament\Support\Icons\Heroicon;
 use Filament\Widgets\StatsOverviewWidget as BaseWidget;
 use Filament\Widgets\StatsOverviewWidget\Stat;
 
@@ -36,7 +35,20 @@ class TreasuryOverviewWidget extends BaseWidget
 
     protected int|string|array $columnSpan = 'full';
 
-    protected int|array|null $columns = 3;
+    /**
+     * Five stats, so a five-across desktop row: three columns would leave a
+     * ragged 3 + 2 with a hole in the last row, which reads as a layout bug.
+     *
+     * @var array<string, int>
+     */
+    /**
+     * Five across from `xl` up, where a tile is wide enough for these short
+     * figures. Below that the band steps down rather than squeezing five
+     * columns into a tablet.
+     *
+     * @var array<string, int>
+     */
+    protected int|array|null $columns = ['@xl' => 5, '@lg' => 3, '@md' => 2, 'default' => 1];
 
     #[\Override]
     public function getHeading(): ?string
@@ -47,7 +59,7 @@ class TreasuryOverviewWidget extends BaseWidget
     #[\Override]
     public function getDescription(): ?string
     {
-        return 'Progress measured in records, not balances. Exact amounts live in the finance panel, which keeps allocation, realized cash and observed Arc capacity as three separate figures.';
+        return 'Progress measured in records, not balances. Exact amounts live in the finance panel.';
     }
 
     #[\Override]
@@ -58,7 +70,6 @@ class TreasuryOverviewWidget extends BaseWidget
         if ($institution === null) {
             return [Stat::make('Money posture', 'Not configured')
                 ->description('Configure EDUFLOW_INSTITUTION_ID for a single institution')
-                ->descriptionIcon(Heroicon::ExclamationTriangle)
                 ->color('warning')];
         }
 
@@ -70,8 +81,7 @@ class TreasuryOverviewWidget extends BaseWidget
             'Ledger balance',
             $wallet === null ? 'No treasury' : number_format((float) $wallet->balance, 2).' USDC',
         )
-            ->description('Local ledger only. This is not on-chain funds and never settles a payable; it is a legacy two-decimal column, so the finance panel uses exact base units instead.')
-            ->descriptionIcon(Heroicon::Banknotes)
+            ->description('Local ledger only — not on-chain funds, and it never settles a payable.')
             ->color($status['in_sync'] === false ? 'warning' : 'gray')
             ->extraAttributes(['class' => 'cursor-pointer hover:shadow-sm transition-shadow'])
             ->url(TransactionResource::getUrl('index'));
@@ -84,13 +94,12 @@ class TreasuryOverviewWidget extends BaseWidget
 
         $evidenceStat = Stat::make('Exact evidence records', (string) ($collections + $snapshots))
             ->description(sprintf(
-                '%d collection batches (%d independently reviewed) · %d budget snapshots. Unreviewed or legacy-attested evidence cannot fund a plan.',
+                '%d collection batches (%d reviewed) · %d budget snapshots',
                 $collections,
                 $reviewed,
                 $snapshots,
             ))
-            ->descriptionIcon(Heroicon::DocumentText)
-            ->color('info')
+            ->color('gray')
             ->extraAttributes(['class' => 'cursor-pointer hover:shadow-sm transition-shadow'])
             ->url(Collections::getUrl(panel: 'finance'));
 
@@ -105,13 +114,12 @@ class TreasuryOverviewWidget extends BaseWidget
             (string) $authorizations->sum(),
         )
             ->description(sprintf(
-                '%d approved · %d rejected · %d held. Approval is time-limited authority, not proof of payment. Background submission and verified settlement remain separate.',
+                '%d approved · %d rejected · %d held — authority, not settlement',
                 $authorizations->get('approve_payment', 0),
                 $authorizations->get('reject_payment', 0),
                 $authorizations->get('hold_payment', 0),
             ))
-            ->descriptionIcon(Heroicon::ClipboardDocumentCheck)
-            ->color('primary')
+            ->color('gray')
             ->extraAttributes(['class' => 'cursor-pointer hover:shadow-sm transition-shadow'])
             ->url(PaymentReviews::getUrl(panel: 'finance'));
 
@@ -124,11 +132,10 @@ class TreasuryOverviewWidget extends BaseWidget
 
         $supervisionStat = Stat::make('Supervision backlog', (string) $waiting)
             ->description(sprintf(
-                '%d waiting or blocked · %d completed. Work runs in the background whether or not anyone is watching.',
+                '%d waiting or blocked · %d completed',
                 $waiting,
                 $states->get('completed', 0),
             ))
-            ->descriptionIcon(Heroicon::ClipboardDocumentList)
             ->color($waiting > 0 ? 'warning' : 'success')
             ->extraAttributes(['class' => 'cursor-pointer hover:shadow-sm transition-shadow'])
             ->url(FinanceDashboard::getUrl(panel: 'finance'));
@@ -138,10 +145,9 @@ class TreasuryOverviewWidget extends BaseWidget
 
         $settlementStat = Stat::make('Settlement status', 'Not executed')
             ->description(sprintf(
-                '%d pending legacy transactions. A stored transaction hash is a claim, not proof — only verified Arc movement and finality settles a payment.',
+                '%d pending · a stored hash is a claim, not proof of payment',
                 $pending,
             ))
-            ->descriptionIcon(Heroicon::CircleStack)
             ->color('gray')
             ->extraAttributes(['class' => 'cursor-pointer hover:shadow-sm transition-shadow'])
             ->url(TransactionResource::getUrl('index'));

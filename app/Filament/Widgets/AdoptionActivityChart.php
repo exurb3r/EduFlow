@@ -35,11 +35,11 @@ class AdoptionActivityChart extends ChartWidget
 
     protected ?string $heading = 'Installation activity';
 
-    protected ?string $description = 'Finance-domain records created per day over the last 14 days. Counts are institution-scoped and measure adoption, not money moved — no payment has been submitted or verified on any rail.';
+    protected ?string $description = 'Finance records created per day over the last 14 days. Adoption, not money moved.';
 
     protected ?string $emptyStateHeading = 'No activity recorded yet';
 
-    protected ?string $emptyStateDescription = 'Receipts, budget evidence, background runs and payment reviews all land here as the school begins using the installation.';
+    protected ?string $emptyStateDescription = 'Receipts, budget evidence and payment reviews land here once the school starts using the installation.';
 
     protected ?string $maxHeight = '320px';
 

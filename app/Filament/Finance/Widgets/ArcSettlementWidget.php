@@ -12,7 +12,6 @@ use App\Services\LeptonTreasuryService;
 use App\Services\TreasuryBalanceObservation;
 use Brick\Math\BigDecimal;
 use Brick\Math\BigInteger;
-use Filament\Support\Icons\Heroicon;
 use Filament\Widgets\StatsOverviewWidget as BaseWidget;
 use Filament\Widgets\StatsOverviewWidget\Stat;
 use Illuminate\Support\Carbon;
@@ -35,7 +34,23 @@ class ArcSettlementWidget extends BaseWidget
 
     protected int|string|array $columnSpan = 'full';
 
-    protected int|array|null $columns = 4;
+    /**
+     * Five stats, so five across at the widest tier — a single clean row.
+     *
+     * Filament's `@`-prefixed grid breakpoints are CONTAINER queries measured
+     * against the widget itself, not the viewport, so `@2xl` means 42rem
+     * (672px) of widget width rather than a large screen. Reading them as
+     * viewport breakpoints put five 176px tiles in a full-width band and ran
+     * every caption to three, four and five lines. Each tier below is the
+     * smallest widget width that still leaves a tile about 200px wide.
+     *
+     * Five does not divide evenly at three or two, so narrower tiers leave a
+     * short last row. That is the only honest option: one tile per row would
+     * be unreadable, and a ragged remainder is preferable to a wall.
+     *
+     * @var array<string, int>
+     */
+    protected int|array|null $columns = ['@6xl' => 5, '@3xl' => 3, '@xl' => 2, 'default' => 1];
 
     /** Minutes after which a funding observation stops being usable evidence. */
     private const int STALE_AFTER_MINUTES = 15;
@@ -49,7 +64,7 @@ class ArcSettlementWidget extends BaseWidget
     #[\Override]
     public function getDescription(): ?string
     {
-        return 'Live wallet observations read through Lepton, separate from funding approvals and settled payments. Native Arc USDC uses 18 decimals; ERC-20 and native interfaces expose the same funds, not two balances.';
+return 'Chain facts about the institution wallet, not receipts and not an approved balance. Arc native USDC is 18-decimal gas.';
     }
 
     #[\Override]
@@ -85,8 +100,7 @@ class ArcSettlementWidget extends BaseWidget
         )
             ->description($observedAt !== null
                 ? sprintf('Block %s · observed %s UTC', (string) ($balance['block_number'] ?? '—'), $observedAt)
-                : ($observation['error'] ?? 'Live balance has not been observed'))
-            ->descriptionIcon(Heroicon::Banknotes)
+: 'No reviewed funding window has observed this wallet yet')
             ->color($isFake === true ? 'warning' : ($balance !== [] ? 'success' : 'gray'));
 
         if ($isFake === true) {
@@ -97,9 +111,8 @@ class ArcSettlementWidget extends BaseWidget
             'Native Arc balance (gas)',
             isset($balance['native_units']) ? new HtmlString('<span class="block min-w-0 break-all">'.e($this->formatNative($balance['native_units'])).'</span>') : 'Not observed',
         )
-            ->description('Same USDC funds at native precision. Circle agent transfers use sponsored gas; sponsorship does not authorize payment.')
-            ->descriptionIcon(Heroicon::Bolt)
-            ->color($balance !== [] ? 'info' : 'gray');
+->description('Arc gas is USDC, so an empty wallet cannot send')
+            ->color('gray');
 
         $status = app(LeptonTreasuryService::class)->status($institution->primaryWallet());
         $chain = strtoupper($status['chain'] === '' ? 'ARC-TESTNET' : $status['chain']);
@@ -108,8 +121,7 @@ class ArcSettlementWidget extends BaseWidget
             ->description($observation['available']
                 ? sprintf('Chain id %s · block %s', (string) $observation['chain_id'], (string) $observation['block_number'])
                 : 'Live chain reads unavailable')
-            ->descriptionIcon(Heroicon::GlobeAlt)
-            ->color($observation['available'] ? ($chain === 'ARC' ? 'danger' : 'success') : 'gray');
+->color($status['live_available'] ? ($chain === 'ARC' ? 'danger' : 'success') : 'gray');
 
         if ($status['address_url'] !== null) {
             $chainStat->url($status['address_url'], shouldOpenInNewTab: true)
@@ -117,15 +129,17 @@ class ArcSettlementWidget extends BaseWidget
         }
 
         if ($chain === 'ARC') {
-            $chainStat->description('MAINNET — the pilot executes on ARC-TESTNET only; no implicit fallback exists');
+            $chainStat->description('Mainnet. The pilot runs on ARC-TESTNET only');
         }
 
+        // The driver is a configuration fact, not a state. It was `primary`,
+        // which made a healthy wallet look like the panel's one call to action
+        // beside the wallet and evidence tiles.
         $driverStat = Stat::make('Execution driver', $status['driver'] === '' ? 'unknown' : $status['driver'])
             ->description($status['is_fake']
                 ? 'Fake gateway: no wallet, no chain, no real funds'
                 : 'Circle Agent Wallet through Lepton')
-            ->descriptionIcon(Heroicon::CommandLine)
-            ->color($status['is_fake'] ? 'warning' : 'primary');
+            ->color($status['is_fake'] ? 'warning' : 'gray');
 
         // Colour follows the same four states as the label, decided once here so
         // the wording and the colour can never disagree.
@@ -152,9 +166,8 @@ class ArcSettlementWidget extends BaseWidget
                     Money::formatExact(data_get($window->snapshot, 'capacity.budget_base_units'), 'USDC'),
                     Money::formatExact(data_get($window->snapshot, 'capacity.cash_base_units'), 'USDC'),
                 ))
-            ->descriptionIcon(Heroicon::Clock)
             ->color($evidenceColour)
-            ->extraAttributes(['class' => 'cursor-pointer hover:shadow-sm transition-shadow'])
+            ->extraAttributes(['class' => 'cursor-pointer'])
             ->url(PaymentReviews::getUrl(panel: 'finance'));
 
         return [$usdcStat, $nativeStat, $chainStat, $evidenceStat, $driverStat];

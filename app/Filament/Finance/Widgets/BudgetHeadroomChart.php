@@ -26,11 +26,13 @@ class BudgetHeadroomChart extends ChartWidget
 {
     protected static ?int $sort = 3;
 
-    protected int|string|array $columnSpan = 'full';
+    // Paired with CollectionsTrendChart in the overview grid, so a half-width
+    // cell rather than a full-width band the chart would only partly fill.
+    protected int|string|array $columnSpan = 1;
 
     protected ?string $heading = 'Approved allocation against realized cash headroom';
 
-    protected ?string $description = 'Latest captured budget evidence per department. Allocation is not cash: an approved permission to spend and collected money are plotted separately, and neither is the Circle wallet balance.';
+    protected ?string $description = 'Allocation is not cash: permission to spend and collected money are plotted separately.';
 
     protected ?string $emptyStateHeading = 'No budget evidence captured yet';
 

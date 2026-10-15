@@ -22,7 +22,14 @@ class LeptonNetworkWidget extends BaseWidget
 
     protected int|string|array $columnSpan = 'full';
 
-    protected int|array|null $columns = 4;
+    /**
+     * A plain integer applies at every breakpoint, which rendered four tiles
+     * side by side on a 390px phone at roughly 85px each. Breaking down to a
+     * single column keeps the chain figures readable on a small screen.
+     *
+     * @var array<string, int>
+     */
+    protected int|array|null $columns = ['@lg' => 4, '@md' => 2, 'default' => 1];
 
     /**
      * Chain reconciliation is a widget-level concern, not a per-stat one:
@@ -140,9 +147,8 @@ class LeptonNetworkWidget extends BaseWidget
 
         $networkStat = Stat::make('Arc Settlement Network', $chain)
             ->description($status['live_available']
-                ? 'Block '.number_format($status['block'] ?? 0).' · chain id '.$status['chain_id'].' · '.($status['rpc_host'] ?? 'rpc')
+                ? 'Block '.number_format($status['block'] ?? 0).' · id '.$status['chain_id']
                 : 'Live chain reads unavailable')
-            ->descriptionIcon('heroicon-m-signal')
             ->color($isMainnet ? 'warning' : 'success');
 
         if ($status['address_url']) {
@@ -158,26 +164,31 @@ class LeptonNetworkWidget extends BaseWidget
             : 'Unavailable')
             ->description($status['onchain_balance'] !== null
                 ? 'Live via RPC · ledger '.number_format((float) $status['ledger_balance'], 2).' USDC'
-                : ($status['error'] ?? 'Chain read failed'))
-            ->descriptionIcon('heroicon-m-banknotes')
+                : 'Chain read failed')
             ->color($status['live_available'] ? 'success' : 'gray');
 
         if ($status['in_sync'] !== null) {
             $balanceStat->color($status['in_sync'] ? 'success' : 'warning')
-                ->description(($status['in_sync'] ? 'Ledger matches chain' : 'Ledger drift '.$status['drift'].' USDC').' · ledger '.number_format((float) $status['ledger_balance'], 2));
+                ->description($status['in_sync'] ? 'Ledger matches chain' : 'Ledger drift '.$status['drift'].' USDC');
         }
 
+        // The value already truncates the address; repeating the full 42-char
+        // token as the description pushed it out of the tile and across the
+        // neighbouring card. The description now states what the address is,
+        // and the full value stays reachable on hover.
         $treasuryStat = Stat::make('Agent Wallet', $this->shortAddress($status['treasury_address']))
-            ->description($status['treasury_address'] ?? 'Set LEPTON_TREASURY_ADDRESS')
-            ->descriptionIcon('heroicon-m-wallet')
-            ->color($status['treasury_address'] ? 'primary' : 'danger');
+            ->description($status['treasury_address'] ? 'Treasury destination on '.$chain : 'Set LEPTON_TREASURY_ADDRESS')
+            ->color($status['treasury_address'] ? 'gray' : 'danger');
+
+        if ($status['treasury_address']) {
+            $treasuryStat->extraAttributes(['title' => $status['treasury_address']]);
+        }
 
         $driverStat = Stat::make('Lepton Driver', $status['driver'])
             ->description($status['is_fake']
                 ? 'Fake driver: no real USDC moves'
                 : 'Circle CLI + arc-canteen')
-            ->descriptionIcon('heroicon-m-command-line')
-            ->color($status['is_fake'] ? 'warning' : 'info');
+            ->color($status['is_fake'] ? 'warning' : 'gray');
 
         return [$networkStat, $balanceStat, $treasuryStat, $driverStat];
     }

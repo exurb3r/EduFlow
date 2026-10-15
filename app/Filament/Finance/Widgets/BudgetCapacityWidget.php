@@ -33,6 +33,10 @@ class BudgetCapacityWidget extends TableWidget
 {
     protected static ?int $sort = 2;
 
+    // Full width, deliberately. This band is nine columns of evidence and its
+    // table is 1199px wide at rest; halved into a 676px cell it hides ~44% of
+    // itself behind a horizontal scrollbar inside a box half the page's width.
+    // Charts scale to half a row, dense evidence tables do not.
     protected int|string|array $columnSpan = 'full';
 
     /** @var array<int, string>|null Memoized held base units keyed by budget id. */
@@ -118,7 +122,7 @@ class BudgetCapacityWidget extends TableWidget
                 Action::make('reviewPlan')
                     ->label('Review')
                     ->icon(Heroicon::ArrowRightCircle)
-                    ->color('primary')
+                    ->color('gray')
                     ->url(fn (): string => FinanceSupervisor::getUrl(panel: 'finance')),
             ])
             ->defaultSort('id', 'desc');
