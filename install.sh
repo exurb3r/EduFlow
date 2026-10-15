@@ -9,7 +9,7 @@ set -Eeuo pipefail
 ROOT="$(pwd)"
 ENV_FILE="$ROOT/.env"
 COMPOSE_FILE="$ROOT/docker-compose.yml"
-COMPOSE_URL="https://raw.githubusercontent.com/koamishin/KoamiStarterKit/main/docker-compose.yml"
+COMPOSE_URL="https://raw.githubusercontent.com/koamishin/OpenSinop/main/docker-compose.yml"
 
 RED='\033[0;31m'; GREEN='\033[0;32m'; YELLOW='\033[1;33m'; CYAN='\033[0;36m'; BOLD='\033[1m'; RESET='\033[0m'
 

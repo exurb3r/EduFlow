@@ -363,7 +363,7 @@ Production Docker containers bundle FrankenPHP, Octane, PostgreSQL 16, Redis 7, 
 To start OpenSinop with sensible production defaults:
 
 ```bash
-docker compose -f https://raw.githubusercontent.com/koamishin/KoamiStarterKit/main/docker-compose.yml up -d
+docker compose -f https://raw.githubusercontent.com/koamishin/OpenSinop/main/docker-compose.yml up -d
 ```
 
 > **Customization:** Pass environment variables before the command to customize ports or settings, e.g. `APP_PORT=8080 docker compose ... up -d`.
@@ -374,11 +374,11 @@ For a guided terminal wizard that prompts for application URL, database credenti
 
 - **macOS / Linux:**
   ```bash
-  bash <(curl -fsSL https://raw.githubusercontent.com/koamishin/KoamiStarterKit/main/install.sh)
+  bash <(curl -fsSL https://raw.githubusercontent.com/koamishin/OpenSinop/main/install.sh)
   ```
 - **Windows (PowerShell):**
   ```powershell
-  irm https://raw.githubusercontent.com/koamishin/KoamiStarterKit/main/install.ps1 | iex
+  irm https://raw.githubusercontent.com/koamishin/OpenSinop/main/install.ps1 | iex
   ```
 
 ##### 3. Updating an existing Docker deployment
@@ -387,15 +387,15 @@ To pull the newest container images, create an automated PostgreSQL database bac
 
 - **macOS / Linux:**
   ```bash
-  bash <(curl -fsSL https://raw.githubusercontent.com/koamishin/KoamiStarterKit/main/install.sh) --update
+  bash <(curl -fsSL https://raw.githubusercontent.com/koamishin/OpenSinop/main/install.sh) --update
   ```
 - **Windows (PowerShell):**
   ```powershell
-  iwr https://raw.githubusercontent.com/koamishin/KoamiStarterKit/main/install.ps1 -OutFile install.ps1; .\install.ps1 -Update
+  iwr https://raw.githubusercontent.com/koamishin/OpenSinop/main/install.ps1 -OutFile install.ps1; .\install.ps1 -Update
   ```
   Or as a one-liner:
   ```powershell
-  & ([scriptblock]::Create((irm https://raw.githubusercontent.com/koamishin/KoamiStarterKit/main/install.ps1))) --update
+  & ([scriptblock]::Create((irm https://raw.githubusercontent.com/koamishin/OpenSinop/main/install.ps1))) --update
   ```
 
 ##### 4. Bootstrap the first administrator
@@ -547,8 +547,8 @@ driver), see `vendor/yukazakiri/lepton-agent/README.md` or the package docs.
 
 | Role | Email | Password |
 |---|---|---|
-| Student | `juan@opensinop.test` | `password` |
-| Finance officer | `finance@opensinop.test` | `password` |
+| Student | `juan@eduflow.test` | `password` |
+| Finance officer | `finance@eduflow.test` | `password` |
 
 These accounts belong to the existing developer demo. The student account still exposes
 legacy assistance screens; it is not a fee-payment portal or a prerequisite for the college
@@ -1176,9 +1176,20 @@ reservation release/rollover, approval renewal/withdrawal, durable recovery and 
 | `php artisan lepton:login --status` | Circle session state per network |
 | `php artisan lepton:login <email>` | Send the OTP, print the request ID |
 | `php artisan lepton:login --request=<id> --otp=<code>` | Complete login |
+| `php artisan lepton:wallets` | List Circle agent wallets on configured chain (`--chain`, `--type`, `--json`) |
+| `php artisan lepton:wallet:create` | Create an agent-controlled SCA wallet (`--testnet`, `--mainnet`) |
+| `php artisan lepton:wallet:fund <address>` | Fund an agent wallet (faucet drip on testnet, Transak/QR on mainnet) |
 | `php artisan lepton:reconcile` | Legacy hash lookup; not complete pilot settlement proof |
 | `php artisan lepton:reconcile --fix` | Legacy reconciliation mutation; review missing/unknown evidence before use |
 | `php artisan app:demo` | Run one full autonomous cycle |
+| `php artisan app:install` | Initialize school identity and financial settings |
+| `php artisan app:bootstrap-admin` | Create the first super-administrator account interactively |
+| `php artisan app:finance-preview` | Read-only treasury and cashflow preview without students |
+| `php artisan app:prepare-vendor-payment` | Prepare an immutable full-bill USDC payment draft |
+| `php artisan app:prepare-finance-policy` | Draft an immutable institution finance policy version |
+| `php artisan app:activate-finance-policy` | Activate a reviewed institution finance policy version |
+| `php artisan app:dispatch-finance-workflows` | Recover and dispatch bounded read-only finance planning work |
+| `php artisan app:reconcile-payment-submissions` | Verify matching settlement and finality on Arc |
 | `php artisan lepton:status --address=0x…` | Chain, block, balance, limits |
 | `php artisan lepton:transfer 0x… --amount=1.00 --from=0x…` | Single transfer (`--estimate` to dry-run) |
 

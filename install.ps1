@@ -6,7 +6,7 @@ $ErrorActionPreference = "Stop"
 $Root = (Get-Location).Path
 $EnvFile = Join-Path $Root ".env"
 $ComposeFile = Join-Path $Root "docker-compose.yml"
-$ComposeUrl = "https://raw.githubusercontent.com/koamishin/KoamiStarterKit/main/docker-compose.yml"
+$ComposeUrl = "https://raw.githubusercontent.com/koamishin/OpenSinop/main/docker-compose.yml"
 
 function Say($Text, [ConsoleColor]$Color = [ConsoleColor]::White) {
     Write-Host $Text -ForegroundColor $Color

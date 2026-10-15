@@ -1,11 +1,11 @@
 # OpenSinop self-hosted Docker Compose setup
 # One-line start (after creating this file): docker compose up -d
 # Or directly from GitHub:
-# docker compose -f https://raw.githubusercontent.com/koamishin/KoamiStarterKit/main/docker-compose.yml up -d
+# docker compose -f https://raw.githubusercontent.com/koamishin/OpenSinop/main/docker-compose.yml up -d
 
 services:
   app:
-    image: ghcr.io/koamishin/koamistarterkit:${EDUFLOW_VERSION:-latest}
+    image: ghcr.io/koamishin/opensinop:${EDUFLOW_VERSION:-latest}
     container_name: opensinop
     restart: unless-stopped
     ports:
