@@ -1,4 +1,4 @@
-# install.ps1 - interactive TUI installer for EduFlow (Windows PowerShell)
+# install.ps1 - interactive TUI installer for OpenSinop (Windows PowerShell)
 # Usage (one line):
 #   irm https://raw.githubusercontent.com/koamishin/KoamiStarterKit/main/install.ps1 | iex
 
@@ -105,7 +105,7 @@ function Gen-Key {
 
 $Update = ($args -contains "--update" -or $args -contains "-Update")
 if ($Update) {
-    Title "EduFlow Update"
+    Title "OpenSinop Update"
     if (-not (Test-Path $EnvFile)) {
         Err "No .env found in $Root. Run the installer first."
         return
@@ -115,16 +115,16 @@ if ($Update) {
         try { Invoke-WebRequest -Uri $ComposeUrl -OutFile $ComposeFile -UseBasicParsing } catch { Err $_.Exception.Message; return }
     }
     $DB_USER = (Select-String -Path $EnvFile -Pattern '^DB_USERNAME=' | Select-Object -Last 1).Line.Split('=',2)[1].Trim('"')
-    if ([string]::IsNullOrWhiteSpace($DB_USER)) { $DB_USER = "eduflow" }
+    if ([string]::IsNullOrWhiteSpace($DB_USER)) { $DB_USER = "opensinop" }
     $DB_NAME = (Select-String -Path $EnvFile -Pattern '^DB_DATABASE=' | Select-Object -Last 1).Line.Split('=',2)[1].Trim('"')
-    if ([string]::IsNullOrWhiteSpace($DB_NAME)) { $DB_NAME = "eduflow" }
+    if ([string]::IsNullOrWhiteSpace($DB_NAME)) { $DB_NAME = "opensinop" }
 
     $backupDir = Join-Path $Root "backups"
     $dbCid = (docker compose ps -q db 2>$null)
     if ($dbCid) {
         New-Item -ItemType Directory -Force -Path $backupDir | Out-Null
         $stamp = Get-Date -Format "yyyyMMdd-HHmmss"
-        $backupFile = Join-Path $backupDir ("eduflow-" + $stamp + ".sql")
+        $backupFile = Join-Path $backupDir ("opensinop-" + $stamp + ".sql")
         try {
             docker compose exec -T db sh -c ("pg_dump -U '" + $DB_USER + "' '" + $DB_NAME + "'") | Out-File -FilePath $backupFile -Encoding utf8
             Ok ("Database backup written to " + $backupFile)
@@ -143,12 +143,12 @@ if ($Update) {
 
     $healthy = $false
     for ($i = 0; $i -lt 24; $i++) {
-        $status = docker inspect --format '{{.State.Health.Status}}' eduflow 2>$null
+        $status = docker inspect --format '{{.State.Health.Status}}' opensinop 2>$null
         if ($status -eq "healthy") { $healthy = $true; break }
         if ($status -eq "unhealthy") { break }
         Start-Sleep -Seconds 5
     }
-    if ($healthy) { Ok "Application is healthy." } else { Warn "Application did not report healthy yet; see docker logs eduflow." }
+    if ($healthy) { Ok "Application is healthy." } else { Warn "Application did not report healthy yet; see docker logs opensinop." }
 
     $appUrlLine = Select-String -Path $EnvFile -Pattern '^APP_URL=' | Select-Object -Last 1
     $APP_URL = if ($appUrlLine) { $appUrlLine.Line.Split('=',2)[1].Trim('"') } else { "http://localhost:8000" }
@@ -169,13 +169,13 @@ if (Test-Path $EnvFile) {
     Warn "Existing .env backed up to .env.previous"
 }
 
-Title "EduFlow TUI Installer (PowerShell)"
+Title "OpenSinop TUI Installer (PowerShell)"
 Info "Interactive setup for Docker-based self-hosting."
 Info "Press Enter to accept a suggested default."
 
 # Application
 Title "Application"
-$APP_NAME = Ask "Application name" "EduFlow"
+$APP_NAME = Ask "Application name" "OpenSinop"
 $APP_ENV = Ask-Choice "Environment" "production" @("production", "local", "staging")
 $tmp = Ask-Choice "Debug mode" "false" @("false", "true")
 $APP_DEBUG = $tmp
@@ -192,10 +192,10 @@ if ($DB_CONNECTION -eq "sqlite") {
 } else {
     $DB_HOST = Ask "DB host" "db"
     $DB_PORT = Ask "DB port" ($DB_CONNECTION -eq "pgsql" ? "5432" : "3306")
-    $DB_DATABASE = Ask "DB name" "eduflow"
-    $DB_USERNAME = Ask "DB username" "eduflow"
+    $DB_DATABASE = Ask "DB name" "opensinop"
+    $DB_USERNAME = Ask "DB username" "opensinop"
     $DB_PASSWORD = Read-Secret "DB password"
-    if ([string]::IsNullOrWhiteSpace($DB_PASSWORD)) { $DB_PASSWORD = "eduflow" }
+    if ([string]::IsNullOrWhiteSpace($DB_PASSWORD)) { $DB_PASSWORD = "opensinop" }
 }
 
 # Cache/session/queue
@@ -374,16 +374,16 @@ Ok "Containers started."
 Title "Health check"
 $healthy = $false
 for ($i = 0; $i -lt 24; $i++) {
-    $status = docker inspect --format '{{.State.Health.Status}}' eduflow 2>$null
+    $status = docker inspect --format '{{.State.Health.Status}}' opensinop 2>$null
     if ($status -eq "healthy") { $healthy = $true; break }
     if ($status -eq "unhealthy") { break }
     Start-Sleep -Seconds 5
 }
-if ($healthy) { Ok "Application is healthy." } else { Warn "Application did not report healthy yet; see docker logs eduflow." }
+if ($healthy) { Ok "Application is healthy." } else { Warn "Application did not report healthy yet; see docker logs opensinop." }
 
 Title "Next steps"
 Info ("Open the app at " + $APP_URL)
 Info "Create the first administrator (interactive):"
-Say '  docker exec -it eduflow php artisan eduflow:bootstrap-admin --name="School Operator" --email="operator@example.org"' White
+Say '  docker exec -it opensinop php artisan eduflow:bootstrap-admin --name="School Operator" --email="operator@example.org"' White
 Info "Circle/Arc features require the Circle CLI and arc-canteen on your workflow host."
 Ok "Installation complete."

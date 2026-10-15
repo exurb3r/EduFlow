@@ -1,4 +1,4 @@
-# EduFlow self-hosted Docker Compose setup
+# OpenSinop self-hosted Docker Compose setup
 # One-line start (after creating this file): docker compose up -d
 # Or directly from GitHub:
 # docker compose -f https://raw.githubusercontent.com/koamishin/KoamiStarterKit/main/docker-compose.yml up -d
@@ -6,21 +6,21 @@
 services:
   app:
     image: ghcr.io/koamishin/koamistarterkit:${EDUFLOW_VERSION:-latest}
-    container_name: eduflow
+    container_name: opensinop
     restart: unless-stopped
     ports:
       - "${APP_PORT:-8000}:8000"
     environment:
-      APP_NAME: ${APP_NAME:-EduFlow}
+      APP_NAME: ${APP_NAME:-OpenSinop}
       APP_ENV: ${APP_ENV:-production}
       APP_DEBUG: ${APP_DEBUG:-false}
       APP_URL: ${APP_URL:-http://localhost:8000}
       DB_CONNECTION: pgsql
       DB_HOST: db
       DB_PORT: 5432
-      DB_DATABASE: ${DB_DATABASE:-eduflow}
-      DB_USERNAME: ${DB_USERNAME:-eduflow}
-      DB_PASSWORD: ${DB_PASSWORD:-eduflow}
+      DB_DATABASE: ${DB_DATABASE:-opensinop}
+      DB_USERNAME: ${DB_USERNAME:-opensinop}
+      DB_PASSWORD: ${DB_PASSWORD:-opensinop}
       REDIS_HOST: redis
       REDIS_PORT: 6379
       CACHE_STORE: redis
@@ -31,8 +31,8 @@ services:
       EDUFLOW_TIMEZONE: ${EDUFLOW_TIMEZONE:-UTC}
       EDUFLOW_CURRENCY: ${EDUFLOW_CURRENCY:-USD}
     volumes:
-      - eduflow_storage:/app/storage
-      - eduflow_cache:/app/bootstrap/cache
+      - opensinop_storage:/app/storage
+      - opensinop_cache:/app/bootstrap/cache
     depends_on:
       db:
         condition: service_healthy
@@ -45,29 +45,29 @@ services:
 
   db:
     image: postgres:16-alpine
-    container_name: eduflow-db
+    container_name: opensinop-db
     restart: unless-stopped
     environment:
-      POSTGRES_DB: ${DB_DATABASE:-eduflow}
-      POSTGRES_USER: ${DB_USERNAME:-eduflow}
-      POSTGRES_PASSWORD: ${DB_PASSWORD:-eduflow}
+      POSTGRES_DB: ${DB_DATABASE:-opensinop}
+      POSTGRES_USER: ${DB_USERNAME:-opensinop}
+      POSTGRES_PASSWORD: ${DB_PASSWORD:-opensinop}
     volumes:
-      - eduflow_db:/var/lib/postgresql/data
+      - opensinop_db:/var/lib/postgresql/data
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U ${DB_USERNAME:-eduflow} -d ${DB_DATABASE:-eduflow}"]
+      test: ["CMD-SHELL", "pg_isready -U ${DB_USERNAME:-opensinop} -d ${DB_DATABASE:-opensinop}"]
       interval: 5s
       timeout: 5s
       retries: 10
 
   redis:
     image: redis:7-alpine
-    container_name: eduflow-redis
+    container_name: opensinop-redis
     restart: unless-stopped
     volumes:
-      - eduflow_redis:/data
+      - opensinop_redis:/data
 
 volumes:
-  eduflow_storage:
-  eduflow_cache:
-  eduflow_db:
-  eduflow_redis:
+  opensinop_storage:
+  opensinop_cache:
+  opensinop_db:
+  opensinop_redis:

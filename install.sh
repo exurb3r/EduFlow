@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# install.sh — interactive TUI installer for EduFlow (macOS/Linux)
+# install.sh — interactive TUI installer for OpenSinop (macOS/Linux)
 # Usage:
 #   bash <(curl -fsSL https://raw.githubusercontent.com/koamishin/KoamiStarterKit/main/install.sh)
 #   curl -fsSL .../install.sh | bash
@@ -174,7 +174,7 @@ env_value() {
 }
 
 if [ "$UPDATE" = "1" ]; then
-    title "EduFlow Update"
+    title "OpenSinop Update"
     if [ ! -f "$ENV_FILE" ]; then
         err "No .env found in $ROOT. Run the installer first."
         exit 1
@@ -183,13 +183,13 @@ if [ "$UPDATE" = "1" ]; then
         info "Downloading docker-compose.yml ..."
         curl -fsSL "$COMPOSE_URL" -o "$COMPOSE_FILE" || { err "download failed"; exit 1; }
     fi
-    DB_USER="$(env_value DB_USERNAME)"; DB_USER="${DB_USER:-eduflow}"
-    DB_NAME="$(env_value DB_DATABASE)"; DB_NAME="${DB_NAME:-eduflow}"
+    DB_USER="$(env_value DB_USERNAME)"; DB_USER="${DB_USER:-opensinop}"
+    DB_NAME="$(env_value DB_DATABASE)"; DB_NAME="${DB_NAME:-opensinop}"
     DB_CID="$(docker compose ps -q db 2>/dev/null || true)"
     if [ -n "$DB_CID" ]; then
         backup_dir="$ROOT/backups"
         mkdir -p "$backup_dir"
-        backup_file="$backup_dir/eduflow-$(date +%Y%m%d-%H%M%S).sql"
+        backup_file="$backup_dir/opensinop-$(date +%Y%m%d-%H%M%S).sql"
         if docker compose exec -T db sh -c "pg_dump -U '$DB_USER' '$DB_NAME'" > "$backup_file" 2>/dev/null; then
             ok "Database backup written to $backup_file"
         else
@@ -209,7 +209,7 @@ if [ "$UPDATE" = "1" ]; then
     fi
     healthy=0
     for _ in $(seq 1 24); do
-        status=$(docker inspect --format '{{.State.Health.Status}}' eduflow 2>/dev/null || true)
+        status=$(docker inspect --format '{{.State.Health.Status}}' opensinop 2>/dev/null || true)
         if [ "$status" = "healthy" ]; then healthy=1; break; fi
         if [ "$status" = "unhealthy" ]; then break; fi
         sleep 5
@@ -217,7 +217,7 @@ if [ "$UPDATE" = "1" ]; then
     if [ "$healthy" = "1" ]; then
         ok "Application is healthy."
     else
-        warn "Application did not report healthy yet; see docker logs eduflow."
+        warn "Application did not report healthy yet; see docker logs opensinop."
     fi
     APP_URL="$(env_value APP_URL)"; APP_URL="${APP_URL:-http://localhost:8000}"
     info "App URL: $APP_URL"
@@ -226,7 +226,7 @@ if [ "$UPDATE" = "1" ]; then
     exit 0
 fi
 
-title "EduFlow TUI Installer (bash)"
+title "OpenSinop TUI Installer (bash)"
 info "Interactive setup for Docker-based self-hosting."
 info "Press Enter to accept a suggested default."
 echo
@@ -247,7 +247,7 @@ declare -a FIELDS=()
 add() { FIELDS+=("$1=$2"); }
 
 title "Application"
-APP_NAME=$(ask "Application name" "EduFlow")
+APP_NAME=$(ask "Application name" "OpenSinop")
 APP_ENV=$(ask_choice "Environment" "production" production local staging)
 APP_DEBUG=$(ask_choice "Debug mode" "false" false true)
 APP_PORT=$(ask "Published HTTP port" "8000")
@@ -262,9 +262,9 @@ if [ "$DB_CONNECTION" = "sqlite" ]; then
 else
     DB_HOST=$(ask "DB host" "db")
     DB_PORT=$(ask "DB port" "$([ "$DB_CONNECTION" = pgsql ] && echo 5432 || echo 3306)")
-    DB_DATABASE=$(ask "DB name" "eduflow")
-    DB_USERNAME=$(ask "DB username" "eduflow")
-    DB_PASSWORD=$(ask_secret "DB password" "eduflow")
+    DB_DATABASE=$(ask "DB name" "opensinop")
+    DB_USERNAME=$(ask "DB username" "opensinop")
+    DB_PASSWORD=$(ask_secret "DB password" "opensinop")
 fi
 
 title "Cache, session and queue"
@@ -433,16 +433,16 @@ ok "Containers started."
 title "Health check"
 healthy=0
 for _ in $(seq 1 24); do
-    status=$(docker inspect --format '{{.State.Health.Status}}' eduflow 2>/dev/null || true)
+    status=$(docker inspect --format '{{.State.Health.Status}}' opensinop 2>/dev/null || true)
     if [ "$status" = "healthy" ]; then healthy=1; break; fi
     if [ "$status" = "unhealthy" ]; then break; fi
     sleep 5
 done
-if [ "$healthy" = 1 ]; then ok "Application is healthy."; else warn "Application did not report healthy yet; see docker logs eduflow."; fi
+if [ "$healthy" = 1 ]; then ok "Application is healthy."; else warn "Application did not report healthy yet; see docker logs opensinop."; fi
 
 title "Next steps"
 info "Open the app at $APP_URL"
 info "Create the first administrator:"
-printf '  %s\n' "$(c "$BOLD" "docker exec -it eduflow php artisan eduflow:bootstrap-admin --name=\"School Operator\" --email=\"operator@example.org\"")"
+printf '  %s\n' "$(c "$BOLD" "docker exec -it opensinop php artisan eduflow:bootstrap-admin --name=\"School Operator\" --email=\"operator@example.org\"")"
 info "Circle/Arc features require the Circle CLI and arc-canteen on your workflow host."
 ok "Installation complete."
