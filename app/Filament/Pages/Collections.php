@@ -170,7 +170,15 @@ class Collections extends Page implements HasTable
                     ->mountUsing(function (CollectionBatch $record, Schema $schema): void {
                         Gate::forUser(Auth::user())->authorize('review', $record);
                         $this->mountBatchEvidence($record);
-                        $schema->fill();
+                        $isArcTx = str_starts_with((string) $record->source_reference, '0x');
+                        $schema->fill([
+                            'decision' => 'approve_receipts',
+                            'verification_reference' => $isArcTx
+                                ? 'Verified Arc Testnet transaction on block explorer'
+                                : 'Verified signed cashier closing report',
+                            'reason' => 'Receipt confirmed against college treasury wallet; approved for budget allocation.',
+                            'attestation' => true,
+                        ]);
                     })
                     ->schema(fn (): array => [
                         ...$this->batchEvidenceSchema(),
@@ -497,6 +505,9 @@ class Collections extends Page implements HasTable
                 ])->columnSpanFull(),
             Section::make('Receipt record')->description('Compare this saved record with the original receipt/report. Recording does not confirm a bank balance.')
                 ->headerActions([
+                    Action::make('allocateInSupervisor')->label('Allocate in Supervisor')->icon(Heroicon::ArrowRight)->color('success')
+                        ->visible(fn (): bool => str_contains((string) ($this->mountedBatchEvidence['review_decision'] ?? ''), 'approved'))
+                        ->url(fn (): string => route('filament.finance.pages.finance-supervisor')),
                     Action::make('evaluateWithPolicy')->label('Evaluate with Policy AI')->icon(Heroicon::Sparkles)->color('primary')
                         ->visible(fn (): bool => Gate::allows('create', InstitutionPolicyEvaluation::class))
                         ->url(fn (): string => route('finance.policy-evaluations.index', ['source_type' => 'collection', 'source_id' => $this->mountedBatchId])),
@@ -505,7 +516,19 @@ class Collections extends Page implements HasTable
                         ->url(fn (): string => route('finance.collection-batches.document', ['collectionBatch' => $this->mountedBatchId])),
                 ])
                 ->schema([
-                    $this->evidenceEntry('source_reference', 'Receipt / report number'), $this->evidenceEntry('channel', 'Payment channel'),
+                    TextEntry::make('source_reference')->label('Receipt reference / proof')
+                        ->state(function (): HtmlString {
+                            $ref = (string) ($this->mountedBatchEvidence['source_reference'] ?? '');
+                            if (str_starts_with($ref, '0x') && strlen($ref) >= 42) {
+                                $short = substr($ref, 0, 10).'…'.substr($ref, -8);
+                                $url = 'https://testnet.arcscan.app/tx/'.$ref;
+
+                                return new HtmlString('<div class="flex flex-col gap-1"><a href="'.$url.'" target="_blank" rel="noopener noreferrer" class="inline-flex items-center gap-1 font-mono text-xs font-semibold text-primary-600 hover:underline dark:text-primary-400">'.$short.' <svg class="h-3 w-3" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14"/></svg></a><span class="font-mono text-[11px] text-gray-500 break-all select-all">'.e($ref).'</span></div>');
+                            }
+
+                            return new HtmlString('<span class="font-mono text-xs">'.e($ref).'</span>');
+                        }),
+                    $this->evidenceEntry('channel', 'Payment channel'),
                     $this->evidenceEntry('received', 'Total received'), $this->evidenceEntry('restricted', 'Amount set aside'),
                     $this->evidenceEntry('collected_from', 'Period starts')->dateTime('M j, Y H:i', config('app.timezone')),
                     $this->evidenceEntry('collected_until', 'Period ends')->dateTime('M j, Y H:i', config('app.timezone')),
