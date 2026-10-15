@@ -407,7 +407,7 @@ On initial boot, the container automatically runs database migrations, enables r
 docker exec -it eduflow php artisan eduflow:bootstrap-admin --name="School Operator" --email="operator@example.org"
 ```
 
-> **Data Persistence:** Database data, uploaded files, and application cache are safely persisted in Docker volumes (`eduflow_db`, `eduflow_storage`, `eduflow_cache`, `eduflow_redis`).
+> **Data Persistence:** Database data, uploaded files, and application cache are safely persisted in Docker volumes (`app_db`, `app_storage`, `app_cache`, `app_redis`).
 
 ---
 
