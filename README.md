@@ -351,55 +351,49 @@ composer run dev
 
 #### Docker Quick Start (recommended)
 
-If Docker is installed, EduFlow can be started in one line using the published
-GitHub Container Registry image:
+Get a running instance with one command:
 
 ```bash
 docker compose -f https://raw.githubusercontent.com/koamishin/KoamiStarterKit/main/docker-compose.yml up -d
 ```
 
-Or run the interactive TUI installer that prompts for APP, database, Redis, mail,
-institution, Circle/Arc and AI settings, validates what it can, and then starts
-the containers:
+This provisions PostgreSQL and Redis, builds nothing locally, runs migrations, enables
+the `Blog` module, and initializes the school. Data persists in Docker volumes.
 
-macOS/Linux:
+Create the first administrator interactively:
+
 ```bash
+docker exec -it eduflow php artisan eduflow:bootstrap-admin \
+  --name="School Operator" --email="operator@example.org"
+```
+
+**Interactive TUI installer** (collects APP, database, Redis, mail, institution,
+Circle/Arc and AI settings):
+
+```bash
+# macOS/Linux
 bash <(curl -fsSL https://raw.githubusercontent.com/koamishin/KoamiStarterKit/main/install.sh)
-```
 
-Update an existing install:
-```bash
-bash <(curl -fsSL https://raw.githubusercontent.com/koamishin/KoamiStarterKit/main/install.sh) --update
-```
-
-Windows (PowerShell):
-```powershell
+# Windows (PowerShell)
 irm https://raw.githubusercontent.com/koamishin/KoamiStarterKit/main/install.ps1 | iex
 ```
 
-Update an existing install:
-```powershell
-iwr https://raw.githubusercontent.com/koamishin/KoamiStarterKit/main/install.ps1 -OutFile install.ps1; .\install.ps1 -Update
-```
-
-Or one-shot update:
-```powershell
-& ([scriptblock]::Create((irm https://raw.githubusercontent.com/koamishin/KoamiStarterKit/main/install.ps1))) --update
-```
-
-The one-line and TUI flows both automatically provision PostgreSQL and Redis,
-run migrations, enable the `Blog` module and initialize the school.
-
-The same command works on Windows (PowerShell), macOS and Linux; pass
-`APP_PORT=8080` (and other `KEY=value`) before it to customize. On first boot,
-create the administrator interactively:
+**Update an existing install** without losing data:
 
 ```bash
-docker exec -it eduflow php artisan eduflow:bootstrap-admin --name="School Operator" --email="operator@example.org"
+# macOS/Linux
+bash <(curl -fsSL https://raw.githubusercontent.com/koamishin/KoamiStarterKit/main/install.sh) --update
+
+# Windows (PowerShell)
+iwr https://raw.githubusercontent.com/koamishin/KoamiStarterKit/main/install.ps1 -OutFile install.ps1
+.\install.ps1 -Update
 ```
 
-Data persists in Docker volumes (`eduflow_storage`, `eduflow_db`, ...). Upgrade by
-pulling the newest image and recreating the app container.
+Pass `APP_PORT=8080` (and other `KEY=value`) before the one-liner to override defaults.
+
+Upgrade note: pulling newer images re-triggers migrations and bootstrap steps idempotently;
+the installer backs up the database before updating.
+
 
 EduFlow is self-hostable. Do **not** use `migrate:fresh --seed` on a real instance; it destroys data.
 Use the idempotent installer instead.
