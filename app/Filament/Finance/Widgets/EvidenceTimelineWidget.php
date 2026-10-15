@@ -30,6 +30,7 @@ class EvidenceTimelineWidget extends TableWidget
 {
     protected static ?int $sort = 7;
 
+    // Full width: eight columns of settlement evidence. See BudgetCapacityWidget.
     protected int|string|array $columnSpan = 'full';
 
     /** @var array<int, string>|null Recorded advisory summaries keyed by intent id. */
@@ -116,7 +117,7 @@ class EvidenceTimelineWidget extends TableWidget
                 Action::make('examinePayment')
                     ->label('Review')
                     ->icon(Heroicon::ArrowRightCircle)
-                    ->color('primary')
+                    ->color('gray')
                     ->url(fn (): string => PaymentReviews::getUrl(panel: 'finance')),
             ])
             ->defaultSort('id', 'desc');

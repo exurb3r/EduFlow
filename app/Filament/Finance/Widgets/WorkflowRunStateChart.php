@@ -22,11 +22,12 @@ class WorkflowRunStateChart extends ChartWidget
 {
     protected static ?int $sort = 5;
 
-    protected int|string|array $columnSpan = 'full';
+    // Paired with PaymentDecisionChart in the overview grid.
+    protected int|string|array $columnSpan = 1;
 
     protected ?string $heading = 'Background work by run state';
 
-    protected ?string $description = 'Counted from persisted run records. Seeing a run is not seeing a payment: no run in this system submits, authorizes or settles a transfer.';
+    protected ?string $description = 'Seeing a run is not seeing a payment. No run submits, authorizes or settles a transfer.';
 
     protected ?string $emptyStateHeading = 'No background runs recorded';
 

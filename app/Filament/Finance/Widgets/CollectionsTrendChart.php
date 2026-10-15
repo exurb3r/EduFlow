@@ -27,11 +27,12 @@ class CollectionsTrendChart extends ChartWidget
 {
     protected static ?int $sort = 2;
 
-    protected int|string|array $columnSpan = 'full';
+    // Paired with BudgetHeadroomChart in the overview grid.
+    protected int|string|array $columnSpan = 1;
 
     protected ?string $heading = 'Reported collections by review state';
 
-    protected ?string $description = 'Last 14 collection intervals. Restricted cash is deducted before any plan, so it is context here rather than spendable money. Reversal and suspense tracking are not implemented, so reversed money is not yet separable.';
+    protected ?string $description = 'Last 14 intervals. Restricted cash is deducted before any plan, so it is not spendable.';
 
     protected ?string $emptyStateHeading = 'No collection batches recorded yet';
 

@@ -98,7 +98,6 @@ test('admin dashboard pins its widgets instead of rendering every registered one
         LeptonNetworkWidget::class,
         TreasuryOverviewWidget::class,
         AgentActivityFeedWidget::class,
-        AccountWidget::class,
     ]);
 
     /**
@@ -108,6 +107,12 @@ test('admin dashboard pins its widgets instead of rendering every registered one
      */
     expect($widgets)->not->toContain(FilamentInfoWidget::class);
     expect($widgets)->not->toContain(ActivityHeatmapWidget::class);
+
+    /**
+     * The "Welcome / sign out" card duplicated the header and pushed the
+     * operations bands below the fold. Sign-out lives in the topbar menu.
+     */
+    expect($widgets)->not->toContain(AccountWidget::class);
 });
 
 test('installation readiness reports the single-institution boundary honestly', function (): void {

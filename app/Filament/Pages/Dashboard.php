@@ -26,7 +26,6 @@ use Filament\Pages\Dashboard as BaseDashboard;
 use Filament\Schemas\Components\Grid as InfoGrid;
 use Filament\Schemas\Components\Section as InfoSection;
 use Filament\Support\Icons\Heroicon;
-use Filament\Widgets\AccountWidget;
 use Filament\Widgets\Widget;
 use Illuminate\Support\Facades\Artisan;
 use Illuminate\Support\Facades\DB;
@@ -60,14 +59,18 @@ class Dashboard extends BaseDashboard
 
         $status = app(LeptonTreasuryService::class)->status($institution->primaryWallet());
 
+        // Deliberately no raw finance-panel URL: a full https:// string in the
+        // subheading reads as a mistake, and the "Finance console" header action
+        // already links there.
+        //
+        // The chain id and driver are omitted because the Settlement rail tile
+        // states both, and repeating a 34-character summary made this line wrap
+        // mid-token into "ARC- / TESTNET 5042002".
         return sprintf(
-            '%s · %s driver on %s %s%s · finance supervision: %s',
+            '%s · %s%s',
             $institution->name,
-            $status['driver'],
             strtoupper((string) $status['chain']),
-            (string) $status['chain_id'],
             $status['is_fake'] ? ' · FAKE DRIVER' : '',
-            Filament::getPanel('finance')->getUrl(),
         );
     }
 
@@ -75,6 +78,10 @@ class Dashboard extends BaseDashboard
      * Explicit rather than inherited: without this the panel renders every
      * registered widget, so an unrelated plugin widget can appear beside
      * settlement figures that operators will read as authoritative.
+     *
+     * AccountWidget is deliberately absent: it rendered a "Welcome / sign out"
+     * card that only repeated the header and pushed the operations bands below
+     * the fold. Sign-out belongs in the topbar user menu.
      *
      * @return array<class-string<Widget>>
      */
@@ -87,7 +94,6 @@ class Dashboard extends BaseDashboard
             LeptonNetworkWidget::class,
             TreasuryOverviewWidget::class,
             AgentActivityFeedWidget::class,
-            AccountWidget::class,
         ];
     }
 
@@ -233,16 +239,22 @@ class Dashboard extends BaseDashboard
                 ->modalSubmitAction(false)
                 ->modalCancelActionLabel('Close'),
 
+            // "AI intelligence" expanded to "Artificial Intelligence
+            // intelligence", which says nothing. "Advisory AI" names the mode
+            // instead and matches the Advisory AI readiness stat below.
             Action::make('aiIntelligence')
-                ->label('AI intelligence')
+                ->label('Advisory AI')
                 ->icon(Heroicon::Sparkles)
-                ->color('info')
+                ->color('gray')
+                ->tooltip('Ask the advisory assistant. It can read and explain, but never moves money.')
                 ->url(fn (): string => AdminAiChat::getUrl()),
 
+            // Navigation, not a warning: colouring this amber made an ordinary
+            // panel switcher read as a caution.
             Action::make('financeConsole')
                 ->label('Finance console')
                 ->icon(Heroicon::Banknotes)
-                ->color('warning')
+                ->color('gray')
                 ->url(fn (): string => Filament::getPanel('finance')->getUrl()),
 
             Action::make('clearCache')
