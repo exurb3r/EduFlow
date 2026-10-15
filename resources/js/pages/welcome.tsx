@@ -609,12 +609,12 @@ export default function Welcome({ canRegister = false }: WelcomeProps) {
                     </p>
 
                     <p className="mt-6 text-sm sm:text-base text-stone-600 leading-relaxed">
-                        OpenSinop reconciles the money for you. It tracks tuition
-                        intake across cashier counters and bank wires, guards
-                        your emergency buffer so savings remain untouchable, and
-                        routes routine bills into safe execution lanes. You
-                        approve the spend. It records the digital receipt, and
-                        tomorrow starts cleanly from there.
+                        OpenSinop reconciles the money for you. It tracks
+                        tuition intake across cashier counters and bank wires,
+                        guards your emergency buffer so savings remain
+                        untouchable, and routes routine bills into safe
+                        execution lanes. You approve the spend. It records the
+                        digital receipt, and tomorrow starts cleanly from there.
                     </p>
                 </section>
 

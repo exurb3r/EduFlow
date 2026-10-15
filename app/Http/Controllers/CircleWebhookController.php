@@ -9,7 +9,7 @@ use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Log;
 use Throwable;
-use Yukazakiri\Lepton\Gateways\CircleRestGateway;
+use Yukazakiri\Lepton\Contracts\CircleGateway;
 
 final class CircleWebhookController extends Controller
 {
@@ -32,12 +32,12 @@ final class CircleWebhookController extends Controller
             'keyId' => $keyId,
         ]);
 
-        // If gateway instance is CircleRestGateway, signature verification can be evaluated
-        $gateway = app()->bound(CircleRestGateway::class) ? app(CircleRestGateway::class) : null;
-        if ($gateway instanceof CircleRestGateway && is_string($signature) && is_string($keyId)) {
+        // If gateway instance supports webhook signature verification
+        $gateway = app()->bound(CircleGateway::class) ? app(CircleGateway::class) : null;
+        if ($gateway !== null && method_exists($gateway, 'fetchEntityPublicKey') && method_exists($gateway, 'verifyWebhookSignature') && is_string($signature) && is_string($keyId)) {
             try {
-                $pubKey = $gateway->fetchEntityPublicKey();
-                $verified = $gateway->verifyWebhookSignature($rawPayload, $signature, $pubKey);
+                $pubKey = (string) $gateway->fetchEntityPublicKey();
+                $verified = (bool) $gateway->verifyWebhookSignature($rawPayload, $signature, $pubKey);
                 if (! $verified) {
                     Log::warning('Circle webhook signature verification failed.');
                 }

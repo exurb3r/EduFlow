@@ -1176,9 +1176,6 @@ reservation release/rollover, approval renewal/withdrawal, durable recovery and 
 | `php artisan lepton:login --status` | Circle session state per network |
 | `php artisan lepton:login <email>` | Send the OTP, print the request ID |
 | `php artisan lepton:login --request=<id> --otp=<code>` | Complete login |
-| `php artisan lepton:wallets` | List Circle agent wallets on configured chain (`--chain`, `--type`, `--json`) |
-| `php artisan lepton:wallet:create` | Create an agent-controlled SCA wallet (`--testnet`, `--mainnet`) |
-| `php artisan lepton:wallet:fund <address>` | Fund an agent wallet (faucet drip on testnet, Transak/QR on mainnet) |
 | `php artisan lepton:reconcile` | Legacy hash lookup; not complete pilot settlement proof |
 | `php artisan lepton:reconcile --fix` | Legacy reconciliation mutation; review missing/unknown evidence before use |
 | `php artisan app:demo` | Run one full autonomous cycle |
