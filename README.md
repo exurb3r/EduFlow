@@ -153,12 +153,14 @@ commands; they are not a ready-made college pilot or permission to use legacy ex
 
 - [College shadow pilot](#college-shadow-pilot-current-hackathon-focus)
 - [What you'll see](#what-youll-see)
-- [Requirements](#requirements)
+- [Requirements & Prerequisites](#requirements--prerequisites)
 - [Setup](#setup)
-- [Development setup (local)](#development-setup-local)
-- [Self-hosted (production) setup](#self-hosted-production-setup)
+  - [Development setup (local)](#development-setup-local)
+  - [Self-hosted (production) setup](#self-hosted-production-setup)
+    - [Option A — Docker deployment (recommended)](#option-a--docker-deployment-recommended)
+    - [Option B — Bare-metal production setup](#option-b--bare-metal-production-setup)
 - [Lepton agent package (Circle + Arc)](#lepton-agent-package-circle--arc)
-- [Authenticate your agent wallet](#authenticate-your-agent-wallet)"""
+- [Authenticate your agent wallet](#authenticate-your-agent-wallet)
 - [Fund the wallet](#fund-the-wallet)
 - [Run the demo](#run-the-demo)
 - [The seeded scenarios](#the-seeded-scenarios)
@@ -224,7 +226,8 @@ real permitted source records, staff review and connected verified testnet evide
 
 | Tool | Minimum Version | Installation / Official Documentation |
 |---|---|---|
-| **PHP** | 8.4.1+ (8.5 recommended) | [PHP Installation Guide](https://www.php.net/downloads) — Required extensions: `pdo_sqlite`, `mbstring`, `openssl`, `curl` |
+| **Docker** (Self-hosting) | 24.0+ (Compose v2) | [Docker Engine](https://docs.docker.com/engine/install/) · [Docker Desktop](https://www.docker.com/products/docker-desktop/) |
+| **PHP** (Bare-metal) | 8.4.1+ (8.5 recommended) | [PHP Installation Guide](https://www.php.net/downloads) — Required extensions: `pdo_sqlite`, `mbstring`, `openssl`, `curl` |
 | **Composer** | 2.x | [Composer Download](https://getcomposer.org/download/) |
 | **Node.js & npm** | 20.18.2+ | [Node.js Downloads](https://nodejs.org/en/download) |
 | **Circle CLI** | 1.1.4+ | [Circle CLI Documentation](https://developers.circle.com/agent-stack/circle-cli) · `npm i -g @circle-fin/cli` |
@@ -349,54 +352,68 @@ composer run dev
 
 ### Self-hosted (production) setup
 
-#### Docker Quick Start (recommended)
+EduFlow is self-hostable. Do **not** use `migrate:fresh --seed` on a real instance; it destroys data.
+Use the idempotent installer instead.
 
-Get a running instance with one command:
+#### Option A — Docker deployment (recommended)
+
+Production Docker containers bundle FrankenPHP, Octane, PostgreSQL 16, Redis 7, and Supervisor (scheduler & queue workers). Images are published to GitHub Container Registry.
+
+##### 1. One-line quick start (Docker Compose)
+
+To start EduFlow with sensible production defaults:
 
 ```bash
 docker compose -f https://raw.githubusercontent.com/koamishin/KoamiStarterKit/main/docker-compose.yml up -d
 ```
 
-This provisions PostgreSQL and Redis, builds nothing locally, runs migrations, enables
-the `Blog` module, and initializes the school. Data persists in Docker volumes.
+> **Customization:** Pass environment variables before the command to customize ports or settings, e.g. `APP_PORT=8080 docker compose ... up -d`.
 
-Create the first administrator interactively:
+##### 2. Interactive TUI installer
+
+For a guided terminal wizard that prompts for application URL, database credentials, Redis, mail, school identity, Circle/Arc wallet settings, and AI configuration before starting containers:
+
+- **macOS / Linux:**
+  ```bash
+  bash <(curl -fsSL https://raw.githubusercontent.com/koamishin/KoamiStarterKit/main/install.sh)
+  ```
+- **Windows (PowerShell):**
+  ```powershell
+  irm https://raw.githubusercontent.com/koamishin/KoamiStarterKit/main/install.ps1 | iex
+  ```
+
+##### 3. Updating an existing Docker deployment
+
+To pull the newest container images, create an automated PostgreSQL database backup in `./backups/`, run new migrations, and restart services:
+
+- **macOS / Linux:**
+  ```bash
+  bash <(curl -fsSL https://raw.githubusercontent.com/koamishin/KoamiStarterKit/main/install.sh) --update
+  ```
+- **Windows (PowerShell):**
+  ```powershell
+  iwr https://raw.githubusercontent.com/koamishin/KoamiStarterKit/main/install.ps1 -OutFile install.ps1; .\install.ps1 -Update
+  ```
+  Or as a one-liner:
+  ```powershell
+  & ([scriptblock]::Create((irm https://raw.githubusercontent.com/koamishin/KoamiStarterKit/main/install.ps1))) --update
+  ```
+
+##### 4. Bootstrap the first administrator
+
+On initial boot, the container automatically runs database migrations, enables required modules, and initializes the school identity. Once healthy, create the first super administrator interactively:
 
 ```bash
-docker exec -it eduflow php artisan eduflow:bootstrap-admin \
-  --name="School Operator" --email="operator@example.org"
+docker exec -it eduflow php artisan eduflow:bootstrap-admin --name="School Operator" --email="operator@example.org"
 ```
 
-**Interactive TUI installer** (collects APP, database, Redis, mail, institution,
-Circle/Arc and AI settings):
+> **Data Persistence:** Database data, uploaded files, and application cache are safely persisted in Docker volumes (`eduflow_db`, `eduflow_storage`, `eduflow_cache`, `eduflow_redis`).
 
-```bash
-# macOS/Linux
-bash <(curl -fsSL https://raw.githubusercontent.com/koamishin/KoamiStarterKit/main/install.sh)
+---
 
-# Windows (PowerShell)
-irm https://raw.githubusercontent.com/koamishin/KoamiStarterKit/main/install.ps1 | iex
-```
+#### Option B — Bare-metal production setup
 
-**Update an existing install** without losing data:
-
-```bash
-# macOS/Linux
-bash <(curl -fsSL https://raw.githubusercontent.com/koamishin/KoamiStarterKit/main/install.sh) --update
-
-# Windows (PowerShell)
-iwr https://raw.githubusercontent.com/koamishin/KoamiStarterKit/main/install.ps1 -OutFile install.ps1
-.\install.ps1 -Update
-```
-
-Pass `APP_PORT=8080` (and other `KEY=value`) before the one-liner to override defaults.
-
-Upgrade note: pulling newer images re-triggers migrations and bootstrap steps idempotently;
-the installer backs up the database before updating.
-
-
-EduFlow is self-hostable. Do **not** use `migrate:fresh --seed` on a real instance; it destroys data.
-Use the idempotent installer instead.
+For environments running PHP and web servers directly on host infrastructure:
 
 1. **Server prerequisites.** Install PHP 8.4+/8.5 with extensions (`pdo`, `mbstring`, `openssl`,
    `curl`, `fileinfo`, `dom`, `xml`, `zip`, `bcmath`), Composer, Node.js 20.18+, and (for treasury
