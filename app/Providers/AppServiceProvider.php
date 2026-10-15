@@ -29,6 +29,7 @@ class AppServiceProvider extends ServiceProvider
     #[\Override]
     public function register(): void
     {
+        $this->ensureHomeForSubprocesses();
         $this->registerFilamentPlugins();
         $this->registerAiContracts();
         $this->registerApprovalPolicy();
@@ -116,6 +117,34 @@ class AppServiceProvider extends ServiceProvider
             'approveSettlementProposals',
             [SettlementApprovalPolicy::class, 'approveSettlementProposals'],
         );
+    }
+
+    /**
+     * Give subprocesses a home directory when the runtime did not supply one.
+     *
+     * The Circle CLI keeps its agent session under $HOME. Some PHP runtimes hand
+     * the built-in web server a scrubbed environment that retains only PATH and
+     * APP_ENV, and every wallet read and transfer then failed with "no agent
+     * session is active" — a rail error that looked like a credential problem but
+     * was really a missing variable. Resolve the directory from the process uid
+     * instead of guessing a path, and only fill a gap: a HOME that is already
+     * set is left exactly as it is.
+     */
+    protected function ensureHomeForSubprocesses(): void
+    {
+        if ((string) getenv('HOME') !== '') {
+            return;
+        }
+
+        $home = function_exists('posix_getpwuid') ? posix_getpwuid(posix_geteuid())['dir'] ?? null : null;
+
+        if (! is_string($home) || $home === '') {
+            return;
+        }
+
+        putenv('HOME='.$home);
+        $_ENV['HOME'] = $home;
+        $_SERVER['HOME'] = $home;
     }
 
     protected function registerCircleWalletCli(): void

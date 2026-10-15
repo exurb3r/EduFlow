@@ -147,6 +147,8 @@ function parseBaseUnits(amount: string): number | null {
 type TuitionQuote = {
     network_fee: string;
     total: string;
+    payer_debit?: string;
+    fee_paid_by_payer?: boolean;
     max_amount_base_units: number;
     amount_base_units?: number;
     balance: string | null;
@@ -461,6 +463,10 @@ export default function StudentDashboard({
         (baseUnits: number): TuitionQuote => ({
             network_fee: '0.000000',
             total: (baseUnits / 1_000_000).toFixed(2),
+            // Placeholder until the server quote lands; a zero fee means the
+            // signed-in rail's fee is not the payer's, so show principal only.
+            payer_debit: (baseUnits / 1_000_000).toFixed(2),
+            fee_paid_by_payer: false,
             max_amount_base_units: remainingBase,
             amount_base_units: baseUnits,
             balance: snapshot?.balance ?? null,
@@ -1144,6 +1150,13 @@ export default function StudentDashboard({
                                                     <dd className="clay-title tabular-nums">
                                                         {payQuote.network_fee}{' '}
                                                         USDC
+                                                        {payQuote.fee_paid_by_payer ===
+                                                        false && (
+                                                            <span className="ml-1.5 text-xs font-normal text-[var(--clay-text-muted)]">
+                                                                paid by Circle,
+                                                                not you
+                                                            </span>
+                                                        )}
                                                     </dd>
                                                 </div>
                                                 <div className="flex items-baseline justify-between gap-4">
@@ -1152,7 +1165,9 @@ export default function StudentDashboard({
                                                         wallet
                                                     </dt>
                                                     <dd className="clay-title tabular-nums">
-                                                        {payQuote.total} USDC
+                                                        {payQuote.payer_debit ??
+                                                            payQuote.total}{' '}
+                                                        USDC
                                                     </dd>
                                                 </div>
                                             </dl>
