@@ -28,7 +28,7 @@ final readonly class InstitutionPolicyEvaluations
 
     public function queueReady(): bool
     {
-        $connection = config('eduflow.background_finance.queue_connection', 'database');
+        $connection = config('queue.default', 'database');
 
         return in_array(config('queue.connections.'.$connection.'.driver'), ['database', 'redis'], true)
             && (int) config('queue.connections.'.$connection.'.retry_after', 0) > 180;

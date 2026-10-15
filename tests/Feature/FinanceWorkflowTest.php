@@ -49,7 +49,7 @@ use function Pest\Laravel\travel;
 /** @return array{actor: User, reviewer: User, snapshot: BudgetSnapshot, institution: Organization} */
 function workflowContext(): array
 {
-    config(['eduflow.institution_id' => null, 'eduflow.background_finance.enabled' => true,
+    config(['queue.default' => 'database', 'eduflow.institution_id' => null, 'eduflow.background_finance.enabled' => true,
         'eduflow.background_finance.queue_connection' => 'database']);
     app()->instance(ArcNetworkGateway::class, Mockery::mock(ArcNetworkGateway::class));
     app()->instance(WalletGateway::class, Mockery::mock(WalletGateway::class));
@@ -193,7 +193,7 @@ test('scheduler sweep recovers undispatched work once per lease and never uses a
 
     // A synchronous queue would run financial work inside the request that
     // merely recorded it, so it is refused outright rather than tolerated.
-    config(['eduflow.background_finance.queue_connection' => 'sync']);
+    config(['queue.default' => 'sync']);
     expect(fn () => $dispatcher->dispatch())->toThrow(ValidationException::class);
     expect($c['snapshot']->hasValidSnapshot())->toBeTrue();
 });

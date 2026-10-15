@@ -87,3 +87,22 @@ test('independent reviewer can inspect a retained collection report in a browser
         ->assertSee('Your review')->assertNoJavaScriptErrors();
     expect(CollectionBatchReview::query()->count())->toBe(0)->and(Transaction::query()->count())->toBe(0);
 })->group('browser');
+
+test('long chain references keep receipt review reachable without horizontal page overflow', function (): void {
+    $this->withVite();
+    $staff = collectionBrowserStaff();
+    $hash = '0x'.str_repeat('e', 64);
+    app(CaptureCollectionBatch::class)->handle($staff['cashier'], [
+        'capture_key' => (string) Str::uuid(), 'source_stream' => 'cashier-fees', 'source_reference' => $hash,
+        'source_document_digest' => hash('sha256', 'synthetic-long-reference-browser-proof'),
+        'cash_evidence_reference' => 'Synthetic long reference; not an on-chain receipt',
+        'currency' => 'USDC', 'received_amount' => '5', 'restricted_amount' => '0',
+        'collected_from' => now()->subDays(2)->toIso8601String(), 'collected_until' => now()->subDay()->toIso8601String(),
+        'source_stream_disjoint' => true, 'received_not_forecast' => true,
+    ]);
+    $this->actingAs($staff['reviewer']);
+    $page = visit('/finance/collections')->assertSee('5.000000 USDC');
+    expect($page->script('document.documentElement.scrollWidth <= window.innerWidth'))->toBeTrue();
+    $page->click('Review')->assertSee('Your review')->assertSee($hash)->assertNoJavaScriptErrors();
+    expect(CollectionBatchReview::query()->count())->toBe(0)->and(Transaction::query()->count())->toBe(0);
+})->group('browser');

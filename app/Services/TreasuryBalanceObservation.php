@@ -24,6 +24,7 @@ final readonly class TreasuryBalanceObservation
         $address = $wallet?->address;
         $base = ['available' => false, 'is_fake' => config('lepton.default') === 'fake' || $this->arc instanceof FakeLeptonGateway,
             'chain' => $chain, 'chain_id' => $chainId, 'address' => $address, 'balance_base_units' => null,
+            'native_units' => null, 'native_residual_units' => null,
             'observed_at' => null, 'block_number' => null, 'block_hash' => null, 'error' => null];
         if (! $wallet instanceof Wallet || $wallet->status !== 'active' || ! is_string($address)
             || preg_match('/^0x[0-9a-fA-F]{40}$/D', $address) !== 1
@@ -33,7 +34,7 @@ final readonly class TreasuryBalanceObservation
         if ($base['is_fake']) {
             return [...$base, 'error' => 'Simulation only. Fake balances are not available money.'];
         }
-        $key = 'finance.balance-observation.'.hash('sha256', $chain.':'.$chainId.':'.strtolower($address));
+        $key = 'finance.balance-observation.v2.'.hash('sha256', $chain.':'.$chainId.':'.strtolower($address));
         $cached = $fresh ? null : Cache::get($key);
         if (is_array($cached)) {
             return $cached;
@@ -41,6 +42,7 @@ final readonly class TreasuryBalanceObservation
         try {
             $observation = $this->observations->capture($wallet);
             $result = [...$base, 'available' => true, 'balance_base_units' => $observation['usdc_base_units'],
+                'native_units' => $observation['native_units'], 'native_residual_units' => $observation['native_residual_units'],
                 'observed_at' => $observation['observed_at'], 'block_number' => $observation['block_number'],
                 'block_hash' => $observation['block_hash']];
         } catch (Throwable $exception) {

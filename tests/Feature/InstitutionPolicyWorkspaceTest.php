@@ -57,7 +57,7 @@ function institutionPolicyAnswer(?string $category = 'teaching-materials'): arra
 /** @return array<string, mixed> */
 function institutionPolicyContext(): array
 {
-    config(['eduflow.institution_id' => null, 'queue.connections.database.retry_after' => 360]);
+    config(['queue.default' => 'database', 'eduflow.institution_id' => null, 'queue.connections.database.retry_after' => 360]);
     Organization::factory()->create();
     $maker = User::factory()->create()->assignRole(Role::findOrCreate('finance_officer', 'web'));
     $reviewer = User::factory()->create()->assignRole(Role::findOrCreate('admin', 'web'));
@@ -192,6 +192,10 @@ test('published policy creates bounded background bill advice without altering p
     app(FinanceWorkflows::class)->process($run->id);
     $result = $run->fresh()->result_digest;
     Bus::fake();
+    $run->update(['state' => 'paused']);
+    app(InstitutionPolicyAdvice::class)->forPlan($run->fresh());
+    Bus::assertNothingDispatched();
+    $run->update(['state' => 'waiting_for_review']);
     app(InstitutionPolicyAdvice::class)->forPlan($run->fresh());
     app(InstitutionPolicyAdvice::class)->forPlan($run->fresh());
     Bus::assertDispatchedTimes(AssessInstitutionPolicy::class, 2);

@@ -1,5 +1,16 @@
 import { Head, Link, router, useHttp, usePoll } from '@inertiajs/react';
-import { ArrowLeft, RefreshCw, ShieldCheck, Sparkles } from 'lucide-react';
+import {
+    AlertTriangle,
+    ArrowLeft,
+    ArrowRight,
+    CheckCircle2,
+    ExternalLink,
+    HelpCircle,
+    Info,
+    RefreshCw,
+    ShieldCheck,
+    Sparkles,
+} from 'lucide-react';
 import { useState } from 'react';
 import { Alert, AlertDescription, AlertTitle } from '@/components/reui/alert';
 import { Badge } from '@/components/reui/badge';
@@ -42,6 +53,8 @@ type Source = {
     evidence: {
         currency: string;
         description?: string;
+        reference?: string;
+        source_stream?: string;
         received_minor_units?: string;
         restricted_minor_units?: string;
         realized_receipts_minor_units?: string;
@@ -50,6 +63,7 @@ type Source = {
         captured_cash_headroom_minor_units?: string;
         recorded_amount?: string;
         reviewed_receipt?: boolean;
+        movement_sourced?: boolean;
     };
 };
 type Citation = { clause_id: string; quote: string };
@@ -62,6 +76,8 @@ type Result = {
     next_step?: string;
     proposed_minor_units?: string;
     unallocated_minor_units?: string;
+    needs_review?: boolean;
+    jev_called?: boolean;
     lines?: {
         target_type: string;
         target_id: number;
@@ -106,6 +122,9 @@ type Props = {
     aiEnabled: boolean;
     adminUrl: string;
     policyUrl: string;
+    financeUrl?: string;
+    collectionsUrl?: string;
+    supervisorUrl?: string;
 };
 
 function statusLabel(state: string): string {
@@ -119,14 +138,30 @@ function statusLabel(state: string): string {
 }
 
 function Citations({ items }: { items: Citation[] }) {
-    return items.map((item, index) => (
-        <blockquote key={index} className="flex min-w-0 flex-col gap-1 text-sm">
-            <span className="text-xs font-medium text-muted-foreground">
-                {item.clause_id}
+    if (!items || items.length === 0) return null;
+
+    return (
+        <div className="flex flex-col gap-2 rounded-lg border border-border/60 bg-muted/30 p-3.5">
+            <span className="text-xs font-semibold tracking-wide uppercase text-muted-foreground">
+                Cited Policy Clauses
             </span>
-            <p className="break-words">“{item.quote}”</p>
-        </blockquote>
-    ));
+            <div className="flex flex-col gap-3">
+                {items.map((item, index) => (
+                    <blockquote
+                        key={index}
+                        className="flex min-w-0 flex-col gap-1 border-l-2 border-primary/50 pl-3 text-sm"
+                    >
+                        <span className="text-xs font-mono font-medium text-primary">
+                            Clause #{item.clause_id}
+                        </span>
+                        <p className="text-sm text-foreground/90 leading-relaxed italic">
+                            “{item.quote}”
+                        </p>
+                    </blockquote>
+                ))}
+            </div>
+        </div>
+    );
 }
 
 export default function PolicyEvaluations({
@@ -138,6 +173,9 @@ export default function PolicyEvaluations({
     aiEnabled,
     adminUrl,
     policyUrl,
+    financeUrl: _financeUrl = '/finance',
+    collectionsUrl = '/finance/collections',
+    supervisorUrl = '/finance/finance-supervisor',
 }: Props) {
     const [sourceKey, setSourceKey] = useState(() => {
         const query = new URLSearchParams(
@@ -222,23 +260,34 @@ export default function PolicyEvaluations({
         }
     }
 
+    // Determine specific review guidance for human staff
+    const isNeedsReview =
+        displayed?.state === 'needs_review' ||
+        displayed?.result?.needs_review === true;
+    const isUnreviewedCollection =
+        source?.source_type === 'collection' &&
+        source.evidence.reviewed_receipt === false;
+
     return (
         <>
             <Head title="Policy evaluations" />
             <main className="mx-auto flex w-full max-w-7xl flex-col gap-6 p-4 md:p-8">
-                <header className="flex flex-wrap items-center justify-between gap-4">
+                {/* Header */}
+                <header className="flex flex-wrap items-center justify-between gap-4 border-b border-border/50 pb-5">
                     <div className="flex min-w-0 flex-col gap-1">
-                        <p className="text-xs text-muted-foreground">
-                            {institution.name}
-                        </p>
-                        <h1 className="text-2xl font-semibold tracking-tight">
+                        <div className="flex items-center gap-2 text-xs font-medium text-muted-foreground">
+                            <span>{institution.name}</span>
+                            <span>·</span>
+                            <span>Financial Operations</span>
+                        </div>
+                        <h1 className="text-2xl font-semibold tracking-tight text-foreground">
                             Policy evaluations
                         </h1>
                         <p className="text-sm text-muted-foreground">
                             Fresh advice. Visible progress. Human review.
                         </p>
                     </div>
-                    <div className="flex flex-wrap gap-2">
+                    <div className="flex flex-wrap items-center gap-2">
                         <Button
                             type="button"
                             size="sm"
@@ -246,7 +295,10 @@ export default function PolicyEvaluations({
                             asChild
                         >
                             <a href={adminUrl}>
-                                <ArrowLeft aria-hidden="true" />
+                                <ArrowLeft
+                                    aria-hidden="true"
+                                    className="mr-1 h-3.5 w-3.5"
+                                />
                                 Back to panel
                             </a>
                         </Button>
@@ -258,19 +310,39 @@ export default function PolicyEvaluations({
                         >
                             <Link href={policyUrl}>Institution policies</Link>
                         </Button>
+                        <Button
+                            type="button"
+                            size="sm"
+                            variant="outline"
+                            asChild
+                        >
+                            <a href={collectionsUrl}>Collections ledger</a>
+                        </Button>
                     </div>
                 </header>
-                <Alert role="status">
-                    <ShieldCheck aria-hidden="true" />
-                    <AlertTitle>Advice, not payment authority</AlertTitle>
-                    <AlertDescription>
+
+                {/* Top Safety Banner */}
+                <Alert
+                    role="status"
+                    className="bg-primary-50/40 border-primary/20 dark:bg-primary-950/20"
+                >
+                    <ShieldCheck
+                        aria-hidden="true"
+                        className="h-5 w-5 text-primary"
+                    />
+                    <AlertTitle className="text-sm font-semibold">
+                        Advice, not payment authority
+                    </AlertTitle>
+                    <AlertDescription className="text-xs text-muted-foreground leading-relaxed">
                         Re-evaluation preserves prior results. It never changes
                         collected fees, student balances, approvals or
                         transfers. Progress shows processing stages and cited
                         conclusions, not private model reasoning.
                     </AlertDescription>
                 </Alert>
-                <div className="grid min-w-0 gap-6 lg:grid-cols-[minmax(0,1fr)_minmax(0,2fr)]">
+
+                <div className="grid min-w-0 gap-6 lg:grid-cols-[minmax(0,1.15fr)_minmax(0,2fr)]">
+                    {/* Left Panel: Source Selection & Breakdown */}
                     <aside className="flex min-w-0 flex-col gap-6">
                         <Frame spacing="default" stacked>
                             <FrameHeader>
@@ -281,7 +353,10 @@ export default function PolicyEvaluations({
                             </FrameHeader>
                             <FramePanel>
                                 <div className="flex min-w-0 flex-col gap-4">
-                                    <Label htmlFor="evaluation-source">
+                                    <Label
+                                        htmlFor="evaluation-source"
+                                        className="text-xs font-medium"
+                                    >
                                         Collection, transaction or budget
                                     </Label>
                                     {sources.length === 0 ? (
@@ -306,7 +381,7 @@ export default function PolicyEvaluations({
                                         >
                                             <SelectTrigger
                                                 id="evaluation-source"
-                                                className="w-full"
+                                                className="w-full text-left"
                                             >
                                                 <SelectValue placeholder="Choose evidence" />
                                             </SelectTrigger>
@@ -322,63 +397,182 @@ export default function PolicyEvaluations({
                                             </SelectContent>
                                         </Select>
                                     )}
-                                    {source?.source_type ===
-                                    'budget_snapshot' ? (
-                                        <dl className="grid grid-cols-1 gap-3 text-sm">
-                                            {[
-                                                [
-                                                    'Opening funds',
-                                                    source.evidence
-                                                        .opening_funds_minor_units,
-                                                ],
-                                                [
-                                                    'Reviewed receipts',
-                                                    source.evidence
-                                                        .realized_receipts_minor_units,
-                                                ],
-                                                [
-                                                    'Restricted cash',
-                                                    source.evidence
-                                                        .restricted_minor_units,
-                                                ],
-                                                [
-                                                    'Captured reserve',
-                                                    source.evidence
-                                                        .protected_reserve_minor_units,
-                                                ],
-                                                [
-                                                    'Captured cash available',
-                                                    source.evidence
-                                                        .captured_cash_headroom_minor_units,
-                                                ],
-                                            ].map(([label, amount]) => (
-                                                <div
-                                                    key={label}
-                                                    className="flex flex-wrap items-center justify-between gap-2"
+
+                                    {/* Structured Evidence Card */}
+                                    {source && (
+                                        <div className="flex flex-col gap-3 rounded-lg border border-border/80 bg-muted/20 p-3.5">
+                                            <div className="flex items-center justify-between gap-2">
+                                                <Badge
+                                                    variant="outline"
+                                                    className="text-xs font-semibold capitalize"
                                                 >
-                                                    <dt className="text-muted-foreground">
-                                                        {label}
-                                                    </dt>
-                                                    <dd className="tabular-nums">
-                                                        {formatUsdc(
-                                                            amount ?? '0',
-                                                        )}
-                                                    </dd>
-                                                </div>
-                                            ))}
-                                            <div className="text-xs text-muted-foreground">
-                                                Captured evidence, not a live
-                                                wallet balance. Active policy
-                                                may protect additional reserve.
+                                                    {source.source_type ===
+                                                    'collection'
+                                                        ? 'Collection Receipt'
+                                                        : source.source_type ===
+                                                            'budget_snapshot'
+                                                          ? 'Budget Snapshot'
+                                                          : 'Recorded Transaction'}
+                                                </Badge>
+                                                {source.evidence
+                                                    .reviewed_receipt !==
+                                                    undefined && (
+                                                    <Badge
+                                                        variant={
+                                                            source.evidence
+                                                                .reviewed_receipt
+                                                                ? 'success-light'
+                                                                : 'warning-light'
+                                                        }
+                                                        className="text-xs"
+                                                    >
+                                                        {source.evidence
+                                                            .reviewed_receipt
+                                                            ? '✓ Staff Approved'
+                                                            : '⏳ Awaiting Review'}
+                                                    </Badge>
+                                                )}
                                             </div>
-                                        </dl>
-                                    ) : (
-                                        source && (
-                                            <p className="break-words text-sm">
-                                                {source.evidence.description}
-                                            </p>
-                                        )
+
+                                            {source.source_type ===
+                                            'budget_snapshot' ? (
+                                                <dl className="grid grid-cols-1 gap-2 text-xs">
+                                                    {[
+                                                        [
+                                                            'Opening funds',
+                                                            source.evidence
+                                                                .opening_funds_minor_units,
+                                                        ],
+                                                        [
+                                                            'Reviewed receipts',
+                                                            source.evidence
+                                                                .realized_receipts_minor_units,
+                                                        ],
+                                                        [
+                                                            'Restricted cash',
+                                                            source.evidence
+                                                                .restricted_minor_units,
+                                                        ],
+                                                        [
+                                                            'Captured reserve',
+                                                            source.evidence
+                                                                .protected_reserve_minor_units,
+                                                        ],
+                                                        [
+                                                            'Captured cash available',
+                                                            source.evidence
+                                                                .captured_cash_headroom_minor_units,
+                                                        ],
+                                                    ].map(([label, amount]) => (
+                                                        <div
+                                                            key={label}
+                                                            className="flex flex-wrap items-center justify-between gap-2"
+                                                        >
+                                                            <dt className="text-muted-foreground">
+                                                                {label}
+                                                            </dt>
+                                                            <dd className="font-mono font-medium">
+                                                                {formatUsdc(
+                                                                    amount ??
+                                                                        '0',
+                                                                )}
+                                                            </dd>
+                                                        </div>
+                                                    ))}
+                                                    <div className="pt-1 text-[11px] text-muted-foreground">
+                                                        Captured evidence, not a
+                                                        live wallet balance.
+                                                        Active policy may
+                                                        protect additional
+                                                        reserve.
+                                                    </div>
+                                                </dl>
+                                            ) : (
+                                                <div className="flex flex-col gap-2 text-xs">
+                                                    {source.evidence
+                                                        .received_minor_units && (
+                                                        <div className="flex items-center justify-between">
+                                                            <span className="text-muted-foreground">
+                                                                Received Amount:
+                                                            </span>
+                                                            <span className="font-mono text-sm font-bold text-foreground">
+                                                                {formatUsdc(
+                                                                    source
+                                                                        .evidence
+                                                                        .received_minor_units,
+                                                                )}
+                                                            </span>
+                                                        </div>
+                                                    )}
+                                                    {source.evidence
+                                                        .source_stream && (
+                                                        <div className="flex items-center justify-between">
+                                                            <span className="text-muted-foreground">
+                                                                Channel:
+                                                            </span>
+                                                            <span className="font-medium text-foreground">
+                                                                {
+                                                                    source
+                                                                        .evidence
+                                                                        .source_stream
+                                                                }
+                                                            </span>
+                                                        </div>
+                                                    )}
+                                                    {source.evidence
+                                                        .reference && (
+                                                        <div className="flex flex-col gap-1 pt-1">
+                                                            <span className="text-muted-foreground">
+                                                                Reference Proof:
+                                                            </span>
+                                                            <span className="font-mono text-[11px] break-all bg-background/80 p-1.5 rounded border border-border/50">
+                                                                {
+                                                                    source
+                                                                        .evidence
+                                                                        .reference
+                                                                }
+                                                            </span>
+                                                        </div>
+                                                    )}
+                                                </div>
+                                            )}
+
+                                            {/* Action to view source in ledger */}
+                                            {source.source_type ===
+                                                'collection' && (
+                                                <div className="pt-2 border-t border-border/50 flex justify-end">
+                                                    <a
+                                                        href={collectionsUrl}
+                                                        className="inline-flex items-center gap-1 text-xs font-semibold text-primary hover:underline"
+                                                    >
+                                                        Open in Collections
+                                                        ledger
+                                                        <ExternalLink
+                                                            aria-hidden="true"
+                                                            className="h-3 w-3"
+                                                        />
+                                                    </a>
+                                                </div>
+                                            )}
+                                            {source.source_type ===
+                                                'budget_snapshot' && (
+                                                <div className="pt-2 border-t border-border/50 flex justify-end">
+                                                    <a
+                                                        href={supervisorUrl}
+                                                        className="inline-flex items-center gap-1 text-xs font-semibold text-primary hover:underline"
+                                                    >
+                                                        Open in Finance
+                                                        Supervisor
+                                                        <ExternalLink
+                                                            aria-hidden="true"
+                                                            className="h-3 w-3"
+                                                        />
+                                                    </a>
+                                                </div>
+                                            )}
+                                        </div>
                                     )}
+
                                     {source &&
                                         source.source_type !==
                                             'budget_snapshot' && (
@@ -389,18 +583,27 @@ export default function PolicyEvaluations({
                                                 without reviewed budget context.
                                             </p>
                                         )}
-                                    <Label htmlFor="evaluation-reason">
-                                        Why re-evaluate?
-                                    </Label>
-                                    <Textarea
-                                        id="evaluation-reason"
-                                        value={reason}
-                                        onChange={(event) =>
-                                            setReason(event.target.value)
-                                        }
-                                        maxLength={1000}
-                                        rows={3}
-                                    />
+
+                                    {/* Why re-evaluate */}
+                                    <div className="flex flex-col gap-1.5 pt-1">
+                                        <Label
+                                            htmlFor="evaluation-reason"
+                                            className="text-xs font-medium"
+                                        >
+                                            Why re-evaluate?
+                                        </Label>
+                                        <Textarea
+                                            id="evaluation-reason"
+                                            value={reason}
+                                            onChange={(event) =>
+                                                setReason(event.target.value)
+                                            }
+                                            maxLength={1000}
+                                            rows={2}
+                                            className="text-xs"
+                                        />
+                                    </div>
+
                                     {Object.values(http.errors)
                                         .flat()
                                         .map((error, index) => (
@@ -416,21 +619,27 @@ export default function PolicyEvaluations({
                                                 </AlertDescription>
                                             </Alert>
                                         ))}
+
                                     <Button
                                         type="button"
                                         size="sm"
                                         disabled={!canRun || http.processing}
                                         onClick={reevaluate}
+                                        className="w-full"
                                     >
-                                        <Sparkles aria-hidden="true" />
+                                        <Sparkles
+                                            aria-hidden="true"
+                                            className="mr-1.5 h-4 w-4"
+                                        />
                                         {http.processing
                                             ? 'Queueing…'
                                             : 'Re-evaluate'}
                                     </Button>
+
                                     {pending && (
                                         <p
                                             role="status"
-                                            className="text-xs text-muted-foreground"
+                                            className="text-xs text-muted-foreground text-center animate-pulse"
                                         >
                                             Run in progress. Wait before
                                             requesting another evaluation.
@@ -439,67 +648,263 @@ export default function PolicyEvaluations({
                                 </div>
                             </FramePanel>
                         </Frame>
+
+                        {/* Policy in force summary */}
                         <Frame spacing="default" stacked>
                             <FrameHeader>
                                 <FrameTitle>Policy in force</FrameTitle>
                             </FrameHeader>
                             <FramePanel>
-                                <div className="flex flex-col gap-3">
-                                    {current ? (
-                                        <>
-                                            <p className="text-sm">
-                                                {current.title}
-                                            </p>
-                                            <p className="text-xs text-muted-foreground">
+                                <div className="flex flex-col gap-2 text-xs">
+                                    <p className="font-semibold text-foreground">
+                                        {current?.title ??
+                                            'No active published policy'}
+                                    </p>
+                                    {current && (
+                                        <div className="flex items-center gap-2 text-muted-foreground">
+                                            <Badge
+                                                variant="outline"
+                                                className="text-[11px]"
+                                            >
                                                 Revision #
                                                 {current.policy_version_id}
-                                            </p>
-                                        </>
-                                    ) : (
-                                        <Alert variant="warning">
-                                            <AlertTitle>
-                                                No active published policy
-                                            </AlertTitle>
-                                            <AlertDescription>
-                                                Test a draft and have a
-                                                different authorized reviewer
-                                                publish it before re-evaluating.
-                                            </AlertDescription>
-                                        </Alert>
+                                            </Badge>
+                                            <span
+                                                className="font-mono text-[11px] truncate max-w-[140px]"
+                                                title={
+                                                    current.publication_digest
+                                                }
+                                            >
+                                                {current.publication_digest.slice(
+                                                    0,
+                                                    10,
+                                                )}
+                                                …
+                                            </span>
+                                        </div>
                                     )}
-                                    {!queueReady && (
-                                        <Alert variant="warning">
-                                            <AlertTitle>
-                                                Queue not ready
-                                            </AlertTitle>
-                                            <AlertDescription>
-                                                Use a durable queue with
-                                                retry_after greater than 180
-                                                seconds.
-                                            </AlertDescription>
-                                        </Alert>
-                                    )}
-                                    {!aiEnabled && (
-                                        <Alert variant="warning">
-                                            <AlertTitle>
-                                                AI advisory disabled
-                                            </AlertTitle>
-                                            <AlertDescription>
-                                                Enable advisory and accept
-                                                provider disclosure in AI
-                                                settings before running.
-                                            </AlertDescription>
-                                        </Alert>
-                                    )}
+                                    <div className="pt-2">
+                                        <Link
+                                            href={policyUrl}
+                                            className="inline-flex items-center gap-1 text-xs font-medium text-primary hover:underline"
+                                        >
+                                            Inspect policy rules & clauses
+                                            <ArrowRight
+                                                aria-hidden="true"
+                                                className="h-3 w-3"
+                                            />
+                                        </Link>
+                                    </div>
                                 </div>
                             </FramePanel>
                         </Frame>
                     </aside>
-                    <section
-                        className="flex min-w-0 flex-col gap-6"
-                        aria-label="Evaluation progress"
-                    >
-                        <Frame spacing="default" stacked>
+
+                    {/* Right Panel: Human Decision Guide, Timeline & Results */}
+                    <div className="flex min-w-0 flex-col gap-6">
+                        {/* 1. Clear Human Decision Box when review is needed */}
+                        {isNeedsReview && (
+                            <div className="rounded-xl border border-amber-500/40 bg-amber-50/50 p-5 shadow-sm dark:bg-amber-950/20">
+                                <div className="flex items-start gap-3.5">
+                                    <div className="rounded-lg bg-amber-100 p-2 text-amber-700 dark:bg-amber-900/40 dark:text-amber-400">
+                                        <AlertTriangle
+                                            aria-hidden="true"
+                                            className="h-5 w-5"
+                                        />
+                                    </div>
+                                    <div className="flex min-w-0 flex-col gap-2">
+                                        <div>
+                                            <h3 className="text-base font-semibold text-amber-950 dark:text-amber-200">
+                                                Human Review & Action Required
+                                            </h3>
+                                            <p className="text-xs text-amber-900/80 dark:text-amber-300/80 leading-relaxed">
+                                                The AI agent did not find an
+                                                unambiguous policy match above
+                                                the required 80% confidence
+                                                threshold (fail-closed safety).
+                                                Zero funds were moved. Follow
+                                                the guidance below to take
+                                                action.
+                                            </p>
+                                        </div>
+
+                                        <div className="grid grid-cols-1 gap-3 pt-2 sm:grid-cols-2">
+                                            {isUnreviewedCollection ? (
+                                                <div className="rounded-lg border border-amber-200 bg-white/70 p-3.5 dark:border-amber-800/40 dark:bg-white/5 flex flex-col justify-between gap-2">
+                                                    <div>
+                                                        <span className="text-xs font-semibold text-foreground">
+                                                            Step 1: Review
+                                                            Receipt in
+                                                            Collections
+                                                        </span>
+                                                        <p className="text-xs text-muted-foreground mt-0.5">
+                                                            This receipt has not
+                                                            been approved by
+                                                            staff yet. A
+                                                            separate officer
+                                                            must check the proof
+                                                            of funds.
+                                                        </p>
+                                                    </div>
+                                                    <Button
+                                                        asChild
+                                                        size="sm"
+                                                        variant="default"
+                                                        className="w-full"
+                                                    >
+                                                        <a
+                                                            href={
+                                                                collectionsUrl
+                                                            }
+                                                        >
+                                                            Open Collections
+                                                            Ledger
+                                                            <ExternalLink
+                                                                aria-hidden="true"
+                                                                className="ml-1.5 h-3.5 w-3.5"
+                                                            />
+                                                        </a>
+                                                    </Button>
+                                                </div>
+                                            ) : (
+                                                <div className="rounded-lg border border-amber-200 bg-white/70 p-3.5 dark:border-amber-800/40 dark:bg-white/5 flex flex-col justify-between gap-2">
+                                                    <div>
+                                                        <span className="text-xs font-semibold text-foreground">
+                                                            Step 1: Plan in
+                                                            Finance Supervisor
+                                                        </span>
+                                                        <p className="text-xs text-muted-foreground mt-0.5">
+                                                            You can manually
+                                                            bind this receipt to
+                                                            a department budget
+                                                            snapshot to allocate
+                                                            it toward
+                                                            institution bills.
+                                                        </p>
+                                                    </div>
+                                                    <Button
+                                                        asChild
+                                                        size="sm"
+                                                        variant="default"
+                                                        className="w-full"
+                                                    >
+                                                        <a href={supervisorUrl}>
+                                                            Open Finance
+                                                            Supervisor
+                                                            <ExternalLink
+                                                                aria-hidden="true"
+                                                                className="ml-1.5 h-3.5 w-3.5"
+                                                            />
+                                                        </a>
+                                                    </Button>
+                                                </div>
+                                            )}
+
+                                            <div className="rounded-lg border border-amber-200 bg-white/70 p-3.5 dark:border-amber-800/40 dark:bg-white/5 flex flex-col justify-between gap-2">
+                                                <div>
+                                                    <span className="text-xs font-semibold text-foreground">
+                                                        Step 2: Refine
+                                                        Institution Policy
+                                                    </span>
+                                                    <p className="text-xs text-muted-foreground mt-0.5">
+                                                        If this fee category
+                                                        should be recognized
+                                                        automatically by the AI
+                                                        agent, add or refine its
+                                                        category clause.
+                                                    </p>
+                                                </div>
+                                                <Button
+                                                    asChild
+                                                    size="sm"
+                                                    variant="outline"
+                                                    className="w-full"
+                                                >
+                                                    <Link href={policyUrl}>
+                                                        Edit Institution Policy
+                                                        <ArrowRight
+                                                            aria-hidden="true"
+                                                            className="ml-1.5 h-3.5 w-3.5"
+                                                        />
+                                                    </Link>
+                                                </Button>
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        )}
+
+                        {/* 2. Success Banner when Category Matched Confidently */}
+                        {displayed?.state === 'completed' &&
+                            displayed?.result?.category_id && (
+                                <div className="rounded-xl border border-emerald-500/30 bg-emerald-50/50 p-5 shadow-sm dark:bg-emerald-950/20">
+                                    <div className="flex items-start gap-3.5">
+                                        <div className="rounded-lg bg-emerald-100 p-2 text-emerald-700 dark:bg-emerald-900/40 dark:text-emerald-400">
+                                            <CheckCircle2
+                                                aria-hidden="true"
+                                                className="h-5 w-5"
+                                            />
+                                        </div>
+                                        <div className="flex min-w-0 flex-col gap-2">
+                                            <div className="flex flex-wrap items-center gap-2">
+                                                <h3 className="text-base font-semibold text-emerald-950 dark:text-emerald-200">
+                                                    AI Matched Policy Category:{' '}
+                                                    {
+                                                        displayed.result
+                                                            .category_id
+                                                    }
+                                                </h3>
+                                                <Badge
+                                                    variant="success-light"
+                                                    className="text-xs"
+                                                >
+                                                    Confidence &gt; 80%
+                                                </Badge>
+                                            </div>
+                                            <p className="text-xs text-emerald-900/80 dark:text-emerald-300/80 leading-relaxed">
+                                                {displayed.result.explanation}
+                                            </p>
+                                            <div className="pt-2 flex flex-wrap gap-2">
+                                                <Button
+                                                    asChild
+                                                    size="sm"
+                                                    variant="default"
+                                                >
+                                                    <a href={supervisorUrl}>
+                                                        Allocate in Finance
+                                                        Supervisor
+                                                        <ArrowRight
+                                                            aria-hidden="true"
+                                                            className="ml-1.5 h-3.5 w-3.5"
+                                                        />
+                                                    </a>
+                                                </Button>
+                                                <Button
+                                                    asChild
+                                                    size="sm"
+                                                    variant="outline"
+                                                >
+                                                    <a href={collectionsUrl}>
+                                                        View in Collections
+                                                        <ExternalLink
+                                                            aria-hidden="true"
+                                                            className="ml-1.5 h-3.5 w-3.5"
+                                                        />
+                                                    </a>
+                                                </Button>
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+                            )}
+
+                        {/* Agent Progress Frame */}
+                        <Frame
+                            spacing="default"
+                            stacked
+                            aria-label="Evaluation progress"
+                        >
                             <FrameHeader>
                                 <div className="flex flex-wrap items-center justify-between gap-3">
                                     <div className="flex flex-col gap-1">
@@ -538,16 +943,27 @@ export default function PolicyEvaluations({
                                                 variant="outline"
                                                 onClick={() => router.reload()}
                                             >
-                                                <RefreshCw aria-hidden="true" />
+                                                <RefreshCw
+                                                    aria-hidden="true"
+                                                    className="mr-1 h-3.5 w-3.5"
+                                                />
                                                 Retry
                                             </Button>
                                         </Alert>
                                     )}
+
                                     {!displayed ? (
-                                        <p className="text-sm text-muted-foreground">
-                                            No evaluation yet. Choose evidence
-                                            and request a fresh run.
-                                        </p>
+                                        <div className="py-8 text-center text-sm text-muted-foreground flex flex-col items-center gap-2">
+                                            <HelpCircle
+                                                aria-hidden="true"
+                                                className="h-8 w-8 text-muted-foreground/50"
+                                            />
+                                            <p>
+                                                No evaluation yet for this
+                                                record. Choose evidence on the
+                                                left and click Re-evaluate.
+                                            </p>
+                                        </div>
                                     ) : (
                                         <>
                                             <div
@@ -577,9 +993,18 @@ export default function PolicyEvaluations({
                                                         displayed.institution_policy_version_id
                                                     }
                                                 </span>
+                                                {displayed.provider && (
+                                                    <span className="text-xs text-muted-foreground font-mono">
+                                                        via {displayed.provider}{' '}
+                                                        (
+                                                        {displayed.model ??
+                                                            'default'}
+                                                        )
+                                                    </span>
+                                                )}
                                                 {displayed.total_targets >
                                                     0 && (
-                                                    <span className="text-xs tabular-nums">
+                                                    <span className="text-xs tabular-nums text-muted-foreground">
                                                         {
                                                             displayed.completed_targets
                                                         }{' '}
@@ -591,6 +1016,7 @@ export default function PolicyEvaluations({
                                                     </span>
                                                 )}
                                             </div>
+
                                             {current &&
                                                 current.publication_digest !==
                                                     displayed.publication_digest && (
@@ -606,6 +1032,7 @@ export default function PolicyEvaluations({
                                                         </AlertDescription>
                                                     </Alert>
                                                 )}
+
                                             {source &&
                                                 source.source_digest !==
                                                     displayed.source_digest && (
@@ -627,13 +1054,16 @@ export default function PolicyEvaluations({
                                                             onClick={() =>
                                                                 router.reload()
                                                             }
+                                                            className="mt-2"
                                                         >
                                                             Refresh sources
                                                         </Button>
                                                     </Alert>
                                                 )}
+
+                                            {/* Timeline */}
                                             <div
-                                                className="flex min-h-0 flex-col gap-3"
+                                                className="flex min-h-0 flex-col gap-3 pt-1"
                                                 tabIndex={0}
                                                 aria-label="Processing timeline"
                                             >
@@ -677,16 +1107,17 @@ export default function PolicyEvaluations({
                                                             </TimelineItem>
                                                         ))}
                                                 </Timeline>
+
                                                 {displayed.timeline.length >
                                                     4 && (
-                                                    <details className="text-sm">
-                                                        <summary className="cursor-pointer text-muted-foreground">
+                                                    <details className="text-xs">
+                                                        <summary className="cursor-pointer text-muted-foreground hover:underline">
                                                             Earlier stages (
                                                             {displayed.timeline
                                                                 .length - 4}
                                                             )
                                                         </summary>
-                                                        <ul className="flex flex-col gap-3 py-3">
+                                                        <ul className="flex flex-col gap-2 py-2.5">
                                                             {displayed.timeline
                                                                 .slice(0, -4)
                                                                 .map(
@@ -698,14 +1129,14 @@ export default function PolicyEvaluations({
                                                                             key={
                                                                                 index
                                                                             }
-                                                                            className="flex flex-col gap-1"
+                                                                            className="flex flex-col gap-0.5 text-muted-foreground"
                                                                         >
-                                                                            <span className="text-xs text-muted-foreground">
+                                                                            <span className="text-[10px] font-mono">
                                                                                 {new Date(
                                                                                     event.at,
                                                                                 ).toLocaleTimeString()}
                                                                             </span>
-                                                                            <span>
+                                                                            <span className="text-foreground/80">
                                                                                 {
                                                                                     event.message
                                                                                 }
@@ -717,11 +1148,12 @@ export default function PolicyEvaluations({
                                                     </details>
                                                 )}
                                             </div>
+
                                             {['queued', 'running'].includes(
                                                 displayed.state,
                                             ) && (
                                                 <div
-                                                    className="flex flex-col gap-2"
+                                                    className="flex flex-col gap-2 pt-2"
                                                     aria-label="Result pending"
                                                 >
                                                     <Skeleton className="h-4 w-2/3" />
@@ -729,11 +1161,12 @@ export default function PolicyEvaluations({
                                                     <p className="text-xs text-muted-foreground">
                                                         {displayed.state ===
                                                         'queued'
-                                                            ? 'Waiting for policy-assessments worker. No agent processing has started.'
+                                                            ? 'Waiting for default queue worker. No agent processing has started.'
                                                             : 'Background processing underway. Result appears after safety checks.'}
                                                     </p>
                                                 </div>
                                             )}
+
                                             {displayed.last_error && (
                                                 <Alert variant="warning">
                                                     <AlertTitle>
@@ -742,18 +1175,24 @@ export default function PolicyEvaluations({
                                                     <AlertDescription>
                                                         {displayed.last_error}
                                                     </AlertDescription>
-                                                    <Button
-                                                        type="button"
-                                                        size="sm"
-                                                        variant="outline"
-                                                        disabled={
-                                                            !canRun ||
-                                                            http.processing
-                                                        }
-                                                        onClick={reevaluate}
-                                                    >
-                                                        Retry as new run
-                                                    </Button>
+                                                    <div className="pt-2">
+                                                        <Button
+                                                            type="button"
+                                                            size="sm"
+                                                            variant="outline"
+                                                            disabled={
+                                                                !canRun ||
+                                                                http.processing
+                                                            }
+                                                            onClick={reevaluate}
+                                                        >
+                                                            <RefreshCw
+                                                                aria-hidden="true"
+                                                                className="mr-1.5 h-3.5 w-3.5"
+                                                            />
+                                                            Retry as new run
+                                                        </Button>
+                                                    </div>
                                                 </Alert>
                                             )}
                                         </>
@@ -761,54 +1200,80 @@ export default function PolicyEvaluations({
                                 </div>
                             </FramePanel>
                         </Frame>
+
+                        {/* Advisory Result Frame */}
                         {displayed?.result && (
                             <Frame spacing="default" stacked>
                                 <FrameHeader>
-                                    <FrameTitle>Advisory result</FrameTitle>
-                                    <FrameDescription>
-                                        {displayed.label}
-                                    </FrameDescription>
+                                    <div className="flex flex-wrap items-center justify-between gap-2">
+                                        <div>
+                                            <FrameTitle>
+                                                Advisory result
+                                            </FrameTitle>
+                                            <FrameDescription>
+                                                {displayed.label}
+                                            </FrameDescription>
+                                        </div>
+                                        <Badge
+                                            variant={
+                                                displayed.result.category_id
+                                                    ? 'success-light'
+                                                    : 'warning-light'
+                                            }
+                                        >
+                                            {displayed.result.category_id
+                                                ? `Category: ${displayed.result.category_id}`
+                                                : 'Requires human clarification'}
+                                        </Badge>
+                                    </div>
                                 </FrameHeader>
                                 <FramePanel>
                                     <div className="flex min-w-0 flex-col gap-4">
-                                        {displayed.result.category_id && (
-                                            <p className="text-sm font-medium">
-                                                Category:{' '}
-                                                {displayed.result.category_id}
-                                            </p>
-                                        )}
                                         {displayed.result.explanation && (
-                                            <p className="break-words text-sm">
+                                            <p className="break-words text-sm leading-relaxed text-foreground/90">
                                                 {displayed.result.explanation}
                                             </p>
                                         )}
+
                                         <Citations
                                             items={
                                                 displayed.result.citations ?? []
                                             }
                                         />
+
                                         {[
                                             ...(displayed.result.questions ??
                                                 []),
                                             ...(displayed.result
                                                 .missing_evidence ?? []),
                                         ].map((message, index) => (
-                                            <p key={index} className="text-sm">
+                                            <p
+                                                key={index}
+                                                className="text-sm font-medium text-amber-700 dark:text-amber-400"
+                                            >
                                                 Needs review: {message}
                                             </p>
                                         ))}
+
                                         {displayed.result.next_step && (
-                                            <p className="text-sm text-muted-foreground">
-                                                {displayed.result.next_step}
-                                            </p>
+                                            <div className="rounded-lg bg-muted/40 p-3 text-xs text-muted-foreground flex items-start gap-2">
+                                                <Info
+                                                    aria-hidden="true"
+                                                    className="h-4 w-4 shrink-0 text-primary mt-0.5"
+                                                />
+                                                <span>
+                                                    {displayed.result.next_step}
+                                                </span>
+                                            </div>
                                         )}
+
                                         {displayed.result
                                             .proposed_minor_units !==
                                             undefined && (
-                                            <div className="flex flex-wrap gap-6 text-sm">
+                                            <div className="flex flex-wrap gap-6 text-sm border-t border-border/50 pt-3">
                                                 <p>
                                                     Proposed:{' '}
-                                                    <strong className="tabular-nums">
+                                                    <strong className="tabular-nums font-mono">
                                                         {formatUsdc(
                                                             displayed.result
                                                                 .proposed_minor_units,
@@ -817,7 +1282,7 @@ export default function PolicyEvaluations({
                                                 </p>
                                                 <p>
                                                     Unallocated:{' '}
-                                                    <strong className="tabular-nums">
+                                                    <strong className="tabular-nums font-mono">
                                                         {formatUsdc(
                                                             displayed.result
                                                                 .unallocated_minor_units ??
@@ -829,6 +1294,8 @@ export default function PolicyEvaluations({
                                         )}
                                     </div>
                                 </FramePanel>
+
+                                {/* Proposed allocation lines if budget plan */}
                                 {displayed.result.lines?.map((line) => (
                                     <FramePanel
                                         key={`${line.target_type}:${line.target_id}`}
@@ -859,7 +1326,7 @@ export default function PolicyEvaluations({
                                                     'Needs review'}
                                             </p>
                                             {line.explanation && (
-                                                <p className="break-words text-sm">
+                                                <p className="text-xs text-muted-foreground">
                                                     {line.explanation}
                                                 </p>
                                             )}
@@ -869,6 +1336,8 @@ export default function PolicyEvaluations({
                                 ))}
                             </Frame>
                         )}
+
+                        {/* Run History Frame */}
                         {matching.length > 0 && (
                             <Frame spacing="default" stacked>
                                 <FrameHeader>
@@ -877,39 +1346,49 @@ export default function PolicyEvaluations({
                                         Previous advice stays unchanged.
                                     </FrameDescription>
                                 </FrameHeader>
-                                {matching.map((item) => (
-                                    <FramePanel key={item.id}>
-                                        <div className="flex flex-wrap items-center justify-between gap-3">
-                                            <div className="flex min-w-0 flex-col gap-1">
-                                                <p className="text-sm">
-                                                    Run #{item.id} ·{' '}
-                                                    {statusLabel(item.state)}
-                                                </p>
-                                                <p className="break-words text-xs text-muted-foreground">
+                                <FramePanel>
+                                    <ul className="flex flex-col divide-y divide-border/50">
+                                        {matching.map((item) => (
+                                            <li
+                                                key={item.id}
+                                                className={`flex flex-col gap-1 py-3 transition hover:bg-muted/10 ${
+                                                    item.id === displayed?.id
+                                                        ? 'bg-muted/20 font-medium'
+                                                        : ''
+                                                }`}
+                                            >
+                                                <div className="flex flex-wrap items-center justify-between gap-2">
+                                                    <span className="text-xs">
+                                                        Run #{item.id} ·{' '}
+                                                        {statusLabel(
+                                                            item.state,
+                                                        )}
+                                                    </span>
+                                                    <Button
+                                                        type="button"
+                                                        size="sm"
+                                                        variant="ghost"
+                                                        className="h-7 text-xs"
+                                                        onClick={() => {
+                                                            setSelectedId(
+                                                                item.id,
+                                                            );
+                                                            setLocal(item);
+                                                        }}
+                                                    >
+                                                        View run #{item.id}
+                                                    </Button>
+                                                </div>
+                                                <p className="text-xs text-muted-foreground">
                                                     {item.reason}
                                                 </p>
-                                            </div>
-                                            <Button
-                                                type="button"
-                                                size="sm"
-                                                variant="ghost"
-                                                onClick={() =>
-                                                    setSelectedId(item.id)
-                                                }
-                                                aria-current={
-                                                    displayed?.id === item.id
-                                                        ? 'true'
-                                                        : undefined
-                                                }
-                                            >
-                                                View run #{item.id}
-                                            </Button>
-                                        </div>
-                                    </FramePanel>
-                                ))}
+                                            </li>
+                                        ))}
+                                    </ul>
+                                </FramePanel>
                             </Frame>
                         )}
-                    </section>
+                    </div>
                 </div>
             </main>
         </>

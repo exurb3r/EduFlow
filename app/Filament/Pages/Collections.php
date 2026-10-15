@@ -47,6 +47,7 @@ use Filament\Tables\Table;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Gate;
+use Illuminate\Support\HtmlString;
 use Illuminate\Support\Str;
 use Illuminate\Validation\ValidationException;
 use Livewire\Attributes\Locked;
@@ -123,7 +124,8 @@ class Collections extends Page implements HasTable
             ->stackedOnMobile()
             ->searchPlaceholder('Find receipt or report number')
             ->columns([
-                TextColumn::make('source_reference')->label('Receipt / report')->searchable()->wrap()
+                TextColumn::make('source_reference')->label('Receipt / report')->searchable()->wrap()->limit(32)
+                    ->tooltip(fn (CollectionBatch $record): string => $record->source_reference)
                     ->description(fn (CollectionBatch $record): string => 'Collection #'.$record->id.' — '.$this->channelLabel($record->source_stream)),
                 TextColumn::make('received_minor_units')->label('Amount received')->alignEnd()
                     ->formatStateUsing(fn (CollectionBatch $record): string => $this->batchMoney($record, 'received_minor_units')),
@@ -468,8 +470,36 @@ class Collections extends Page implements HasTable
     private function batchEvidenceSchema(): array
     {
         return [
+            Section::make('Purpose & Review Status')
+                ->description('In EduFlow, all incoming cash must be independently checked before it can be allocated to department budgets or used to pay bills (four-eyes governance).')
+                ->schema([
+                    TextEntry::make('human_purpose')
+                        ->hiddenLabel()
+                        ->state(function (): HtmlString {
+                            $status = (string) ($this->mountedBatchEvidence['review_decision'] ?? '');
+                            $isApproved = str_contains($status, 'approved');
+                            $isAwaiting = str_contains($status, 'Awaiting');
+
+                            $badge = $isApproved
+                                ? '<span class="inline-flex items-center gap-1.5 rounded-full px-2.5 py-1 text-xs font-semibold bg-emerald-50 text-emerald-700 border border-emerald-200 dark:bg-emerald-950/40 dark:text-emerald-400 dark:border-emerald-800/40">✓ Verified & Approved — Eligible for Budget Planning</span>'
+                                : ($isAwaiting
+                                    ? '<span class="inline-flex items-center gap-1.5 rounded-full px-2.5 py-1 text-xs font-semibold bg-amber-50 text-amber-700 border border-amber-200 dark:bg-amber-950/40 dark:text-amber-400 dark:border-amber-800/40">⏳ Awaiting Independent Staff Review — Not Spendable Yet</span>'
+                                    : '<span class="inline-flex items-center gap-1.5 rounded-full px-2.5 py-1 text-xs font-semibold bg-rose-50 text-rose-700 border border-rose-200 dark:bg-rose-950/40 dark:text-rose-400 dark:border-rose-800/40">⚠️ Held or Needs Clarification</span>');
+
+                            $detail = $isApproved
+                                ? 'This receipt has been independently checked against proof of funds. The cash is confirmed in the treasury and can be planned in the Finance Supervisor.'
+                                : ($isAwaiting
+                                    ? 'This receipt has been recorded by staff, but policy forbids using it until another authorized staff member confirms the proof of funds.'
+                                    : 'This receipt was held or rejected during independent review. It will not be offered to budget planning.');
+
+                            return new HtmlString('<div class="flex flex-col gap-2"><div>'.$badge.'</div><p class="text-xs text-gray-600 dark:text-gray-400 leading-relaxed">'.$detail.'</p></div>');
+                        })->columnSpanFull(),
+                ])->columnSpanFull(),
             Section::make('Receipt record')->description('Compare this saved record with the original receipt/report. Recording does not confirm a bank balance.')
                 ->headerActions([
+                    Action::make('evaluateWithPolicy')->label('Evaluate with Policy AI')->icon(Heroicon::Sparkles)->color('primary')
+                        ->visible(fn (): bool => Gate::allows('create', InstitutionPolicyEvaluation::class))
+                        ->url(fn (): string => route('finance.policy-evaluations.index', ['source_type' => 'collection', 'source_id' => $this->mountedBatchId])),
                     Action::make('downloadCollectionDocument')->label('Download receipt / report')->icon(Heroicon::ArrowDownTray)->color('gray')
                         ->visible(fn (): bool => ($this->mountedBatchEvidence['has_document'] ?? false) === true)
                         ->url(fn (): string => route('finance.collection-batches.document', ['collectionBatch' => $this->mountedBatchId])),
@@ -488,7 +518,7 @@ class Collections extends Page implements HasTable
                 $this->evidenceEntry('verification_reference', 'What the reviewer checked')->columnSpanFull(),
                 $this->evidenceEntry('reason', 'Review notes')->columnSpanFull(),
             ])->columns(['default' => 1, 'md' => 2])->columnSpanFull(),
-            Section::make('Audit details')->collapsible()->collapsed()->schema([
+            Section::make('Cryptographic audit trail (SHA-256)')->collapsible()->collapsed()->schema([
                 $this->evidenceEntry('id', 'Collection ID'), $this->evidenceEntry('prepared_by', 'Recorder ID'),
                 $this->evidenceEntry('source_stream', 'Source identifier')->columnSpanFull(),
                 TextEntry::make('expected_digest')->label('Record fingerprint')

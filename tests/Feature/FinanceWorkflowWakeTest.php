@@ -60,7 +60,7 @@ const WAKE_TREASURY = '0x2629de3b67042842ab2a2e33a1bd81ca583d975c';
  */
 function wakeContext(): array
 {
-    config(['eduflow.institution_id' => null, 'eduflow.background_finance.enabled' => true,
+    config(['queue.default' => 'database', 'eduflow.institution_id' => null, 'eduflow.background_finance.enabled' => true,
         'eduflow.background_finance.queue_connection' => 'database',
         'lepton.default' => 'fake', 'lepton.arc.chain' => 'ARC-TESTNET', 'lepton.arc.treasury' => WAKE_TREASURY]);
     app()->instance(ArcNetworkGateway::class, Mockery::mock(ArcNetworkGateway::class));
@@ -311,7 +311,7 @@ test('direct wake refuses unsafe queues without invalidating a committed capture
     Bus::fake();
     Exceptions::fake();
     $c = wakeContext();
-    config(['eduflow.background_finance.queue_connection' => $connection, 'queue.connections.'.$connection.'.retry_after' => $retryAfter]);
+    config(['queue.default' => $connection, 'queue.connections.'.$connection.'.retry_after' => $retryAfter]);
     $review = approveWakeReceipt($c);
     $snapshot = app(CaptureBudgetSnapshot::class)->handle($c['actor'], $c['budget'], wakePlanInput($c, $review));
     $run = FinanceWorkflowRun::query()->where('kind', 'budget_plan')->firstOrFail();

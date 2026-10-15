@@ -1,6 +1,7 @@
 @layer components {
     .fi-collections-workspace {
         display: grid;
+        grid-template-columns: minmax(0, 1fr);
         min-width: 0;
         gap: 1.5rem;
     }

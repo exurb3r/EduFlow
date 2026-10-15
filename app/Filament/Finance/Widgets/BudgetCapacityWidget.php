@@ -57,6 +57,7 @@ class BudgetCapacityWidget extends TableWidget
                 ->selectRaw('MAX(id)')
                 ->where('organization_id', $institution->id)
                 ->groupBy('budget_id'))
+            ->whereDoesntHave('workflowRuns', fn (Builder $query): Builder => $query->where('state', 'paused'))
             ->with('budget');
     }
 

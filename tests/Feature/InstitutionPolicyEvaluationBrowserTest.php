@@ -24,7 +24,7 @@ test('admin requests fresh allocation sees live progress citations and preserved
     $this->actingAs($context['reviewer']);
     $page = visit('/finance/policy-evaluations?source_type=budget_snapshot&source_id=1')
         ->assertSee('Policy evaluations')->assertSee('Advice, not payment authority')
-        ->press('Re-evaluate')->assertSee('Waiting for policy-assessments worker.');
+        ->press('Re-evaluate')->assertSee('Waiting for default queue worker.');
     $run = InstitutionPolicyEvaluation::query()->sole();
     $run->checkpoint('classifying', 'Checking approved invoice against saved policy clauses.', ['state' => 'running', 'total_targets' => 3]);
     $page->assertSee('Checking approved invoice against saved policy clauses.')->assertSee('0 of 3 targets checked');
