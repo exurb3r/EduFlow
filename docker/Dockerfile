@@ -71,6 +71,7 @@ LABEL org.opencontainers.image.licenses=MIT
 ARG USER_ID=1000
 ARG GROUP_ID=1000
 ARG ROOT=/app
+ENV ROOT=/app
 ARG TZ=UTC
 
 ENV TERM=xterm-color

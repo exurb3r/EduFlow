@@ -7,30 +7,79 @@ running_migrations_and_seeders=${RUNNING_MIGRATIONS_AND_SEEDERS:-"false"}
 
 # Provide sane defaults for service env vars so health checks don't fail when
 # project .env hasn't been loaded into the container environment yet.
-REDIS_HOST="${REDIS_HOST:-redis}"
-REDIS_PORT="${REDIS_PORT:-6379}"
+REDIS_HOST="${REDIS_HOST:-}"
 DB_HOST="${DB_HOST:-pgsql}"
 DB_PORT="${DB_PORT:-5432}"
-export REDIS_HOST REDIS_PORT DB_HOST DB_PORT
+export REDIS_HOST DB_HOST DB_PORT
+
+ROOT=${ROOT:-/app}
+export ROOT
+
+# Persist / generate APP_KEY automatically for self-hosted installs.
+if [ -z "${APP_KEY}" ]; then
+    key_file="${ROOT}/storage/framework/.app_key"
+    if [ -f "${key_file}" ]; then
+        APP_KEY=$(cat "${key_file}")
+    else
+        mkdir -p "${ROOT}/storage/framework"
+        APP_KEY=$(php -r "echo 'base64:'.base64_encode(random_bytes(32));")
+        echo "${APP_KEY}" > "${key_file}"
+    fi
+    export APP_KEY
+fi
+
+fix_permissions() {
+    chown -R "${USER:-laravel}:${USER:-laravel}" "${ROOT}/storage" "${ROOT}/bootstrap/cache" 2>/dev/null || true
+}
+
+init_application() {
+    echo "Preparing application..."
+    fix_permissions
+    php artisan module:enable Blog --no-interaction || true
+    php artisan migrate --force || true
+    php artisan module:migrate --force --no-interaction || true
+    php artisan storage:link || true
+
+    if [ ! -f "${ROOT}/storage/.app_installed" ]; then
+        echo "Initializing App institution..."
+        if php artisan eduflow:install \
+            --institution="${EDUFLOW_INSTITUTION:-My School}" \
+            --country="${EDUFLOW_COUNTRY:-US}" \
+            --timezone="${EDUFLOW_TIMEZONE:-UTC}" \
+            --locale="${EDUFLOW_LOCALE:-en}" \
+            --currency="${EDUFLOW_CURRENCY:-USD}" \
+            --no-interaction; then
+            touch "${ROOT}/storage/.app_installed"
+            fix_permissions
+            echo "Institution initialized."
+            echo "Create the first administrator:"
+            echo "  docker exec -it <container> php artisan eduflow:bootstrap-admin --name=\"School Operator\" --email=\"operator@example.org\""
+        else
+            echo "Institution initialization was skipped or failed (possibly already initialized). Continuing."
+        fi
+    fi
+
+    fix_permissions
+}
 
 initialStuff() {
     echo "Container mode: $container_mode"
 
-    if [ ! -d "/var/www/html/vendor/laravel/horizon" ]; then
+    if [ ! -d "${ROOT}/vendor/laravel/horizon" ]; then
         echo "Horizon not installed. Disabling Horizon supervisor config."
         if [ -f "/etc/supervisor/conf.d/supervisord.horizon.conf" ]; then
             echo "" > /etc/supervisor/conf.d/supervisord.horizon.conf
         fi
     fi
 
-    if [ ! -d "/var/www/html/vendor/laravel/pulse" ]; then
-        echo "Pulse not installed. Disabling Pulse supervisor config."
+    if [ ! -d "${ROOT}/vendor/laravel/pulse" ]; then
         if [ -f "/etc/supervisor/conf.d/supervisord.pulse.conf" ]; then
+            echo "Pulse not installed. Disabling Pulse supervisor config."
             echo "" > /etc/supervisor/conf.d/supervisord.pulse.conf
         fi
     fi
 
-    if [ ! -d "/var/www/html/vendor/laravel/telescope" ]; then
+    if [ ! -d "${ROOT}/vendor/laravel/telescope" ]; then
         if [ -f "/etc/supervisor/conf.d/supervisord.telescope.conf" ]; then
             echo "Telescope not installed. Disabling Telescope supervisor config."
             echo "" > /etc/supervisor/conf.d/supervisord.telescope.conf
@@ -39,32 +88,39 @@ initialStuff() {
 
     check_connections
 
-    php artisan storage:link; \
-    php artisan optimize:clear; \
-    php artisan optimize;
+    init_application
+
+    php artisan optimize:clear
+    php artisan optimize
 }
 
 check_connections() {
     echo "Checking connections..."
 
     # Check Redis
-    echo "Testing Redis connection to ${REDIS_HOST}:${REDIS_PORT}..."
-    php -r "
-        \$maxTries = 30;
-        for (\$i = 0; \$i < \$maxTries; \$i++) {
-            try {
-                \$redis = new Redis();
-                \$redis->connect(getenv('REDIS_HOST'), getenv('REDIS_PORT'));
-                if (\$redis->ping()) {
-                    echo 'Redis connection successful.' . PHP_EOL;
-                    exit(0);
-                }
-            } catch (Exception \$e) {}
-            sleep(1);
-        }
-        echo 'Failed to connect to Redis.' . PHP_EOL;
-        exit(1);
-    "
+    if [ -n "${REDIS_HOST}" ]; then
+        echo "Testing Redis connection to ${REDIS_HOST}:${REDIS_PORT:-6379}..."
+        REDIS_PORT="${REDIS_PORT:-6379}"
+        export REDIS_PORT
+        php -r "
+            \$maxTries = 30;
+            for (\$i = 0; \$i < \$maxTries; \$i++) {
+                try {
+                    \$redis = new Redis();
+                    \$redis->connect(getenv('REDIS_HOST'), getenv('REDIS_PORT'));
+                    if (\$redis->ping()) {
+                        echo 'Redis connection successful.' . PHP_EOL;
+                        exit(0);
+                    }
+                } catch (Exception \$e) {}
+                sleep(1);
+            }
+            echo 'Failed to connect to Redis.' . PHP_EOL;
+            exit(1);
+        "
+    else
+        echo "Skipping Redis check (REDIS_HOST not set)."
+    fi
 
     # Check Database
     echo "Testing Database connection to ${DB_HOST}:${DB_PORT}..."
@@ -90,7 +146,7 @@ check_connections() {
     # Check Storage
     echo "Testing Storage permissions..."
     php -r "
-        \$path = '/var/www/html/storage/framework/testing/connection_test';
+        \$path = '${ROOT}/storage/framework/testing/connection_test';
         @mkdir(dirname(\$path), 0777, true);
         if (@file_put_contents(\$path, 'test') !== false && @unlink(\$path)) {
             echo 'Storage is writable and readable.' . PHP_EOL;
@@ -134,12 +190,12 @@ elif [ "${container_mode}" = "http" ]; then
 elif [ "${container_mode}" = "horizon" ]; then
     initialStuff
     exec /usr/bin/supervisord -n -c /etc/supervisor/conf.d/supervisord.horizon.conf
-elif [ "${container_mode}" = "reverb" ]; then
-    initialStuff
-    exec /usr/bin/supervisord -n -c /etc/supervisor/conf.d/supervisord.reverb.conf
 elif [ "${container_mode}" = "scheduler" ]; then
     initialStuff
     exec /usr/bin/supervisord -n -c /etc/supervisor/conf.d/supervisord.scheduler.conf
+elif [ "${container_mode}" = "reverb" ]; then
+    initialStuff
+    exec /usr/bin/supervisord -n -c /etc/supervisor/conf.d/supervisord.reverb.conf
 elif [ "${container_mode}" = "worker" ]; then
     if [ -z "${WORKER_COMMAND}" ]; then
         echo "WORKER_COMMAND is undefined."
