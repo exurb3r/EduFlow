@@ -188,7 +188,7 @@ class LeptonDoctor extends Command
 
         if ($dbAddress !== null && strcasecmp($dbAddress, $configured) !== 0) {
             $this->failures++;
-            $this->detail('Database treasury differs. Run: php artisan eduflow:demo  or use "Use agent wallet" on the dashboard.');
+            $this->detail('Database treasury differs. Run: php artisan app:demo  or use "Use agent wallet" on the dashboard.');
         }
 
         // Is it funded? On Arc, USDC is the gas token, so an empty wallet cannot send.

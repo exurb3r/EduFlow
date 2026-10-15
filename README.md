@@ -197,7 +197,7 @@ The existing seed/command below still includes optional assistance fixtures. It 
 for development and does not represent the fee-collections pilot or its planned student UI:
 
 ```
-$ php artisan eduflow:demo
+$ php artisan app:demo
 
 Cycle: auto-paid 3, escalated 2, held 1, disbursed 85 USDC.
 
@@ -403,7 +403,7 @@ To pull the newest container images, create an automated PostgreSQL database bac
 On initial boot, the container automatically runs database migrations, enables required modules, and initializes the school identity. Once healthy, create the first super administrator interactively:
 
 ```bash
-docker exec -it opensinop php artisan eduflow:bootstrap-admin --name="School Operator" --email="operator@example.org"
+docker exec -it opensinop php artisan app:bootstrap-admin --name="School Operator" --email="operator@example.org"
 ```
 
 > **Data Persistence:** Database data, uploaded files, and application cache are safely persisted in Docker volumes (`app_db`, `app_storage`, `app_cache`, `app_redis`).
@@ -458,8 +458,8 @@ For environments running PHP and web servers directly on host infrastructure:
    ```
 5. **School identity and first administrator** (idempotent; safe to repeat as a no-op):
    ```bash
-   php artisan eduflow:install --institution="Pilot School" --country=PH --timezone=Asia/Manila --currency=PHP --no-interaction
-   php artisan eduflow:bootstrap-admin --name="School Operator" --email="operator@school.example"
+   php artisan app:install --institution="Pilot School" --country=PH --timezone=Asia/Manila --currency=PHP --no-interaction
+   php artisan app:bootstrap-admin --name="School Operator" --email="operator@school.example"
    ```
    Bootstrap prompts for a password interactively (hidden). Verify the admin email and
    configure MFA before opening access.
@@ -558,8 +558,8 @@ On an operator-controlled instance with reviewed database configuration,
 
 ```bash
 php artisan migrate --force --no-interaction
-php artisan eduflow:install --institution="Pilot School" --country=PH --timezone=Asia/Manila --currency=PHP --no-interaction
-php artisan eduflow:bootstrap-admin --name="School Operator" --email="operator@school.example"
+php artisan app:install --institution="Pilot School" --country=PH --timezone=Asia/Manila --currency=PHP --no-interaction
+php artisan app:bootstrap-admin --name="School Operator" --email="operator@school.example"
 ```
 
 Migrations are a separate operator task. Installer never migrates, resets data, seeds demo
@@ -698,11 +698,11 @@ fail for lack of funds.
 
 ```bash
 php artisan lepton:doctor      # is it wired up?
-php artisan eduflow:demo       # run one full autonomous cycle
+php artisan app:demo       # run one full autonomous cycle
 php artisan lepton:reconcile   # legacy hash lookup; stronger pilot verification required
 ```
 
-`eduflow:demo` moves **85 USDC** of real testnet USDC (30 + 45 + the 10 USDC aid
+`app:demo` moves **85 USDC** of real testnet USDC (30 + 45 + the 10 USDC aid
 portion). It is not a simulation under the `circle` driver, and it is not repeatable
 without re-funding — see [Funding](#fund-the-wallet).
 
@@ -816,7 +816,7 @@ invented obligations, self-set schedules or self-granted authority.
 Enable `EDUFLOW_BACKGROUND_FINANCE=true` only with a durable `database` or `redis` connection
 configured through `EDUFLOW_FINANCE_QUEUE_CONNECTION`. Keep a supervised queue worker on
 `finance-planning` and invoke Laravel scheduler every minute. The scheduled
-`eduflow:dispatch-finance-workflows` recovers committed work; `sync` is refused. Background
+`app:dispatch-finance-workflows` recovers committed work; `sync` is refused. Background
 finance defaults off, and no scheduler task submits money.
 
 One institution workflow service coordinates specialist tasks; several unrestricted LLMs
@@ -905,7 +905,7 @@ app(Yukazakiri\Lepton\Contracts\ArcNetworkGateway::class)
 ## Institution finance preview (no students required)
 
 ```bash
-php artisan eduflow:finance-preview --days=30 --no-interaction
+php artisan app:finance-preview --days=30 --no-interaction
 ```
 
 Read-only C0 entry point: binds the installation institution, observes its recorded
@@ -930,11 +930,11 @@ fund and valid aid policy. The existing aid approval endpoint remains aid-only.
 
 ## Vendor-payment draft preparation (C1 foundation)
 
-`eduflow:prepare-vendor-payment` prepares one immutable, full-bill USDC draft. Operator
+`app:prepare-vendor-payment` prepares one immutable, full-bill USDC draft. Operator
 supplies an existing invoice ID, institution-owned Circle wallet ID, authorized staff ID,
 exact fee ceiling and a UUID intent key retained for retries. Required options:
 `--actor`, `--wallet`, `--max-fee`, `--intent-key`; inspect available syntax with
-`php artisan eduflow:prepare-vendor-payment --help`.
+`php artisan app:prepare-vendor-payment --help`.
 
 Draft preparation is not human sign-off or proof that the named staff member personally
 ran the CLI: host operator has attribution responsibility. No browser/AI tool can call this
@@ -965,17 +965,17 @@ require future reviewed release first. Recovery review never grants payment auth
 
 ## Reviewed institution finance policy (C1 foundation)
 
-`eduflow:prepare-finance-policy` creates an immutable version without activating it.
+`app:prepare-finance-policy` creates an immutable version without activating it.
 Required: version identifier, `--actor`, explicit `--reserve` in exact USDC. Options
 `--auto-limit`, `--daily-limit`, `--max-fee` default to zero. Auto limit cannot exceed daily
-limit. Inspect syntax with `php artisan eduflow:prepare-finance-policy --help`.
+limit. Inspect syntax with `php artisan app:prepare-finance-policy --help`.
 
-`eduflow:activate-finance-policy` requires policy version ID, separate authorized
+`app:activate-finance-policy` requires policy version ID, separate authorized
 `--reviewer`, and explicit `--expected-activation=none` for first activation or current
 activation ID for replacement. It never infers the latest review context. Same review
 retry returns existing evidence; stale context, self-review (including super admins),
 reactivation of superseded versions and corrupt history are refused. Inspect syntax with
-`php artisan eduflow:activate-finance-policy --help`.
+`php artisan app:activate-finance-policy --help`.
 
 Activations are append-only, bind predecessor digest and validate actual policy content
 through the complete recorded history (up to 10,000 activations; beyond that fails closed
@@ -1171,7 +1171,7 @@ reservation release/rollover, approval renewal/withdrawal, durable recovery and 
 | `php artisan lepton:login --request=<id> --otp=<code>` | Complete login |
 | `php artisan lepton:reconcile` | Legacy hash lookup; not complete pilot settlement proof |
 | `php artisan lepton:reconcile --fix` | Legacy reconciliation mutation; review missing/unknown evidence before use |
-| `php artisan eduflow:demo` | Run one full autonomous cycle |
+| `php artisan app:demo` | Run one full autonomous cycle |
 | `php artisan lepton:status --address=0x…` | Chain, block, balance, limits |
 | `php artisan lepton:transfer 0x… --amount=1.00 --from=0x…` | Single transfer (`--estimate` to dry-run) |
 
@@ -1485,7 +1485,7 @@ claims a balance the chain does not hold. Use **Sync from chain**, and check
 rather than your Circle agent wallet, or you are querying a chain you are not
 authenticated for.
 
-**`eduflow:demo` is not repeatable** — each run spends 85 USDC. Re-fund, or use
+**`app:demo` is not repeatable** — each run spends 85 USDC. Re-fund, or use
 `LEPTON_DRIVER=fake`.
 
 ---

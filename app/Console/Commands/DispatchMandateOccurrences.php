@@ -24,7 +24,9 @@ use Illuminate\Validation\ValidationException;
  */
 class DispatchMandateOccurrences extends Command
 {
-    protected $signature = 'eduflow:dispatch-mandate-occurrences';
+    protected $signature = 'app:dispatch-mandate-occurrences';
+
+    protected $aliases = ['eduflow:dispatch-mandate-occurrences'];
 
     protected $description = 'Classify due recurring obligations against approved standing mandates; submits nothing';
 

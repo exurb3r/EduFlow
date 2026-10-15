@@ -432,6 +432,6 @@ if [ "$healthy" = 1 ]; then ok "Application is healthy."; else warn "Application
 title "Next steps"
 info "Open the app at $APP_URL"
 info "Create the first administrator:"
-printf '  %s\n' "$(c "$BOLD" "docker exec -it opensinop php artisan eduflow:bootstrap-admin --name=\"School Operator\" --email=\"operator@example.org\"")"
+printf '  %s\n' "$(c "$BOLD" "docker exec -it opensinop php artisan app:bootstrap-admin --name=\"School Operator\" --email=\"operator@example.org\"")"
 info "Circle/Arc features require the Circle CLI and arc-canteen on your workflow host."
 ok "Installation complete."

@@ -47,7 +47,7 @@
         @if ($institutionMissing)
             <x-filament::section
                 heading="Institution context unavailable"
-                description="Run eduflow:install or configure EDUFLOW_INSTITUTION_ID. Data is never selected by row order."
+                description="Run app:install or configure EDUFLOW_INSTITUTION_ID. Data is never selected by row order."
                 icon="heroicon-o-exclamation-triangle"
                 icon-color="danger"
             />

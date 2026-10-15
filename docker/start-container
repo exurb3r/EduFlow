@@ -42,7 +42,7 @@ init_application() {
 
     if [ ! -f "${ROOT}/storage/.opensinop_installed" ] && [ ! -f "${ROOT}/storage/.eduflow_installed" ]; then
         echo "Initializing OpenSinop institution..."
-        if php artisan eduflow:install \
+        if php artisan app:install \
             --institution="${EDUFLOW_INSTITUTION:-My School}" \
             --country="${EDUFLOW_COUNTRY:-US}" \
             --timezone="${EDUFLOW_TIMEZONE:-UTC}" \
@@ -53,7 +53,7 @@ init_application() {
             fix_permissions
             echo "Institution initialized."
             echo "Create the first administrator:"
-            echo "  docker exec -it opensinop php artisan eduflow:bootstrap-admin --name=\"School Operator\" --email=\"operator@example.org\""
+            echo "  docker exec -it opensinop php artisan app:bootstrap-admin --name=\"School Operator\" --email=\"operator@example.org\""
         else
             echo "Institution initialization was skipped or failed (possibly already initialized). Continuing."
         fi

@@ -11,7 +11,9 @@ use Illuminate\Validation\ValidationException;
 
 class DispatchPaymentSubmissions extends Command
 {
-    protected $signature = 'eduflow:dispatch-payment-submissions {--limit=50} {--recover-stale}';
+    protected $signature = 'app:dispatch-payment-submissions {--limit=50} {--recover-stale}';
+
+    protected $aliases = ['eduflow:dispatch-payment-submissions'];
 
     protected $description = 'Hand durably owed payment submissions to the queue and recover expired worker leases';
 

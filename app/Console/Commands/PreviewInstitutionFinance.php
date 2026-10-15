@@ -11,7 +11,7 @@ use Illuminate\Console\Attributes\Signature;
 use Illuminate\Console\Command;
 use Throwable;
 
-#[Signature('eduflow:finance-preview {--days=30 : Indicative forecast horizon, between 1 and 90 days}')]
+#[Signature('app:finance-preview {--days=30 : Indicative forecast horizon, between 1 and 90 days}', aliases: ['eduflow:finance-preview'])]
 #[Description('Observe institution treasury and review vendor bills without approving, reserving or sending money.')]
 class PreviewInstitutionFinance extends Command
 {

@@ -123,7 +123,7 @@ class TreasuryWallet extends Page implements HasTable
         $institution = $this->institution();
 
         if (! $institution instanceof Organization) {
-            return 'Institution context unavailable — configure EDUFLOW_INSTITUTION_ID or run php artisan eduflow:install.';
+            return 'Institution context unavailable — configure EDUFLOW_INSTITUTION_ID or run php artisan app:install.';
         }
 
         return $institution->name.' · See what is owed, what cash is observed, and what still needs review.';

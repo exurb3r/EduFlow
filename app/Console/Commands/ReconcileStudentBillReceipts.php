@@ -9,7 +9,9 @@ use Illuminate\Console\Command;
 
 class ReconcileStudentBillReceipts extends Command
 {
-    protected $signature = 'eduflow:reconcile-student-bill-receipts';
+    protected $signature = 'app:reconcile-student-bill-receipts';
+
+    protected $aliases = ['eduflow:reconcile-student-bill-receipts'];
 
     protected $description = 'Recover verified bill receipts missing from Collections; never creates a second cash arrival';
 

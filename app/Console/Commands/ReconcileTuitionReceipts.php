@@ -17,7 +17,9 @@ use Illuminate\Console\Command;
  */
 class ReconcileTuitionReceipts extends Command
 {
-    protected $signature = 'eduflow:reconcile-tuition-receipts';
+    protected $signature = 'app:reconcile-tuition-receipts';
+
+    protected $aliases = ['eduflow:reconcile-tuition-receipts'];
 
     protected $description = 'Redeliver committed pilot tuition settlements for reconciliation; recovery only, never a second receipt';
 

@@ -16,7 +16,7 @@ use Illuminate\Console\Attributes\Signature;
 use Illuminate\Console\Command;
 use Throwable;
 
-#[Signature('eduflow:prepare-vendor-payment {invoice : Institution invoice ID} {--actor= : Authorized staff ID attributed to preparation} {--wallet= : Institution Circle wallet ID} {--max-fee=0 : Exact USDC fee ceiling} {--intent-key= : UUID reused for retries of this document}')]
+#[Signature('app:prepare-vendor-payment {invoice : Institution invoice ID} {--actor= : Authorized staff ID attributed to preparation} {--wallet= : Institution Circle wallet ID} {--max-fee=0 : Exact USDC fee ceiling} {--intent-key= : UUID reused for retries of this document}', aliases: ['eduflow:prepare-vendor-payment'])]
 #[Description('Prepare an immutable vendor-payment draft; does not approve, reserve or submit funds.')]
 class PrepareVendorPaymentDraft extends Command
 {

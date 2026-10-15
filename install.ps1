@@ -367,6 +367,6 @@ if ($healthy) { Ok "Application is healthy." } else { Warn "Application did not 
 Title "Next steps"
 Info ("Open the app at " + $APP_URL)
 Info "Create the first administrator (interactive):"
-Say '  docker exec -it opensinop php artisan eduflow:bootstrap-admin --name="School Operator" --email="operator@example.org"' White
+Say '  docker exec -it opensinop php artisan app:bootstrap-admin --name="School Operator" --email="operator@example.org"' White
 Info "Circle/Arc features require the Circle CLI and arc-canteen on your workflow host."
 Ok "Installation complete."

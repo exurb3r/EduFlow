@@ -16,7 +16,9 @@ use Illuminate\Console\Command;
  */
 class DispatchStudentBillPayments extends Command
 {
-    protected $signature = 'eduflow:dispatch-student-bill-payments';
+    protected $signature = 'app:dispatch-student-bill-payments';
+
+    protected $aliases = ['eduflow:dispatch-student-bill-payments'];
 
     protected $description = 'Redeliver consented bill payments; recovery only, and never a second transfer';
 

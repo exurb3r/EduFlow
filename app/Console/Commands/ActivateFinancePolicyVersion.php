@@ -13,7 +13,7 @@ use Illuminate\Console\Attributes\Signature;
 use Illuminate\Console\Command;
 use Throwable;
 
-#[Signature('eduflow:activate-finance-policy {policy : Institution policy version ID} {--reviewer= : Separate authorized staff ID attributed to activation} {--expected-activation= : Explicit current activation ID or none for first activation}')]
+#[Signature('app:activate-finance-policy {policy : Institution policy version ID} {--reviewer= : Separate authorized staff ID attributed to activation} {--expected-activation= : Explicit current activation ID or none for first activation}', aliases: ['eduflow:activate-finance-policy'])]
 #[Description('Activate a reviewed institution policy version; does not approve or enable payments.')]
 class ActivateFinancePolicyVersion extends Command
 {

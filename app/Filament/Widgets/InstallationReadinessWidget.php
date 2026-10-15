@@ -56,7 +56,7 @@ class InstallationReadinessWidget extends BaseWidget
 
         if ($institution === null) {
             return [Stat::make('Installation', 'Not configured')
-                ->description('Run php artisan eduflow:install. A missing or ambiguous institution fails closed rather than defaulting to the first row.')
+                ->description('Run php artisan app:install. A missing or ambiguous institution fails closed rather than defaulting to the first row.')
                 ->descriptionIcon('heroicon-o-exclamation-triangle')
                 ->color('danger')];
         }
