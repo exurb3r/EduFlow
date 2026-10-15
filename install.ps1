@@ -175,7 +175,7 @@ Info "Press Enter to accept a suggested default."
 
 # Application
 Title "Application"
-$APP_NAME = Ask "Application name" "App"
+$APP_NAME = Ask "Application name" "OpenSinop"
 $APP_ENV = Ask-Choice "Environment" "production" @("production", "local", "staging")
 $tmp = Ask-Choice "Debug mode" "false" @("false", "true")
 $APP_DEBUG = $tmp

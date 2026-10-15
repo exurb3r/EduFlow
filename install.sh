@@ -247,7 +247,7 @@ declare -a FIELDS=()
 add() { FIELDS+=("$1=$2"); }
 
 title "Application"
-APP_NAME=$(ask "Application name" "App")
+APP_NAME=$(ask "Application name" "OpenSinop")
 APP_ENV=$(ask_choice "Environment" "production" production local staging)
 APP_DEBUG=$(ask_choice "Debug mode" "false" false true)
 APP_PORT=$(ask "Published HTTP port" "8000")

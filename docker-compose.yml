@@ -11,7 +11,7 @@ services:
     ports:
       - "${APP_PORT:-8000}:8000"
     environment:
-      APP_NAME: ${APP_NAME:-App}
+      APP_NAME: ${APP_NAME:-OpenSinop}
       APP_ENV: ${APP_ENV:-production}
       APP_DEBUG: ${APP_DEBUG:-false}
       APP_URL: ${APP_URL:-http://localhost:8000}
