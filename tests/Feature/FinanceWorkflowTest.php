@@ -235,6 +235,25 @@ test('cashier and finance supervisor pages display exact evidence and record pla
     expect(FinancePlanReview::query()->count())->toBe(1)->and($run->fresh()->state)->toBe('completed')->and(Transaction::query()->count())->toBe(0);
 });
 
+test('finance supervisor page renders command center metrics, 4-stage pipeline and quick filters', function (): void {
+    $c = workflowContext();
+    Filament::setCurrentPanel(Filament::getPanel('finance'));
+    actingAs($c['reviewer']);
+
+    Livewire::test(FinanceSupervisor::class)
+        ->assertSuccessful()
+        ->assertSee('Finance Supervisor Command Center')
+        ->assertSee('Autonomous Allocation Architecture')
+        ->assertSee('Awaiting Decision')
+        ->assertSee('Background Worker')
+        ->assertSee('Accepted Proposals')
+        ->assertSee('Receipt Routing')
+        ->call('filterByState', 'waiting_for_review')
+        ->assertSet('activeStateFilter', 'waiting_for_review')
+        ->call('filterByState', null)
+        ->assertSet('activeStateFilter', null);
+});
+
 test('scheduler recovery discovers committed sources even when original enablement was off', function (): void {
     $c = workflowContext();
     DB::table((new FinanceWorkflowRun)->getTable())->delete();

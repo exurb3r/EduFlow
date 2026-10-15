@@ -135,6 +135,10 @@ class FinanceDashboard extends BaseDashboard
                 ->color('gray')
                 ->url(fn (): string => PaymentReviews::getUrl(panel: 'finance')),
 
+            Action::make('policyDecisions')->label('Policy evaluations')->icon(Heroicon::Sparkles)->color('gray')
+                ->visible(fn (): bool => Auth::user() instanceof User && Auth::user()->hasAnyRole(['admin', 'super_admin']))
+                ->url(fn (): string => route('finance.policy-evaluations.index')),
+
             ActionGroup::make([
                 Action::make('syncRail')
                     ->label('Sync Arc balance')
