@@ -31,7 +31,8 @@ return new class extends Migration
             $table->id();
             $table->foreignId('organization_id')->constrained()->restrictOnDelete();
             // Append-only: exactly one terminal decision per proposal, decided once.
-            $table->foreignId('payment_reservation_release_id')->unique()->constrained()->restrictOnDelete();
+            $table->foreignId('payment_reservation_release_id')->constrained()->restrictOnDelete();
+            $table->unique('payment_reservation_release_id', 'prrr_release_id_uq');
             $table->foreignId('payment_reservation_id')->constrained()->restrictOnDelete();
             $table->foreignId('reviewed_by')->constrained('users')->restrictOnDelete();
             $table->string('decision', 32);
