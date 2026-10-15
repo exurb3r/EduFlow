@@ -121,7 +121,9 @@ test('a student can quote and pay their own tuition', function (): void {
     expect($payment)->not->toBeNull()
         ->and($payment->state)->toBe('simulated')
         ->and(StudentTuitionPayment::query()->count())->toBe(0)
-        ->and($account->fresh()->remainingAmount())->toBe(300_000000);
+        ->and($account->fresh()->remainingAmount())->toBe(300_000000)
+        ->and($student->user->notifications()->count())->toBe(1)
+        ->and($student->user->notifications()->first()->data['type'])->toBe('tuition_payment_submitted');
 });
 
 test('the quote returns the request key the payment must echo back', function (): void {

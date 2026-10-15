@@ -9,6 +9,8 @@ use App\Models\StudentTuitionPayment;
 use App\Models\StudentTuitionPaymentAttempt;
 use App\Models\StudentTuitionPaymentIntent;
 use App\Models\TuitionAccount;
+use App\Models\User;
+use App\Notifications\TuitionPaymentSubmittedNotification;
 use App\Services\StudentTuitionPaymentService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
@@ -65,6 +67,20 @@ class StudentTuitionPaymentController extends Controller
 
         $attempt = $this->payments->pay($student, $account, (int) $validated['amount_base_units'], $requestKey, $validated['request_digest'], true);
 
+        $user = $request->user();
+        if ($user instanceof User) {
+            $amountUsdc = number_format((int) $validated['amount_base_units'] / 1_000_000, 2);
+            $termName = $account->academicTerm->name;
+            $user->notify(new TuitionPaymentSubmittedNotification(
+                amount: $amountUsdc,
+                description: $termName !== ''
+                    ? "Tuition payment of {$amountUsdc} USDC sent to Arc Testnet rail for {$termName}."
+                    : "Tuition payment of {$amountUsdc} USDC sent to Arc Testnet rail for processing.",
+                term: $termName,
+                requestKey: $requestKey,
+            ));
+        }
+
         return response()->json(self::statusData($attempt->refresh()), 202);
     }
 
@@ -80,8 +96,16 @@ class StudentTuitionPaymentController extends Controller
         abort_unless($request->user()?->hasRole('student'), 403);
         $student = $request->user()->student()->firstOrFail();
 
+        self::expireStalePreparedAttempts($student->id);
+
+        return response()->json(['data' => StudentTuitionPaymentAttempt::query()->where('student_id', $student->id)
+            ->latest('id')->limit(50)->get()->map(fn (StudentTuitionPaymentAttempt $a): array => self::statusData($a))]);
+    }
+
+    public static function expireStalePreparedAttempts(int $studentId): void
+    {
         StudentTuitionPaymentAttempt::query()
-            ->where('student_id', $student->id)
+            ->where('student_id', $studentId)
             ->where('state', 'prepared')
             ->whereNull('submission_started_at')
             ->get()
@@ -99,9 +123,6 @@ class StudentTuitionPaymentController extends Controller
                     ]);
                 }
             });
-
-        return response()->json(['data' => StudentTuitionPaymentAttempt::query()->where('student_id', $student->id)
-            ->latest('id')->limit(50)->get()->map(fn (StudentTuitionPaymentAttempt $a): array => self::statusData($a))]);
     }
 
     public function clearHold(Request $request, StudentTuitionPaymentAttempt $attempt): JsonResponse

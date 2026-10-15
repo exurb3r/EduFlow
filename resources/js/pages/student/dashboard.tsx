@@ -277,7 +277,7 @@ export default function StudentDashboard({
 
     // Track seen notification and transaction IDs to notify on incoming funds
     const seenNotificationIdsRef = useRef<Set<string>>(
-        new Set(notificationSummary?.recent.map((n) => n.id) ?? []),
+        new Set(notificationSummary?.recent?.map((n) => n.id) ?? []),
     );
     const lastToastRef = useRef<{ text: string; time: number } | null>(null);
     const prevBalanceRef = useRef<string | null>(snapshot?.balance ?? null);
@@ -300,35 +300,6 @@ export default function StudentDashboard({
             description: description ?? undefined,
         });
     };
-
-    // Alert on initial mount for any recent unread received notifications
-    useEffect(() => {
-        if (!notificationSummary?.recent) {
-            return;
-        }
-
-        const now = Date.now();
-        for (const n of notificationSummary.recent) {
-            const lower = n.title.toLowerCase();
-            if (
-                n.readAt === null &&
-                (lower.includes('received') ||
-                    lower.includes('tuition') ||
-                    lower.includes('sent') ||
-                    lower.includes('payment') ||
-                    lower.includes('transfer'))
-            ) {
-                const parsedTime = new Date(n.createdAt).getTime();
-                const isRecent =
-                    !Number.isNaN(parsedTime) &&
-                    now - parsedTime < 10 * 60 * 1000;
-                if (isRecent && !seenNotificationIdsRef.current.has(n.id)) {
-                    seenNotificationIdsRef.current.add(n.id);
-                    showReceivedToast(n.title, n.body);
-                }
-            }
-        }
-    }, []);
 
     // Watch for new notifications from background polling
     useEffect(() => {
@@ -386,6 +357,16 @@ export default function StudentDashboard({
         }
         prevBalanceRef.current = snapshot?.balance ?? null;
     }, [snapshot?.balance, transactions]);
+
+    const prevPostedRef = useRef(Boolean(activeReceipt?.posted));
+    useEffect(() => {
+        if (!prevPostedRef.current && activeReceipt?.posted) {
+            toast.success('Tuition payment posted!', {
+                description: `${formatBaseUnits(activeReceipt.applied_base_units)} USDC successfully credited to your tuition ledger.`,
+            });
+        }
+        prevPostedRef.current = Boolean(activeReceipt?.posted);
+    }, [activeReceipt?.posted, activeReceipt?.applied_base_units]);
 
     const shouldFastPoll =
         hasInFlight ||
@@ -1272,7 +1253,9 @@ export default function StudentDashboard({
                                                                     ? prev.request_key
                                                                     : undefined,
                                                         }));
-                                                    } else {
+                                                    } else if (
+                                                        val.trim() === ''
+                                                    ) {
                                                         setPayQuote(null);
                                                     }
                                                 }}
@@ -1397,10 +1380,15 @@ export default function StudentDashboard({
                                                 type="submit"
                                                 disabled={
                                                     paying ||
-                                                    quoting ||
-                                                    !payQuote ||
                                                     Boolean(inFlightAttempt) ||
-                                                    !consent
+                                                    !consent ||
+                                                    !payAmount ||
+                                                    parseBaseUnits(
+                                                        payAmount,
+                                                    ) === null ||
+                                                    parseBaseUnits(
+                                                        payAmount,
+                                                    )! <= 0
                                                 }
                                                 data-loading={paying}
                                                 className="clay-focus rounded-full bg-[var(--clay-primary)] font-semibold text-[var(--clay-primary-foreground)]"
