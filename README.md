@@ -1,6 +1,6 @@
 <div align="center">
 
-# OpenSinop
+# App
 
 **Bounded departmental finance on Circle Agent Wallets + Arc**
 
@@ -13,14 +13,14 @@ department's approved budget, and link authorized bills to USDC payments on Arc 
 
 ## What this is
 
-OpenSinop is institution-owned finance orchestration using
+App is institution-owned finance orchestration using
 [Circle Agent Stack](https://developers.circle.com/agent-stack) and the
 [Arc](https://docs.arc.io) network. Long-term scope covers collections, budgets and
 approved obligations; current hackathon scope is deliberately one departmental workflow,
 not an unrestricted AI treasurer or replacement for the college's accounting system.
 
 The current product question is **what should the institution do with fees already
-collected from students?** OpenSinop's target is to review verified collections, protect
+collected from students?** App's target is to review verified collections, protect
 restricted funds and reserves, and explain how available cash can cover approved obligations.
 The college pilot uses deterministic policy checks to:
 
@@ -67,7 +67,7 @@ policy activation or developer demo is not a certified school treasury system.
 
 **Direction:** fee collections and budget planning in shadow/parallel mode. Start smaller:
 **one department, its already-approved budget and approved bills for the next couple of
-weeks**. The owner reports a local college agreed to explore OpenSinop; actual usage,
+weeks**. The owner reports a local college agreed to explore App; actual usage,
 completed pilot results and public endorsement have not been established. Confirm this
 is the college's most important feasible problem with its finance owner.
 
@@ -182,7 +182,7 @@ commands; they are not a ready-made college pilot or permission to use legacy ex
 
 **Intended college workflow, not a claim that the complete UI/execution path ships today:**
 Students pay through the college's existing process; staff confirms realized fee receipts.
-OpenSinop reviews those funds alongside approved budgets and commitments, proposes which
+App reviews those funds alongside approved budgets and commitments, proposes which
 approved departmental bills can be funded, and explains any holds or shortfalls. Finance
 staff reviews the proposals. Each eligible authorized bill is then linked to a verified
 USDC payment on Arc testnet while the college continues paying locally in parallel.
@@ -278,8 +278,8 @@ existing database records. Never use this setup on a school database or an insta
 holding configured providers or payment history.
 
 ```bash
-git clone https://github.com/koamishin/OpenSinop.git
-cd OpenSinop
+git clone https://github.com/koamishin/App.git
+cd App
 
 composer install
 npm install
@@ -352,7 +352,7 @@ composer run dev
 
 ### Self-hosted (production) setup
 
-OpenSinop is self-hostable. Do **not** use `migrate:fresh --seed` on a real instance; it destroys data.
+App is self-hostable. Do **not** use `migrate:fresh --seed` on a real instance; it destroys data.
 Use the idempotent installer instead.
 
 #### Option A — Docker deployment (recommended)
@@ -361,7 +361,7 @@ Production Docker containers bundle FrankenPHP, Octane, PostgreSQL 16, Redis 7, 
 
 ##### 1. One-line quick start (Docker Compose)
 
-To start OpenSinop with sensible production defaults:
+To start App with sensible production defaults:
 
 ```bash
 docker compose -f https://raw.githubusercontent.com/koamishin/KoamiStarterKit/main/docker-compose.yml up -d
@@ -421,7 +421,7 @@ For environments running PHP and web servers directly on host infrastructure:
    [Lepton agent package (Circle + Arc)](#lepton-agent-package-circle--arc)).
 2. **Application code.**
    ```bash
-   git clone https://github.com/koamishin/OpenSinop.git /var/www/eduflow
+   git clone https://github.com/koamishin/App.git /var/www/eduflow
    cd /var/www/eduflow
    composer install --no-dev --optimize-autoloader
    npm ci
@@ -658,7 +658,7 @@ php artisan lepton:login --request=<request-id> --otp=B1X-123456
 > authorise an ARC-TESTNET transfer. If testnet transfers fail, check the *testnet* row
 > in `lepton:login --status`.
 
-The package stores no credentials. The Circle CLI owns the session; OpenSinop only reads it.
+The package stores no credentials. The Circle CLI owns the session; App only reads it.
 
 ---
 
@@ -678,7 +678,7 @@ Error: Faucet drip failed (429): API rate limit error
 So a realistically funded wallet holds about **100–120 USDC**. That ceiling is why the
 demo scenarios are the size they are — see [The seeded scenarios](#the-seeded-scenarios).
 
-Once funded, point OpenSinop at that wallet and sync the ledger:
+Once funded, point App at that wallet and sync the ledger:
 
 ```bash
 # LEPTON_TREASURY_ADDRESS=0xYourAgentWallet   in .env
@@ -753,7 +753,7 @@ portal, staff review UI and safe payment-execution lifecycle are not yet shipped
 ### Student side — fee payment and confirmation
 
 - Students pay tuition or other fees through the college's existing approved payment process.
-  The pilot does not require students to hold USDC or use a new OpenSinop payment portal.
+  The pilot does not require students to hold USDC or use a new App payment portal.
 - Students retain the official receipt/reference. Authorized staff verifies received funds
   before including them in the institution's collections data; an expected payment or
   uploaded receipt alone is not confirmed cash.
@@ -1265,7 +1265,7 @@ data and without costing a completion.
 > in their instructions, and the gate decodes a string response. If a gateway streams SSE
 > regardless of `stream: false`, add an `Accept: application/json` extra header.
 
-**OpenSinop works with none of this.** Every model call is fail-closed: a missing key, an
+**App works with none of this.** Every model call is fail-closed: a missing key, an
 unreachable endpoint, malformed output or a timeout all resolve to "no advisory available",
 and the deterministic engine proceeds alone. A model outage degrades the product; it never
 blocks a payment.
@@ -1293,7 +1293,7 @@ be downgraded by any response.
 - **27 adversarial tests** cover injected amounts, injected verdicts, malformed output,
   provider failure and prompt injection. All run offline via the SDK's own fakes.
 
-### Ask OpenSinop: conversation with a figure check
+### Ask App: conversation with a figure check
 
 The student chat has two answers to every question. The deterministic one comes first and is
 always computed by PHP. A model may then *rephrase* it, and never replaces it.
@@ -1302,7 +1302,7 @@ always computed by PHP. A model may then *rephrase* it, and never replaces it.
 "What is my tuition balance?"
         │
         ▼
-  AskOpenSinop::answer()          ← deterministic, live policy, integer math
+  AskApp::answer()          ← deterministic, live policy, integer math
         │
         ▼
   StudentBrief                  ← those facts + that explanation, assembled by PHP
@@ -1422,7 +1422,7 @@ review UI or the safe new payment lifecycle:
 Invoices + Aid requests
         │
         ▼
-  OpenSinopAgent::runAutonomousCycle()
+  AppAgent::runAutonomousCycle()
         │
         ▼
   FinancialPolicyEngine / EvaluateAssistancePolicy     ← deterministic PHP
@@ -1495,7 +1495,7 @@ authenticated for.
 
 ```
 app/
-  Agents/OpenSinopAgent.php            the autonomous cycle
+  Agents/AppAgent.php            the autonomous cycle
   Policies/                          invoice + assistance policy (deterministic)
   Actions/                           policy evaluation, escalation approval
   Services/
@@ -1504,11 +1504,11 @@ app/
     LeptonReconciliationService.php  proves settlement on-chain
     LeptonTreasuryService.php        live chain reads vs the ledger
   Console/Commands/
-    OpenSinopDemo.php                  the end-to-end demo
+    AppDemo.php                  the end-to-end demo
     LeptonDoctor.php                 the "is it working" check
 database/seeders/
-  OpenSinopFinancialSeeder.php         org, wallets, budgets, the six invoices
-  OpenSinopPlanSeeder.php              thresholds, assistance fund, aid policy
+  AppFinancialSeeder.php         org, wallets, budgets, the six invoices
+  AppPlanSeeder.php              thresholds, assistance fund, aid policy
   EducationDemoSeeder.php           students, tuition, one pending aid request
 ```
 

@@ -40,8 +40,8 @@ init_application() {
     php artisan module:migrate --force --no-interaction || true
     php artisan storage:link || true
 
-    if [ ! -f "${ROOT}/storage/.opensinop_installed" ]; then
-        echo "Initializing OpenSinop institution..."
+    if [ ! -f "${ROOT}/storage/.app_installed" ]; then
+        echo "Initializing App institution..."
         if php artisan eduflow:install \
             --institution="${EDUFLOW_INSTITUTION:-My School}" \
             --country="${EDUFLOW_COUNTRY:-US}" \
@@ -49,7 +49,7 @@ init_application() {
             --locale="${EDUFLOW_LOCALE:-en}" \
             --currency="${EDUFLOW_CURRENCY:-USD}" \
             --no-interaction; then
-            touch "${ROOT}/storage/.opensinop_installed"
+            touch "${ROOT}/storage/.app_installed"
             fix_permissions
             echo "Institution initialized."
             echo "Create the first administrator:"
