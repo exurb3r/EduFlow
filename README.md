@@ -508,15 +508,22 @@ php artisan lepton:login --status
 
 **Configure `.env`:**
 ```env
-LEPTON_DRIVER=circle            # circle = real; fake = in-memory (default under testing)
+# Drivers: circle (CLI agent stack), developer or circle-rest (pure REST API), fake (in-memory)
+LEPTON_DRIVER=circle
 LEPTON_CIRCLE_BIN=circle
 LEPTON_ARC_BIN=arc-canteen
 LEPTON_CHAIN=ARC-TESTNET
 LEPTON_CHAIN_ID=5042002
-LEPTON_TREASURY_ADDRESS=0x...   # Circle agent wallet address
+LEPTON_TREASURY_ADDRESS=0x...   # Circle agent or developer wallet address
 LEPTON_RPC_URL=                 # optional override
 LEPTON_DRY_RUN=false
 LEPTON_ALLOW_RAW_CIRCLE=false
+
+# Optional: when using LEPTON_DRIVER=developer (pure HTTP REST API, zero CLI binaries)
+LEPTON_CIRCLE_API_KEY=
+LEPTON_ENTITY_SECRET=
+LEPTON_WALLET_SET_ID=
+LEPTON_CIRCLE_API_URL=https://api.circle.com/v1/w3s
 ```
 
 **Verify:**

@@ -229,13 +229,25 @@ $EDUFLOW_CURRENCY = (Ask "Accounting currency" "USD").ToUpper()
 # Lepton
 Title "Lepton agent (Circle + Arc)"
 Info "Driver selection:"
-Info "  • fake   - In-memory simulated ledger (no Circle CLI, wallet, or funds needed; safe for testing/demos)"
-Info "  • circle - Live onchain rail using Circle Agent Stack & Arc network (requires Circle CLI & MPC wallet)"
-$LEPTON_DRIVER = Ask-Choice "Lepton driver" "fake" @("fake", "circle")
+Info "  • fake      - In-memory simulated ledger (no credentials needed; safe for testing/demos)"
+Info "  • circle    - Circle CLI agent stack (email OTP login via Circle CLI binary)"
+Info "  • developer - Pure HTTP REST API using Circle Developer-Controlled Wallets (no CLI needed)"
+$LEPTON_DRIVER = Ask-Choice "Lepton driver" "fake" @("fake", "circle", "developer")
 $LEPTON_CHAIN = Ask-Choice "Chain" "ARC-TESTNET" @("ARC-TESTNET", "ARC-MAINNET")
 $LEPTON_DRY_RUN = Ask-Choice "Dry run (no real transfers)" "true" @("true", "false")
 $LEPTON_TREASURY_ADDRESS = Ask "Treasury wallet address (empty for fake)" ""
 $LEPTON_RPC_URL = Ask "Arc RPC URL (empty for default)" ""
+
+$LEPTON_CIRCLE_API_KEY = ""
+$LEPTON_ENTITY_SECRET = ""
+$LEPTON_WALLET_SET_ID = ""
+if ($LEPTON_DRIVER -eq "developer") {
+    Title "Circle Developer REST API"
+    Info "Configure Developer-Controlled Wallets credentials (api.circle.com/v1/w3s):"
+    $LEPTON_CIRCLE_API_KEY = Read-Secret "Circle API Key"
+    $LEPTON_ENTITY_SECRET = Read-Secret "Entity Secret (32-byte / 64 hex characters)"
+    $LEPTON_WALLET_SET_ID = Ask "Wallet Set ID (optional)" ""
+}
 
 # AI
 Title "Optional AI advisory"
@@ -331,6 +343,10 @@ $lines += 'LEPTON_CHAIN="' + $LEPTON_CHAIN + '"'
 $lines += 'LEPTON_DRY_RUN="' + $LEPTON_DRY_RUN + '"'
 $lines += 'LEPTON_TREASURY_ADDRESS="' + $LEPTON_TREASURY_ADDRESS + '"'
 $lines += 'LEPTON_RPC_URL="' + $LEPTON_RPC_URL + '"'
+$lines += 'LEPTON_CIRCLE_API_KEY="' + $LEPTON_CIRCLE_API_KEY + '"'
+$lines += 'LEPTON_ENTITY_SECRET="' + $LEPTON_ENTITY_SECRET + '"'
+$lines += 'LEPTON_WALLET_SET_ID="' + $LEPTON_WALLET_SET_ID + '"'
+$lines += 'LEPTON_CIRCLE_API_URL="https://api.circle.com/v1/w3s"'
 $lines += 'AI_PROVIDER="' + $AI_PROVIDER + '"'
 $lines += 'AI_LOCAL_URL="' + $AI_LOCAL_URL + '"'
 $lines += 'AI_LOCAL_MODEL="' + $AI_LOCAL_MODEL + '"'

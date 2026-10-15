@@ -7,6 +7,7 @@ use App\Http\Controllers\Auth\SocialAuthController;
 use App\Http\Controllers\AutonomousCycleController;
 use App\Http\Controllers\BudgetSnapshotController;
 use App\Http\Controllers\ChatHistoryController;
+use App\Http\Controllers\CircleWebhookController;
 use App\Http\Controllers\CollectionBatchController;
 use App\Http\Controllers\FinanceApprovalController;
 use App\Http\Controllers\FundingWindowController;
@@ -36,6 +37,8 @@ Route::get('/', fn () => Inertia::render('welcome', [
 Route::get('/skills/design', fn () => Inertia::render('skills/design', [
     'canRegister' => Features::enabled(Features::registration()),
 ]))->name('skills.design');
+
+Route::post('api/webhooks/circle', [CircleWebhookController::class, 'handle'])->name('api.webhooks.circle');
 
 Route::get('dashboard', [StudentDashboardController::class, 'index'])->middleware(['auth', 'verified'])->name('dashboard');
 

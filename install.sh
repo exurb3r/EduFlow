@@ -294,13 +294,25 @@ EDUFLOW_CURRENCY=$(ask "Accounting currency" "USD" | tr '[:lower:]' '[:upper:]')
 
 title "Lepton agent (Circle + Arc)"
 info "Driver selection:"
-info "  • fake   - In-memory simulated ledger (no Circle CLI, wallet, or funds needed; safe for testing/demos)"
-info "  • circle - Live onchain rail using Circle Agent Stack & Arc network (requires Circle CLI & MPC wallet)"
-LEPTON_DRIVER=$(ask_choice "Lepton driver" "fake" fake circle)
+info "  • fake      - In-memory simulated ledger (no credentials needed; safe for testing/demos)"
+info "  • circle    - Circle CLI agent stack (email OTP login via Circle CLI binary)"
+info "  • developer - Pure HTTP REST API using Circle Developer-Controlled Wallets (no CLI needed)"
+LEPTON_DRIVER=$(ask_choice "Lepton driver" "fake" fake circle developer)
 LEPTON_CHAIN=$(ask_choice "Chain" "ARC-TESTNET" ARC-TESTNET ARC-MAINNET)
 LEPTON_DRY_RUN=$(ask_choice "Dry run (no real transfers)" "true" true false)
 LEPTON_TREASURY_ADDRESS=$(ask "Treasury wallet address (empty for fake)" "")
 LEPTON_RPC_URL=$(ask "Arc RPC URL (empty for default)" "")
+
+LEPTON_CIRCLE_API_KEY=""
+LEPTON_ENTITY_SECRET=""
+LEPTON_WALLET_SET_ID=""
+if [ "$LEPTON_DRIVER" = "developer" ]; then
+    title "Circle Developer REST API"
+    info "Configure Developer-Controlled Wallets credentials (api.circle.com/v1/w3s):"
+    LEPTON_CIRCLE_API_KEY=$(ask_secret "Circle API Key")
+    LEPTON_ENTITY_SECRET=$(ask_secret "Entity Secret (32-byte / 64 hex characters)")
+    LEPTON_WALLET_SET_ID=$(ask "Wallet Set ID (optional)" "")
+fi
 
 title "Optional AI advisory"
 AI_PROVIDER=$(ask_choice "AI provider" "none" none local openai anthropic)
@@ -395,6 +407,10 @@ LEPTON_CHAIN="$LEPTON_CHAIN"
 LEPTON_DRY_RUN="$LEPTON_DRY_RUN"
 LEPTON_TREASURY_ADDRESS="$LEPTON_TREASURY_ADDRESS"
 LEPTON_RPC_URL="$LEPTON_RPC_URL"
+LEPTON_CIRCLE_API_KEY="$LEPTON_CIRCLE_API_KEY"
+LEPTON_ENTITY_SECRET="$LEPTON_ENTITY_SECRET"
+LEPTON_WALLET_SET_ID="$LEPTON_WALLET_SET_ID"
+LEPTON_CIRCLE_API_URL="https://api.circle.com/v1/w3s"
 AI_PROVIDER="$AI_PROVIDER"
 AI_LOCAL_URL="$AI_LOCAL_URL"
 AI_LOCAL_MODEL="$AI_LOCAL_MODEL"
