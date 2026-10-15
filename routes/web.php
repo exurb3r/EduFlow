@@ -23,6 +23,7 @@ use App\Http\Controllers\StudentAssistanceController;
 use App\Http\Controllers\StudentBillController;
 use App\Http\Controllers\StudentDashboardController;
 use App\Http\Controllers\StudentPaymentsController;
+use App\Http\Controllers\StudentProfileController;
 use App\Http\Controllers\StudentTuitionPaymentController;
 use App\Http\Controllers\StudentWalletController;
 use App\Http\Controllers\VendorDestinationController;
@@ -53,6 +54,7 @@ Route::middleware(['auth', 'verified'])->group(function (): void {
     Route::post('finance/policies/{institutionPolicyVersion}/assess', [InstitutionPolicyController::class, 'assess'])->middleware('throttle:5,1')->name('finance.policies.assess');
     Route::post('finance/policies/{institutionPolicyVersion}/publish', [InstitutionPolicyController::class, 'publish'])->middleware('throttle:5,1')->name('finance.policies.publish');
     Route::get('student/dashboard', [StudentDashboardController::class, 'show'])->name('student.dashboard');
+    Route::get('student/profile', [StudentProfileController::class, 'show'])->name('student.profile');
     Route::post('assistance-requests', [AssistanceRequestController::class, 'store'])->name('assistance-requests.store');
     Route::get('assistance/create', [AssistanceRequestController::class, 'create'])->name('assistance.create');
     Route::post('assistance', [AssistanceRequestController::class, 'storeIntake'])->middleware('throttle:10,1')->name('assistance.store');

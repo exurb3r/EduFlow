@@ -2,6 +2,7 @@
 
 use App\Http\Middleware\EnforceSchoolRegistration;
 use App\Http\Middleware\HandleAppearance;
+use App\Http\Middleware\HandleColorTheme;
 use App\Http\Middleware\HandleInertiaRequests;
 use Illuminate\Foundation\Application;
 use Illuminate\Foundation\Configuration\Exceptions;
@@ -15,12 +16,13 @@ return Application::configure(basePath: dirname(__DIR__))
         health: '/up',
     )
     ->withMiddleware(function (Middleware $middleware): void {
-        $middleware->encryptCookies(except: ['appearance', 'sidebar_state']);
+$middleware->encryptCookies(except: ['appearance', 'color-theme', 'sidebar_state']);
         $middleware->validateCsrfTokens(except: ['api/webhooks/*']);
 
         $middleware->web(append: [
             EnforceSchoolRegistration::class,
             HandleAppearance::class,
+            HandleColorTheme::class,
             HandleInertiaRequests::class,
             AddLinkHeadersForPreloadedAssets::class,
         ]);

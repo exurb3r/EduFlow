@@ -157,7 +157,7 @@ export default function StudentWallet({
                         <div className="flex flex-wrap items-start justify-between gap-4">
                             <div>
                                 <p className="bulletin-eyebrow">Balance</p>
-                                <p className="bulletin-figure mt-2 text-4xl tabular-nums">
+                                <p className="bulletin-figure mt-2 tabular-nums">
                                     {formatBalance(snapshot)}{' '}
                                     <span className="text-base font-semibold text-[var(--clay-text-muted)]">
                                         USDC

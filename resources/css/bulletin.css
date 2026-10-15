@@ -22,17 +22,19 @@
 | Instrument Sans without ever importing it — the UI was silently
 | falling back to system fonts; Inter is the deliberate replacement).
 | JetBrains Mono carries data: ticket numbers, timestamps, counts.
-| The type scale is SIX sizes, no exceptions. Hierarchy is carried by
+| The type scale is SEVEN sizes, no exceptions. Hierarchy is carried by
 | SIZE and WEIGHT first, color second.
 |
 | Type roles (use these, not ad-hoc sizes):
 |   .clay-h1          page title        xl  700
 |   .clay-h2          dialog/section    lg  700
+|   .clay-figure      card stat         fig 700 tabular
 |   .clay-title       card heading      base 600
 |   .clay-body        running text      sm  400
 |   .bulletin-eyebrow section label     xs  600 + tracking
+|   .clay-label       pill / tag        2xs 600 + tracking uppercase
 |   .clay-meta        mono metadata     2xs 400 tabular
-|   .bulletin-figure  stat numerals     xl  700 tabular
+|   .bulletin-figure  hero stat         xl  700 tabular
 |
 | Grid & layout: one content column per page — 72rem max for the
 | dashboard, 48rem for notifications. Mental model is 12-col: stats
@@ -69,8 +71,10 @@
         --clay-ink: #f6f1e6;
         --clay-text: #eae4d6;
         --clay-text-muted: #a8a192;
-        --clay-text-faint: #7c7466;
-        --clay-border: #292520;
+        /* Raised from #7c7466 (4.05:1) — 11px mono metadata must clear AA. */
+        --clay-text-faint: #938a7a;
+        /* Raised from #292520 (1.23:1) so card edges stay visible. */
+        --clay-border: #36312b;
         --clay-primary: #e9dfc7;
         --clay-primary-bright: #f5edd9;
         --clay-primary-soft: #2b261c;
@@ -129,12 +133,17 @@
         --font-display: var(--font-sans);
         --font-mono: 'JetBrains Mono', ui-monospace, SFMono-Regular, monospace;
 
-        /* Type scale — six steps, nothing else */
+        /* Type scale — seven steps, nothing else.
+       --text-scale-fig is a role-named step sitting between lg and xl. It
+       exists because the portal had five competing treatments for a stat
+       numeral (24/30/36/40/44px) with no name between them; giving the card
+       figure one token is what stops each page inventing its own. */
         --text-scale-2xs: 0.6875rem;
         --text-scale-xs: 0.75rem;
         --text-scale-sm: 0.875rem;
         --text-scale-base: 1rem;
         --text-scale-lg: 1.375rem;
+        --text-scale-fig: 1.5rem;
         --text-scale-xl: clamp(1.75rem, 1.25rem + 2.5vw, 2.5rem);
 
         /* Spacing rhythm — 4pt base, section cadence steps at sm */
@@ -195,18 +204,22 @@
         --clay-ink: #211c14;
         --clay-text: #2b261d;
         --clay-text-muted: #6e6553;
-        --clay-text-faint: #998f7c;
-        --clay-border: #e0d9c8;
+        /* Raised from #998f7c (2.66:1 on --clay-surface-soft) — far below AA. */
+        --clay-text-faint: #6b6252;
+        --clay-border: #d5cdba;
         --clay-primary: #262019;
         --clay-primary-bright: #332b20;
         --clay-primary-soft: #ede6d4;
         --clay-primary-foreground: #f5edd9;
-        --clay-accent: #8a7448;
+        /* Darkened from #8a7448 (3.99:1 on the page ground) — accent is link text. */
+        --clay-accent: #7d6a40;
         --clay-accent-soft: #f0e9d8;
 
-        --status-pending: #d97706;
-        --status-progress: #a98943;
-        --status-resolved: #2f855a;
+        /* Darkened for AA on paper: --status-* sits in a /10 chip with full-strength
+           text, so the label itself must clear 4.5:1 against the ground. */
+        --status-pending: #ae5f05;
+        --status-progress: #8b7037;
+        --status-resolved: #2e8258;
         --status-urgent: #c0362c;
 
         --primary-foreground: var(--clay-primary-foreground);
@@ -505,6 +518,22 @@
         isolation: isolate;
     }
 
+    /* Clay grain. Without it the ground is a flat fill and large dark areas
+   band visibly on cheap panels; a tiled fractal-noise layer at 3.5% reads as
+   unglazed ceramic rather than dead black. It sits on the GROUND only, not
+   over the cards, so body copy keeps its edges. */
+    :where(.bulletin) {
+        background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='180' height='180'%3E%3Cfilter id='g'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.82' numOctaves='4' stitchTiles='stitch'/%3E%3CfeColorMatrix type='saturate' values='0'/%3E%3C/filter%3E%3Crect width='180' height='180' filter='url(%23g)' opacity='0.035'/%3E%3C/svg%3E");
+        background-repeat: repeat;
+        background-size: 180px 180px;
+    }
+
+    /* Light mode grain has to be darker, not fainter: white grounds show
+   noise far more readily than black ones. */
+    html:not(.dark) :where(.bulletin) {
+        background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='180' height='180'%3E%3Cfilter id='g'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.82' numOctaves='4' stitchTiles='stitch'/%3E%3CfeColorMatrix type='saturate' values='0'/%3E%3C/filter%3E%3Crect width='180' height='180' filter='url(%23g)' opacity='0.03'/%3E%3C/svg%3E");
+    }
+
     :where(.clay-ambient)::before {
         content: '';
         position: fixed;
@@ -518,7 +547,7 @@
         pointer-events: none;
         background: radial-gradient(
             circle,
-            rgb(var(--clay-brand-glow) / 0.13) 0%,
+            rgb(var(--clay-brand-glow) / 0.18) 0%,
             transparent 62%
         );
     }
@@ -536,13 +565,17 @@
         pointer-events: none;
         background: radial-gradient(
             circle,
-            rgb(var(--clay-accent-glow) / 0.07) 0%,
+            rgb(var(--clay-accent-glow) / 0.1) 0%,
             transparent 60%
         );
     }
 
     html:not(.dark) :where(.clay-ambient)::before {
-        opacity: 0.5;
+        opacity: 0.45;
+    }
+
+    html:not(.dark) :where(.clay-ambient)::after {
+        opacity: 0.6;
     }
 
     /* Brand-hue text selection — small, deliberate detail. */
@@ -603,6 +636,17 @@
         color: var(--clay-ink);
     }
 
+    /* Card stat numeral. Sits between .clay-h2 and .bulletin-figure so a
+       figure inside a card never competes with the page hero figure. */
+    :where(.clay-figure) {
+        font-size: var(--text-scale-fig);
+        font-weight: 700;
+        line-height: 0.95;
+        letter-spacing: -0.025em;
+        font-variant-numeric: lining-nums tabular-nums;
+        color: var(--clay-ink);
+    }
+
     :where(.clay-title) {
         font-size: var(--text-scale-base);
         font-weight: 600;
@@ -626,10 +670,22 @@
         color: var(--clay-text-faint);
     }
 
+    /* Micro label for status pills and inline tags. Sans, not mono — it is a
+       word, not a datum; .clay-meta stays reserved for data. */
+    :where(.clay-label) {
+        font-size: var(--text-scale-2xs);
+        font-weight: 600;
+        line-height: 1.2;
+        letter-spacing: 0.09em;
+        text-transform: uppercase;
+        color: inherit;
+    }
+
     /* Inter was built for UI: swap to its tightly-spaced display cut at
-   large sizes so headlines keep the same optical rhythm as body text. */
+       large sizes so headlines keep the same optical rhythm as body text. */
     :where(.clay-h1),
-    :where(.bulletin-figure) {
+    :where(.bulletin-figure),
+    :where(.clay-figure) {
         font-feature-settings:
             'ss01' on,
             'cv11' on;
