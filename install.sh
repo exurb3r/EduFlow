@@ -293,6 +293,9 @@ EDUFLOW_TIMEZONE=$(ask "Timezone" "UTC")
 EDUFLOW_CURRENCY=$(ask "Accounting currency" "USD" | tr '[:lower:]' '[:upper:]')
 
 title "Lepton agent (Circle + Arc)"
+info "Driver selection:"
+info "  • fake   - In-memory simulated ledger (no Circle CLI, wallet, or funds needed; safe for testing/demos)"
+info "  • circle - Live onchain rail using Circle Agent Stack & Arc network (requires Circle CLI & MPC wallet)"
 LEPTON_DRIVER=$(ask_choice "Lepton driver" "fake" fake circle)
 LEPTON_CHAIN=$(ask_choice "Chain" "ARC-TESTNET" ARC-TESTNET ARC-MAINNET)
 LEPTON_DRY_RUN=$(ask_choice "Dry run (no real transfers)" "true" true false)

@@ -228,6 +228,9 @@ $EDUFLOW_CURRENCY = (Ask "Accounting currency" "USD").ToUpper()
 
 # Lepton
 Title "Lepton agent (Circle + Arc)"
+Info "Driver selection:"
+Info "  • fake   - In-memory simulated ledger (no Circle CLI, wallet, or funds needed; safe for testing/demos)"
+Info "  • circle - Live onchain rail using Circle Agent Stack & Arc network (requires Circle CLI & MPC wallet)"
 $LEPTON_DRIVER = Ask-Choice "Lepton driver" "fake" @("fake", "circle")
 $LEPTON_CHAIN = Ask-Choice "Chain" "ARC-TESTNET" @("ARC-TESTNET", "ARC-MAINNET")
 $LEPTON_DRY_RUN = Ask-Choice "Dry run (no real transfers)" "true" @("true", "false")
