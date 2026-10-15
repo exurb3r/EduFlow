@@ -201,6 +201,8 @@ class StudentDashboardController extends Controller
             ->where('status', 'confirmed')
             ->sum('amount');
 
+        StudentTuitionPaymentController::expireStalePreparedAttempts($student->id);
+
         return Inertia::render('student/dashboard', [
             'wallet' => [
                 'address' => $walletAddress,
