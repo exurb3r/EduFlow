@@ -891,7 +891,7 @@ export default function DesignSkillsLanding() {
                                 href="/"
                                 className="inline-flex items-center gap-2 rounded-lg border border-[#313131] bg-[#181818] px-5 py-3 text-base font-semibold text-white hover:bg-[#272727] active:scale-[0.98] transition-colors duration-200 ease-[cubic-bezier(0.32,0.72,0,1)]"
                             >
-                                <span>Return to EduFlow Home</span>
+                                <span>Return to OpenSinop Home</span>
                                 <ArrowRight className="size-4" />
                             </Link>
                         </div>
@@ -917,10 +917,10 @@ export default function DesignSkillsLanding() {
                             href="/"
                             className="hover:text-white transition-colors"
                         >
-                            EduFlow App
+                            OpenSinop App
                         </Link>
                         <a
-                            href="https://github.com/koamishin/EduFlow"
+                            href="https://github.com/koamishin/OpenSinop"
                             target="_blank"
                             rel="noopener noreferrer"
                             className="hover:text-white transition-colors inline-flex items-center gap-1"

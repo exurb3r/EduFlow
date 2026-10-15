@@ -1,7 +1,7 @@
 ARG PHP_VERSION=8.5
 ARG FRANKENPHP_VERSION=1.9
 ARG COMPOSER_VERSION=2.8
-ARG APP_NAME=KoamiStarterKit
+ARG APP_NAME=OpenSinop
 ARG APP_ENV=production
 ARG APP_DEBUG=false
 ARG APP_URL=https://koami.koamishin.org
@@ -63,9 +63,9 @@ RUN bun run build
 FROM dunglas/frankenphp:${FRANKENPHP_VERSION}-php${PHP_VERSION}
 
 LABEL maintainer="Yukazakiri <yukazaki@koamishin.org>"
-LABEL org.opencontainers.image.title="KoamiStarterKit Docker Setup"
-LABEL org.opencontainers.image.description="Production-ready Docker Setup for KoamiStarterKit"
-LABEL org.opencontainers.image.source=https://github.com/koamishin/koamiStarterKit
+LABEL org.opencontainers.image.title="OpenSinop Docker Setup"
+LABEL org.opencontainers.image.description="Production-ready Docker Setup for OpenSinop"
+LABEL org.opencontainers.image.source=https://github.com/koamishin/OpenSinop
 LABEL org.opencontainers.image.licenses=MIT
 
 ARG USER_ID=1000

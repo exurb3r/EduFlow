@@ -1,10 +1,10 @@
-# EduFlow AI
+# OpenSinop AI
 
 ## The Autonomous Financial Operator for Education
 
 > **Receive. Predict. Decide. Pay.**
 
-EduFlow AI is an AI-powered financial agent designed for schools, universities, training centers, and other education organizations. It continuously monitors the organization's treasury, upcoming obligations, approved budgets, and education-related funds, then makes and executes financial decisions within clearly defined rules.
+OpenSinop AI is an AI-powered financial agent designed for schools, universities, training centers, and other education organizations. It continuously monitors the organization's treasury, upcoming obligations, approved budgets, and education-related funds, then makes and executes financial decisions within clearly defined rules.
 
 The project is designed for the **Tameion Agents Hackathon × Circle**, with the main focus on the **Autonomous Business Operator** use case and supporting capabilities from intelligent treasury management and AP/AR automation.
 
@@ -35,7 +35,7 @@ These activities are often handled through separate spreadsheets, accounting too
 
 ### Solution
 
-EduFlow AI acts as a **bounded autonomous financial operator**.
+OpenSinop AI acts as a **bounded autonomous financial operator**.
 
 It observes the school's financial state, analyzes cash flow, checks financial policies, creates a decision, executes permitted transactions, verifies the result, and records the complete action in an audit trail.
 
@@ -47,7 +47,7 @@ The AI does **not** have unlimited control over funds. Every action is constrain
 
 ### Product Name
 
-**EduFlow AI**
+**OpenSinop AI**
 
 ### Main Tagline
 
@@ -55,7 +55,7 @@ The AI does **not** have unlimited control over funds. Every action is constrain
 
 ### One-Liner
 
-> EduFlow AI helps schools manage their money autonomously by forecasting liquidity, prioritizing obligations, executing approved USDC payments on Arc, and escalating decisions that exceed policy limits.
+> OpenSinop AI helps schools manage their money autonomously by forecasting liquidity, prioritizing obligations, executing approved USDC payments on Arc, and escalating decisions that exceed policy limits.
 
 ### Differentiator
 
@@ -71,7 +71,7 @@ Scholarships and student assistance are important education-specific workflows, 
 
 ## 3. Hackathon Alignment
 
-EduFlow AI is primarily designed around these hackathon directions:
+OpenSinop AI is primarily designed around these hackathon directions:
 
 ### Primary: Autonomous Business Operator
 
@@ -81,7 +81,7 @@ The agent should demonstrate a complete business-finance workflow:
 
 ### Supporting: Intelligent Business Treasury
 
-EduFlow continuously evaluates:
+OpenSinop continuously evaluates:
 
 - Current treasury balance
 - Upcoming obligations
@@ -93,7 +93,7 @@ EduFlow continuously evaluates:
 
 ### Supporting: AP/AR Automation
 
-EduFlow can process and organize:
+OpenSinop can process and organize:
 
 - Vendor invoices
 - Payment requests
@@ -111,7 +111,7 @@ Future versions can maintain vendor records, milestone payments, service history
 
 ### 4.1 Autonomous Treasury Management
 
-EduFlow monitors the organization's financial position and determines whether available funds should be used, reserved, or held.
+OpenSinop monitors the organization's financial position and determines whether available funds should be used, reserved, or held.
 
 Example:
 
@@ -133,7 +133,7 @@ Keep required operating reserve.
 
 ### 4.2 Vendor Payment Agent
 
-EduFlow reads a vendor payment request and determines whether it can be automatically executed.
+OpenSinop reads a vendor payment request and determines whether it can be automatically executed.
 
 Example:
 
@@ -151,7 +151,7 @@ Decision: AUTO-PAY
 
 ### 4.3 Scholarship and Student Assistance
 
-EduFlow can manage a dedicated assistance budget.
+OpenSinop can manage a dedicated assistance budget.
 
 Example:
 
@@ -170,7 +170,7 @@ This creates an education-specific example of bounded financial autonomy.
 
 ### 4.4 Refund Processing
 
-EduFlow can validate a refund request against school rules and available funds.
+OpenSinop can validate a refund request against school rules and available funds.
 
 Example:
 
@@ -187,7 +187,7 @@ Decision: AUTO-APPROVE
 
 ### 4.5 Cash-Flow Risk Detection
 
-Instead of only displaying a balance, EduFlow predicts future liquidity problems.
+Instead of only displaying a balance, OpenSinop predicts future liquidity problems.
 
 Example:
 
@@ -681,7 +681,7 @@ Suggested service-oriented structure:
 ```text
 app/
 ├── Agents/
-│   ├── EduFlowAgent.php
+│   ├── OpenSinopAgent.php
 │   ├── TreasuryAgent.php
 │   ├── PaymentAgent.php
 │   └── AssistanceAgent.php
@@ -747,7 +747,7 @@ The agent should focus on financial reasoning instead of generic chat.
 ### Example Prompt Concept
 
 ```text
-You are EduFlow AI, a bounded financial operator for an education organization.
+You are OpenSinop AI, a bounded financial operator for an education organization.
 
 You must:
 1. Analyze the current treasury.
@@ -767,7 +767,7 @@ The actual enforcement must remain in Laravel rather than in the prompt.
 
 The MVP does not need sophisticated financial-market prediction.
 
-Instead, EduFlow should perform **cash-flow forecasting** based on known financial events.
+Instead, OpenSinop should perform **cash-flow forecasting** based on known financial events.
 
 ### Simplified Forecast Formula
 
@@ -805,7 +805,7 @@ A smart contract can provide another enforcement layer for treasury rules.
 Possible contract name:
 
 ```text
-EduFlowFund.sol
+OpenSinopFund.sol
 ```
 
 Potential responsibilities:
@@ -931,7 +931,7 @@ Requested: 150 USDC
 
 Automatic Assistance Limit: 100 USDC
 
-EduFlow AI Decision:
+OpenSinop AI Decision:
 100 USDC approved automatically
 50 USDC sent for human review
 ```
@@ -958,7 +958,7 @@ The school's treasury receives:
 
 ### Step 2 — Observe Financial State
 
-EduFlow reads:
+OpenSinop reads:
 
 ```text
 Treasury: 25,420 USDC
@@ -970,7 +970,7 @@ Cloud Invoice: 450 USDC
 
 ### Step 3 — Forecast
 
-EduFlow determines the projected balance remains above the reserve.
+OpenSinop determines the projected balance remains above the reserve.
 
 ### Step 4 — Make Decisions
 
@@ -999,7 +999,7 @@ The approved payment is executed using the Circle/USDC infrastructure on Arc.
 
 ### Step 6 — Verify
 
-EduFlow records:
+OpenSinop records:
 
 - Transaction status
 - Transaction ID/hash
@@ -1026,7 +1026,7 @@ Show the dashboard and explain:
 
 Show a school treasury receiving USDC.
 
-> EduFlow sees the new revenue and updates its financial position.
+> OpenSinop sees the new revenue and updates its financial position.
 
 ### Scene 3 — AI Analyzes Treasury
 
@@ -1037,25 +1037,25 @@ Show:
 - Reserve
 - Forecast
 
-> EduFlow predicts whether the school can safely pay its obligations.
+> OpenSinop predicts whether the school can safely pay its obligations.
 
 ### Scene 4 — Autonomous Payment
 
 Show an invoice that meets policy requirements.
 
-> Because the payment is within budget, below the automatic limit, and does not threaten the reserve, EduFlow executes it automatically.
+> Because the payment is within budget, below the automatic limit, and does not threaten the reserve, OpenSinop executes it automatically.
 
 ### Scene 5 — Human Escalation
 
 Show a larger transaction.
 
-> A larger equipment purchase exceeds the agent's authority, so EduFlow stops and asks a human for approval.
+> A larger equipment purchase exceeds the agent's authority, so OpenSinop stops and asks a human for approval.
 
 ### Scene 6 — Education Use Case
 
 Show a scholarship or emergency assistance request.
 
-> EduFlow can also operate an education-specific fund, such as student assistance, using the same bounded autonomy model.
+> OpenSinop can also operate an education-specific fund, such as student assistance, using the same bounded autonomy model.
 
 ### Scene 7 — Proof
 
@@ -1290,7 +1290,7 @@ This is important because autonomous finance requires traceability and accountab
 
 ## 24. Human-in-the-Loop Model
 
-EduFlow should follow a simple autonomy model:
+OpenSinop should follow a simple autonomy model:
 
 ```text
 LOW RISK / WITHIN LIMIT
@@ -1412,22 +1412,22 @@ A general-purpose education financial operating system with multiple cooperating
 Potential specialized agents:
 
 ```text
-EduFlow Treasury Agent
+OpenSinop Treasury Agent
         ↓
-EduFlow AP/AR Agent
+OpenSinop AP/AR Agent
         ↓
-EduFlow Scholarship Agent
+OpenSinop Scholarship Agent
         ↓
-EduFlow Vendor Agent
+OpenSinop Vendor Agent
         ↓
-EduFlow Compliance Agent
+OpenSinop Compliance Agent
 ```
 
 ---
 
 ## 28. Why This Project Is Distinct
 
-EduFlow AI should be presented as an **agent-first financial system**, not simply another school management application.
+OpenSinop AI should be presented as an **agent-first financial system**, not simply another school management application.
 
 The key loop is:
 
@@ -1468,15 +1468,15 @@ Laravel provides the application, policy, orchestration, and audit layer.
 
 ### 30-Second Pitch
 
-> Schools receive tuition, pay vendors, manage scholarships and refunds, and constantly balance future obligations against available cash. EduFlow AI is an autonomous financial operator built for education. It monitors the school's treasury, forecasts liquidity, decides which payments are safe, executes permitted USDC transactions on Arc, and escalates anything outside its authority. Every action is protected by deterministic policies and recorded in an audit trail.
+> Schools receive tuition, pay vendors, manage scholarships and refunds, and constantly balance future obligations against available cash. OpenSinop AI is an autonomous financial operator built for education. It monitors the school's treasury, forecasts liquidity, decides which payments are safe, executes permitted USDC transactions on Arc, and escalates anything outside its authority. Every action is protected by deterministic policies and recorded in an audit trail.
 
 ### Core Message
 
-> **EduFlow AI doesn't just tell schools what to do with their money. It can act within the rules the school gives it.**
+> **OpenSinop AI doesn't just tell schools what to do with their money. It can act within the rules the school gives it.**
 
 ### Tagline
 
-> **EduFlow AI — Receive. Predict. Decide. Pay.**
+> **OpenSinop AI — Receive. Predict. Decide. Pay.**
 
 ---
 
@@ -1487,7 +1487,7 @@ The finished hackathon MVP should be able to demonstrate this exact sequence:
 ```text
 1. School receives USDC revenue
               ↓
-2. EduFlow reads treasury + obligations
+2. OpenSinop reads treasury + obligations
               ↓
 3. AI forecasts future liquidity
               ↓

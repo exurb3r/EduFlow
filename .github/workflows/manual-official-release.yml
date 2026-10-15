@@ -154,7 +154,7 @@ jobs:
           platforms: linux/amd64
           tags: ${{ steps.tags.outputs.tags }}
           labels: |
-            org.opencontainers.image.title=EduFlow
+            org.opencontainers.image.title=OpenSinop
             org.opencontainers.image.revision=${{ needs.prepare.outputs.commit }}
             org.opencontainers.image.version=${{ needs.prepare.outputs.version }}
             org.opencontainers.image.licenses=MIT
@@ -180,7 +180,7 @@ jobs:
           }
           Path('version.json').write_text(json.dumps(metadata, indent=2) + '\n')
           Path('RELEASE_NOTES.md').write_text(
-              '# EduFlow ' + os.environ['VERSION'] + '\n\n'
+              '# OpenSinop ' + os.environ['VERSION'] + '\n\n'
               'Tested commit: `' + os.environ['TESTED_SHA'] + '`\n\n'
               'CI evidence: ' + os.environ['CI_URL'] + '\n\n'
               'Image: `' + metadata['image'] + '`\n\n'
@@ -193,7 +193,7 @@ jobs:
         with:
           tag_name: ${{ needs.prepare.outputs.tag }}
           target_commitish: ${{ needs.prepare.outputs.commit }}
-          name: EduFlow ${{ needs.prepare.outputs.version }}
+          name: OpenSinop ${{ needs.prepare.outputs.version }}
           body_path: RELEASE_NOTES.md
           draft: ${{ inputs.draft }}
           prerelease: ${{ inputs.prerelease }}

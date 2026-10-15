@@ -12,7 +12,7 @@ use Illuminate\Console\Attributes\Signature;
 use Illuminate\Console\Command;
 use Illuminate\Validation\ValidationException;
 
-#[Signature('eduflow:bootstrap-admin {--name= : First administrator display name} {--email= : First administrator email address}')]
+#[Signature('app:bootstrap-admin {--name= : First administrator display name} {--email= : First administrator email address}', aliases: ['eduflow:bootstrap-admin'])]
 #[Description('Create the first administrator using hidden password prompts without changing existing accounts.')]
 class BootstrapAdmin extends Command
 {

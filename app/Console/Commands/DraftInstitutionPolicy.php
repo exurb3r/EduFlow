@@ -16,7 +16,7 @@ use Illuminate\Support\Facades\Gate;
 use Illuminate\Support\Str;
 use Throwable;
 
-#[Signature('eduflow:draft-institution-policy {author : Verified staff user ID} {--save : Persist an editable draft; never publish or enable runtime}')]
+#[Signature('app:draft-institution-policy {author : Verified staff user ID} {--save : Persist an editable draft; never publish or enable runtime}', aliases: ['eduflow:draft-institution-policy'])]
 #[Description('Preview or save the institution-specific collections and bill-allocation draft without granting spending authority.')]
 class DraftInstitutionPolicy extends Command
 {

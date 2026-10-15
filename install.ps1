@@ -1,4 +1,4 @@
-# install.ps1 - interactive TUI installer for App (Windows PowerShell)
+# install.ps1 - interactive TUI installer for OpenSinop (Windows PowerShell)
 # Usage (one line):
 #   irm https://raw.githubusercontent.com/koamishin/KoamiStarterKit/main/install.ps1 | iex
 
@@ -6,7 +6,7 @@ $ErrorActionPreference = "Stop"
 $Root = (Get-Location).Path
 $EnvFile = Join-Path $Root ".env"
 $ComposeFile = Join-Path $Root "docker-compose.yml"
-$ComposeUrl = "https://raw.githubusercontent.com/koamishin/KoamiStarterKit/main/docker-compose.yml"
+$ComposeUrl = "https://raw.githubusercontent.com/koamishin/OpenSinop/main/docker-compose.yml"
 
 function Say($Text, [ConsoleColor]$Color = [ConsoleColor]::White) {
     Write-Host $Text -ForegroundColor $Color
@@ -105,7 +105,7 @@ function Gen-Key {
 
 $Update = ($args -contains "--update" -or $args -contains "-Update")
 if ($Update) {
-    Title "App Update"
+    Title "OpenSinop Update"
     if (-not (Test-Path $EnvFile)) {
         Err "No .env found in $Root. Run the installer first."
         return
@@ -115,16 +115,16 @@ if ($Update) {
         try { Invoke-WebRequest -Uri $ComposeUrl -OutFile $ComposeFile -UseBasicParsing } catch { Err $_.Exception.Message; return }
     }
     $DB_USER = (Select-String -Path $EnvFile -Pattern '^DB_USERNAME=' | Select-Object -Last 1).Line.Split('=',2)[1].Trim('"')
-    if ([string]::IsNullOrWhiteSpace($DB_USER)) { $DB_USER = "app" }
+    if ([string]::IsNullOrWhiteSpace($DB_USER)) { $DB_USER = "opensinop" }
     $DB_NAME = (Select-String -Path $EnvFile -Pattern '^DB_DATABASE=' | Select-Object -Last 1).Line.Split('=',2)[1].Trim('"')
-    if ([string]::IsNullOrWhiteSpace($DB_NAME)) { $DB_NAME = "app" }
+    if ([string]::IsNullOrWhiteSpace($DB_NAME)) { $DB_NAME = "opensinop" }
 
     $backupDir = Join-Path $Root "backups"
     $dbCid = (docker compose ps -q db 2>$null)
     if ($dbCid) {
         New-Item -ItemType Directory -Force -Path $backupDir | Out-Null
         $stamp = Get-Date -Format "yyyyMMdd-HHmmss"
-        $backupFile = Join-Path $backupDir ("app-" + $stamp + ".sql")
+        $backupFile = Join-Path $backupDir ("opensinop-" + $stamp + ".sql")
         try {
             docker compose exec -T db sh -c ("pg_dump -U '" + $DB_USER + "' '" + $DB_NAME + "'") | Out-File -FilePath $backupFile -Encoding utf8
             Ok ("Database backup written to " + $backupFile)
@@ -143,12 +143,12 @@ if ($Update) {
 
     $healthy = $false
     for ($i = 0; $i -lt 24; $i++) {
-        $status = docker inspect --format '{{.State.Health.Status}}' app 2>$null
+        $status = docker inspect --format '{{.State.Health.Status}}' opensinop 2>$null
         if ($status -eq "healthy") { $healthy = $true; break }
         if ($status -eq "unhealthy") { break }
         Start-Sleep -Seconds 5
     }
-    if ($healthy) { Ok "Application is healthy." } else { Warn "Application did not report healthy yet; see docker logs app." }
+    if ($healthy) { Ok "Application is healthy." } else { Warn "Application did not report healthy yet; see docker logs opensinop." }
 
     $appUrlLine = Select-String -Path $EnvFile -Pattern '^APP_URL=' | Select-Object -Last 1
     $APP_URL = if ($appUrlLine) { $appUrlLine.Line.Split('=',2)[1].Trim('"') } else { "http://localhost:8000" }
@@ -169,7 +169,7 @@ if (Test-Path $EnvFile) {
     Warn "Existing .env backed up to .env.previous"
 }
 
-Title "App TUI Installer (PowerShell)"
+Title "OpenSinop TUI Installer (PowerShell)"
 Info "Interactive setup for Docker-based self-hosting."
 Info "Press Enter to accept a suggested default."
 
@@ -192,9 +192,9 @@ if ($DB_CONNECTION -eq "sqlite") {
 } else {
     $DB_HOST = "db"
     $DB_PORT = if ($DB_CONNECTION -eq "pgsql") { "5432" } else { "3306" }
-    $DB_DATABASE = "app"
-    $DB_USERNAME = "app"
-    $DB_PASSWORD = "app"
+    $DB_DATABASE = "opensinop"
+    $DB_USERNAME = "opensinop"
+    $DB_PASSWORD = "opensinop"
 }
 
 # Cache/session/queue
@@ -229,13 +229,25 @@ $EDUFLOW_CURRENCY = (Ask "Accounting currency" "USD").ToUpper()
 # Lepton
 Title "Lepton agent (Circle + Arc)"
 Info "Driver selection:"
-Info "  • fake   - In-memory simulated ledger (no Circle CLI, wallet, or funds needed; safe for testing/demos)"
-Info "  • circle - Live onchain rail using Circle Agent Stack & Arc network (requires Circle CLI & MPC wallet)"
-$LEPTON_DRIVER = Ask-Choice "Lepton driver" "fake" @("fake", "circle")
+Info "  • fake      - In-memory simulated ledger (no credentials needed; safe for testing/demos)"
+Info "  • circle    - Circle CLI agent stack (email OTP login via Circle CLI binary)"
+Info "  • developer - Pure HTTP REST API using Circle Developer-Controlled Wallets (no CLI needed)"
+$LEPTON_DRIVER = Ask-Choice "Lepton driver" "fake" @("fake", "circle", "developer")
 $LEPTON_CHAIN = Ask-Choice "Chain" "ARC-TESTNET" @("ARC-TESTNET", "ARC-MAINNET")
 $LEPTON_DRY_RUN = Ask-Choice "Dry run (no real transfers)" "true" @("true", "false")
 $LEPTON_TREASURY_ADDRESS = Ask "Treasury wallet address (empty for fake)" ""
 $LEPTON_RPC_URL = Ask "Arc RPC URL (empty for default)" ""
+
+$LEPTON_CIRCLE_API_KEY = ""
+$LEPTON_ENTITY_SECRET = ""
+$LEPTON_WALLET_SET_ID = ""
+if ($LEPTON_DRIVER -eq "developer") {
+    Title "Circle Developer REST API"
+    Info "Configure Developer-Controlled Wallets credentials (api.circle.com/v1/w3s):"
+    $LEPTON_CIRCLE_API_KEY = Read-Secret "Circle API Key"
+    $LEPTON_ENTITY_SECRET = Read-Secret "Entity Secret (32-byte / 64 hex characters)"
+    $LEPTON_WALLET_SET_ID = Ask "Wallet Set ID (optional)" ""
+}
 
 # AI
 Title "Optional AI advisory"
@@ -331,6 +343,10 @@ $lines += 'LEPTON_CHAIN="' + $LEPTON_CHAIN + '"'
 $lines += 'LEPTON_DRY_RUN="' + $LEPTON_DRY_RUN + '"'
 $lines += 'LEPTON_TREASURY_ADDRESS="' + $LEPTON_TREASURY_ADDRESS + '"'
 $lines += 'LEPTON_RPC_URL="' + $LEPTON_RPC_URL + '"'
+$lines += 'LEPTON_CIRCLE_API_KEY="' + $LEPTON_CIRCLE_API_KEY + '"'
+$lines += 'LEPTON_ENTITY_SECRET="' + $LEPTON_ENTITY_SECRET + '"'
+$lines += 'LEPTON_WALLET_SET_ID="' + $LEPTON_WALLET_SET_ID + '"'
+$lines += 'LEPTON_CIRCLE_API_URL="https://api.circle.com/v1/w3s"'
 $lines += 'AI_PROVIDER="' + $AI_PROVIDER + '"'
 $lines += 'AI_LOCAL_URL="' + $AI_LOCAL_URL + '"'
 $lines += 'AI_LOCAL_MODEL="' + $AI_LOCAL_MODEL + '"'
@@ -357,16 +373,16 @@ Ok "Containers started."
 Title "Health check"
 $healthy = $false
 for ($i = 0; $i -lt 24; $i++) {
-    $status = docker inspect --format '{{.State.Health.Status}}' app 2>$null
+    $status = docker inspect --format '{{.State.Health.Status}}' opensinop 2>$null
     if ($status -eq "healthy") { $healthy = $true; break }
     if ($status -eq "unhealthy") { break }
     Start-Sleep -Seconds 5
 }
-if ($healthy) { Ok "Application is healthy." } else { Warn "Application did not report healthy yet; see docker logs app." }
+if ($healthy) { Ok "Application is healthy." } else { Warn "Application did not report healthy yet; see docker logs opensinop." }
 
 Title "Next steps"
 Info ("Open the app at " + $APP_URL)
 Info "Create the first administrator (interactive):"
-Say '  docker exec -it app php artisan eduflow:bootstrap-admin --name="School Operator" --email="operator@example.org"' White
+Say '  docker exec -it opensinop php artisan app:bootstrap-admin --name="School Operator" --email="operator@example.org"' White
 Info "Circle/Arc features require the Circle CLI and arc-canteen on your workflow host."
 Ok "Installation complete."

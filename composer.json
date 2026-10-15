@@ -1,8 +1,8 @@
 {
     "$schema": "https://getcomposer.org/schema.json",
-    "name": "koamishin/eduflow",
+    "name": "koamishin/opensinop",
     "type": "project",
-    "description": "KoamiStarterKit - A modern Laravel 13 starter kit with React 19, Inertia.js, Tailwind CSS, Fortify authentication, and Wayfinder routing. Production-ready with Octane, comprehensive testing setup with Pest, and automated CI/CD workflows.",
+    "description": "OpenSinop - Bounded departmental finance on Circle Agent Wallets + Arc.",
     "keywords": [
         "laravel",
         "laravel-13",
@@ -20,7 +20,7 @@
         "boilerplate",
         "framework"
     ],
-    "homepage": "https://github.com/koamishin/eduflow",
+    "homepage": "https://github.com/koamishin/OpenSinop",
     "readme": "README.md",
     "license": "MIT",
     "authors": [

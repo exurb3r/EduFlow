@@ -92,7 +92,7 @@ export default function Notifications({
                         <div>
                             <p className="bulletin-eyebrow flex items-center gap-2">
                                 <Bell className="size-3.5" />
-                                EduFlow
+                                OpenSinop
                             </p>
                             <h1 className="clay-h1 mt-2">Notifications</h1>
                             {unread_count > 0 && (

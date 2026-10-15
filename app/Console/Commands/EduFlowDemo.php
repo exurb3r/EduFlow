@@ -17,7 +17,7 @@ use Illuminate\Console\Attributes\Description;
 use Illuminate\Console\Attributes\Signature;
 use Illuminate\Console\Command;
 
-#[Signature('eduflow:demo {--student-email=juan@eduflow.test}')]
+#[Signature('app:demo {--student-email=juan@eduflow.test}', aliases: ['eduflow:demo'])]
 #[Description('End-to-end EduFlow demo: revenue, forecast, 450 auto-pay, 2500 escalate, 150 split, audit.')]
 class EduFlowDemo extends Command
 {

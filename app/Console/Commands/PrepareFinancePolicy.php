@@ -13,7 +13,7 @@ use Illuminate\Console\Attributes\Signature;
 use Illuminate\Console\Command;
 use Throwable;
 
-#[Signature('eduflow:prepare-finance-policy {version : Stable policy version identifier} {--actor= : Authorized staff ID attributed to preparation} {--reserve= : Required exact USDC minimum reserve} {--auto-limit=0 : Exact USDC automatic payment limit} {--daily-limit=0 : Exact USDC daily disbursement limit} {--max-fee=0 : Exact USDC fee ceiling}')]
+#[Signature('app:prepare-finance-policy {version : Stable policy version identifier} {--actor= : Authorized staff ID attributed to preparation} {--reserve= : Required exact USDC minimum reserve} {--auto-limit=0 : Exact USDC automatic payment limit} {--daily-limit=0 : Exact USDC daily disbursement limit} {--max-fee=0 : Exact USDC fee ceiling}', aliases: ['eduflow:prepare-finance-policy'])]
 #[Description('Prepare an immutable inactive institution finance policy; does not enable payments.')]
 class PrepareFinancePolicy extends Command
 {

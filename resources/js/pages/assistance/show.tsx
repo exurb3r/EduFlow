@@ -115,7 +115,7 @@ export default function ShowAssistance({
                     )}
                 </section>
 
-                {/* Interactive Ask EduFlow Q&A for this specific request */}
+                {/* Interactive Ask OpenSinop Q&A for this specific request */}
                 <AskEduFlow
                     suggestedQuestions={[
                         `Why was request #${request.id} split into autonomous and review portions?`,

@@ -73,7 +73,7 @@ class InstallationInstitution
     public function require(): Organization
     {
         return $this->current() ?? throw new RuntimeException(
-            'Institution context unavailable. Run eduflow:install or configure EDUFLOW_INSTITUTION_ID for exactly one institution.'
+            'Institution context unavailable. Run app:install or configure EDUFLOW_INSTITUTION_ID for exactly one institution.'
         );
     }
 }

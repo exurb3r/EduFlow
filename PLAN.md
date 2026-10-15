@@ -1,4 +1,4 @@
-# EduFlow AI — Project Plan & Architecture Roadmap
+# OpenSinop AI — Project Plan & Architecture Roadmap
 
 **Tagline:** Open-source institutional finance agent and payment orchestration, powered by Circle Agent Stack and USDC settlement on Arc.
 
@@ -25,7 +25,7 @@ is still unproven and deliberately refused:** the installed `circle wallet trans
 enforceable fee ceiling, so `FeeBoundedPaymentTransport` fails closed before invoking the signer,
 and both tuition flags default off. See **§14.10.4**.
 
-**Post-merge planning update (2026-10-12):** [PR #14](https://github.com/koamishin/EduFlow/pull/14),
+**Post-merge planning update (2026-10-12):** [PR #14](https://github.com/koamishin/OpenSinop/pull/14),
 merged as `207fe89`, adds a student wallet page, live balance reads, staff wallet generation
 and **Pay Now** on `/student/dashboard`. The backend quotes a transfer, attempts to send
 from a generated student wallet to the configured treasury, writes `StudentTuitionPayment`,
@@ -80,7 +80,7 @@ unresolved investigation, with no established provider handle or chain hash. A b
 snapshot, an empty provider-history observation or an HTTP 400 does **not** prove no payment
 was accepted. Earlier conclusions that `--quiet` caused the error, or that a fee-shaped response
 proved nothing broadcast, remain unestablished. Investigate existing attempts before resending.
-The package's published `v2.8.0` has not been adopted here: EduFlow still locks `v2.7.0`.
+The package's published `v2.8.0` has not been adopted here: OpenSinop still locks `v2.7.0`.
 
 **Payment approval navigation (2026-10-11):** `PaymentReviews` is now explicitly registered in the admin panel as **Automation → Payment Approvals**, with a shortcut from Payment Submissions. Previously only the finance route was registered. Both panels retain the existing review policy, independent reviewer/direct permission/MFA requirements, and exact reservation evidence. This UI records authority only; it does not itself submit a transfer. Submission history is read-only, and agent advice is not payment authority. Navigation/rendering and existing authorization/dashboard regressions pass (88 tests combined). Live payment transport and safe unresolved-attempt recovery remain separate blockers.
 
@@ -132,7 +132,7 @@ reimbursement. Either bound those explicitly or stop describing it as a total-co
 **The live run reached a durable, authorized submission, and stopped at the rail's asynchrony (2026-10-11).**
 The whole §14.4 Step 4 human lane ran end to end on the real chain: reviewed destination, reviewed
 invoice, closed budget snapshot, funding window, reservation, independent enrolment, MFA-backed
-authorization by a named reviewer, and a durable outbox entry. Then `eduflow:dispatch-payment-submissions`
+authorization by a named reviewer, and a durable outbox entry. Then `opensinop:dispatch-payment-submissions`
 and the worker ran, and the transfer did **not** broadcast.
 
 `circle wallet transfer` without `--quiet` returns a fee preview — `gasLimit`, `networkFee`,
@@ -157,7 +157,7 @@ switch, the lease recovery and the `unknown` reconciliation path all already cop
 
 **What went right when it stopped, and is worth keeping:** the executor recorded `unknown` with **no**
 `provider_reference`, wrote **zero** `transactions`, reported `payments_submitted: 0`, retained the
-capacity hold rather than releasing it on a false negative, and `eduflow:reconcile-payment-submissions`
+capacity hold rather than releasing it on a false negative, and `opensinop:reconcile-payment-submissions`
 correctly reported "No submitted references await verification" — it did not go looking for a
 settlement that never existed.
 
@@ -198,7 +198,7 @@ The transport then submitted and **Circle refused it**:
 
 ```
 circle wallet transfer 0x48a1… --amount 5 --address 0x19be… --chain ARC-TESTNET
-    --idempotency-key eduflow:… --quiet
+    --idempotency-key opensinop:… --quiet
   → Error: Service returned error 400: Invalid request body.
 ```
 
@@ -224,7 +224,7 @@ different investigations. The detail is now recorded on the append-only attempt.
 durable submission outbox, reviewed reservation release, the isolated executor with the Arc
 settlement predicate, reviewed funding-window rollover, the standing-mandate lane (§18.4 records plus
 the sessionless occurrence scanner), and the enforced nonzero-allowance gate that previously existed
-in config but was read nowhere. The legacy `EduFlowAgent` auto-pay route is **disabled** — both the
+in config but was read nowhere. The legacy `OpenSinopAgent` auto-pay route is **disabled** — both the
 vendor and assistance branches now require the authorized workflow. **1400 Pest tests pass
 (3 skipped).**
 
@@ -251,7 +251,7 @@ run live.
 `PaymentSubmissionOutbox` is written inside the authorization's own transaction, so an
 approved payment can never exist without a durable obligation to submit it — the
 commit-to-broker gap is closed by construction rather than by a retry. Identity
-(`request_key`, `provider_idempotency_key = eduflow:{request_key}`, and every bound digest)
+(`request_key`, `provider_idempotency_key = opensinop:{request_key}`, and every bound digest)
 is immutable and stable across replays; only queue progress moves, and a concluded entry can
 never be reopened. `PaymentSubmissionAttempt` is append-only with dense numbering, so a gap
 means a lost write rather than a silent skip. The submission key is a UUIDv5 derived from the
@@ -365,12 +365,12 @@ the hold is released. `can_execute` remains false throughout.
 
 ## 1. Executive Summary & Core Concept
 
-EduFlow is an institution-owned financial agent: it observes collections and obligations, plans cash use, applies approved spending policy, submits payments through Circle, and reconciles settlement on Arc. Student aid is one workload alongside vendor invoices, donations, subscriptions, and reimbursements—not the agent's identity or startup requirement.
+OpenSinop is an institution-owned financial agent: it observes collections and obligations, plans cash use, applies approved spending policy, submits payments through Circle, and reconciles settlement on Arc. Student aid is one workload alongside vendor invoices, donations, subscriptions, and reimbursements—not the agent's identity or startup requirement.
 
 USDC on Arc is the primary operational settlement asset. Institutions may still keep bills and statutory accounts in domestic currency. Current `CurrencyCode` supports USDC, USD, PHP, EUR, GBP, CAD, SGD, and INR; AUD and NGN remain expansion targets. Native-fiat accounting, executable FX and local-bank off-ramps are not complete. USDC settlement does not itself satisfy local payroll, tax, custody or accounting requirements.
 
 Target architecture separates responsibilities:
-- **EduFlow control plane:** Institution identity, counterparties, payable/receivable documents, budgets, reservations, approvals, bounded planning and document-linked accounting evidence.
+- **OpenSinop control plane:** Institution identity, counterparties, payable/receivable documents, budgets, reservations, approvals, bounded planning and document-linked accounting evidence.
 - **Circle execution plane:** Agent Wallet operations through Lepton; product-specific Wallets, Gateway, CCTP and App Kit capabilities through reviewed adapters. These services move/sign value; they do not know the school's procurement or funding restrictions.
 - **Arc settlement plane:** USDC movement, successful execution and deterministic finality. Independently reconcile intended payments against matching evidence; onchain correctness does not prove vendor ownership or goods delivery.
 - **Currency/reporting plane:** Exact source/settlement amounts and fees with immutable quote snapshots when conversion occurs. Indicative display rates never authorize an FX trade. Internal tuition credits never imply a USDC or bank transfer.
@@ -381,7 +381,7 @@ purchase commitments, restricted grant receipt, enrollment collection exception 
 vendor destination change. Each needs a documented response and accountable owner;
 not every event needs a payment or an AI model. Section 13 defines concrete examples.
 
-EduFlow introduces an **institution-first bounded agent loop**:
+OpenSinop introduces an **institution-first bounded agent loop**:
 > Observe verified balances and documents; reconcile collections; forecast liquidity; propose payment intents; authorize and reserve deterministically; request human review for exceptions; submit through Circle; verify Arc settlement; post accounting evidence.
 
 The existing vendor cycle works independently of student records. C0 now also constructs
@@ -527,7 +527,7 @@ or external-provider availability; fresh release CI remains required.
 
 Shipped:
 - `AssistanceAssessor`, `TreasuryAnalyst` — `HasStructuredOutput`, advisory only.
-- `AskEduFlowAgent` — conversational, read-only, no tools.
+- `AskOpenSinopAgent` — conversational, read-only, no tools.
 - `SettlementOperator` — `Conversational` + `HasTools`, proposes via tool calls.
 - `DisburseAssistance` — `Approvable`; `needsApproval()` **is** the policy engine, and
   `handle()` re-evaluates rather than trusting the earlier verdict.
@@ -562,7 +562,7 @@ instructions and the gate decodes a string response. And `AiProviderResolver` mu
 built `Provider` instance rather than the driver name, because a bare name resolves against
 `config/ai.php` and fails with "requires a default text model".
 
-`AskEduFlow` is now conversational. The deterministic answer is computed first and is always
+`AskOpenSinop` is now conversational. The deterministic answer is computed first and is always
 the floor; `StudentBrief` hands the model the facts *and* that explanation, and `QnaGate`
 replaces the text only when `BriefGuard` finds every figure in the response inside the brief.
 Verified live against the configured gateway: it rephrases the split explanation correctly,
@@ -678,12 +678,12 @@ engine, so a prompt-injected `"approved_amount": 999999` is discarded.
 | --- | --- | --- | --- |
 | `AssistanceAssessor` | `HasStructuredOutput` | Classify hardship, score urgency, flag anomalies | Advisory only |
 | `TreasuryAnalyst` | `HasStructuredOutput` | Forecast narrative, explain reserve risk | Advisory only |
-| `AskEduFlow` | `Conversational` + `RemembersConversations` | Student Q&A over balance, rates, policy | Read-only |
+| `AskOpenSinop` | `Conversational` + `RemembersConversations` | Student Q&A over balance, rates, policy | Read-only |
 | `SettlementOperator` | `HasTools` (Approvable) | Propose disbursements as tool calls | Gated by `needsApproval()` |
 
-All four use `Promptable`. `AskEduFlow` uses `RemembersConversations` so chat history
+All four use `Promptable`. `AskOpenSinop` uses `RemembersConversations` so chat history
 persists to the SDK's `agent_conversations` tables, replacing the stateless `fetch()` POST
-in `resources/js/components/ask-eduflow.tsx`.
+in `resources/js/components/ask-opensinop.tsx`.
 
 #### 3.5 Non-Negotiable Invariants
 
@@ -828,7 +828,7 @@ neither proves mainnet or local-bank readiness.
      - Finance officer logs into `/finance` and views Juan's escalated request with complete AI reasoning and locked exchange rate.
      - Administrator approves the remaining $50 USDC.
   7. **Audit & Explanation:**
-     - EduFlow answers: *"Why didn't you send the full $150 USDC initially?"*
+     - OpenSinop answers: *"Why didn't you send the full $150 USDC initially?"*
      - Agent explains the institutional threshold and currency conversion breakdown.
 
 ---
@@ -879,7 +879,7 @@ progress is tracked immediately after the table. No item is closed solely by cha
 - **OSS-02 seed safety implemented:** Role seeding creates no users in any environment.
   Explicit `DemoUsersSeeder` owns local/testing defaults; demo `DatabaseSeeder` invokes it.
   Production/staging seeding creates no users or
-  demo records. `eduflow:bootstrap-admin` creates the first admin through hidden password
+  demo records. `opensinop:bootstrap-admin` creates the first admin through hidden password
   prompts, refuses existing accounts/second superadmins, and records a secret-free audit.
   Existing default accounts are not deleted or reset; operators must remediate them.
 - **OSS-12 release guards implemented in part:** CI no longer commits formatter/refactor
@@ -894,7 +894,7 @@ progress is tracked immediately after the table. No item is closed solely by cha
   installer identity or matching explicit `EDUFLOW_INSTITUTION_ID`, and exactly one
   organization; missing/invalid/ambiguous context fails closed. Dashboards, wallet doctor
   and settlement operator factory no longer choose `Organization::first()`.
-- **Installer foundation:** `eduflow:install` initializes institution/settings through a
+- **Installer foundation:** `opensinop:install` initializes institution/settings through a
   locked DB transaction, without migrating, demo seeding, admin creation or wallet/provider
   I/O. Identical retry preserves state; explicit adoption required for legacy institution;
   conflicting identity/metadata refused. Initial registration, impersonation and AI disabled.
@@ -984,7 +984,7 @@ type implies — an on-chain receipt cannot close a custodian or payout-partner 
   override third-party licenses or make Circle/AI services open-source.
 - Publish third-party notices and a software bill of materials (SBOM) with release
   artifacts. Record provenance for imported starter-kit code.
-- No EduFlow license server, per-student unlock, mandatory telemetry or maintainer login.
+- No OpenSinop license server, per-student unlock, mandatory telemetry or maintainer login.
   The institution owns its Circle account/session and pays applicable external service,
   network and ramp fees. Self-hosted OSS does not mean Circle's hosted infrastructure
   becomes self-hosted, free or available in every jurisdiction.
@@ -1077,11 +1077,11 @@ image. Secrets, databases, uploaded files, debug tools, and development artifact
 not enter an image layer; use an explicit build-context exclusion policy. Public source
 archives must retain README and installation/security documentation.
 
-**CLI progress:** `eduflow:install` now initializes institution identity, role-only seeds
-and safe settings after separately applied migrations. `eduflow:bootstrap-admin` creates
+**CLI progress:** `opensinop:install` now initializes institution identity, role-only seeds
+and safe settings after separately applied migrations. `opensinop:bootstrap-admin` creates
 first admin independently. Full workflow/data onboarding is not complete.
-`eduflow:health` remains proposed, not an existing command. Planned health reports readiness
-without changing balances or broadcasting payments. Installer never calls `eduflow:demo`.
+`opensinop:health` remains proposed, not an existing command. Planned health reports readiness
+without changing balances or broadcasting payments. Installer never calls `opensinop:demo`.
 
 ### 7.2 School Onboarding Flow
 
@@ -1353,8 +1353,8 @@ upgrade test. Test the previous supported release upgrading to each new one. Do 
 retroactively edit published migrations to repair school databases.
 
 Recommend semantic versioning with separate `preview` and `stable` channels. Choose the
-first EduFlow version after reviewing repository tags; `version.json` currently belongs
-to the starter kit, not a certified EduFlow release. A preview must never update the
+first OpenSinop version after reviewing repository tags; `version.json` currently belongs
+to the starter kit, not a certified OpenSinop release. A preview must never update the
 stable `latest` image. Operators pin a version/digest; no automatic financial production
 upgrade from a moving tag. Release artifacts must identify source commit, SBOM, license
 notices, checksum/signature, runtime matrix and known limitations.
@@ -1478,7 +1478,7 @@ Decisions to confirm before implementation:
    aggregated collection is in scope at all, whether custodian/payout-partner settlement
    is in scope for any target jurisdiction, whether an institution-custodial ledger
    product is explicitly out of scope, and whether `Student.payout_address` is confirmed
-   legacy. These decisions are what make EduFlow a two-legged system or confirm it stays a
+   legacy. These decisions are what make OpenSinop a two-legged system or confirm it stays a
    one-way payment-mirroring tool.
 7. Confirm the bounded autonomous lane framing and its dependency order (§18.8): a standing
    mandate decides the class of payment, deterministic PHP decides each occurrence, the model
@@ -1504,16 +1504,16 @@ service dependencies, custody duties or live-payment certification.
 **Research date:** 2026-10-05. Official documentation and public sample source were read;
 no wallet was provisioned/funded, no dependency installed and no transaction submitted.
 Capabilities below are vendor-documented, not verified against this deployment. Mainnet
-support does not certify EduFlow or establish institution-specific service eligibility.
+support does not certify OpenSinop or establish institution-specific service eligibility.
 
 ### 12.1 Responsibility Split and No-Student Baseline
 
-Circle/Arc is the financial execution backbone; EduFlow is the institution's orchestration
+Circle/Arc is the financial execution backbone; OpenSinop is the institution's orchestration
 and control layer. Neither a wallet balance nor an LLM replaces accounting policy.
 
 | Layer | Responsibility | Must not be mistaken for |
 | --- | --- | --- |
-| EduFlow | Documents, institution permissions, budgets, approvals, reservations, bounded plans, postings and reconciliation | Unrestricted model authority or a complete ERP |
+| OpenSinop | Documents, institution permissions, budgets, approvals, reservations, bounded plans, postings and reconciliation | Unrestricted model authority or a complete ERP |
 | Circle Agent Stack / Wallets | Signing and wallet operations, supported spending controls, provider screening | School procurement validation, universal KYB or complete institution compliance |
 | Arc | USDC transfers, execution evidence and deterministic finality | Proof that the intended legal beneficiary delivered goods or owns an address |
 | Gateway / App Kits | Explicit crosschain liquidity and payment capabilities | Automatic local-bank settlement or an unlimited delegated spending budget |
@@ -1535,7 +1535,7 @@ flowchart TD
     K[Optional student aid module] --> B
 ```
 
-**Existing legacy seam, not the background execution contract:** `EduFlowAgent::runAutonomousCycle(Organization)` forecasts and processes
+**Existing legacy seam, not the background execution contract:** `OpenSinopAgent::runAutonomousCycle(Organization)` forecasts and processes
 vendor `Invoice` rows before assistance. It is invoked by the developer command/dashboard,
 not a safe scheduled departmental executor. Do not schedule this legacy float-based cycle
 or reuse its assistance approval path to implement Sections 14.7–14.10. A `Student` is not required for that vendor path.
@@ -1543,7 +1543,7 @@ or reuse its assistance approval path to implement Sections 14.7–14.10. A `Stu
 builds an institution operator without them; active institution-scoped aid setup enables
 those tools separately. No fake student or duplicate finance application is introduced.
 
-**C0 implemented in part:** `eduflow:finance-preview` and `InspectInstitutionFinance`
+**C0 implemented in part:** `opensinop:finance-preview` and `InspectInstitutionFinance`
 use persisted installation identity, recorded treasury, Arc network checks and read-only
 vendor reviews. CLI records `finance_previewed`, including `no_op` for no open bills.
 No students, tuition accounts, aid fund/policy or AI provider required. The report always
@@ -1705,7 +1705,7 @@ The agent must not have access to the institution mailbox, OTPs, private keys, e
 secret or unrestricted shell. Only the isolated executor receives signing authority.
 Never fund an automated operational wallet with the entire unrestricted treasury.
 Reserve custody/recovery remains under institution control; replenishment requires
-approved policy and human review initially. Independent EduFlow limits remain mandatory.
+approved policy and human review initially. Independent OpenSinop limits remain mandatory.
 
 Each treasury account records provider/account identifier, address, network, account type,
 role, ownership approval and readiness state. Roles distinguish reserve, operational and
@@ -1722,7 +1722,7 @@ gateway contract.
 
 ### 12.3 Arc Integration Rules That Change the Implementation
 
-| Concern | Verified documentation | EduFlow requirement |
+| Concern | Verified documentation | OpenSinop requirement |
 | --- | --- | --- |
 | Networks | Mainnet chain ID `5042`; testnet `5042002`; USDC gas | Pin environment/chain/provider; verify RPC chain ID; never silent mainnet fallback |
 | Precision | Native USDC 18 decimals; ERC-20 interface 6; one underlying balance | Payment units stay 6; preserve 18-decimal native balance/gas/residual strings; no floats or double-counted balances |
@@ -1813,7 +1813,7 @@ that the choice belongs in the plan rather than in an implementation.
 
 ### 12.6 Durable Institution Cycle and Accounting Controls
 
-Proposed `eduflow:financial-cycle` dispatches durable work; it is not claimed to exist.
+Proposed `opensinop:financial-cycle` dispatches durable work; it is not claimed to exist.
 Use Laravel scheduler and queue workers, not an indefinite request or Octane callback.
 Use overlap/single-server controls with shared lock store, plus authoritative DB unique
 intent identities. Queue uniqueness is not external exactly-once payment safety.
@@ -1887,7 +1887,7 @@ package/architecture additions require approval. Do not invent PHP methods for T
 
 ### 12.8 Reference Apps: Borrow Patterns, Not Production Guarantees
 
-| Supplied resource | Verified material | Safe use in EduFlow |
+| Supplied resource | Verified material | Safe use in OpenSinop |
 | --- | --- | --- |
 | `circlefin/arc-fintech` | Next.js/Supabase treasury, Developer-Controlled Wallets, App Kit Send/Bridge/Swap, Gateway balances and notifications; testnet sample, Earn rewards mocked; Apache-2.0 | Wallet/available-balance separation, estimate-before-send, provider IDs and webhook-driven updates; port domain patterns, not framework/security assumptions |
 | `circlefin/arc-escrow` | Arc testnet escrow with Circle contract execution; `validate-work` releases after LLM `valid`/`HIGH`; Apache-2.0 | Study escrow/refund lifecycle only. Never use model confidence as institutional release authority; use approved evidence, authorization and audited contract conditions |
@@ -1895,7 +1895,7 @@ package/architecture additions require approval. Do not invent PHP methods for T
 | `circlefin/arc-x402-circle-wallets` | At review time repo contains README only, describing autonomous x402 with a developer-controlled wallet | Concept reference only; no runnable integration/code or production proof to copy |
 | Canteen “Agents and Ledgers” | Editorial source analysis of nine ledgers and agent boundaries | Document provenance, three-way matching, visible repair, shared validation path and idempotency. Specific third-party findings need independent verification before adoption |
 
-Apache-2.0 code reuse requires license/notice review; EduFlow's MIT does not override it.
+Apache-2.0 code reuse requires license/notice review; OpenSinop's MIT does not override it.
 None of these testnet samples proves institution eligibility, statutory accounting,
 production custody, security audit or an end-to-end regional fiat off-ramp.
 
@@ -1979,7 +1979,7 @@ Receipt verification, exact legacy treasury migration, durable submission/recove
 required.
 
 **Benefit verification is separate:** The owner reports a local college agreed to explore
-EduFlow, with concern about AI handling money. This is an interested pilot partner, not a
+OpenSinop, with concern about AI handling money. This is an interested pilot partner, not a
 completed deployment, adoption metric or public endorsement. No completed college pilot,
 measured savings, improved retention or lower outage rate is claimed. Section 14 defines the
 current shadow/testnet pilot; wider benefits below remain hypotheses with observable measures.
@@ -2161,7 +2161,7 @@ lane, collect real-user evidence and keep Circle Agent Wallets for the hackathon
 This is product guidance, not a waiver of safety gates, official judging rules, guaranteed
 endorsement or a promise of social promotion.
 
-**Pilot partner status:** The owner reports one local college said yes to exploring EduFlow.
+**Pilot partner status:** The owner reports one local college said yes to exploring OpenSinop.
 The college remains skeptical of AI handling institutional funds. Department, primary pain
 point, authorized finance owner, records, limits and publication permissions still require
 confirmation. Do not describe this as a completed pilot or production adoption.
@@ -2229,7 +2229,7 @@ intake must not block an institution with zero student rows from planning approv
 
 1. Keep the college's actual collections, statutory accounts and payments in local currency
    through its existing process. Pilot access is read-only or approved anonymized extracts;
-   EduFlow has no authority to debit the college's bank account or mainnet treasury.
+   OpenSinop has no authority to debit the college's bank account or mainnet treasury.
 2. Preserve each source amount/currency and reference. Use an immutable, staff-approved
    reference-rate snapshot, source/time and explicit rounding rule to derive exact
    six-decimal USDC mirror units. Do not assume one local-currency unit equals one USDC.
@@ -2496,7 +2496,7 @@ or subjective "morals" assessment is needed for this pilot.
 linked successful testnet payments for eligible approved items, separately authorized capped
 lane demonstrated, rejected/held paths safe, replay/recovery checked and permissioned
 user/payment/metric evidence collected. It does **not** mean real college bills were paid
-by EduFlow, student fees were collected onchain, production/mainnet readiness, measured
+by OpenSinop, student fees were collected onchain, production/mainnet readiness, measured
 adoption beyond the observed pilot, or a guaranteed Arc/Circle shoutout.
 
 **Deferred scope:** all-institution autonomous treasury; production student payment intake and
@@ -2664,11 +2664,11 @@ are passed to the model. Unavailable AI degrades explanations, not deterministic
 **Delivered background foundation:** `FinanceWorkflowRun` persists cashier-review/budget-plan
 work, bounded attempts/heartbeat/backoff, review wait and notification delivery state.
 `ProcessFinanceWorkflow` uses durable `finance-planning` queue; per-minute
-`eduflow:dispatch-finance-workflows` recovers committed work with scheduler overlap controls.
+`opensinop:dispatch-finance-workflows` recovers committed work with scheduler overlap controls.
 Finance Supervisor/Collections pages inspect evidence and record independent plan/receipt
 decisions. Runtime defaults off and refuses `sync`. None of these tasks submits payments.
 
-**Current blockers:** existing `EduFlowAgent::runAutonomousCycle` and dashboard button use
+**Current blockers:** existing `OpenSinopAgent::runAutonomousCycle` and dashboard button use
 legacy execution and must not be scheduled as this workflow. New model/sessionless work needs explicit institution-scoped
 service authority, not a fabricated human actor passed to current staff actions. **Reviewed
 release and rollover are now delivered**, so the funding-hold blocker is gone; what is left is a
@@ -2916,7 +2916,7 @@ implemented; the automatic coordination target is not yet complete.
 | Fee ceiling enforced by the signer | `FeeBoundedPaymentTransport::supportsFeeCeiling()` gates submission, and `CircleAgentWalletTransport::submit()` throws when `max_fee_base_units` is present because the installed `circle wallet transfer` exposes no enforceable cap. A `--estimate` is a prediction, not a spending limit, so the lane fails closed before invoking the signer rather than signing unbounded |
 | Chain, purpose and stop guards | `assertRail()` refuses a non-testnet chain, a chain-id mismatch, the fake driver, or an installation institution that differs from the intent's. Submission additionally requires `enabled`, an unset `stop_switch`, and `investigation_owner_id` naming a verified-email finance owner who is **not** the payer. Nothing in this lane calls `beginLogin()`/`completeLogin()` |
 | No-resend async observation | `submission_started_at` is a write-once fence set inside the claim transaction, and model events forbid a started attempt returning to a dispatchable `prepared`. `provider_handle` (Circle transaction id) and `provider_reference` (chain hash) are separate columns. Only `prepared` may submit; `submitting`/`accepted`/`awaiting_verification`/`unknown` observe the existing handle through `resolve()`, bounded by `max_observations`; a lost handle parks the attempt for operator review. A queue retry re-reads the stored row instead of trusting the job payload |
-| Safe recovery | Scheduler recovery (`eduflow:dispatch-student-tuition`) redispatches committed consent and observes existing attempts. Observation fails closed when observation is disabled. Posting is idempotent under a row lock with a unique `movement_key`/`request_key`, and a committed consent survives queue failure. Verified evidence, the fee, the verification time and `posted_at` are write-once |
+| Safe recovery | Scheduler recovery (`opensinop:dispatch-student-tuition`) redispatches committed consent and observes existing attempts. Observation fails closed when observation is disabled. Posting is idempotent under a row lock with a unique `movement_key`/`request_key`, and a committed consent survives queue failure. Verified evidence, the fee, the verification time and `posted_at` are write-once |
 | Truthful student view | Transfer state, chain hash and fee are shown separately from allocation; the dashboard and `GET student/tuition/attempts` read persisted attempts only, and no GET, reload or poll can submit. Testnet is labelled as a pilot that does not pay official college tuition, and a lost response tells the payer to inspect existing attempts rather than create a new payment |
 | Pilot receipt is not official revenue | The inbound path writes **no** `Transaction` row and credits no float treasury. Verified movement produces only a pilot allocation against a designated testnet-designated account |
 
@@ -2935,7 +2935,7 @@ so nothing dispatches until an operator turns them on.
 | Stricter than staff reconciliation | Automated intake additionally requires a **verified attempt** — `student_tuition_payment_attempt_id` with intact `settlement_evidence`, consent digest, hash, chain, sender, recipient and exact amount. The legacy `tx_verified_on_chain` flag alone is refused, because the planner refuses it too and an unattended row nobody can use is noise at best |
 | A named maker, never the payer | `EDUFLOW_TUITION_INTAKE_OWNER_ID` must name a verified-email `finance_officer`/`admin`/`super_admin` account, and never the student who paid. `prepared_by` records it, so maker/checker separation applies unchanged: the owner cannot review the receipt it caused |
 | One derived identity per movement | The capture key is a UUIDv5 of `payment.movement_key`, not a generated UUID. A replay reproduces the identical receipt, and no sweep tick can mint a second identity for one settlement |
-| Deliverable and recoverable | Posting registers an after-commit wake, and `eduflow:reconcile-tuition-receipts` redelivers committed settlements no receipt covers. A rollback discards the wake with the transaction; a broker outage, an undeliverable dispatch or a flag that was off at posting time leaves the payment committed and owed, not lost |
+| Deliverable and recoverable | Posting registers an after-commit wake, and `opensinop:reconcile-tuition-receipts` redelivers committed settlements no receipt covers. A rollback discards the wake with the transaction; a broker outage, an undeliverable dispatch or a flag that was off at posting time leaves the payment committed and owed, not lost |
 | Still no authority | An automatically reconciled receipt arrives unreviewed: `receipts_reviewed => false`, zero unrestricted cash, `can_execute => false`. Reconciliation still writes no `Transaction` and credits no float treasury |
 
 **B1 delivered 2026-10-12 (unified Collections).** `ImportTuitionPaymentAsCollection` reconciles a
@@ -3118,7 +3118,7 @@ does not establish independent control by the student or a separate custodian ac
 | Student | Wallet/balance page and operator-generated Circle address available | `Student.payout_address` now drives common reads and can match a generated `StudentWallet`. It is still not proof that the student independently controls signing. |
 | Vendor | A free-text alias plus a reviewed address | `Vendor.wallet_address` is legacy master data. The reviewed path is `VendorDestinationVersion`, whose address is operator-controlled during the pilot. |
 
-EduFlow now has entry points for both legs, but **an inbound send UI is not a completed
+OpenSinop now has entry points for both legs, but **an inbound send UI is not a completed
 reconciled collection workflow**. Proving tuition intake requires matching settlement and
 one safe allocation, then separately making the receipt eligible for planning. Proving a
 vendor outflow still requires genuine staff authority and matching settlement. Neither leg
@@ -3129,7 +3129,7 @@ proves production custody, fiat settlement or actual college/vendor receipt from
 Every address the system touches has exactly one role and one custody answer. Conflating
 them is how an agent ends up signing for someone else's funds.
 
-| # | Role | Key holder | Who can move funds | EduFlow stores | Can the model touch it |
+| # | Role | Key holder | Who can move funds | OpenSinop stores | Can the model touch it |
 | --- | --- | --- | --- | --- | --- |
 | 1 | **Institution reserve** | Institution, human 2-of-2 MPC (Circle Agent Wallet) | Named humans only, with OTP | Provider/account id, address, chain, custody attestation, recovery owner | **Never** |
 | 2 | **Institution operational** | Institution, human 2-of-2 MPC | Named humans; the agent may submit a bounded, authorized intent | Same, plus allowance, policy ceiling and funded amount | Proposes only; cannot sign, change limits or move funds |
@@ -3161,13 +3161,13 @@ Rules that follow:
 
 ```mermaid
 flowchart LR
-    subgraph Institution["Institution (EduFlow controls these)"]
+    subgraph Institution["Institution (OpenSinop controls these)"]
         R[Reserve wallet<br/>role 1] -->|human, bounded + reviewed| O[Operational wallet<br/>role 2]
         G[Gateway deposit<br/>role 3] -.->|future, separate review| O
         SP[Operator-provisioned student pilot wallet<br/>role 6] -->|merged Pay Now; receipt safety pending| O
     end
 
-    subgraph Counterparties["Counterparties (EduFlow never holds these keys)"]
+    subgraph Counterparties["Counterparties (OpenSinop never holds these keys)"]
         V[Vendor destination<br/>role 4]
         P[Payer source<br/>role 5]
     end
@@ -3313,7 +3313,7 @@ institution-release work. Do not redesign unrelated tables before the safe tuiti
 - **Two product claims become explicitly conditional** in Section 6.1's capability table:
   "receivables and inbound matching" requires §12.5 plus a payer identity; "vendor bills"
   require a counterparty destination type and its matching settlement predicate.
-- **A future "EduFlow pays any vendor in USDC" claim is not supportable from this codebase**
+- **A future "OpenSinop pays any vendor in USDC" claim is not supportable from this codebase**
   without either an approved payout partner or counterparties who already hold USDC. Both are
   named in §13.5 as not proved.
 
@@ -3321,7 +3321,7 @@ institution-release work. Do not redesign unrelated tables before the safe tuiti
 
 1. Whether the institution release may ship **model C (aggregated collection)** at all, or
    whether inbound stays staff-recorded indefinitely. This is the single decision that
-   determines whether EduFlow is ever a two-legged system.
+   determines whether OpenSinop is ever a two-legged system.
 2. Whether `custodian_account` / `payout_partner_account` are in scope for any target
    jurisdiction, and who owns that integration and its compliance review.
 3. Whether an institution-custodial ledger product is explicitly out of scope. This section
@@ -3395,7 +3395,7 @@ panel.
 them and they were missing: `PaymentIntent::{reservation, financePolicyVersion,
 vendorDestinationVersion, invoiceVersionReview}`, `CollectionBatch::preparer`,
 `BudgetSnapshot::budget`. Tests: `tests/Feature/Filament/FinanceSupervisorDashboardTest.php`
-and the reworked `EduFlowCommandCenterTest`.
+and the reworked `OpenSinopCommandCenterTest`.
 
 ### 16.6 Current screen availability and remaining work (2026-10-13)
 
@@ -3486,7 +3486,7 @@ be able to see which arrow is live without reading the source.
 
 | # | Step | Actor | Status |
 | --- | --- | --- | --- |
-| 1A | Existing-channel collection | College's existing cash/bank channel; cashier captures source proof | Supported aggregate evidence lane; real bank settlement stays outside EduFlow |
+| 1A | Existing-channel collection | College's existing cash/bank channel; cashier captures source proof | Supported aggregate evidence lane; real bank settlement stays outside OpenSinop |
 | 1B | Optional direct portal attempt | Student Pay Now → quote/pay API → generated wallet → configured treasury | Immutable quote/consent, expiring fee ceiling, chain/purpose/stop guards, provider-handle observation and no-resend recovery exist (B0 slice); a live run is unproven because the installed rail cannot enforce the accepted fee ceiling and refuses to sign |
 | 2A | Record manual receipts | `CaptureCollectionBatch` → `CollectionBatch` | Built; private upload and three-step entry in both panels |
 | 2B | Verify, allocate and import digital receipt | Matching movement predicate → posted payment → reconciliation into source-linked Collections | Built: verified-path posting, immutable consent/settlement provenance, explicit staff reconciliation and an off-by-default unattended intake that is stricter (verified attempt proof, named non-payer owner, derived capture identity). Staff-side attention views remain open |
@@ -3524,7 +3524,7 @@ payment.
    not already authorised.
 2. **No model runs in the finance decision path.** Every `AgentDecision::create()` call site
    is the legacy *student assistance* path (`EvaluateAssistancePolicy`,
-   `PolicyEngineService`, `EduFlowAgent`). The vendor-payment chain writes zero model output.
+   `PolicyEngineService`, `OpenSinopAgent`). The vendor-payment chain writes zero model output.
 3. **An authorised payment still does not settle the local payable.** A verified testnet
    mirror consumes its pilot reservation and nothing else (§14.3.6). It is not college
    income, not an accounting posting and not a vendor receipt.

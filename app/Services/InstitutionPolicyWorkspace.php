@@ -93,7 +93,7 @@ final readonly class InstitutionPolicyWorkspace
      * The head of the publication chain.
      *
      * This is the newest independently published policy, NOT necessarily the
-     * one whose controls payments currently use. `eduflow:activate-finance-policy`
+     * one whose controls payments currently use. `app:activate-finance-policy`
      * can activate a different FinancePolicyVersion out of band, and when it
      * does this publication is superseded by its own controls. Callers that
      * gate money must check `hasActiveControls()` rather than treat this as

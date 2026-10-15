@@ -40,20 +40,20 @@ init_application() {
     php artisan module:migrate --force --no-interaction || true
     php artisan storage:link || true
 
-    if [ ! -f "${ROOT}/storage/.app_installed" ]; then
-        echo "Initializing App institution..."
-        if php artisan eduflow:install \
+    if [ ! -f "${ROOT}/storage/.opensinop_installed" ] && [ ! -f "${ROOT}/storage/.eduflow_installed" ]; then
+        echo "Initializing OpenSinop institution..."
+        if php artisan app:install \
             --institution="${EDUFLOW_INSTITUTION:-My School}" \
             --country="${EDUFLOW_COUNTRY:-US}" \
             --timezone="${EDUFLOW_TIMEZONE:-UTC}" \
             --locale="${EDUFLOW_LOCALE:-en}" \
             --currency="${EDUFLOW_CURRENCY:-USD}" \
             --no-interaction; then
-            touch "${ROOT}/storage/.app_installed"
+            touch "${ROOT}/storage/.opensinop_installed"
             fix_permissions
             echo "Institution initialized."
             echo "Create the first administrator:"
-            echo "  docker exec -it <container> php artisan eduflow:bootstrap-admin --name=\"School Operator\" --email=\"operator@example.org\""
+            echo "  docker exec -it opensinop php artisan app:bootstrap-admin --name=\"School Operator\" --email=\"operator@example.org\""
         else
             echo "Institution initialization was skipped or failed (possibly already initialized). Continuing."
         fi

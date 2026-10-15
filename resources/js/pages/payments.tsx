@@ -77,11 +77,11 @@ export default function Payments({
                         <div>
                             <p className="bulletin-eyebrow flex items-center gap-2">
                                 <ReceiptText className="size-3.5" />
-                                EduFlow AI &middot; Payout Ledger
+                                OpenSinop AI &middot; Payout Ledger
                             </p>
                             <h1 className="clay-h1 mt-2">My Payments</h1>
                             <p className="clay-body mt-1.5">
-                                Every disbursement EduFlow has sent to your
+                                Every disbursement OpenSinop has sent to your
                                 wallet, with its on-chain trail.
                             </p>
                         </div>

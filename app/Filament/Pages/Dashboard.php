@@ -55,7 +55,7 @@ class Dashboard extends BaseDashboard
         $institution = app(InstallationInstitution::class)->current();
 
         if ($institution === null) {
-            return 'Institution context unavailable. Run php artisan eduflow:install; data is never selected by row order.';
+            return 'Institution context unavailable. Run php artisan app:install; data is never selected by row order.';
         }
 
         $status = app(LeptonTreasuryService::class)->status($institution->primaryWallet());

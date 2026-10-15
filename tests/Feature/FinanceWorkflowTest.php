@@ -240,18 +240,20 @@ test('finance supervisor page renders command center metrics, 4-stage pipeline a
     Filament::setCurrentPanel(Filament::getPanel('finance'));
     actingAs($c['reviewer']);
 
-    Livewire::test(FinanceSupervisor::class)
-        ->assertSuccessful()
+    $testable = Livewire::test(FinanceSupervisor::class);
+    $testable->assertSuccessful()
         ->assertSee('Finance Supervisor Command Center')
         ->assertSee('Autonomous Allocation Architecture')
         ->assertSee('Awaiting Decision')
         ->assertSee('Background Worker')
         ->assertSee('Accepted Proposals')
-        ->assertSee('Receipt Routing')
-        ->call('filterByState', 'waiting_for_review')
-        ->assertSet('activeStateFilter', 'waiting_for_review')
-        ->call('filterByState', null)
-        ->assertSet('activeStateFilter', null);
+        ->assertSee('Receipt Routing');
+
+    $testable->call('filterByState', 'waiting_for_review');
+    $testable->assertSet('activeStateFilter', 'waiting_for_review');
+
+    $testable->call('filterByState', null);
+    $testable->assertSet('activeStateFilter', null);
 });
 
 test('scheduler recovery discovers committed sources even when original enablement was off', function (): void {

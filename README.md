@@ -1,6 +1,6 @@
 <div align="center">
 
-# App
+# OpenSinop
 
 **Bounded departmental finance on Circle Agent Wallets + Arc**
 
@@ -13,14 +13,14 @@ department's approved budget, and link authorized bills to USDC payments on Arc 
 
 ## What this is
 
-App is institution-owned finance orchestration using
+OpenSinop is institution-owned finance orchestration using
 [Circle Agent Stack](https://developers.circle.com/agent-stack) and the
 [Arc](https://docs.arc.io) network. Long-term scope covers collections, budgets and
 approved obligations; current hackathon scope is deliberately one departmental workflow,
 not an unrestricted AI treasurer or replacement for the college's accounting system.
 
 The current product question is **what should the institution do with fees already
-collected from students?** App's target is to review verified collections, protect
+collected from students?** OpenSinop's target is to review verified collections, protect
 restricted funds and reserves, and explain how available cash can cover approved obligations.
 The college pilot uses deterministic policy checks to:
 
@@ -67,7 +67,7 @@ policy activation or developer demo is not a certified school treasury system.
 
 **Direction:** fee collections and budget planning in shadow/parallel mode. Start smaller:
 **one department, its already-approved budget and approved bills for the next couple of
-weeks**. The owner reports a local college agreed to explore App; actual usage,
+weeks**. The owner reports a local college agreed to explore OpenSinop; actual usage,
 completed pilot results and public endorsement have not been established. Confirm this
 is the college's most important feasible problem with its finance owner.
 
@@ -182,7 +182,7 @@ commands; they are not a ready-made college pilot or permission to use legacy ex
 
 **Intended college workflow, not a claim that the complete UI/execution path ships today:**
 Students pay through the college's existing process; staff confirms realized fee receipts.
-App reviews those funds alongside approved budgets and commitments, proposes which
+OpenSinop reviews those funds alongside approved budgets and commitments, proposes which
 approved departmental bills can be funded, and explains any holds or shortfalls. Finance
 staff reviews the proposals. Each eligible authorized bill is then linked to a verified
 USDC payment on Arc testnet while the college continues paying locally in parallel.
@@ -197,7 +197,7 @@ The existing seed/command below still includes optional assistance fixtures. It 
 for development and does not represent the fee-collections pilot or its planned student UI:
 
 ```
-$ php artisan eduflow:demo
+$ php artisan app:demo
 
 Cycle: auto-paid 3, escalated 2, held 1, disbursed 85 USDC.
 
@@ -277,8 +277,8 @@ existing database records. Never use this setup on a school database or an insta
 holding configured providers or payment history.
 
 ```bash
-git clone https://github.com/koamishin/App.git
-cd App
+git clone https://github.com/koamishin/OpenSinop.git
+cd OpenSinop
 
 composer install
 npm install
@@ -351,7 +351,7 @@ composer run dev
 
 ### Self-hosted (production) setup
 
-App is self-hostable. Do **not** use `migrate:fresh --seed` on a real instance; it destroys data.
+OpenSinop is self-hostable. Do **not** use `migrate:fresh --seed` on a real instance; it destroys data.
 Use the idempotent installer instead.
 
 #### Option A — Docker deployment (recommended)
@@ -360,10 +360,10 @@ Production Docker containers bundle FrankenPHP, Octane, PostgreSQL 16, Redis 7, 
 
 ##### 1. One-line quick start (Docker Compose)
 
-To start App with sensible production defaults:
+To start OpenSinop with sensible production defaults:
 
 ```bash
-docker compose -f https://raw.githubusercontent.com/koamishin/KoamiStarterKit/main/docker-compose.yml up -d
+docker compose -f https://raw.githubusercontent.com/koamishin/OpenSinop/main/docker-compose.yml up -d
 ```
 
 > **Customization:** Pass environment variables before the command to customize ports or settings, e.g. `APP_PORT=8080 docker compose ... up -d`.
@@ -374,11 +374,11 @@ For a guided terminal wizard that prompts for application URL, database credenti
 
 - **macOS / Linux:**
   ```bash
-  bash <(curl -fsSL https://raw.githubusercontent.com/koamishin/KoamiStarterKit/main/install.sh)
+  bash <(curl -fsSL https://raw.githubusercontent.com/koamishin/OpenSinop/main/install.sh)
   ```
 - **Windows (PowerShell):**
   ```powershell
-  irm https://raw.githubusercontent.com/koamishin/KoamiStarterKit/main/install.ps1 | iex
+  irm https://raw.githubusercontent.com/koamishin/OpenSinop/main/install.ps1 | iex
   ```
 
 ##### 3. Updating an existing Docker deployment
@@ -387,15 +387,15 @@ To pull the newest container images, create an automated PostgreSQL database bac
 
 - **macOS / Linux:**
   ```bash
-  bash <(curl -fsSL https://raw.githubusercontent.com/koamishin/KoamiStarterKit/main/install.sh) --update
+  bash <(curl -fsSL https://raw.githubusercontent.com/koamishin/OpenSinop/main/install.sh) --update
   ```
 - **Windows (PowerShell):**
   ```powershell
-  iwr https://raw.githubusercontent.com/koamishin/KoamiStarterKit/main/install.ps1 -OutFile install.ps1; .\install.ps1 -Update
+  iwr https://raw.githubusercontent.com/koamishin/OpenSinop/main/install.ps1 -OutFile install.ps1; .\install.ps1 -Update
   ```
   Or as a one-liner:
   ```powershell
-  & ([scriptblock]::Create((irm https://raw.githubusercontent.com/koamishin/KoamiStarterKit/main/install.ps1))) --update
+  & ([scriptblock]::Create((irm https://raw.githubusercontent.com/koamishin/OpenSinop/main/install.ps1))) --update
   ```
 
 ##### 4. Bootstrap the first administrator
@@ -403,7 +403,7 @@ To pull the newest container images, create an automated PostgreSQL database bac
 On initial boot, the container automatically runs database migrations, enables required modules, and initializes the school identity. Once healthy, create the first super administrator interactively:
 
 ```bash
-docker exec -it eduflow php artisan eduflow:bootstrap-admin --name="School Operator" --email="operator@example.org"
+docker exec -it opensinop php artisan app:bootstrap-admin --name="School Operator" --email="operator@example.org"
 ```
 
 > **Data Persistence:** Database data, uploaded files, and application cache are safely persisted in Docker volumes (`app_db`, `app_storage`, `app_cache`, `app_redis`).
@@ -420,8 +420,8 @@ For environments running PHP and web servers directly on host infrastructure:
    [Lepton agent package (Circle + Arc)](#lepton-agent-package-circle--arc)).
 2. **Application code.**
    ```bash
-   git clone https://github.com/koamishin/App.git /var/www/eduflow
-   cd /var/www/eduflow
+   git clone https://github.com/koamishin/OpenSinop.git /var/www/opensinop
+   cd /var/www/opensinop
    composer install --no-dev --optimize-autoloader
    npm ci
    npm run build
@@ -436,13 +436,13 @@ For environments running PHP and web servers directly on host infrastructure:
    APP_NAME="Your School"
    APP_ENV=production
    APP_DEBUG=false
-   APP_URL=https://eduflow.example.org
+   APP_URL=https://opensinop.example.org
 
    DB_CONNECTION=pgsql        # or mysql
    DB_HOST=127.0.0.1
    DB_PORT=5432
-   DB_DATABASE=eduflow
-   DB_USERNAME=eduflow
+   DB_DATABASE=opensinop
+   DB_USERNAME=opensinop
    DB_PASSWORD=change-me
 
    QUEUE_CONNECTION=database   # or redis
@@ -458,8 +458,8 @@ For environments running PHP and web servers directly on host infrastructure:
    ```
 5. **School identity and first administrator** (idempotent; safe to repeat as a no-op):
    ```bash
-   php artisan eduflow:install --institution="Pilot School" --country=PH --timezone=Asia/Manila --currency=PHP --no-interaction
-   php artisan eduflow:bootstrap-admin --name="School Operator" --email="operator@school.example"
+   php artisan app:install --institution="Pilot School" --country=PH --timezone=Asia/Manila --currency=PHP --no-interaction
+   php artisan app:bootstrap-admin --name="School Operator" --email="operator@school.example"
    ```
    Bootstrap prompts for a password interactively (hidden). Verify the admin email and
    configure MFA before opening access.
@@ -508,15 +508,22 @@ php artisan lepton:login --status
 
 **Configure `.env`:**
 ```env
-LEPTON_DRIVER=circle            # circle = real; fake = in-memory (default under testing)
+# Drivers: circle (CLI agent stack), developer or circle-rest (pure REST API), fake (in-memory)
+LEPTON_DRIVER=circle
 LEPTON_CIRCLE_BIN=circle
 LEPTON_ARC_BIN=arc-canteen
 LEPTON_CHAIN=ARC-TESTNET
 LEPTON_CHAIN_ID=5042002
-LEPTON_TREASURY_ADDRESS=0x...   # Circle agent wallet address
+LEPTON_TREASURY_ADDRESS=0x...   # Circle agent or developer wallet address
 LEPTON_RPC_URL=                 # optional override
 LEPTON_DRY_RUN=false
 LEPTON_ALLOW_RAW_CIRCLE=false
+
+# Optional: when using LEPTON_DRIVER=developer (pure HTTP REST API, zero CLI binaries)
+LEPTON_CIRCLE_API_KEY=
+LEPTON_ENTITY_SECRET=
+LEPTON_WALLET_SET_ID=
+LEPTON_CIRCLE_API_URL=https://api.circle.com/v1/w3s
 ```
 
 **Verify:**
@@ -558,8 +565,8 @@ On an operator-controlled instance with reviewed database configuration,
 
 ```bash
 php artisan migrate --force --no-interaction
-php artisan eduflow:install --institution="Pilot School" --country=PH --timezone=Asia/Manila --currency=PHP --no-interaction
-php artisan eduflow:bootstrap-admin --name="School Operator" --email="operator@school.example"
+php artisan app:install --institution="Pilot School" --country=PH --timezone=Asia/Manila --currency=PHP --no-interaction
+php artisan app:bootstrap-admin --name="School Operator" --email="operator@school.example"
 ```
 
 Migrations are a separate operator task. Installer never migrates, resets data, seeds demo
@@ -657,7 +664,7 @@ php artisan lepton:login --request=<request-id> --otp=B1X-123456
 > authorise an ARC-TESTNET transfer. If testnet transfers fail, check the *testnet* row
 > in `lepton:login --status`.
 
-The package stores no credentials. The Circle CLI owns the session; App only reads it.
+The package stores no credentials. The Circle CLI owns the session; OpenSinop only reads it.
 
 ---
 
@@ -677,7 +684,7 @@ Error: Faucet drip failed (429): API rate limit error
 So a realistically funded wallet holds about **100–120 USDC**. That ceiling is why the
 demo scenarios are the size they are — see [The seeded scenarios](#the-seeded-scenarios).
 
-Once funded, point App at that wallet and sync the ledger:
+Once funded, point OpenSinop at that wallet and sync the ledger:
 
 ```bash
 # LEPTON_TREASURY_ADDRESS=0xYourAgentWallet   in .env
@@ -698,11 +705,11 @@ fail for lack of funds.
 
 ```bash
 php artisan lepton:doctor      # is it wired up?
-php artisan eduflow:demo       # run one full autonomous cycle
+php artisan app:demo       # run one full autonomous cycle
 php artisan lepton:reconcile   # legacy hash lookup; stronger pilot verification required
 ```
 
-`eduflow:demo` moves **85 USDC** of real testnet USDC (30 + 45 + the 10 USDC aid
+`app:demo` moves **85 USDC** of real testnet USDC (30 + 45 + the 10 USDC aid
 portion). It is not a simulation under the `circle` driver, and it is not repeatable
 without re-funding — see [Funding](#fund-the-wallet).
 
@@ -752,7 +759,7 @@ portal, staff review UI and safe payment-execution lifecycle are not yet shipped
 ### Student side — fee payment and confirmation
 
 - Students pay tuition or other fees through the college's existing approved payment process.
-  The pilot does not require students to hold USDC or use a new App payment portal.
+  The pilot does not require students to hold USDC or use a new OpenSinop payment portal.
 - Students retain the official receipt/reference. Authorized staff verifies received funds
   before including them in the institution's collections data; an expected payment or
   uploaded receipt alone is not confirmed cash.
@@ -816,7 +823,7 @@ invented obligations, self-set schedules or self-granted authority.
 Enable `EDUFLOW_BACKGROUND_FINANCE=true` only with a durable `database` or `redis` connection
 configured through `EDUFLOW_FINANCE_QUEUE_CONNECTION`. Keep a supervised queue worker on
 `finance-planning` and invoke Laravel scheduler every minute. The scheduled
-`eduflow:dispatch-finance-workflows` recovers committed work; `sync` is refused. Background
+`app:dispatch-finance-workflows` recovers committed work; `sync` is refused. Background
 finance defaults off, and no scheduler task submits money.
 
 One institution workflow service coordinates specialist tasks; several unrestricted LLMs
@@ -905,7 +912,7 @@ app(Yukazakiri\Lepton\Contracts\ArcNetworkGateway::class)
 ## Institution finance preview (no students required)
 
 ```bash
-php artisan eduflow:finance-preview --days=30 --no-interaction
+php artisan app:finance-preview --days=30 --no-interaction
 ```
 
 Read-only C0 entry point: binds the installation institution, observes its recorded
@@ -930,11 +937,11 @@ fund and valid aid policy. The existing aid approval endpoint remains aid-only.
 
 ## Vendor-payment draft preparation (C1 foundation)
 
-`eduflow:prepare-vendor-payment` prepares one immutable, full-bill USDC draft. Operator
+`app:prepare-vendor-payment` prepares one immutable, full-bill USDC draft. Operator
 supplies an existing invoice ID, institution-owned Circle wallet ID, authorized staff ID,
 exact fee ceiling and a UUID intent key retained for retries. Required options:
 `--actor`, `--wallet`, `--max-fee`, `--intent-key`; inspect available syntax with
-`php artisan eduflow:prepare-vendor-payment --help`.
+`php artisan app:prepare-vendor-payment --help`.
 
 Draft preparation is not human sign-off or proof that the named staff member personally
 ran the CLI: host operator has attribution responsibility. No browser/AI tool can call this
@@ -965,17 +972,17 @@ require future reviewed release first. Recovery review never grants payment auth
 
 ## Reviewed institution finance policy (C1 foundation)
 
-`eduflow:prepare-finance-policy` creates an immutable version without activating it.
+`app:prepare-finance-policy` creates an immutable version without activating it.
 Required: version identifier, `--actor`, explicit `--reserve` in exact USDC. Options
 `--auto-limit`, `--daily-limit`, `--max-fee` default to zero. Auto limit cannot exceed daily
-limit. Inspect syntax with `php artisan eduflow:prepare-finance-policy --help`.
+limit. Inspect syntax with `php artisan app:prepare-finance-policy --help`.
 
-`eduflow:activate-finance-policy` requires policy version ID, separate authorized
+`app:activate-finance-policy` requires policy version ID, separate authorized
 `--reviewer`, and explicit `--expected-activation=none` for first activation or current
 activation ID for replacement. It never infers the latest review context. Same review
 retry returns existing evidence; stale context, self-review (including super admins),
 reactivation of superseded versions and corrupt history are refused. Inspect syntax with
-`php artisan eduflow:activate-finance-policy --help`.
+`php artisan app:activate-finance-policy --help`.
 
 Activations are append-only, bind predecessor digest and validate actual policy content
 through the complete recorded history (up to 10,000 activations; beyond that fails closed
@@ -1171,7 +1178,15 @@ reservation release/rollover, approval renewal/withdrawal, durable recovery and 
 | `php artisan lepton:login --request=<id> --otp=<code>` | Complete login |
 | `php artisan lepton:reconcile` | Legacy hash lookup; not complete pilot settlement proof |
 | `php artisan lepton:reconcile --fix` | Legacy reconciliation mutation; review missing/unknown evidence before use |
-| `php artisan eduflow:demo` | Run one full autonomous cycle |
+| `php artisan app:demo` | Run one full autonomous cycle |
+| `php artisan app:install` | Initialize school identity and financial settings |
+| `php artisan app:bootstrap-admin` | Create the first super-administrator account interactively |
+| `php artisan app:finance-preview` | Read-only treasury and cashflow preview without students |
+| `php artisan app:prepare-vendor-payment` | Prepare an immutable full-bill USDC payment draft |
+| `php artisan app:prepare-finance-policy` | Draft an immutable institution finance policy version |
+| `php artisan app:activate-finance-policy` | Activate a reviewed institution finance policy version |
+| `php artisan app:dispatch-finance-workflows` | Recover and dispatch bounded read-only finance planning work |
+| `php artisan app:reconcile-payment-submissions` | Verify matching settlement and finality on Arc |
 | `php artisan lepton:status --address=0x…` | Chain, block, balance, limits |
 | `php artisan lepton:transfer 0x… --amount=1.00 --from=0x…` | Single transfer (`--estimate` to dry-run) |
 
@@ -1264,7 +1279,7 @@ data and without costing a completion.
 > in their instructions, and the gate decodes a string response. If a gateway streams SSE
 > regardless of `stream: false`, add an `Accept: application/json` extra header.
 
-**App works with none of this.** Every model call is fail-closed: a missing key, an
+**OpenSinop works with none of this.** Every model call is fail-closed: a missing key, an
 unreachable endpoint, malformed output or a timeout all resolve to "no advisory available",
 and the deterministic engine proceeds alone. A model outage degrades the product; it never
 blocks a payment.
@@ -1292,7 +1307,7 @@ be downgraded by any response.
 - **27 adversarial tests** cover injected amounts, injected verdicts, malformed output,
   provider failure and prompt injection. All run offline via the SDK's own fakes.
 
-### Ask App: conversation with a figure check
+### Ask OpenSinop: conversation with a figure check
 
 The student chat has two answers to every question. The deterministic one comes first and is
 always computed by PHP. A model may then *rephrase* it, and never replaces it.
@@ -1301,7 +1316,7 @@ always computed by PHP. A model may then *rephrase* it, and never replaces it.
 "What is my tuition balance?"
         │
         ▼
-  AskApp::answer()          ← deterministic, live policy, integer math
+  AskOpenSinop::answer()          ← deterministic, live policy, integer math
         │
         ▼
   StudentBrief                  ← those facts + that explanation, assembled by PHP
@@ -1421,7 +1436,7 @@ review UI or the safe new payment lifecycle:
 Invoices + Aid requests
         │
         ▼
-  AppAgent::runAutonomousCycle()
+  OpenSinopAgent::runAutonomousCycle()
         │
         ▼
   FinancialPolicyEngine / EvaluateAssistancePolicy     ← deterministic PHP
@@ -1485,7 +1500,7 @@ claims a balance the chain does not hold. Use **Sync from chain**, and check
 rather than your Circle agent wallet, or you are querying a chain you are not
 authenticated for.
 
-**`eduflow:demo` is not repeatable** — each run spends 85 USDC. Re-fund, or use
+**`app:demo` is not repeatable** — each run spends 85 USDC. Re-fund, or use
 `LEPTON_DRIVER=fake`.
 
 ---
@@ -1494,7 +1509,7 @@ authenticated for.
 
 ```
 app/
-  Agents/AppAgent.php            the autonomous cycle
+  Agents/OpenSinopAgent.php            the autonomous cycle
   Policies/                          invoice + assistance policy (deterministic)
   Actions/                           policy evaluation, escalation approval
   Services/
@@ -1503,11 +1518,11 @@ app/
     LeptonReconciliationService.php  proves settlement on-chain
     LeptonTreasuryService.php        live chain reads vs the ledger
   Console/Commands/
-    AppDemo.php                  the end-to-end demo
+    OpenSinopDemo.php                  the end-to-end demo
     LeptonDoctor.php                 the "is it working" check
 database/seeders/
-  AppFinancialSeeder.php         org, wallets, budgets, the six invoices
-  AppPlanSeeder.php              thresholds, assistance fund, aid policy
+  OpenSinopFinancialSeeder.php         org, wallets, budgets, the six invoices
+  OpenSinopPlanSeeder.php              thresholds, assistance fund, aid policy
   EducationDemoSeeder.php           students, tuition, one pending aid request
 ```
 

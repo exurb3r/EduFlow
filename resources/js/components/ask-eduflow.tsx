@@ -135,7 +135,7 @@ export function AskEduFlow({
                 const msg =
                     err instanceof Error
                         ? err.message
-                        : 'Could not connect to EduFlow AI. Please try again.';
+                        : 'Could not connect to OpenSinop AI. Please try again.';
                 setError(msg);
             }
         });
@@ -158,7 +158,7 @@ export function AskEduFlow({
                         </div>
                         <div>
                             <CardTitle className="text-base font-semibold">
-                                Ask EduFlow AI
+                                Ask OpenSinop AI
                             </CardTitle>
                             <CardDescription className="text-xs">
                                 Natural-language explainability for tuition,

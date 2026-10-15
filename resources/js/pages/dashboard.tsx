@@ -118,7 +118,7 @@ export default function Dashboard({
                     <header className="flex flex-col gap-6">
                         <div className="min-w-0">
                             <p className="bulletin-eyebrow">
-                                EduFlow &middot; Northstar Learning Center
+                                OpenSinop &middot; Northstar Learning Center
                             </p>
                             <h1 className="clay-h1 mt-2">
                                 Welcome back,{' '}

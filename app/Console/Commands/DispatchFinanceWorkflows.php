@@ -10,7 +10,9 @@ use Throwable;
 
 class DispatchFinanceWorkflows extends Command
 {
-    protected $signature = 'eduflow:dispatch-finance-workflows';
+    protected $signature = 'app:dispatch-finance-workflows';
+
+    protected $aliases = ['eduflow:dispatch-finance-workflows'];
 
     protected $description = 'Recover and dispatch bounded read-only finance work; never executes payments.';
 

@@ -9,7 +9,9 @@ use Illuminate\Console\Command;
 
 class DispatchStudentTuitionPayments extends Command
 {
-    protected $signature = 'eduflow:dispatch-student-tuition';
+    protected $signature = 'app:dispatch-student-tuition';
+
+    protected $aliases = ['eduflow:dispatch-student-tuition'];
 
     protected $description = 'Dispatch consented pilot tuition work; recovery observes existing attempts and never resends';
 

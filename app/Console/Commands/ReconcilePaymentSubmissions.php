@@ -23,9 +23,11 @@ use function Laravel\Prompts\confirm;
  */
 class ReconcilePaymentSubmissions extends Command
 {
-    protected $signature = 'eduflow:reconcile-payment-submissions
+    protected $signature = 'app:reconcile-payment-submissions
         {--limit=50 : Maximum entries to reconcile in one pass}
         {--mirror : Write a local ledger row for entries verified as settled}';
+
+    protected $aliases = ['eduflow:reconcile-payment-submissions'];
 
     protected $description = 'Verify submitted payment references against Arc and record only proven settlements';
 

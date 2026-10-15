@@ -12,7 +12,7 @@ use Illuminate\Console\Attributes\Signature;
 use Illuminate\Console\Command;
 use Illuminate\Validation\ValidationException;
 
-#[Signature('eduflow:install {--institution= : Institution name} {--country= : Two-letter country code} {--timezone=UTC : School timezone} {--locale=en : Supported school locale} {--currency=USDC : Supported accounting currency} {--adopt-institution= : Explicit existing organization ID to adopt}')]
+#[Signature('app:install {--institution= : Institution name} {--country= : Two-letter country code} {--timezone=UTC : School timezone} {--locale=en : Supported school locale} {--currency=USDC : Supported accounting currency} {--adopt-institution= : Explicit existing organization ID to adopt}', aliases: ['eduflow:install'])]
 #[Description('Initialize one school without demo data, wallets, payments or credential changes. Requires applied migrations.')]
 class InstallEduFlow extends Command
 {
@@ -70,7 +70,7 @@ class InstallEduFlow extends Command
 
         if (! User::query()->whereHas('roles', fn ($query) => $query
             ->where('name', RoleEnums::SUPER_ADMIN->value)->where('guard_name', 'web'))->exists()) {
-            $this->line('Next: php artisan eduflow:bootstrap-admin');
+            $this->line('Next: php artisan app:bootstrap-admin');
         }
 
         return self::SUCCESS;

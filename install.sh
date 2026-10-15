@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# install.sh — interactive TUI installer for App (macOS/Linux)
+# install.sh — interactive TUI installer for OpenSinop (macOS/Linux)
 # Usage:
 #   bash <(curl -fsSL https://raw.githubusercontent.com/koamishin/KoamiStarterKit/main/install.sh)
 #   curl -fsSL .../install.sh | bash
@@ -9,7 +9,7 @@ set -Eeuo pipefail
 ROOT="$(pwd)"
 ENV_FILE="$ROOT/.env"
 COMPOSE_FILE="$ROOT/docker-compose.yml"
-COMPOSE_URL="https://raw.githubusercontent.com/koamishin/KoamiStarterKit/main/docker-compose.yml"
+COMPOSE_URL="https://raw.githubusercontent.com/koamishin/OpenSinop/main/docker-compose.yml"
 
 RED='\033[0;31m'; GREEN='\033[0;32m'; YELLOW='\033[1;33m'; CYAN='\033[0;36m'; BOLD='\033[1m'; RESET='\033[0m'
 
@@ -174,7 +174,7 @@ env_value() {
 }
 
 if [ "$UPDATE" = "1" ]; then
-    title "App Update"
+    title "OpenSinop Update"
     if [ ! -f "$ENV_FILE" ]; then
         err "No .env found in $ROOT. Run the installer first."
         exit 1
@@ -183,13 +183,13 @@ if [ "$UPDATE" = "1" ]; then
         info "Downloading docker-compose.yml ..."
         curl -fsSL "$COMPOSE_URL" -o "$COMPOSE_FILE" || { err "download failed"; exit 1; }
     fi
-    DB_USER="$(env_value DB_USERNAME)"; DB_USER="${DB_USER:-app}"
-    DB_NAME="$(env_value DB_DATABASE)"; DB_NAME="${DB_NAME:-app}"
+    DB_USER="$(env_value DB_USERNAME)"; DB_USER="${DB_USER:-opensinop}"
+    DB_NAME="$(env_value DB_DATABASE)"; DB_NAME="${DB_NAME:-opensinop}"
     DB_CID="$(docker compose ps -q db 2>/dev/null || true)"
     if [ -n "$DB_CID" ]; then
         backup_dir="$ROOT/backups"
         mkdir -p "$backup_dir"
-        backup_file="$backup_dir/app-$(date +%Y%m%d-%H%M%S).sql"
+        backup_file="$backup_dir/opensinop-$(date +%Y%m%d-%H%M%S).sql"
         if docker compose exec -T db sh -c "pg_dump -U '$DB_USER' '$DB_NAME'" > "$backup_file" 2>/dev/null; then
             ok "Database backup written to $backup_file"
         else
@@ -209,7 +209,7 @@ if [ "$UPDATE" = "1" ]; then
     fi
     healthy=0
     for _ in $(seq 1 24); do
-        status=$(docker inspect --format '{{.State.Health.Status}}' app 2>/dev/null || true)
+        status=$(docker inspect --format '{{.State.Health.Status}}' opensinop 2>/dev/null || true)
         if [ "$status" = "healthy" ]; then healthy=1; break; fi
         if [ "$status" = "unhealthy" ]; then break; fi
         sleep 5
@@ -217,7 +217,7 @@ if [ "$UPDATE" = "1" ]; then
     if [ "$healthy" = "1" ]; then
         ok "Application is healthy."
     else
-        warn "Application did not report healthy yet; see docker logs app."
+        warn "Application did not report healthy yet; see docker logs opensinop."
     fi
     APP_URL="$(env_value APP_URL)"; APP_URL="${APP_URL:-http://localhost:8000}"
     info "App URL: $APP_URL"
@@ -226,7 +226,7 @@ if [ "$UPDATE" = "1" ]; then
     exit 0
 fi
 
-title "App TUI Installer (bash)"
+title "OpenSinop TUI Installer (bash)"
 info "Interactive setup for Docker-based self-hosting."
 info "Press Enter to accept a suggested default."
 echo
@@ -263,9 +263,9 @@ if [ "$DB_CONNECTION" = "sqlite" ]; then
 else
     DB_HOST="db"
     DB_PORT="$([ "$DB_CONNECTION" = pgsql ] && echo 5432 || echo 3306)"
-    DB_DATABASE="app"
-    DB_USERNAME="app"
-    DB_PASSWORD="app"
+    DB_DATABASE="opensinop"
+    DB_USERNAME="opensinop"
+    DB_PASSWORD="opensinop"
 fi
 
 # Common environment defaults (production)
@@ -294,13 +294,25 @@ EDUFLOW_CURRENCY=$(ask "Accounting currency" "USD" | tr '[:lower:]' '[:upper:]')
 
 title "Lepton agent (Circle + Arc)"
 info "Driver selection:"
-info "  • fake   - In-memory simulated ledger (no Circle CLI, wallet, or funds needed; safe for testing/demos)"
-info "  • circle - Live onchain rail using Circle Agent Stack & Arc network (requires Circle CLI & MPC wallet)"
-LEPTON_DRIVER=$(ask_choice "Lepton driver" "fake" fake circle)
+info "  • fake      - In-memory simulated ledger (no credentials needed; safe for testing/demos)"
+info "  • circle    - Circle CLI agent stack (email OTP login via Circle CLI binary)"
+info "  • developer - Pure HTTP REST API using Circle Developer-Controlled Wallets (no CLI needed)"
+LEPTON_DRIVER=$(ask_choice "Lepton driver" "fake" fake circle developer)
 LEPTON_CHAIN=$(ask_choice "Chain" "ARC-TESTNET" ARC-TESTNET ARC-MAINNET)
 LEPTON_DRY_RUN=$(ask_choice "Dry run (no real transfers)" "true" true false)
 LEPTON_TREASURY_ADDRESS=$(ask "Treasury wallet address (empty for fake)" "")
 LEPTON_RPC_URL=$(ask "Arc RPC URL (empty for default)" "")
+
+LEPTON_CIRCLE_API_KEY=""
+LEPTON_ENTITY_SECRET=""
+LEPTON_WALLET_SET_ID=""
+if [ "$LEPTON_DRIVER" = "developer" ]; then
+    title "Circle Developer REST API"
+    info "Configure Developer-Controlled Wallets credentials (api.circle.com/v1/w3s):"
+    LEPTON_CIRCLE_API_KEY=$(ask_secret "Circle API Key")
+    LEPTON_ENTITY_SECRET=$(ask_secret "Entity Secret (32-byte / 64 hex characters)")
+    LEPTON_WALLET_SET_ID=$(ask "Wallet Set ID (optional)" "")
+fi
 
 title "Optional AI advisory"
 AI_PROVIDER=$(ask_choice "AI provider" "none" none local openai anthropic)
@@ -395,6 +407,10 @@ LEPTON_CHAIN="$LEPTON_CHAIN"
 LEPTON_DRY_RUN="$LEPTON_DRY_RUN"
 LEPTON_TREASURY_ADDRESS="$LEPTON_TREASURY_ADDRESS"
 LEPTON_RPC_URL="$LEPTON_RPC_URL"
+LEPTON_CIRCLE_API_KEY="$LEPTON_CIRCLE_API_KEY"
+LEPTON_ENTITY_SECRET="$LEPTON_ENTITY_SECRET"
+LEPTON_WALLET_SET_ID="$LEPTON_WALLET_SET_ID"
+LEPTON_CIRCLE_API_URL="https://api.circle.com/v1/w3s"
 AI_PROVIDER="$AI_PROVIDER"
 AI_LOCAL_URL="$AI_LOCAL_URL"
 AI_LOCAL_MODEL="$AI_LOCAL_MODEL"
@@ -422,16 +438,16 @@ ok "Containers started."
 title "Health check"
 healthy=0
 for _ in $(seq 1 24); do
-    status=$(docker inspect --format '{{.State.Health.Status}}' app 2>/dev/null || true)
+    status=$(docker inspect --format '{{.State.Health.Status}}' opensinop 2>/dev/null || true)
     if [ "$status" = "healthy" ]; then healthy=1; break; fi
     if [ "$status" = "unhealthy" ]; then break; fi
     sleep 5
 done
-if [ "$healthy" = 1 ]; then ok "Application is healthy."; else warn "Application did not report healthy yet; see docker logs app."; fi
+if [ "$healthy" = 1 ]; then ok "Application is healthy."; else warn "Application did not report healthy yet; see docker logs opensinop."; fi
 
 title "Next steps"
 info "Open the app at $APP_URL"
 info "Create the first administrator:"
-printf '  %s\n' "$(c "$BOLD" "docker exec -it app php artisan eduflow:bootstrap-admin --name=\"School Operator\" --email=\"operator@example.org\"")"
+printf '  %s\n' "$(c "$BOLD" "docker exec -it opensinop php artisan app:bootstrap-admin --name=\"School Operator\" --email=\"operator@example.org\"")"
 info "Circle/Arc features require the Circle CLI and arc-canteen on your workflow host."
 ok "Installation complete."

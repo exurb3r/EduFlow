@@ -72,7 +72,7 @@ class FinanceDashboard extends BaseDashboard
         $institution = app(InstallationInstitution::class)->current();
 
         if ($institution === null) {
-            return 'Institution context unavailable — run eduflow:install. Data is never selected by row order.';
+            return 'Institution context unavailable — run app:install. Data is never selected by row order.';
         }
 
         $status = app(LeptonTreasuryService::class)->status($institution->primaryWallet());

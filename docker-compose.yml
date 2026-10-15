@@ -1,73 +1,77 @@
-# App self-hosted Docker Compose setup
+# OpenSinop self-hosted Docker Compose setup
 # One-line start (after creating this file): docker compose up -d
 # Or directly from GitHub:
-# docker compose -f https://raw.githubusercontent.com/koamishin/KoamiStarterKit/main/docker-compose.yml up -d
+# docker compose -f https://raw.githubusercontent.com/koamishin/OpenSinop/main/docker-compose.yml up -d
 
 services:
-  app:
-    image: ghcr.io/koamishin/koamistarterkit:${EDUFLOW_VERSION:-latest}
-    container_name: app
-    restart: unless-stopped
-    ports:
-      - "${APP_PORT:-8000}:8000"
-    environment:
-      APP_NAME: ${APP_NAME:-OpenSinop}
-      APP_ENV: ${APP_ENV:-production}
-      APP_DEBUG: ${APP_DEBUG:-false}
-      APP_URL: ${APP_URL:-http://localhost:8000}
-      DB_CONNECTION: pgsql
-      DB_HOST: db
-      DB_PORT: 5432
-      DB_DATABASE: ${DB_DATABASE:-app}
-      DB_USERNAME: ${DB_USERNAME:-app}
-      DB_PASSWORD: ${DB_PASSWORD:-app}
-      REDIS_HOST: redis
-      REDIS_PORT: 6379
-      CACHE_STORE: redis
-      SESSION_DRIVER: database
-      QUEUE_CONNECTION: database
-      EDUFLOW_INSTITUTION: ${EDUFLOW_INSTITUTION:-My School}
-      EDUFLOW_COUNTRY: ${EDUFLOW_COUNTRY:-US}
-      EDUFLOW_TIMEZONE: ${EDUFLOW_TIMEZONE:-UTC}
-      EDUFLOW_CURRENCY: ${EDUFLOW_CURRENCY:-USD}
-    volumes:
-      - app_storage:/app/storage
-      - app_cache:/app/bootstrap/cache
-    depends_on:
-      db:
-        condition: service_healthy
-    healthcheck:
-      test: ["CMD-SHELL", "healthcheck"]
-      interval: 10s
-      timeout: 5s
-      retries: 12
-      start_period: 60s
+    app:
+        image: ghcr.io/koamishin/opensinop:${EDUFLOW_VERSION:-latest}
+        container_name: opensinop
+        restart: unless-stopped
+        ports:
+            - '${APP_PORT:-8000}:8000'
+        environment:
+            APP_NAME: ${APP_NAME:-OpenSinop}
+            APP_ENV: ${APP_ENV:-production}
+            APP_DEBUG: ${APP_DEBUG:-false}
+            APP_URL: ${APP_URL:-http://localhost:8000}
+            DB_CONNECTION: pgsql
+            DB_HOST: db
+            DB_PORT: 5432
+            DB_DATABASE: ${DB_DATABASE:-opensinop}
+            DB_USERNAME: ${DB_USERNAME:-opensinop}
+            DB_PASSWORD: ${DB_PASSWORD:-opensinop}
+            REDIS_HOST: redis
+            REDIS_PORT: 6379
+            CACHE_STORE: redis
+            SESSION_DRIVER: database
+            QUEUE_CONNECTION: database
+            EDUFLOW_INSTITUTION: ${EDUFLOW_INSTITUTION:-My School}
+            EDUFLOW_COUNTRY: ${EDUFLOW_COUNTRY:-US}
+            EDUFLOW_TIMEZONE: ${EDUFLOW_TIMEZONE:-UTC}
+            EDUFLOW_CURRENCY: ${EDUFLOW_CURRENCY:-USD}
+        volumes:
+            - opensinop_storage:/app/storage
+            - opensinop_cache:/app/bootstrap/cache
+        depends_on:
+            db:
+                condition: service_healthy
+        healthcheck:
+            test: ['CMD-SHELL', 'healthcheck']
+            interval: 10s
+            timeout: 5s
+            retries: 12
+            start_period: 60s
 
-  db:
-    image: postgres:16-alpine
-    container_name: app-db
-    restart: unless-stopped
-    environment:
-      POSTGRES_DB: ${DB_DATABASE:-app}
-      POSTGRES_USER: ${DB_USERNAME:-app}
-      POSTGRES_PASSWORD: ${DB_PASSWORD:-app}
-    volumes:
-      - app_db:/var/lib/postgresql/data
-    healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U ${DB_USERNAME:-app} -d ${DB_DATABASE:-app}"]
-      interval: 5s
-      timeout: 5s
-      retries: 10
+    db:
+        image: postgres:16-alpine
+        container_name: opensinop-db
+        restart: unless-stopped
+        environment:
+            POSTGRES_DB: ${DB_DATABASE:-opensinop}
+            POSTGRES_USER: ${DB_USERNAME:-opensinop}
+            POSTGRES_PASSWORD: ${DB_PASSWORD:-opensinop}
+        volumes:
+            - opensinop_db:/var/lib/postgresql/data
+        healthcheck:
+            test:
+                [
+                    'CMD-SHELL',
+                    'pg_isready -U ${DB_USERNAME:-opensinop} -d ${DB_DATABASE:-opensinop}',
+                ]
+            interval: 5s
+            timeout: 5s
+            retries: 10
 
-  redis:
-    image: redis:7-alpine
-    container_name: app-redis
-    restart: unless-stopped
-    volumes:
-      - app_redis:/data
+    redis:
+        image: redis:7-alpine
+        container_name: opensinop-redis
+        restart: unless-stopped
+        volumes:
+            - opensinop_redis:/data
 
 volumes:
-  app_storage:
-  app_cache:
-  app_db:
-  app_redis:
+    opensinop_storage:
+    opensinop_cache:
+    opensinop_db:
+    opensinop_redis:
