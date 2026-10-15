@@ -66,7 +66,6 @@ it('renders no description icon inside a finance stat tile', function (): void {
 it('keeps every finance stat description to a single short line', function (): void {
     foreach ($this->finance as $widget) {
         $method = new ReflectionMethod($widget, 'getStats');
-        $method->setAccessible(true);
 
         foreach ($method->invoke(new $widget) as $stat) {
             /** @var Stat $stat */
@@ -86,10 +85,13 @@ it('keeps every finance stat description to a single short line', function (): v
 it('never puts an untruncated address in a finance stat value or description', function (): void {
     foreach ($this->finance as $widget) {
         $method = new ReflectionMethod($widget, 'getStats');
-        $method->setAccessible(true);
 
-        foreach ($method->invoke(new $widget) as $stat) {
-            /** @var Stat $stat */
+        // See AdminOverviewPresentationTest: the element type is declared once
+        // on the local, because a @var inside the loop would attach to $field.
+        /** @var list<Stat> $stats */
+        $stats = $method->invoke(new $widget);
+
+        foreach ($stats as $stat) {
             foreach ([(string) $stat->getValue(), (string) $stat->getDescription()] as $field) {
                 expect($field)->not->toMatch(
                     '/0x[0-9a-fA-F]{40}/',
@@ -183,7 +185,6 @@ it('keeps every finance band description to a single orienting line', function (
 
     foreach ($bands as $widget) {
         $method = new ReflectionMethod($widget, 'getDescription');
-        $method->setAccessible(true);
 
         $description = (string) $method->invoke(new $widget);
 
@@ -207,7 +208,7 @@ it('renders no unicode replacement characters on the finance overview', function
 
 /**
  * The approval inbox is the one band with its own blade, so none of the widget
- * rules reach it. Its three lanes were amber, sky and emerald — three hues for
+ * rules reach it. Its three lanes were amber, sky and emerald ï¿½ three hues for
  * three kinds of work, which read as three severities. Emerald is the colour
  * this panel uses for proven settlement, so a queue of payments awaiting
  * authorization was tinted like good news, and the "Authorize" row action wore

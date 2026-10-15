@@ -749,7 +749,6 @@ test('finance stat captions stay caption length with real data', function (): vo
 
     foreach ([ArcSettlementWidget::class, AutonomyLaneWidget::class, OperationsHealthWidget::class] as $widget) {
         $method = new ReflectionMethod($widget, 'getStats');
-        $method->setAccessible(true);
 
         $stats = $method->invoke(new $widget);
 

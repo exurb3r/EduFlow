@@ -28,6 +28,8 @@ use Illuminate\Support\Carbon;
  * @property int|null $reference_id
  * @property array<string, mixed>|null $metadata
  * @property Carbon|null $executed_at
+ * @property Carbon|null $created_at
+ * @property Carbon|null $updated_at
  * @property-read Organization $organization
  * @property-read Wallet $wallet
  */
