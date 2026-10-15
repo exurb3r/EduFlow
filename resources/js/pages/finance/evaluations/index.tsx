@@ -78,6 +78,11 @@ type Result = {
     unallocated_minor_units?: string;
     needs_review?: boolean;
     jev_called?: boolean;
+    confidence?: number | null;
+    probabilities?: Record<string, number> | null;
+    top_category_id?: string | null;
+    top_category_name?: string | null;
+    decision_process?: string[] | null;
     lines?: {
         target_type: string;
         target_id: number;
@@ -1257,7 +1262,7 @@ export default function PolicyEvaluations({
                                                                 .probabilities,
                                                         )
                                                             .filter(
-                                                                ([_, score]) =>
+                                                                ([, score]) =>
                                                                     (score as number) >
                                                                     0.005,
                                                             )

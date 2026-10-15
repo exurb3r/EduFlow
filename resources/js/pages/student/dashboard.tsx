@@ -883,7 +883,7 @@ export default function StudentDashboard({
                                                 setPayQuote(
                                                     buildInstantQuote(units),
                                                 );
-                                                void fetchQuote(units);
+                                                void requestQuote(units);
                                             }}
                                             onDone={() => {
                                                 setPayOpen(false);
@@ -987,7 +987,7 @@ export default function StudentDashboard({
                                                                         units,
                                                                     ),
                                                                 );
-                                                                void fetchQuote(
+                                                                void requestQuote(
                                                                     units,
                                                                 );
                                                             }}
@@ -1016,7 +1016,7 @@ export default function StudentDashboard({
                                                                 remainingBase,
                                                             ),
                                                         );
-                                                        void fetchQuote(
+                                                        void requestQuote(
                                                             remainingBase,
                                                         );
                                                     }}
@@ -1027,7 +1027,8 @@ export default function StudentDashboard({
                                                             : 'border-[var(--clay-border)] bg-[var(--clay-surface-soft)] text-[var(--clay-text)] hover:border-[var(--clay-primary-bright)]/40'
                                                     }`}
                                                 >
-                                                    Full ({remainingUsdc.toFixed(2)})
+                                                    Full (
+                                                    {remainingUsdc.toFixed(2)})
                                                 </button>
                                             </div>
                                         </div>
