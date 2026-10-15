@@ -247,6 +247,9 @@ export default function Dashboard({
     notifications = null,
     finance = null,
 }: DashboardProps) {
+    Dashboard.layout = {
+        breadcrumbs: [{ title: 'Dashboard', href: dashboard() }],
+    };
     const { auth } = usePage<{ auth: Auth }>().props;
     const [search, setSearch] = useState(filters.search);
 
@@ -849,8 +852,4 @@ export default function Dashboard({
             </div>
         </>
     );
-
-    Dashboard.layout = {
-        breadcrumbs: [{ title: 'Dashboard', href: dashboard() }],
-    };
 }
