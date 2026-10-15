@@ -254,11 +254,12 @@ if ($AI_PROVIDER -eq "none") { $AI_PROVIDER = "local" }
 
 # Live checks
 Title "Live network checks"
-$rpc = Test-Rpc $LEPTON_RPC_URL
-if ($rpc[0] -eq $null) {
-    Info "Arc RPC check skipped (no URL supplied)."
-} elseif ($rpc[0]) {
-    Ok ("Arc RPC reachable: chainId=" + $rpc[1])
+$rpcTarget = if ([string]::IsNullOrWhiteSpace($LEPTON_RPC_URL)) {
+    if ($LEPTON_CHAIN -eq "ARC-MAINNET") { "https://rpc.mainnet.arc.io" } else { "https://rpc.testnet.arc.io" }
+} else { $LEPTON_RPC_URL }
+$rpc = Test-Rpc $rpcTarget
+if ($rpc[0]) {
+    Ok ("Arc RPC reachable ($rpcTarget): chainId=" + $rpc[1])
 } else {
     Warn ("Arc RPC check failed: " + $rpc[1])
 }

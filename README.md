@@ -231,8 +231,7 @@ real permitted source records, staff review and connected verified testnet evide
 | **Composer** | 2.x | [Composer Download](https://getcomposer.org/download/) |
 | **Node.js & npm** | 20.18.2+ | [Node.js Downloads](https://nodejs.org/en/download) |
 | **Circle CLI** | 1.1.4+ | [Circle CLI Documentation](https://developers.circle.com/agent-stack/circle-cli) · `npm i -g @circle-fin/cli` |
-| **uv** (Astral) | Latest | [Astral uv Documentation](https://docs.astral.sh/uv/) · Python package & tool manager |
-| **arc-canteen** | Latest | [Arc Network Docs](https://docs.arc.io) · [The Canteen App](https://arc-node.thecanteenapp.com/) · CLI for Arc testnet RPC & wallet |
+| **uv / arc-canteen** (Optional) | Latest | [Arc Network Docs](https://docs.arc.io) · Arc blockchain queries now use direct HTTP JSON-RPC automatically |
 
 ### Installing the prerequisites
 

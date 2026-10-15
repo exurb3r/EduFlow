@@ -319,11 +319,15 @@ else
 fi
 
 title "Live network checks"
-if [ -n "$LEPTON_RPC_URL" ]; then
-    res=$(rpc_test "$LEPTON_RPC_URL")
-    if [ "$res" = "FAIL" ]; then warn "Arc RPC check failed."; elif [ -n "$res" ]; then ok "Arc RPC reachable: chainId=$res"; fi
-else
-    info "Arc RPC check skipped (no URL supplied)."
+rpc_target="${LEPTON_RPC_URL:-https://rpc.testnet.arc.io}"
+if [ "$LEPTON_CHAIN" = "ARC-MAINNET" ] && [ -z "$LEPTON_RPC_URL" ]; then
+    rpc_target="https://rpc.mainnet.arc.io"
+fi
+res=$(rpc_test "$rpc_target")
+if [ "$res" = "FAIL" ]; then
+    warn "Arc RPC check failed for $rpc_target."
+elif [ -n "$res" ]; then
+    ok "Arc RPC reachable ($rpc_target): chainId=$res"
 fi
 
 if cmd_exists circle; then ok "Circle CLI found on PATH."; else warn "Circle CLI not found on PATH (needed only for circle driver)."; fi
