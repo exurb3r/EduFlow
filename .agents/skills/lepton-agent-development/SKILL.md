@@ -11,18 +11,17 @@ Use it when working with `yukazakiri/lepton-agent`: moving USDC, reading Arc cha
 state, authenticating a Circle agent wallet, paying x402 services, or writing tests
 that must not touch a chain.
 
-## The four gateways
+## The five gateways
 
-Everything goes through a contract resolved from the container. There is deliberately
-no generic `run()` passthrough, so there is never a reason to shell out to `circle`
-yourself.
+Everything goes through a contract resolved from the container:
 
 | Contract | Purpose |
 |---|---|
-| `WalletGateway` | `transfer`, `balance`, `transactions`, `limits` |
+| `WalletGateway` | `transfer`, `balance`, `transactions`, `limits`, `wallets`, `createWallet`, `fundWallet` |
 | `ArcNetworkGateway` | `rpc`, `blockNumber`, `chainId`, `rpcUrl`, `treasuryAddress`, `explorerUrl`, `addressExplorerUrl` |
 | `AuthGateway` | `authStatus`, `beginLogin`, `completeLogin`, `isAuthenticatedFor` |
 | `X402Gateway` | `searchServices`, `inspectService`, `payService`, `gatewayBalance` |
+| `CircleGateway` | `run`, `wallets`, `createWallet`, `fundWallet`, `signMessage`, `signTypedData`, `execute`, `gatewayDeposit`, `gatewayWithdraw`, `bridgeTransfer`, `bridgeStatus`, `bridgeFee`, `contractAddress`, `contractQuery`, `blockchains` |
 
 ```php
 use Yukazakiri\Lepton\Contracts\WalletGateway;
@@ -32,6 +31,37 @@ $wallets = app(WalletGateway::class);
 
 Inject the contract into a service rather than resolving it deep in a call chain, so
 the class stays testable.
+
+## Wallet management (create, list, fund)
+
+Manage Circle agent wallets programmatically via `WalletGateway` or the `Lepton` facade,
+or via dedicated Artisan CLI commands:
+
+```php
+use Yukazakiri\Lepton\Contracts\WalletGateway;
+use Yukazakiri\Lepton\Facades\Lepton;
+
+// List wallets on chain
+$wallets = app(WalletGateway::class)->wallets(['chain' => 'ARC-TESTNET']);
+$wallets = Lepton::listWallets(['chain' => 'ARC-TESTNET']);
+
+// Create agent wallet (EVM SCA)
+$newWallet = app(WalletGateway::class)->createWallet(['testnet' => true]);
+$newWallet = Lepton::createWallet(['testnet' => true]);
+
+// Fund wallet (Circle testnet faucet drip or mainnet payment link)
+$funded = app(WalletGateway::class)->fundWallet('0xAddress', ['chain' => 'ARC-TESTNET']);
+$funded = Lepton::fundWallet('0xAddress', ['chain' => 'ARC-TESTNET']);
+```
+
+### CLI commands
+
+```bash
+php artisan lepton:wallets                     # list agent wallets on configured chain
+php artisan lepton:wallets --chain=ARC-TESTNET # filter by chain
+php artisan lepton:wallet:create --testnet     # create agent wallet on testnet
+php artisan lepton:wallet:fund 0xAddress       # request testnet faucet drip
+```
 
 ## Money is integer base units
 
@@ -210,6 +240,5 @@ property or a singleton.
 
 ## What the package does not wrap
 
-`wallet create`, `fund`, `sign`, `swap`, `execute`, `import`, `bridge`, `contract`,
-`earn`, `blockchain config`. Run those through the Circle CLI directly; do not assume
+`wallet import`, `swap`, `earn`. Run those through the Circle CLI directly; do not assume
 a gateway method exists because the CLI verb does.

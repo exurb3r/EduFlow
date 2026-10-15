@@ -41,6 +41,12 @@ Circle can only sign for wallets it custodies. An `arc-canteen` local wallet hol
 Circle cannot use, so transfers against it fail even with a valid session. `lepton:doctor`
 prints all three addresses (env, database, circle) side by side — a mismatch is the bug.
 
+## Manage agent wallets through Lepton commands and contracts
+Do not shell out to raw `circle` CLI commands directly in application code. Use:
+- `php artisan lepton:wallets` (or `app(WalletGateway::class)->wallets()`) to list wallets.
+- `php artisan lepton:wallet:create --testnet` (or `app(WalletGateway::class)->createWallet()`) to create agent wallets.
+- `php artisan lepton:wallet:fund <address>` (or `app(WalletGateway::class)->fundWallet()`) to fund wallets via faucet on testnet.
+
 ## Never cast a hex quantity with hexdec()
 `hexdec()` returns a **float** past `PHP_INT_MAX`, and an `(int)` cast of that wraps to a
 negative number. Native Arc USDC is 18 decimals, so 20 USDC is 2e19 wei — well over the
