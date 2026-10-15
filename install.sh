@@ -248,8 +248,8 @@ add() { FIELDS+=("$1=$2"); }
 
 title "Application"
 APP_NAME=$(ask "Application name" "OpenSinop")
-APP_ENV=$(ask_choice "Environment" "production" production local staging)
-APP_DEBUG=$(ask_choice "Debug mode" "false" false true)
+APP_ENV="production"
+APP_DEBUG="false"
 APP_PORT=$(ask "Published HTTP port" "8000")
 APP_URL=$(ask "Public URL" "http://localhost:$APP_PORT")
 APP_KEY="$(gen_key)"
@@ -267,34 +267,23 @@ else
     DB_PASSWORD=$(ask_secret "DB password" "app")
 fi
 
-title "Cache, session and queue"
-CACHE_STORE=$(ask_choice "Cache store" "$([ "$DB_CONNECTION" = sqlite ] && echo database || echo redis)" database redis array file)
-SESSION_DRIVER=$(ask_choice "Session driver" "$([ "$CACHE_STORE" = redis ] && echo redis || echo database)" database redis file cookie)
-QUEUE_CONNECTION=$(ask_choice "Queue connection" "database" database redis sync)
+# Common environment defaults (production)
+CACHE_STORE="database"
+SESSION_DRIVER="database"
+QUEUE_CONNECTION="database"
+REDIS_HOST="127.0.0.1"
+REDIS_PORT="6379"
+REDIS_PASSWORD="null"
 
-if printf '%s %s %s' "$CACHE_STORE" "$SESSION_DRIVER" "$QUEUE_CONNECTION" | grep -q redis; then
-    title "Redis"
-    REDIS_HOST=$(ask "Redis host" "redis")
-    REDIS_PORT=$(ask "Redis port" "6379")
-    REDIS_PASSWORD=$(ask_secret "Redis password (empty if none)" "")
-    [ -z "$REDIS_PASSWORD" ] && REDIS_PASSWORD="null"
-else
-    REDIS_HOST="127.0.0.1"; REDIS_PORT="6379"; REDIS_PASSWORD="null"
-fi
-
-title "Mail"
-MAIL_MAILER=$(ask_choice "Mail driver" "smtp" smtp log sendmail ses postmark)
-if [ "$MAIL_MAILER" = "smtp" ]; then
-    MAIL_HOST=$(ask "SMTP host" "mailpit")
-    MAIL_PORT=$(ask "SMTP port" "1025")
-    MAIL_USERNAME=$(ask "SMTP username" "")
-    MAIL_PASSWORD=$(ask_secret "SMTP password" "")
-    MAIL_SCHEME=$(ask_choice "SMTP scheme" "null" null tls ssl)
-else
-    MAIL_HOST="127.0.0.1"; MAIL_PORT="2525"; MAIL_USERNAME=""; MAIL_PASSWORD=""; MAIL_SCHEME="null"
-fi
-MAIL_FROM_ADDRESS=$(ask "Mail from address" "hello@example.com")
-MAIL_FROM_NAME=$(ask "Mail from name" "$APP_NAME")
+# Mail defaults
+MAIL_MAILER="log"
+MAIL_HOST="127.0.0.1"
+MAIL_PORT="2525"
+MAIL_USERNAME=""
+MAIL_PASSWORD=""
+MAIL_SCHEME="null"
+MAIL_FROM_ADDRESS="hello@example.com"
+MAIL_FROM_NAME="$APP_NAME"
 
 title "School identity"
 EDUFLOW_INSTITUTION=$(ask "Institution name" "My School")
@@ -326,14 +315,6 @@ else
 fi
 
 title "Live network checks"
-if printf '%s %s %s' "$CACHE_STORE" "$SESSION_DRIVER" "$QUEUE_CONNECTION" | grep -q redis; then
-    if redis_ping "$REDIS_HOST" "$REDIS_PORT" "${REDIS_PASSWORD:-}" 2>/dev/null; then
-        ok "Redis reachable: PING -> PONG"
-    else
-        warn "Redis not reachable now (will retry after containers start)."
-    fi
-fi
-
 if [ -n "$LEPTON_RPC_URL" ]; then
     res=$(rpc_test "$LEPTON_RPC_URL")
     if [ "$res" = "FAIL" ]; then warn "Arc RPC check failed."; elif [ -n "$res" ]; then ok "Arc RPC reachable: chainId=$res"; fi

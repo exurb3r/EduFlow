@@ -176,9 +176,8 @@ Info "Press Enter to accept a suggested default."
 # Application
 Title "Application"
 $APP_NAME = Ask "Application name" "OpenSinop"
-$APP_ENV = Ask-Choice "Environment" "production" @("production", "local", "staging")
-$tmp = Ask-Choice "Debug mode" "false" @("false", "true")
-$APP_DEBUG = $tmp
+$APP_ENV = "production"
+$APP_DEBUG = "false"
 $APP_PORT = Ask "Published HTTP port" "8000"
 $APP_URL = Ask "Public URL" ("http://localhost:" + $APP_PORT)
 $APP_KEY = Gen-Key
@@ -200,37 +199,25 @@ if ($DB_CONNECTION -eq "sqlite") {
 
 # Cache/session/queue
 Title "Cache, session and queue"
-$defaultCache = if ($DB_CONNECTION -eq "sqlite") { "database" } else { "redis" }
-$CACHE_STORE = Ask-Choice "Cache store" $defaultCache @("database", "redis", "array", "file")
-$defaultSession = if ($CACHE_STORE -in @("database","redis")) { $CACHE_STORE } else { "database" }
-$SESSION_DRIVER = Ask-Choice "Session driver" $defaultSession @("database", "redis", "file", "cookie")
-$QUEUE_CONNECTION = Ask-Choice "Queue connection" "database" @("database", "redis", "sync")
-
-$redisNeeded = ($CACHE_STORE -eq "redis" -or $SESSION_DRIVER -eq "redis" -or $QUEUE_CONNECTION -eq "redis")
-if ($redisNeeded) {
-    Title "Redis"
-    $REDIS_HOST = Ask "Redis host" "redis"
-    $REDIS_PORT = Ask "Redis port" "6379"
-    $REDIS_PASSWORD = Read-Secret "Redis password (empty if none)"
-    if ([string]::IsNullOrWhiteSpace($REDIS_PASSWORD)) { $REDIS_PASSWORD = "null" }
-} else {
-    $REDIS_HOST = "127.0.0.1"; $REDIS_PORT = "6379"; $REDIS_PASSWORD = "null"
-}
+# Common environment defaults (production)
+$CACHE_STORE = "database"
+$SESSION_DRIVER = "database"
+$QUEUE_CONNECTION = "database"
+$REDIS_HOST = "127.0.0.1"
+$REDIS_PORT = "6379"
+$REDIS_PASSWORD = "null"
 
 # Mail
 Title "Mail"
-$MAIL_MAILER = Ask-Choice "Mail driver" "smtp" @("smtp", "log", "sendmail", "ses", "postmark")
-if ($MAIL_MAILER -eq "smtp") {
-    $MAIL_HOST = Ask "SMTP host" "mailpit"
-    $MAIL_PORT = Ask "SMTP port" "1025"
-    $MAIL_USERNAME = Ask "SMTP username" ""
-    $MAIL_PASSWORD = Read-Secret "SMTP password"
-    $MAIL_SCHEME = Ask-Choice "SMTP scheme" "null" @("null", "tls", "ssl")
-} else {
-    $MAIL_HOST = "127.0.0.1"; $MAIL_PORT = "2525"; $MAIL_USERNAME = ""; $MAIL_PASSWORD = ""; $MAIL_SCHEME = "null"
-}
-$MAIL_FROM_ADDRESS = Ask "Mail from address" "hello@example.com"
-$MAIL_FROM_NAME = Ask "Mail from name" $APP_NAME
+# Mail defaults
+$MAIL_MAILER = "log"
+$MAIL_HOST = "127.0.0.1"
+$MAIL_PORT = "2525"
+$MAIL_USERNAME = ""
+$MAIL_PASSWORD = ""
+$MAIL_SCHEME = "null"
+$MAIL_FROM_ADDRESS = "hello@example.com"
+$MAIL_FROM_NAME = $APP_NAME
 
 # Institution
 Title "School identity"
@@ -264,14 +251,6 @@ if ($AI_PROVIDER -eq "none") { $AI_PROVIDER = "local" }
 
 # Live checks
 Title "Live network checks"
-if ($redisNeeded) {
-    if (Test-Redis $REDIS_HOST ([int]$REDIS_PORT) $REDIS_PASSWORD) {
-        Ok "Redis reachable: PING -> PONG"
-    } else {
-        Warn "Redis not reachable now (will retry after containers start)."
-    }
-}
-
 $rpc = Test-Rpc $LEPTON_RPC_URL
 if ($rpc[0] -eq $null) {
     Info "Arc RPC check skipped (no URL supplied)."
