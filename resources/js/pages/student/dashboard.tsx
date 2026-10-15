@@ -272,6 +272,25 @@ export default function StudentDashboard({
     const [isRefreshingTxs, setIsRefreshingTxs] = useState(false);
     const [copiedTxHash, setCopiedTxHash] = useState<string | null>(null);
 
+    const [inlineDismissedId, setInlineDismissedId] = useState<number | null>(
+        () => {
+            try {
+                const stored = sessionStorage.getItem(
+                    'eduflow_dismissed_tuition_attempt',
+                );
+                return stored ? Number(stored) : null;
+            } catch {
+                return null;
+            }
+        },
+    );
+
+    const latestTrackerAttempt = trackerAttempts[0] ?? null;
+    const showInlineTracker =
+        hasInFlight ||
+        (latestTrackerAttempt !== null &&
+            latestTrackerAttempt.id !== inlineDismissedId);
+
     const { props } = usePage();
     const notificationSummary = props.notificationSummary;
 
@@ -1431,6 +1450,64 @@ export default function StudentDashboard({
                             </DialogContent>
                         </Dialog>
 
+                        {/* -- Active Tuition Payment Rail Tracker -- */}
+                        {showInlineTracker && (
+                            <section
+                                aria-labelledby="live-tuition-rail-heading"
+                                className="flex flex-col gap-2.5"
+                            >
+                                <div className="flex items-center justify-between px-1">
+                                    <h2
+                                        id="live-tuition-rail-heading"
+                                        className="bulletin-eyebrow flex items-center gap-2"
+                                    >
+                                        <Radio className="size-3.5 text-[var(--clay-primary-bright)] animate-pulse" />
+                                        <span>Tuition payment rail</span>
+                                        {hasInFlight && (
+                                            <span className="rounded-full border border-amber-500/20 bg-amber-500/10 px-2 py-0.5 text-[10px] font-semibold text-amber-400 animate-pulse">
+                                                Live Transfer Active
+                                            </span>
+                                        )}
+                                    </h2>
+                                    <button
+                                        type="button"
+                                        onClick={() =>
+                                            setMonitorDrawerOpen(true)
+                                        }
+                                        className="clay-focus inline-flex items-center gap-1 text-xs font-semibold text-[var(--clay-primary-bright)] hover:underline"
+                                    >
+                                        Rail Monitor Drawer
+                                        <ArrowRight className="size-3" />
+                                    </button>
+                                </div>
+
+                                <StudentPaymentTracker
+                                    attempts={trackerAttempts}
+                                    tuitionAccount={tuitionAccount}
+                                    walletBalance={snapshot?.balance}
+                                    onOpenPay={() => openPay()}
+                                    onDone={() => {
+                                        if (latestTrackerAttempt) {
+                                            setInlineDismissedId(
+                                                latestTrackerAttempt.id,
+                                            );
+                                            try {
+                                                sessionStorage.setItem(
+                                                    'eduflow_dismissed_tuition_attempt',
+                                                    String(
+                                                        latestTrackerAttempt.id,
+                                                    ),
+                                                );
+                                            } catch {
+                                                // Ignore storage errors
+                                            }
+                                        }
+                                        setMonitorDrawerOpen(false);
+                                    }}
+                                />
+                            </section>
+                        )}
+
                         {/* -- Wallet hero -- */}
                         <section
                             aria-labelledby="wallet-heading"
@@ -1645,6 +1722,55 @@ export default function StudentDashboard({
                                                     : '••••'}
                                             </p>
                                         )}
+
+                                        {hasInFlight && inFlightAttempt ? (
+                                            <div className="mt-3 flex items-center justify-between rounded-xl border border-amber-500/30 bg-amber-500/10 p-2.5 text-xs text-amber-300">
+                                                <div className="flex min-w-0 items-center gap-2">
+                                                    <Loader2 className="size-3.5 shrink-0 animate-spin text-amber-400" />
+                                                    <span className="truncate font-medium">
+                                                        {formatBaseUnits(
+                                                            inFlightAttempt.amount_base_units,
+                                                        )}{' '}
+                                                        USDC transfer in flight
+                                                    </span>
+                                                </div>
+                                                <button
+                                                    type="button"
+                                                    onClick={() =>
+                                                        setMonitorDrawerOpen(
+                                                            true,
+                                                        )
+                                                    }
+                                                    className="clay-focus ml-2 shrink-0 font-semibold text-amber-200 underline hover:text-amber-100"
+                                                >
+                                                    Track
+                                                </button>
+                                            </div>
+                                        ) : activeReceipt?.posted ? (
+                                            <div className="mt-3 flex items-center justify-between rounded-xl border border-emerald-500/30 bg-emerald-500/10 p-2.5 text-xs text-emerald-300">
+                                                <div className="flex min-w-0 items-center gap-2">
+                                                    <CheckCircle2 className="size-3.5 shrink-0 text-emerald-400" />
+                                                    <span className="truncate font-medium">
+                                                        Last payment of{' '}
+                                                        {formatBaseUnits(
+                                                            activeReceipt.applied_base_units,
+                                                        )}{' '}
+                                                        USDC posted
+                                                    </span>
+                                                </div>
+                                                <button
+                                                    type="button"
+                                                    onClick={() =>
+                                                        setMonitorDrawerOpen(
+                                                            true,
+                                                        )
+                                                    }
+                                                    className="clay-focus ml-2 shrink-0 font-semibold text-emerald-200 underline hover:text-emerald-100"
+                                                >
+                                                    Receipt
+                                                </button>
+                                            </div>
+                                        ) : null}
 
                                         <dl className="mt-6 grid grid-cols-2 gap-4 border-t border-[var(--clay-border)] pt-5">
                                             <div>
