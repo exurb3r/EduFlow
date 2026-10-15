@@ -737,9 +737,9 @@ export default function StudentDashboard({
                 return;
             }
 
-            setPayOpen(false);
+            setPayOpen(true);
             setReceipt(payload);
-            setMonitorDrawerOpen(true);
+            setMonitorDrawerOpen(false);
             toast.success('Tuition payment submitted', {
                 description: 'Tracking live progress on Arc Testnet rail…',
             });
@@ -867,292 +867,31 @@ export default function StudentDashboard({
                                 </DialogHeader>
 
                                 {activeReceipt ? (
-                                    <div className="grid gap-4">
-                                        <div className="flex items-center gap-2.5">
-                                            {activeReceipt.posted ? (
-                                                <>
-                                                    <CheckCircle2 className="size-5 shrink-0 text-[var(--status-resolved)]" />
-                                                    <p className="clay-title text-[var(--status-resolved)]">
-                                                        Successfully transferred
-                                                    </p>
-                                                </>
-                                            ) : activeReceipt.verified ? (
-                                                <>
-                                                    <Check className="size-5 shrink-0 text-[var(--status-resolved)]" />
-                                                    <p className="clay-title text-[var(--status-resolved)]">
-                                                        Verified on chain —
-                                                        posting allocation…
-                                                    </p>
-                                                </>
-                                            ) : activeReceipt.state ===
-                                              'failed' ? (
-                                                <>
-                                                    <TriangleAlert className="size-5 shrink-0 text-[var(--status-urgent)]" />
-                                                    <p className="clay-title text-[var(--status-urgent)]">
-                                                        Transfer could not be
-                                                        completed
-                                                    </p>
-                                                </>
-                                            ) : activeReceipt.simulated ? (
-                                                <p className="clay-title text-[var(--status-pending)]">
-                                                    Rehearsal — nothing was
-                                                    sent.
-                                                </p>
-                                            ) : (
-                                                <>
-                                                    <Loader2 className="size-5 shrink-0 animate-spin text-[var(--status-pending)]" />
-                                                    <p className="clay-title text-[var(--status-pending)]">
-                                                        {activeReceipt.stage ===
-                                                            'needs_operator_review' ||
-                                                        activeReceipt.requires_investigation
-                                                            ? 'Preflight blocked — funds returned to balance'
-                                                            : activeReceipt.state ===
-                                                                'prepared'
-                                                              ? 'Payment recorded — processing transfer…'
-                                                              : activeReceipt.state ===
-                                                                  'submitting'
-                                                                ? 'Submitting to Arc network…'
-                                                                : activeReceipt.state ===
-                                                                    'accepted'
-                                                                  ? 'Accepted by network — awaiting block…'
-                                                                  : activeReceipt.state ===
-                                                                      'awaiting_verification'
-                                                                    ? 'On chain — verifying movement…'
-                                                                    : activeReceipt.state_label}
-                                                    </p>
-                                                </>
-                                            )}
-                                        </div>
-                                        <dl className="grid gap-3 text-sm">
-                                            <div className="flex items-baseline justify-between gap-4">
-                                                <dt className="clay-meta">
-                                                    Status
-                                                </dt>
-                                                <dd className="clay-title">
-                                                    {activeReceipt.posted ? (
-                                                        <span className="inline-flex items-center gap-1.5 font-semibold text-[var(--status-resolved)]">
-                                                            <CheckCircle2 className="size-3.5" />
-                                                            Successfully
-                                                            transferred
-                                                        </span>
-                                                    ) : activeReceipt.verified ? (
-                                                        <span className="inline-flex items-center gap-1.5 font-semibold text-[var(--status-resolved)]">
-                                                            <Check className="size-3.5" />
-                                                            Verified on chain
-                                                        </span>
-                                                    ) : activeReceipt.stage ===
-                                                          'needs_operator_review' ||
-                                                      activeReceipt.requires_investigation ? (
-                                                        <span className="inline-flex items-center gap-1.5 font-semibold text-amber-500">
-                                                            <TriangleAlert className="size-3.5" />
-                                                            Hold returned to
-                                                            balance
-                                                        </span>
-                                                    ) : activeReceipt.state ===
-                                                      'failed' ? (
-                                                        <span className="inline-flex items-center gap-1.5 font-semibold text-[var(--status-urgent)]">
-                                                            <TriangleAlert className="size-3.5" />
-                                                            Failed
-                                                        </span>
-                                                    ) : activeReceipt.simulated ? (
-                                                        <span className="font-semibold text-[var(--status-pending)]">
-                                                            Rehearsal
-                                                        </span>
-                                                    ) : (
-                                                        <span className="inline-flex items-center gap-1.5 font-semibold text-[var(--status-pending)]">
-                                                            <Loader2 className="size-3.5 animate-spin" />
-                                                            Processing transfer…
-                                                        </span>
-                                                    )}
-                                                </dd>
-                                            </div>
-                                            <div className="flex items-baseline justify-between gap-4">
-                                                <dt className="clay-meta">
-                                                    {activeReceipt.simulated
-                                                        ? 'Would be sent to institution'
-                                                        : 'Transferred amount'}
-                                                </dt>
-                                                <dd className="clay-title tabular-nums">
-                                                    {formatBaseUnits(
-                                                        activeReceipt.amount_base_units,
-                                                    )}{' '}
-                                                    USDC
-                                                </dd>
-                                            </div>
-                                            <div className="flex items-baseline justify-between gap-4">
-                                                <dt className="clay-meta">
-                                                    {activeReceipt.simulated
-                                                        ? 'Network fee (not charged)'
-                                                        : 'Proven network fee'}
-                                                </dt>
-                                                <dd className="clay-title tabular-nums">
-                                                    {activeReceipt.actual_network_fee
-                                                        ? `${Number(activeReceipt.actual_network_fee).toFixed(6)} USDC`
-                                                        : activeReceipt.posted
-                                                          ? 'Sponsored'
-                                                          : 'Not yet proven'}
-                                                </dd>
-                                            </div>
-                                            <div className="flex items-baseline justify-between gap-4">
-                                                <dt className="clay-meta">
-                                                    Applied to this account
-                                                </dt>
-                                                <dd
-                                                    className={`clay-title tabular-nums ${activeReceipt.posted ? 'text-[var(--status-resolved)]' : ''}`}
-                                                >
-                                                    {formatBaseUnits(
-                                                        activeReceipt.applied_base_units,
-                                                    )}{' '}
-                                                    USDC
-                                                    {!activeReceipt.posted &&
-                                                        activeReceipt.state !==
-                                                            'failed' &&
-                                                        !activeReceipt.simulated && (
-                                                            <span className="ml-1.5 text-xs font-normal text-[var(--clay-text-muted)]">
-                                                                (pending)
-                                                            </span>
-                                                        )}
-                                                </dd>
-                                            </div>
-                                            {BigInt(
-                                                activeReceipt.overpayment_base_units ??
-                                                    '0',
-                                            ) > 0n && (
-                                                <div className="flex items-baseline justify-between gap-4">
-                                                    <dt className="clay-meta">
-                                                        Larger than what was
-                                                        owed
-                                                    </dt>
-                                                    <dd className="clay-title tabular-nums text-[var(--status-pending)]">
-                                                        {formatBaseUnits(
-                                                            activeReceipt.overpayment_base_units,
-                                                        )}{' '}
-                                                        USDC
-                                                    </dd>
-                                                </div>
-                                            )}
-                                            <div className="flex items-baseline justify-between gap-4">
-                                                <dt className="clay-meta">
-                                                    Still owed
-                                                </dt>
-                                                <dd className="clay-title tabular-nums">
-                                                    {formatBaseUnits(
-                                                        tuitionAccount?.remaining_amount ??
-                                                            '0',
-                                                    )}{' '}
-                                                    USDC
-                                                </dd>
-                                            </div>
-                                            <div className="min-w-0">
-                                                <dt className="clay-meta">
-                                                    Transaction
-                                                </dt>
-                                                <dd className="clay-meta mt-1">
-                                                    {activeReceipt.tx_hash ? (
-                                                        <div className="flex flex-wrap items-center justify-between gap-2">
-                                                            <span className="font-mono text-xs break-all">
-                                                                {
-                                                                    activeReceipt.tx_hash
-                                                                }
-                                                            </span>
-                                                            {activeReceipt.explorer_url && (
-                                                                <a
-                                                                    href={
-                                                                        activeReceipt.explorer_url
-                                                                    }
-                                                                    target="_blank"
-                                                                    rel="noopener noreferrer"
-                                                                    className="clay-focus inline-flex shrink-0 items-center gap-1 rounded text-xs font-semibold text-[var(--clay-primary-bright)] hover:underline"
-                                                                >
-                                                                    Verify on
-                                                                    Arcscan
-                                                                    <ExternalLink className="size-3" />
-                                                                </a>
-                                                            )}
-                                                        </div>
-                                                    ) : (
-                                                        <span className="text-[var(--clay-text-muted)]">
-                                                            {activeReceipt.state ===
-                                                            'failed'
-                                                                ? 'No transaction broadcast'
-                                                                : 'Pending relayer dispatch…'}
-                                                        </span>
-                                                    )}
-                                                </dd>
-                                            </div>
-                                        </dl>
-                                        <p className="clay-meta">
-                                            {activeReceipt.posted
-                                                ? 'Receipt verified on Arc Testnet consensus and credited to tuition balance.'
-                                                : activeReceipt.simulated
-                                                  ? 'No USDC moved on any network, and no fee was charged.'
-                                                  : 'Fees are shown only when proven. Receipt status, allocation and official tuition are different claims.'}
-                                        </p>
-                                        <p className="clay-meta">
-                                            {activeReceipt.posted ? (
-                                                <span className="font-semibold text-[var(--status-resolved)]">
-                                                    Allocation: Posted to
-                                                    designated pilot account.
-                                                </span>
-                                            ) : (
-                                                <span>
-                                                    {activeReceipt.guidance}{' '}
-                                                    Allocation: Not posted.
-                                                </span>
-                                            )}
-                                        </p>
-                                        {BigInt(
-                                            activeReceipt.overpayment_base_units ??
-                                                '0',
-                                        ) > 0n && (
-                                            <p className="clay-meta">
-                                                You paid more than this account
-                                                owed, so the excess is recorded
-                                                against your account rather than
-                                                absorbed into the school's
-                                                budget.
-                                            </p>
-                                        )}
-                                        <div className="flex flex-wrap items-center gap-2.5">
-                                            <Button
-                                                type="button"
-                                                className="clay-focus flex-1 rounded-full bg-[var(--clay-primary)] font-semibold text-[var(--clay-primary-foreground)]"
-                                                onClick={() => {
-                                                    setPayOpen(false);
-                                                    setReceipt(null);
-                                                    setMonitorDrawerOpen(false);
-                                                }}
-                                            >
-                                                Done
-                                            </Button>
-                                            {activeReceipt.posted &&
-                                                remainingBase > 0 && (
-                                                    <Button
-                                                        type="button"
-                                                        variant="outline"
-                                                        className="clay-focus rounded-full border-[var(--clay-border)] text-xs font-semibold"
-                                                        onClick={() => {
-                                                            setReceipt(null);
-                                                            setConsent(false);
-                                                            setRequestKey(null);
-                                                            isInitialOpenRef.current = true;
-                                                            setPayAmount(
-                                                                (
-                                                                    defaultPayBaseUnits /
-                                                                    1_000_000
-                                                                ).toFixed(2),
-                                                            );
-                                                            setPayQuote(
-                                                                buildInstantQuote(
-                                                                    defaultPayBaseUnits,
-                                                                ),
-                                                            );
-                                                        }}
-                                                    >
-                                                        Make another payment
-                                                    </Button>
-                                                )}
-                                        </div>
+                                    <div className="pt-1">
+                                        <StudentPaymentTracker
+                                            attempts={[
+                                                activeReceipt,
+                                                ...trackerAttempts,
+                                            ]}
+                                            tuitionAccount={tuitionAccount}
+                                            walletBalance={snapshot?.balance}
+                                            onOpenPay={() => {
+                                                setReceipt(null);
+                                                setConsent(true);
+                                                setPayAmount('5.00');
+                                                const units = 5_000_000;
+                                                setPayQuote(
+                                                    buildInstantQuote(units),
+                                                );
+                                                void fetchQuote(units);
+                                            }}
+                                            onDone={() => {
+                                                setPayOpen(false);
+                                                setReceipt(null);
+                                                setMonitorDrawerOpen(false);
+                                            }}
+                                            className="border-0 bg-transparent p-0 shadow-none"
+                                        />
                                     </div>
                                 ) : (
                                     <form
@@ -1210,12 +949,95 @@ export default function StudentDashboard({
                                             </div>
                                         </dl>
 
+                                        {/* Quick Amount Chips */}
+                                        <div className="space-y-1.5">
+                                            <span className="bulletin-eyebrow text-xs text-[var(--clay-text-muted)]">
+                                                Quick amounts
+                                            </span>
+                                            <div className="flex flex-wrap items-center gap-1.5">
+                                                {[5, 10, 25, 50]
+                                                    .filter(
+                                                        (amt) =>
+                                                            amt <=
+                                                            remainingUsdc,
+                                                    )
+                                                    .map((amt) => (
+                                                        <button
+                                                            key={amt}
+                                                            type="button"
+                                                            onClick={() => {
+                                                                const val =
+                                                                    amt.toFixed(
+                                                                        2,
+                                                                    );
+                                                                setPayAmount(
+                                                                    val,
+                                                                );
+                                                                setConsent(
+                                                                    true,
+                                                                );
+                                                                setPayError(
+                                                                    null,
+                                                                );
+                                                                const units =
+                                                                    amt *
+                                                                    1_000_000;
+                                                                setPayQuote(
+                                                                    buildInstantQuote(
+                                                                        units,
+                                                                    ),
+                                                                );
+                                                                void fetchQuote(
+                                                                    units,
+                                                                );
+                                                            }}
+                                                            className={`rounded-full px-3 py-1 text-xs font-semibold border transition ${
+                                                                payAmount ===
+                                                                amt.toFixed(2)
+                                                                    ? 'border-[var(--clay-primary-bright)] bg-[var(--clay-primary)]/20 text-[var(--clay-primary-bright)] shadow-xs'
+                                                                    : 'border-[var(--clay-border)] bg-[var(--clay-surface-soft)] text-[var(--clay-text)] hover:border-[var(--clay-primary-bright)]/40'
+                                                            }`}
+                                                        >
+                                                            {amt} USDC
+                                                        </button>
+                                                    ))}
+                                                <button
+                                                    type="button"
+                                                    onClick={() => {
+                                                        const val =
+                                                            remainingUsdc.toFixed(
+                                                                2,
+                                                            );
+                                                        setPayAmount(val);
+                                                        setConsent(true);
+                                                        setPayError(null);
+                                                        setPayQuote(
+                                                            buildInstantQuote(
+                                                                remainingBase,
+                                                            ),
+                                                        );
+                                                        void fetchQuote(
+                                                            remainingBase,
+                                                        );
+                                                    }}
+                                                    className={`rounded-full px-3 py-1 text-xs font-semibold border transition ${
+                                                        payAmount ===
+                                                        remainingUsdc.toFixed(2)
+                                                            ? 'border-[var(--clay-primary-bright)] bg-[var(--clay-primary)]/20 text-[var(--clay-primary-bright)] shadow-xs'
+                                                            : 'border-[var(--clay-border)] bg-[var(--clay-surface-soft)] text-[var(--clay-text)] hover:border-[var(--clay-primary-bright)]/40'
+                                                    }`}
+                                                >
+                                                    Full ({remainingUsdc.toFixed(2)})
+                                                </button>
+                                            </div>
+                                        </div>
+
                                         <div className="space-y-1.5">
                                             <Label
                                                 htmlFor="pay_amount"
                                                 className="bulletin-eyebrow"
                                             >
-                                                Amount (USDC)
+                                                Custom Amount (USDC)
                                             </Label>
                                             <Input
                                                 id="pay_amount"

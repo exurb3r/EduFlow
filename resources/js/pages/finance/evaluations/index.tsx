@@ -1235,6 +1235,127 @@ export default function PolicyEvaluations({
                                             </p>
                                         )}
 
+                                        {/* JEV Probability Scoring Breakdown */}
+                                        {displayed.result.probabilities &&
+                                            Object.keys(
+                                                displayed.result.probabilities,
+                                            ).length > 0 && (
+                                                <div className="flex flex-col gap-2.5 rounded-lg border border-border/70 bg-muted/20 p-3.5">
+                                                    <div className="flex items-center justify-between">
+                                                        <span className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
+                                                            JEV Category
+                                                            Confidence Scoring
+                                                        </span>
+                                                        <span className="rounded bg-background px-2 py-0.5 font-mono text-[11px] text-muted-foreground border border-border/50">
+                                                            Safety Threshold:
+                                                            80%
+                                                        </span>
+                                                    </div>
+                                                    <div className="flex flex-col gap-2 pt-1">
+                                                        {Object.entries(
+                                                            displayed.result
+                                                                .probabilities,
+                                                        )
+                                                            .filter(
+                                                                ([_, score]) =>
+                                                                    (score as number) >
+                                                                    0.005,
+                                                            )
+                                                            .map(
+                                                                ([
+                                                                    cat,
+                                                                    score,
+                                                                ]) => {
+                                                                    const pct =
+                                                                        Math.round(
+                                                                            (score as number) *
+                                                                                100,
+                                                                        );
+                                                                    const isSelected =
+                                                                        cat ===
+                                                                        displayed
+                                                                            .result
+                                                                            ?.category_id;
+                                                                    const isHigh =
+                                                                        pct >=
+                                                                        80;
+                                                                    return (
+                                                                        <div
+                                                                            key={
+                                                                                cat
+                                                                            }
+                                                                            className="flex flex-col gap-1"
+                                                                        >
+                                                                            <div className="flex items-center justify-between text-xs">
+                                                                                <span
+                                                                                    className={`font-mono ${
+                                                                                        isSelected
+                                                                                            ? 'font-bold text-foreground'
+                                                                                            : 'text-muted-foreground'
+                                                                                    }`}
+                                                                                >
+                                                                                    {
+                                                                                        cat
+                                                                                    }
+                                                                                </span>
+                                                                                <span className="font-mono text-xs tabular-nums font-semibold">
+                                                                                    {
+                                                                                        pct
+                                                                                    }
+                                                                                    %
+                                                                                </span>
+                                                                            </div>
+                                                                            <div className="h-2 w-full overflow-hidden rounded-full bg-muted">
+                                                                                <div
+                                                                                    className={`h-full rounded-full transition-all duration-500 ${
+                                                                                        isHigh
+                                                                                            ? 'bg-emerald-500'
+                                                                                            : isSelected
+                                                                                              ? 'bg-primary'
+                                                                                              : 'bg-amber-400'
+                                                                                    }`}
+                                                                                    style={{
+                                                                                        width: `${Math.max(pct, 2)}%`,
+                                                                                    }}
+                                                                                />
+                                                                            </div>
+                                                                        </div>
+                                                                    );
+                                                                },
+                                                            )}
+                                                    </div>
+                                                </div>
+                                            )}
+
+                                        {/* JEV Decision Process Steps */}
+                                        {displayed.result.decision_process &&
+                                            displayed.result.decision_process
+                                                .length > 0 && (
+                                                <div className="flex flex-col gap-2 rounded-lg border border-border/60 bg-muted/20 p-3.5">
+                                                    <span className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
+                                                        Decision Audit Process
+                                                    </span>
+                                                    <ol className="relative flex flex-col gap-2 pt-1">
+                                                        {displayed.result.decision_process.map(
+                                                            (step, idx) => (
+                                                                <li
+                                                                    key={idx}
+                                                                    className="flex items-start gap-2.5 text-xs"
+                                                                >
+                                                                    <span className="flex size-4 shrink-0 items-center justify-center rounded-full bg-primary/10 text-[10px] font-bold text-primary mt-0.5">
+                                                                        {idx +
+                                                                            1}
+                                                                    </span>
+                                                                    <span className="text-foreground/90 leading-relaxed">
+                                                                        {step}
+                                                                    </span>
+                                                                </li>
+                                                            ),
+                                                        )}
+                                                    </ol>
+                                                </div>
+                                            )}
+
                                         <Citations
                                             items={
                                                 displayed.result.citations ?? []
