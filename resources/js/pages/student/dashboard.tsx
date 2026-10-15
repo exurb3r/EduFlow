@@ -796,7 +796,7 @@ export default function StudentDashboard({
                         <header className="flex flex-col gap-5 lg:flex-row lg:items-end lg:justify-between">
                             <div className="min-w-0">
                                 <p className="bulletin-eyebrow">
-                                    EduFlow &middot; Northstar Learning Center
+                                    OpenSinop &middot; Northstar Learning Center
                                 </p>
                                 <h1 className="clay-h1 mt-2">
                                     Welcome back,{' '}
@@ -1858,7 +1858,7 @@ export default function StudentDashboard({
                                     <div className="flex items-center gap-2">
                                         <p className="bulletin-eyebrow flex items-center gap-1.5">
                                             <ReceiptText className="size-3.5 text-[var(--clay-primary-bright)]" />
-                                            EduFlow &middot; Arc Testnet Ledger
+                                            OpenSinop &middot; Arc Testnet Ledger
                                         </p>
                                         {transactions.length > 0 && (
                                             <span className="rounded-full bg-[var(--clay-surface-soft)] px-2 py-0.5 text-[10px] font-semibold text-[var(--clay-text-muted)]">

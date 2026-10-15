@@ -86,7 +86,7 @@ class LeptonNetworkWidget extends BaseWidget
                 ->color('gray')
                 ->requiresConfirmation()
                 ->modalHeading('Overwrite the ledger with the on-chain balance?')
-                ->modalDescription('Reads the live '.strtoupper($status['chain']).' balance through Lepton and writes it to the EduFlow ledger. Use this when the two have diverged.')
+                ->modalDescription('Reads the live '.strtoupper($status['chain']).' balance through Lepton and writes it to the OpenSinop ledger. Use this when the two have diverged.')
                 ->action(function () use ($wallet): void {
                     if (! $wallet) {
                         Notification::make()->title('No treasury wallet found.')->danger()->send();

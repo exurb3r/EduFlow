@@ -58,7 +58,7 @@ export function AssistanceAiExplanation({
                         </div>
                         <div>
                             <CardTitle className="text-base font-semibold">
-                                EduFlow AI Reasoning & Policy Evaluation
+                                OpenSinop AI Reasoning & Policy Evaluation
                             </CardTitle>
                             <CardDescription className="text-xs">
                                 Deterministic evaluation under Policy{' '}

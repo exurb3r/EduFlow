@@ -1,4 +1,4 @@
-# App self-hosted Docker Compose setup
+# OpenSinop self-hosted Docker Compose setup
 # One-line start (after creating this file): docker compose up -d
 # Or directly from GitHub:
 # docker compose -f https://raw.githubusercontent.com/koamishin/KoamiStarterKit/main/docker-compose.yml up -d
@@ -6,7 +6,7 @@
 services:
   app:
     image: ghcr.io/koamishin/koamistarterkit:${EDUFLOW_VERSION:-latest}
-    container_name: app
+    container_name: opensinop
     restart: unless-stopped
     ports:
       - "${APP_PORT:-8000}:8000"
@@ -18,9 +18,9 @@ services:
       DB_CONNECTION: pgsql
       DB_HOST: db
       DB_PORT: 5432
-      DB_DATABASE: ${DB_DATABASE:-app}
-      DB_USERNAME: ${DB_USERNAME:-app}
-      DB_PASSWORD: ${DB_PASSWORD:-app}
+      DB_DATABASE: ${DB_DATABASE:-opensinop}
+      DB_USERNAME: ${DB_USERNAME:-opensinop}
+      DB_PASSWORD: ${DB_PASSWORD:-opensinop}
       REDIS_HOST: redis
       REDIS_PORT: 6379
       CACHE_STORE: redis
@@ -31,8 +31,8 @@ services:
       EDUFLOW_TIMEZONE: ${EDUFLOW_TIMEZONE:-UTC}
       EDUFLOW_CURRENCY: ${EDUFLOW_CURRENCY:-USD}
     volumes:
-      - app_storage:/app/storage
-      - app_cache:/app/bootstrap/cache
+      - opensinop_storage:/app/storage
+      - opensinop_cache:/app/bootstrap/cache
     depends_on:
       db:
         condition: service_healthy
@@ -45,29 +45,29 @@ services:
 
   db:
     image: postgres:16-alpine
-    container_name: app-db
+    container_name: opensinop-db
     restart: unless-stopped
     environment:
-      POSTGRES_DB: ${DB_DATABASE:-app}
-      POSTGRES_USER: ${DB_USERNAME:-app}
-      POSTGRES_PASSWORD: ${DB_PASSWORD:-app}
+      POSTGRES_DB: ${DB_DATABASE:-opensinop}
+      POSTGRES_USER: ${DB_USERNAME:-opensinop}
+      POSTGRES_PASSWORD: ${DB_PASSWORD:-opensinop}
     volumes:
-      - app_db:/var/lib/postgresql/data
+      - opensinop_db:/var/lib/postgresql/data
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U ${DB_USERNAME:-app} -d ${DB_DATABASE:-app}"]
+      test: ["CMD-SHELL", "pg_isready -U ${DB_USERNAME:-opensinop} -d ${DB_DATABASE:-opensinop}"]
       interval: 5s
       timeout: 5s
       retries: 10
 
   redis:
     image: redis:7-alpine
-    container_name: app-redis
+    container_name: opensinop-redis
     restart: unless-stopped
     volumes:
-      - app_redis:/data
+      - opensinop_redis:/data
 
 volumes:
-  app_storage:
-  app_cache:
-  app_db:
-  app_redis:
+  opensinop_storage:
+  opensinop_cache:
+  opensinop_db:
+  opensinop_redis:

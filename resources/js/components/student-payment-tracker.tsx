@@ -74,7 +74,7 @@ export function StudentPaymentTracker({
         () => {
             try {
                 const stored = sessionStorage.getItem(
-                    'eduflow_dismissed_tuition_attempt',
+                    'opensinop_dismissed_tuition_attempt',
                 );
 
                 return stored ? Number(stored) : null;
@@ -140,7 +140,7 @@ export function StudentPaymentTracker({
             setDismissedAttemptId(idToDismiss);
             try {
                 sessionStorage.setItem(
-                    'eduflow_dismissed_tuition_attempt',
+                    'opensinop_dismissed_tuition_attempt',
                     String(idToDismiss),
                 );
             } catch {
@@ -698,7 +698,7 @@ export function StudentPaymentTracker({
                                     onClick={() => {
                                         try {
                                             sessionStorage.removeItem(
-                                                'eduflow_dismissed_tuition_attempt',
+                                                'opensinop_dismissed_tuition_attempt',
                                             );
                                         } catch {
                                             // Ignore storage errors

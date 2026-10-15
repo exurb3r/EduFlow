@@ -460,7 +460,7 @@
                                         @keydown="handleKeyDown($event)"
                                         @input="autoGrowTextarea($event)"
                                         rows="2"
-                                        placeholder="How can ARC help analyze your EduFlow platform operations today?"
+                                        placeholder="How can ARC help analyze your OpenSinop platform operations today?"
                                         class="min-h-[68px] w-full resize-none border-0 bg-transparent p-0 text-xs sm:text-sm text-zinc-900 placeholder:text-zinc-400 focus:outline-none focus:ring-0 leading-relaxed dark:text-zinc-100 dark:placeholder:text-zinc-500"
                                     ></textarea>
 
@@ -532,7 +532,7 @@
                                     </div>
                                 </div>
                                 <p class="mt-2.5 text-center text-[11px] text-zinc-400 dark:text-zinc-500">
-                                    ARC analyzes real-time EduFlow financial and student data.
+                                    ARC analyzes real-time OpenSinop financial and student data.
                                 </p>
                             </form>
 
@@ -806,7 +806,7 @@
                     </form>
 
                     <p class="mt-2 text-center text-[10px] text-zinc-400 dark:text-zinc-500">
-                        ARC connects to real-time EduFlow financial and student data.
+                        ARC connects to real-time OpenSinop financial and student data.
                     </p>
                 </div>
             </div>

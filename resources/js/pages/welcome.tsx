@@ -180,7 +180,7 @@ const VENDOR_SHORTLIST: VendorRow[] = [
 
 const FAQS: FaqItem[] = [
     {
-        q: 'Does EduFlow spend school money on its own?',
+        q: 'Does OpenSinop spend school money on its own?',
         a: 'Only routine bills under your strict limit that you explicitly pre authorize, like monthly campus internet. Everything else requires an authorized human staff member to click yes.',
     },
     {
@@ -189,7 +189,7 @@ const FAQS: FaqItem[] = [
     },
     {
         q: 'Do students or parents need digital wallets or crypto?',
-        a: 'No. Parents and students pay through standard bank wires, cashier counter cash, or credit cards. EduFlow handles the ledger and treasury protection in the background.',
+        a: 'No. Parents and students pay through standard bank wires, cashier counter cash, or credit cards. OpenSinop handles the ledger and treasury protection in the background.',
     },
     {
         q: 'How does the emergency reserve stay safe?',
@@ -197,7 +197,7 @@ const FAQS: FaqItem[] = [
     },
     {
         q: 'Is there a monthly subscription fee or seat license?',
-        a: 'None. EduFlow is open source software released under the MIT license. You host it on your own institutional infrastructure with full ownership of your records.',
+        a: 'None. OpenSinop is open source software released under the MIT license. You host it on your own institutional infrastructure with full ownership of your records.',
     },
     {
         q: 'Can our staff freeze the payment wallet at any moment?',
@@ -220,7 +220,7 @@ export default function Welcome({ canRegister = false }: WelcomeProps) {
 
     return (
         <div className="min-h-screen bg-[#FAFAF9] text-[#1C1917] font-sans antialiased selection:bg-[#1C1917] selection:text-white relative">
-            <Head title="EduFlow — Simple School Finance and Bill Payments" />
+            <Head title="OpenSinop — Simple School Finance and Bill Payments" />
 
             {/* Radiant Ambient Light Background */}
             <div className="absolute inset-0 pointer-events-none overflow-hidden -z-10">
@@ -233,11 +233,11 @@ export default function Welcome({ canRegister = false }: WelcomeProps) {
                 <div className="mx-auto flex max-w-6xl items-center justify-between px-4 sm:px-6 h-16">
                     <Link href="/" className="flex items-center gap-2.5 group">
                         <div className="flex size-7 items-center justify-center rounded-lg bg-[#1C1917] text-white font-serif font-bold text-sm shadow-[0_2px_8px_rgba(0,0,0,0.12)] transition-transform group-hover:scale-105">
-                            E
+                            O
                         </div>
                         <div className="flex flex-col">
                             <span className="font-serif text-base font-bold tracking-tight text-[#1C1917]">
-                                EduFlow
+                                OpenSinop
                             </span>
                         </div>
                     </Link>
@@ -346,7 +346,7 @@ export default function Welcome({ canRegister = false }: WelcomeProps) {
                         style={{ textWrap: 'pretty' }}
                         className="mt-6 max-w-2xl text-base sm:text-lg text-stone-600 leading-relaxed font-sans"
                     >
-                        EduFlow reconciles tuition where families pay, locks
+                        OpenSinop reconciles tuition where families pay, locks
                         your emergency reserve first, and proposes small,
                         measured bill payments, then waits for your yes before a
                         single dollar moves.
@@ -590,13 +590,13 @@ export default function Welcome({ canRegister = false }: WelcomeProps) {
                     </div>
                 </section>
 
-                {/* 2. INTRODUCING EDUFLOW NARRATIVE SECTION */}
+                {/* 2. INTRODUCING OPENSINOP NARRATIVE SECTION */}
                 <section
                     id="product"
                     className="mx-auto max-w-4xl px-4 sm:px-6"
                 >
                     <span className="text-xs font-mono uppercase tracking-widest text-stone-500 block mb-3 font-semibold">
-                        INTRODUCING EDUFLOW
+                        INTRODUCING OPENSINOP
                     </span>
 
                     <p className="text-xl sm:text-2xl font-serif text-stone-900 leading-relaxed font-bold">
@@ -609,7 +609,7 @@ export default function Welcome({ canRegister = false }: WelcomeProps) {
                     </p>
 
                     <p className="mt-6 text-sm sm:text-base text-stone-600 leading-relaxed">
-                        EduFlow reconciles the money for you. It tracks tuition
+                        OpenSinop reconciles the money for you. It tracks tuition
                         intake across cashier counters and bank wires, guards
                         your emergency buffer so savings remain untouchable, and
                         routes routine bills into safe execution lanes. You
@@ -1074,7 +1074,7 @@ export default function Welcome({ canRegister = false }: WelcomeProps) {
                         </h2>
                         <p className="mt-3 max-w-xl text-sm text-stone-600">
                             No per seat charges and no vendor lock in. Run
-                            EduFlow on your own school servers with complete
+                            OpenSinop on your own school servers with complete
                             data sovereignty.
                         </p>
                     </div>
@@ -1284,7 +1284,7 @@ export default function Welcome({ canRegister = false }: WelcomeProps) {
                             style={{ textWrap: 'pretty' }}
                             className="mt-3 max-w-xl mx-auto text-sm text-stone-600 leading-relaxed font-sans"
                         >
-                            Enter your institution domain. EduFlow organizes
+                            Enter your institution domain. OpenSinop organizes
                             your tuition intake, guards your emergency buffer,
                             and sets up your first verified bill release.
                         </p>
@@ -1328,7 +1328,7 @@ export default function Welcome({ canRegister = false }: WelcomeProps) {
                 <div className="mx-auto max-w-6xl px-4 sm:px-6 flex flex-col sm:flex-row items-center justify-between gap-6">
                     <div className="flex flex-col gap-1 text-center sm:text-left">
                         <span className="font-serif text-sm font-bold text-stone-900">
-                            EduFlow
+                            OpenSinop
                         </span>
                         <span className="font-sans text-xs">
                             Your school treasury operator. Evidence in, bounded
@@ -1338,7 +1338,7 @@ export default function Welcome({ canRegister = false }: WelcomeProps) {
 
                     <div className="flex flex-wrap items-center justify-center gap-6">
                         <a
-                            href="https://github.com/koamishin/EduFlow"
+                            href="https://github.com/koamishin/OpenSinop"
                             target="_blank"
                             rel="noopener noreferrer"
                             className="hover:text-stone-900 transition-colors inline-flex items-center gap-1"

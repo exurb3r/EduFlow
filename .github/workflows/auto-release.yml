@@ -93,7 +93,7 @@ jobs:
             ${{ steps.identity.outputs.image }}:sha-${{ github.event.workflow_run.head_sha }}
             ${{ steps.identity.outputs.image }}:preview
           labels: |
-            org.opencontainers.image.title=EduFlow
+            org.opencontainers.image.title=OpenSinop
             org.opencontainers.image.revision=${{ github.event.workflow_run.head_sha }}
             org.opencontainers.image.version=${{ steps.identity.outputs.version }}
             org.opencontainers.image.licenses=MIT
@@ -119,7 +119,7 @@ jobs:
           }
           Path('version.json').write_text(json.dumps(metadata, indent=2) + '\n')
           Path('RELEASE_NOTES.md').write_text(
-              '# EduFlow preview\n\n'
+              '# OpenSinop preview\n\n'
               'Development preview; not certified for school production or live funds.\n\n'
               'Tested commit: `' + os.environ['TESTED_SHA'] + '`\n\n'
               'CI evidence: ' + os.environ['CI_URL'] + '\n\n'
@@ -132,7 +132,7 @@ jobs:
         with:
           tag_name: ${{ steps.identity.outputs.tag }}
           target_commitish: ${{ github.event.workflow_run.head_sha }}
-          name: EduFlow ${{ steps.identity.outputs.version }}
+          name: OpenSinop ${{ steps.identity.outputs.version }}
           body_path: RELEASE_NOTES.md
           draft: false
           prerelease: true

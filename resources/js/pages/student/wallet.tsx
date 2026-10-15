@@ -131,7 +131,7 @@ export default function StudentWallet({
                         <div>
                             <p className="bulletin-eyebrow flex items-center gap-2">
                                 <Wallet className="size-3.5" />
-                                EduFlow AI &middot; Wallet
+                                OpenSinop AI &middot; Wallet
                             </p>
                             <h1 className="clay-h1 mt-2">My Wallet</h1>
                             <p className="clay-body mt-1.5">

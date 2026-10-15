@@ -109,7 +109,7 @@ export default function FinancialAssistance({
             preserveScroll: true,
             onSuccess: () => {
                 form.reset();
-                toast.success('Request submitted to EduFlow AI.', {
+                toast.success('Request submitted to OpenSinop AI.', {
                     description:
                         'The agent evaluated it against the assistance policy.',
                 });
@@ -131,12 +131,12 @@ export default function FinancialAssistance({
                     <header className="flex flex-col gap-2">
                         <p className="bulletin-eyebrow flex items-center gap-2">
                             <HandCoins className="size-3.5" />
-                            EduFlow AI &middot; Bounded Autonomy
+                            OpenSinop AI &middot; Bounded Autonomy
                         </p>
                         <h1 className="clay-h1">Financial Assistance</h1>
                         <p className="clay-body max-w-xl">
                             Request emergency assistance in {policy.currency}.
-                            EduFlow evaluates every request against the
+                            OpenSinop evaluates every request against the
                             assistance policy — amounts within the automatic
                             limit are paid instantly, the rest escalates to a
                             human reviewer.
@@ -244,7 +244,7 @@ export default function FinancialAssistance({
                                     data-loading={form.processing}
                                     className="clay-focus gap-2 rounded-full bg-[var(--clay-primary)] px-6 font-semibold text-[var(--clay-primary-foreground)] shadow-[var(--shadow-cta)] hover:bg-[var(--clay-primary-bright)]"
                                 >
-                                    Submit to EduFlow AI
+                                    Submit to OpenSinop AI
                                     <ArrowRight className="size-4" />
                                 </Button>
                             </div>
