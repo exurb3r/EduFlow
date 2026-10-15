@@ -16,6 +16,7 @@ use Illuminate\Support\Facades\Cache;
 use Spatie\Permission\Models\Role;
 use Yukazakiri\Lepton\Contracts\WalletGateway;
 use Yukazakiri\Lepton\DTOs\BalanceResult;
+use Yukazakiri\Lepton\DTOs\TransferResolution;
 use Yukazakiri\Lepton\DTOs\TransferResult;
 use Yukazakiri\Lepton\Gateways\FakeLeptonGateway;
 use Yukazakiri\Lepton\Support\CliRunner;
@@ -210,6 +211,29 @@ test('a chain failure is reported, not recorded', function (): void {
         public function limits(string $address, array $options = []): array
         {
             return [];
+        }
+
+        public function resolve(string $handle, array $options = []): TransferResolution
+        {
+            throw new LeptonCliException(command: ['wallet', 'transfer'], exitCode: 1, stderr: 'unused');
+        }
+
+        /** @return array<int,array<string,mixed>> */
+        public function wallets(array $options = []): array
+        {
+            throw new LeptonCliException(command: ['wallet', 'list'], exitCode: 1, stderr: 'unused');
+        }
+
+        /** @return array<string,mixed> */
+        public function createWallet(array $options = []): array
+        {
+            throw new LeptonCliException(command: ['wallet', 'create'], exitCode: 1, stderr: 'unused');
+        }
+
+        /** @return array<string,mixed> */
+        public function fundWallet(string $address, array $options = []): array
+        {
+            throw new LeptonCliException(command: ['wallet', 'fund'], exitCode: 1, stderr: 'unused');
         }
     });
 
