@@ -171,6 +171,12 @@ return [
         'typesafe' => [
             'driver' => 'typesafe',
             'key' => env('TYPESAFE_API_KEY'),
+            'url' => env('TYPESAFE_URL', 'https://api.typesafe.ai/v1'),
+            'models' => [
+                'classification' => [
+                    'default' => env('TYPESAFE_CLASSIFICATION_MODEL', 'jev-latest'),
+                ],
+            ],
         ],
 
         'voyageai' => [

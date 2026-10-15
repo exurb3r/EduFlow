@@ -28,8 +28,6 @@ class AssessInstitutionPolicy implements ShouldQueue
 
     public function __construct(public int $assessmentId)
     {
-        $this->onConnection((string) config('eduflow.background_finance.queue_connection', 'database'));
-        $this->onQueue('policy-assessments');
         $this->afterCommit();
     }
 

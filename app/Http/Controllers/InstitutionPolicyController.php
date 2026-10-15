@@ -57,8 +57,8 @@ class InstitutionPolicyController extends Controller
             'assessments' => $playground,
             'planAdvice' => $advice,
             'financeUrl' => url('/finance'),
-            'queueReady' => in_array(config('queue.connections.'.config('eduflow.background_finance.queue_connection', 'database').'.driver'), ['database', 'redis'], true)
-                && (int) config('queue.connections.'.config('eduflow.background_finance.queue_connection', 'database').'.retry_after', 0) > 180,
+            'queueReady' => in_array(config('queue.connections.'.config('queue.default', 'database').'.driver'), ['database', 'redis'], true)
+                && (int) config('queue.connections.'.config('queue.default', 'database').'.retry_after', 0) > 180,
             'canPublish' => $request->user()->hasAnyRole(['admin', 'super_admin']), 'aiEnabled' => $settings->mayCallProvider()]);
     }
 
@@ -90,7 +90,7 @@ class InstitutionPolicyController extends Controller
         if ($data['kind'] === 'examples' && ($institutionPolicyVersion->content['examples'] ?? []) === []) {
             throw ValidationException::withMessages(['assessment' => 'Add at least one expected example before testing publication readiness.']);
         }
-        $connection = (string) config('eduflow.background_finance.queue_connection', 'database');
+        $connection = (string) config('queue.default', 'database');
         if (! in_array(config('queue.connections.'.$connection.'.driver'), ['database', 'redis'], true)
             || (int) config('queue.connections.'.$connection.'.retry_after', 0) <= 180) {
             throw ValidationException::withMessages(['assessment' => 'Policy assessments require a durable queue with retry_after greater than 180 seconds.']);

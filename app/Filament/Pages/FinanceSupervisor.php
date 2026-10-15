@@ -41,7 +41,6 @@ use Filament\Infolists\Components\RepeatableEntry;
 use Filament\Infolists\Components\TextEntry;
 use Filament\Notifications\Notification;
 use Filament\Pages\Page;
-use Filament\Schemas\Components\Actions;
 use Filament\Schemas\Components\Component;
 use Filament\Schemas\Components\Grid;
 use Filament\Schemas\Components\Section;
@@ -55,6 +54,7 @@ use Filament\Tables\Contracts\HasTable;
 use Filament\Tables\Filters\SelectFilter;
 use Filament\Tables\Table;
 use Illuminate\Database\Eloquent\Builder;
+use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Gate;
 use Illuminate\Support\Str;
@@ -126,28 +126,47 @@ class FinanceSupervisor extends Page implements HasTable
             ->description('Refreshes every 10 seconds. Review exact proposals and prepare eligible bills for independent payment review; no transfer is submitted here.')
             ->defaultSort('id', 'desc')->striped()->poll('10s')
             ->columns([
-                TextColumn::make('id')->label('Run')->prefix('#')->sortable(),
-                TextColumn::make('kind')->label('Workflow')->badge()->color('gray')
+                TextColumn::make('id')->label('Run')->prefix('#')->fontFamily('mono')->weight('bold')->sortable(),
+                TextColumn::make('kind')->label('Workflow')->badge()
+                    ->color(fn (string $state): string => match ($state) {
+                        'budget_plan' => 'primary',
+                        'collection_review' => 'info',
+                        default => 'gray',
+                    })
+                    ->icon(fn (string $state): string => match ($state) {
+                        'budget_plan' => 'heroicon-m-scale',
+                        'collection_review' => 'heroicon-m-inbox-stack',
+                        default => 'heroicon-m-document',
+                    })
                     ->formatStateUsing(fn (string $state): string => self::KINDS[$state] ?? $state),
                 TextColumn::make('state')->badge()
                     ->formatStateUsing(fn (string $state): string => self::STATES[$state] ?? $state)
                     ->color(fn (string $state): string => match ($state) {
                         'completed' => 'success', 'waiting_for_review', 'blocked', 'paused' => 'warning',
                         'failed' => 'danger', 'running' => 'info', default => 'gray',
+                    })
+                    ->icon(fn (string $state): string => match ($state) {
+                        'completed' => 'heroicon-m-check-circle',
+                        'waiting_for_review' => 'heroicon-m-clock',
+                        'blocked', 'failed' => 'heroicon-m-exclamation-triangle',
+                        'running' => 'heroicon-m-arrow-path',
+                        default => 'heroicon-m-pause-circle',
                     }),
-                TextColumn::make('trigger_key')->label('Trigger')->searchable()->limit(38)->wrap()
+                TextColumn::make('trigger_key')->label('Trigger')->searchable()->fontFamily('mono')->limit(32)
+                    ->copyable()
                     ->tooltip(fn (FinanceWorkflowRun $record): string => $record->trigger_key),
-                TextColumn::make('budget_snapshot_id')->label('Budget snapshot')->prefix('#')->placeholder('—')
+                TextColumn::make('budget_snapshot_id')->label('Budget snapshot')->prefix('#')->fontFamily('mono')->placeholder('—')
                     ->toggleable(isToggledHiddenByDefault: true),
-                TextColumn::make('collection_batch_id')->label('Collection batch')->prefix('#')->placeholder('—')
+                TextColumn::make('collection_batch_id')->label('Collection batch')->prefix('#')->fontFamily('mono')->placeholder('—')
                     ->toggleable(isToggledHiddenByDefault: true),
-                TextColumn::make('attempts')->alignEnd(),
+                TextColumn::make('attempts')->alignEnd()->badge()->color('gray'),
                 TextColumn::make('heartbeat_at')->label('Heartbeat (UTC)')->dateTime('Y-m-d H:i:s', 'UTC')->placeholder('Not started')->sortable(),
                 TextColumn::make('next_attempt_at')->label('Next attempt (UTC)')->dateTime('Y-m-d H:i:s', 'UTC')->placeholder('Not scheduled')
                     ->toggleable(isToggledHiddenByDefault: true),
                 TextColumn::make('created_at')->label('Created (UTC)')->dateTime('Y-m-d H:i:s', 'UTC')->sortable()
                     ->toggleable(isToggledHiddenByDefault: true),
                 TextColumn::make('last_error')->label('Last error')->limit(65)->wrap()->placeholder('None')
+                    ->color(fn (?string $state): string => filled($state) ? 'danger' : 'gray')
                     ->toggleable(isToggledHiddenByDefault: true),
             ])
             ->filters([
@@ -257,16 +276,61 @@ class FinanceSupervisor extends Page implements HasTable
     protected function getHeaderActions(): array
     {
         return [
-            $this->proposeAllocationAction(),
-            $this->prepareReceiptRouteAction(),
-            $this->approveReceiptRouteAction(),
-            Action::make('paymentProgress')->label('Payment progress')->icon(Heroicon::QueueList)->color('gray')
-                ->visible(fn (): bool => PaymentSubmissionResource::canViewAny())
-                ->url(fn (): string => PaymentSubmissionResource::getUrl(panel: 'finance')),
-            Action::make('captureBudgetSnapshot')->label('Capture budget planning evidence')->icon(Heroicon::Plus)
+            Action::make('proposeAllocation')
+                ->label('Propose receipt allocation')
+                ->icon(Heroicon::Scale)
+                ->color('primary')
+                ->button()
                 ->visible(fn (): bool => Gate::forUser(Auth::user())->allows('create', BudgetSnapshot::class))
-                ->modalHeading('Capture budget planning evidence')->modalWidth('5xl')
-                ->modalDescription('Immutable planning snapshot, not funding. Capture does not reserve funds, change accounts or authorize payment. New snapshots enter the background queue only when enabled.')
+                ->modalHeading('Propose how received cash is allocated')
+                ->modalWidth('4xl')
+                ->modalSubmitActionLabel('Build proposal')
+                ->modalDescription('The agent classifies each approved invoice and active budget line against the institution\'s published policy and ranks them in the order staff arranged. It proposes amounts only; it reserves nothing, approves nothing and pays nothing.')
+                ->schema([
+                    Select::make('snapshot_digest')->label('Realised receipt context')->required()->options(fn (): array => BudgetSnapshot::query()
+                        ->where('organization_id', app(InstallationInstitution::class)->current()?->id)->orderByDesc('id')->limit(100)->get()
+                        ->filter(fn (BudgetSnapshot $snapshot): bool => $snapshot->hasValidSnapshot() && $snapshot->budget->status === 'active')
+                        ->mapWithKeys(fn (BudgetSnapshot $snapshot): array => [$snapshot->snapshot_digest => 'Snapshot #'.$snapshot->id.' · '
+                            .$snapshot->snapshot['department']['name'].' · receipts '.Money::formatExact($snapshot->snapshot['amounts']['realized_receipts'], $snapshot->currency).' '.$snapshot->currency])->all()),
+                    Placeholder::make('policy_note')->label('Policy in force')->content(function (): string {
+                        $policy = app(InstitutionPolicyWorkspace::class)->active();
+
+                        return $policy === null
+                            ? 'No published policy with active controls. Publish one before proposing.'
+                            : 'Revision #'.$policy->institution_policy_version_id.' · '.$policy->version->title.' · approved by #'.$policy->approved_by;
+                    }),
+                ])
+                ->action(function (array $data, Schema $schema, ProposeReceiptAllocation $propose): void {
+                    Gate::forUser(Auth::user())->authorize('create', BudgetSnapshot::class);
+                    /** @var BudgetSnapshot $snapshot */
+                    $snapshot = BudgetSnapshot::query()->where('organization_id', app(InstallationInstitution::class)->require()->id)
+                        ->where('snapshot_digest', $data['snapshot_digest'])->firstOrFail();
+                    try {
+                        $plan = $propose->handle($this->actor(), $snapshot, (string) Str::uuid());
+                    } catch (ValidationException $exception) {
+                        $errors = [];
+                        foreach ($exception->errors() as $field => $messages) {
+                            $errors[$schema->getStatePath().'.'.$field] = $messages;
+                        }
+                        Notification::make()->danger()->title('Allocation proposal refused')
+                            ->body(implode(' ', array_merge(...array_values($errors))))->persistent()->send();
+
+                        return;
+                    }
+                    Notification::make()->success()->title('Allocation proposed, not approved')
+                        ->body(Money::formatExact($plan->proposed_minor_units, $plan->currency).' '.$plan->currency.' proposed across '
+                            .$plan->plan['proposals_awaiting_human_review'].' line(s). Nothing is reserved or paid; review each line before any payment.')
+                        ->persistent()->send();
+                }),
+
+            Action::make('captureBudgetSnapshot')
+                ->label('Capture planning snapshot')
+                ->icon(Heroicon::PlusCircle)
+                ->color('gray')
+                ->visible(fn (): bool => Gate::forUser(Auth::user())->allows('create', BudgetSnapshot::class))
+                ->modalHeading('Capture budget planning evidence')
+                ->modalWidth('5xl')
+                ->modalDescription('Immutable planning snapshot, not funding. Capture does not reserve funds, change accounts or authorize payment. New snapshots enter the default queue for background planning.')
                 ->modalSubmitActionLabel('Capture planning snapshot')
                 ->mountUsing(function (Schema $schema): void {
                     Gate::forUser(Auth::user())->authorize('create', BudgetSnapshot::class);
@@ -291,9 +355,19 @@ class FinanceSupervisor extends Page implements HasTable
                         throw ValidationException::withMessages($errors);
                     }
                     Notification::make()->title('Planning snapshot #'.$snapshot->id.' captured')
-                        ->body('Evidence only. No funding, payment authorization or accounts changed. Background processing depends on configuration and worker availability.')
+                        ->body('Evidence only. No funding, payment authorization or accounts changed. Planning uses the default queue and requires a running worker.')
                         ->success()->send();
                 }),
+
+            $this->prepareReceiptRouteAction(),
+            $this->approveReceiptRouteAction(),
+
+            Action::make('paymentProgress')
+                ->label('Payment progress')
+                ->icon(Heroicon::QueueList)
+                ->color('gray')
+                ->visible(fn (): bool => PaymentSubmissionResource::canViewAny())
+                ->url(fn (): string => PaymentSubmissionResource::getUrl(panel: 'finance')),
         ];
     }
 
@@ -415,7 +489,7 @@ class FinanceSupervisor extends Page implements HasTable
                 } catch (ValidationException $exception) {
                     throw ValidationException::withMessages([$schema->getStatePath().'.attestation' => collect($exception->errors())->flatten()->all()]);
                 }
-                Notification::make()->title('Receipt routing reviewed')->body('Successor planning remains default off until operator enables it. No spending approved.')->success()->send();
+                Notification::make()->title('Receipt routing reviewed')->body('Reviewed receipts can now trigger bounded successor planning on the default queue. No spending approved.')->success()->send();
             });
     }
 
@@ -521,50 +595,44 @@ class FinanceSupervisor extends Page implements HasTable
     public function operations(Schema $schema): Schema
     {
         return $schema->components([
-            Grid::make(['default' => 1, 'xl' => 2])->schema([
-                Section::make('Background processing')->icon(Heroicon::ServerStack)
-                    ->description('Configuration is not worker-health proof. Check run state, heartbeat and last error.')
-                    ->schema([
-                        TextEntry::make('background_enabled')->label('Background finance')
-                            ->state(fn (): string => config('eduflow.background_finance.enabled', false) ? 'Enabled in configuration' : 'Disabled in configuration')
-                            ->badge()->color(fn (): string => config('eduflow.background_finance.enabled', false) ? 'success' : 'gray')->columnSpanFull(),
-                        TextEntry::make('queue_connection')->label('Queue connection')->state(fn (): string => config('eduflow.background_finance.queue_connection', 'database')),
-                        TextEntry::make('queue_name')->label('Planning queue')->state(fn (): string => config('eduflow.background_finance.queue', 'finance-planning')),
-                    ])->columns(['default' => 1, 'md' => 2])->columnSpan(1),
-                Section::make('Waiting review inbox')->icon(Heroicon::Inbox)
-                    ->description('Institution-wide counts. Policy checks decide who can review each record.')
-                    ->schema([
-                        TextEntry::make('waiting_plans')->label('Budget proposals waiting')->state(fn (): int => $this->waitingInbox['plans']),
-                        TextEntry::make('waiting_collections')->label('Collection workflows waiting')->state(fn (): int => $this->waitingInbox['collections']),
-                        Actions::make([
-                            Action::make('filterWaitingPlans')->label('Show waiting proposals')->color('gray')
-                                ->action(function (): void {
-                                    $this->showWaitingPlans();
-                                }),
-                            Action::make('openCollections')->label('Open collections ledger')->color('gray')
-                                ->visible(fn (): bool => Collections::canAccess())->url(fn (): string => Collections::getUrl(panel: 'finance')),
-                        ])->columnSpanFull(),
-                    ])->columns(['default' => 1, 'md' => 2])->columnSpan(1),
-            ])->columnSpanFull(),
-            Section::make('Receipt routing and successors')->description('Approved mapping only. Routing never widens bill sets, refreshes expiry, accepts proposals or authorizes payment.')
+            Section::make('Receipt routing and successors')
+                ->icon(Heroicon::ArrowsRightLeft)
+                ->description('Approved mapping only. Routing never widens bill sets, refreshes expiry, accepts proposals or authorizes payment.')
+                ->collapsible()
+                ->collapsed()
                 ->schema([
                     TextEntry::make('receipt_routing_enabled')->label('Receipt-triggered planning')
                         ->state(fn (): string => config('eduflow.background_finance.receipt_routing_enabled', false) ? 'Enabled in configuration' : 'Disabled in configuration')
-                        ->badge()->color('gray'),
+                        ->badge()->color(fn (): string => config('eduflow.background_finance.receipt_routing_enabled', false) ? 'success' : 'gray'),
                     RepeatableEntry::make('receipt_routes')->label('Prepared and approved contexts')->state(fn (): array => ReceiptBudgetRoute::query()
                         ->where('organization_id', app(InstallationInstitution::class)->current()?->id)->with('approval')->orderByDesc('id')->limit(20)->get()
                         ->map(fn (ReceiptBudgetRoute $route): array => ['id' => $route->id, 'source' => $route->source_stream,
                             'snapshot_id' => $route->budget_snapshot_id, 'status' => $route->approval === null ? 'Awaiting independent approval' : 'Approved for planning only',
                             'valid_until' => $route->valid_until->toIso8601String()])->all())
-                        ->schema([TextEntry::make('id')->label('Route ID'), TextEntry::make('source')->label('Source'),
-                            TextEntry::make('snapshot_id')->label('Staff context snapshot'), TextEntry::make('status')->label('Status')->badge()->color('gray'),
-                            TextEntry::make('valid_until')->label('Original expiry')])->columns(['default' => 1, 'md' => 2]),
+                        ->schema([
+                            TextEntry::make('id')->label('Route ID')->prefix('#')->fontFamily('mono')->weight('bold'),
+                            TextEntry::make('source')->label('Source Stream')->badge()->color('info'),
+                            TextEntry::make('snapshot_id')->label('Staff Context Snapshot')->prefix('#')->fontFamily('mono'),
+                            TextEntry::make('status')->label('Status')->badge()->color(fn (string $state): string => match ($state) {
+                                'Approved for planning only' => 'success',
+                                default => 'warning',
+                            }),
+                            TextEntry::make('valid_until')->label('Original Expiry (UTC)')->dateTime('Y-m-d H:i:s'),
+                        ])->columns(['default' => 2, 'md' => 5]),
                     RepeatableEntry::make('receipt_triggers')->label('Receipt-triggered planning work')->state(fn (): array => ReceiptPlanTrigger::query()
                         ->where('organization_id', app(InstallationInstitution::class)->current()?->id)->orderByDesc('id')->limit(20)->get()->toArray())
-                        ->schema([TextEntry::make('collection_batch_review_id')->label('Receipt review ID'), TextEntry::make('state')->badge()->color('gray'),
-                            TextEntry::make('predecessor_snapshot_id')->label('Predecessor snapshot')->placeholder('Not captured'),
-                            TextEntry::make('budget_snapshot_id')->label('Successor snapshot')->placeholder('Not captured'),
-                            TextEntry::make('last_error')->label('Blocked reason')->placeholder('None')->wrap()])->columns(['default' => 1, 'md' => 2]),
+                        ->schema([
+                            TextEntry::make('collection_batch_review_id')->label('Receipt review ID')->prefix('#')->fontFamily('mono'),
+                            TextEntry::make('state')->badge()->color(fn (string $state): string => match ($state) {
+                                'completed' => 'success',
+                                'blocked', 'failed' => 'danger',
+                                'running' => 'info',
+                                default => 'warning',
+                            }),
+                            TextEntry::make('predecessor_snapshot_id')->label('Predecessor snapshot')->prefix('#')->placeholder('Not captured')->fontFamily('mono'),
+                            TextEntry::make('budget_snapshot_id')->label('Successor snapshot')->prefix('#')->placeholder('Not captured')->fontFamily('mono'),
+                            TextEntry::make('last_error')->label('Blocked reason')->placeholder('None')->color('danger')->wrap(),
+                        ])->columns(['default' => 2, 'md' => 5]),
                 ])->columnSpanFull(),
         ]);
     }
@@ -580,9 +648,72 @@ class FinanceSupervisor extends Page implements HasTable
         return ['plans' => (int) ($counts['budget_plan'] ?? 0), 'collections' => (int) ($counts['collection_review'] ?? 0)];
     }
 
+    public ?string $activeStateFilter = null;
+
+    public function filterByState(?string $state): void
+    {
+        Gate::forUser(Auth::user())->authorize('viewAny', FinanceWorkflowRun::class);
+        $this->activeStateFilter = $state;
+
+        if ($state === null) {
+            $this->tableFilters = [];
+        } else {
+            $this->tableFilters = [
+                'state' => ['value' => $state],
+            ];
+        }
+
+        $this->updatedTableFilters();
+    }
+
+    /** @return array<string, mixed> */
+    public function getSupervisorMetrics(): array
+    {
+        $orgId = app(InstallationInstitution::class)->current()?->id;
+
+        $query = $this->runsQuery()->withoutEagerLoads();
+        $waitingCount = (clone $query)->where('state', 'waiting_for_review')->count();
+        $runningCount = (clone $query)->where('state', 'running')->count();
+        $completedCount = (clone $query)->where('state', 'completed')->count();
+        $failedCount = (clone $query)->whereIn('state', ['failed', 'blocked'])->count();
+        $totalCount = (clone $query)->count();
+
+        $acceptedCount = FinancePlanReview::query()
+            ->where('organization_id', $orgId)
+            ->where('decision', 'accept_plan')
+            ->count();
+
+        $activeRoutesCount = ReceiptBudgetRoute::query()
+            ->where('organization_id', $orgId)
+            ->whereHas('approval')
+            ->count();
+
+        $latestHeartbeat = (clone $query)
+            ->whereNotNull('heartbeat_at')
+            ->latest('heartbeat_at')
+            ->value('heartbeat_at');
+
+        $isEngineHealthy = (bool) config('eduflow.background_finance.enabled', false);
+
+        return [
+            'waiting' => $waitingCount,
+            'running' => $runningCount,
+            'completed' => $completedCount,
+            'failed' => $failedCount,
+            'total' => $totalCount,
+            'accepted' => $acceptedCount,
+            'activeRoutes' => $activeRoutesCount,
+            'latestHeartbeat' => $latestHeartbeat ? Carbon::parse($latestHeartbeat)->diffForHumans() : 'No recent activity',
+            'isEngineHealthy' => $isEngineHealthy,
+            'queueConnection' => (string) config('queue.default', 'database'),
+            'queueName' => (string) config('eduflow.background_finance.queue_connection', 'policy-assessments'),
+        ];
+    }
+
     public function showWaitingPlans(): void
     {
         Gate::forUser(Auth::user())->authorize('viewAny', FinanceWorkflowRun::class);
+        $this->activeStateFilter = 'waiting_for_review';
         $this->tableFilters = ['state' => ['value' => 'waiting_for_review'], 'kind' => ['value' => 'budget_plan']];
         $this->updatedTableFilters();
     }
@@ -624,65 +755,170 @@ class FinanceSupervisor extends Page implements HasTable
     private function runEvidenceSchema(): array
     {
         return [
-            Section::make('Run identity and worker status')->schema([
-                $this->runEntry('id', 'Run ID'), $this->runEntry('organization_id', 'Institution ID'),
-                $this->runEntry('kind', 'Workflow'), $this->runEntry('state', 'State'),
-                $this->runEntry('budget_snapshot_id', 'Budget snapshot ID'), $this->runEntry('collection_batch_id', 'Collection batch ID'),
-                $this->runEntry('attempts', 'Attempts'), $this->runEntry('heartbeat_at', 'Heartbeat (UTC)'),
-                $this->runEntry('next_attempt_at', 'Next attempt (UTC)'), $this->runEntry('created_at', 'Created (UTC)'),
-                $this->runEntry('last_error', 'Last error')->columnSpanFull(),
-                $this->runEntry('trigger_key', 'Trigger key')->copyable()->columnSpanFull(),
-                $this->runEntry('source_digest', 'Source digest')->copyable()->columnSpanFull(),
-                TextEntry::make('expected_digest')->label('Mounted result digest')
-                    ->state(fn (): string => $this->mountedResultDigest)->wrap()->copyable()->columnSpanFull(),
-                $this->runEntry('integrity', 'Result integrity')->columnSpanFull(),
-            ])->columns(['default' => 1, 'md' => 2])->columnSpanFull(),
-            Section::make('Exact budget proposal')->visible(fn (): bool => ($this->mountedRunEvidence['kind'] ?? null) === self::KINDS['budget_plan'] && $this->mountedPlan !== [])
-                ->description('Original-currency amounts and USDC valuations are distinct. Suggestions are not funded payment instructions.')
+            Section::make('Run Summary & Status')
+                ->icon(Heroicon::ShieldCheck)
+                ->description('Workflow execution status and cryptographic integrity.')
                 ->schema([
-                    $this->planEntry('department.name', 'Department'), $this->planEntry('currency', 'Original currency'),
-                    $this->planEntry('snapshot_id', 'Proposal source snapshot ID'),
-                    $this->planEntry('snapshot_digest', 'Proposal source snapshot digest')->copyable()->columnSpanFull(),
-                    $this->planEntry('as_of', 'Evidence as of'), $this->planEntry('valid_until', 'Evidence valid until'),
-                    $this->planMoneyEntry('headroom.budget_minor_units', 'Initial budget headroom'),
-                    $this->planMoneyEntry('headroom.cash_minor_units', 'Initial realized cash headroom'),
-                    $this->planMoneyEntry('remaining_budget_minor_units', 'Remaining budget headroom'),
-                    $this->planMoneyEntry('remaining_cash_minor_units', 'Remaining realized cash headroom'),
-                    TextEntry::make('suggested_usdc_valuation')->label('Suggested USDC valuation — not settlement funding')
-                        ->state(fn (): string => $this->formatUnits($this->mountedPlan['suggested_usdc_valuation_base_units'] ?? null, 'USDC'))->columnSpanFull(),
-                    $this->planEntry('collection_evidence.mode', 'Collection evidence mode'),
-                    $this->planMoneyEntry('collection_evidence.received_minor_units', 'Realized receipts in source evidence'),
-                    $this->planEntry('collection_evidence.review_ids', 'Bound collection review IDs')->listWithLineBreaks(),
-                    IconEntry::make('opening_funds_exclude_collections')->label('Opening funds exclude counted collections')
-                        ->state(fn (): mixed => data_get($this->mountedPlan, 'collection_evidence.opening_funds_exclude_collections'))->boolean(),
-                    RepeatableEntry::make('planned_bills')->label('Closed bill set and cumulative rule checks')
+                    Grid::make(['default' => 2, 'sm' => 4])->schema([
+                        TextEntry::make('run_id_display')
+                            ->label('Run #')
+                            ->state(fn (): string => '#'.($this->mountedRunEvidence['id'] ?? '—'))
+                            ->fontFamily('mono')
+                            ->weight('bold'),
+                        TextEntry::make('kind')
+                            ->label('Workflow Type')
+                            ->badge()
+                            ->color(fn (): string => ($this->mountedRunEvidence['kind'] ?? '') === self::KINDS['budget_plan'] ? 'primary' : 'info')
+                            ->icon(fn (): string => ($this->mountedRunEvidence['kind'] ?? '') === self::KINDS['budget_plan'] ? 'heroicon-m-scale' : 'heroicon-m-inbox-stack')
+                            ->state(fn (): string => $this->mountedRunEvidence['kind'] ?? '—'),
+                        TextEntry::make('state')
+                            ->label('Execution State')
+                            ->badge()
+                            ->color(fn (): string => match ($this->mountedRunEvidence['state'] ?? '') {
+                                'Completed' => 'success',
+                                'Waiting for review', 'Blocked', 'Paused' => 'warning',
+                                'Failed' => 'danger',
+                                'Running' => 'info',
+                                default => 'gray',
+                            })
+                            ->icon(fn (): string => match ($this->mountedRunEvidence['state'] ?? '') {
+                                'Completed' => 'heroicon-m-check-circle',
+                                'Waiting for review' => 'heroicon-m-clock',
+                                'Failed', 'Blocked' => 'heroicon-m-exclamation-triangle',
+                                'Running' => 'heroicon-m-arrow-path',
+                                default => 'heroicon-m-pause-circle',
+                            })
+                            ->state(fn (): string => $this->mountedRunEvidence['state'] ?? '—'),
+                        TextEntry::make('attempts')
+                            ->label('Attempts')
+                            ->badge()
+                            ->color('gray')
+                            ->state(fn (): int => (int) ($this->mountedRunEvidence['attempts'] ?? 1)),
+                    ]),
+
+                    Grid::make(['default' => 1, 'sm' => 3])->schema([
+                        TextEntry::make('heartbeat_at')
+                            ->label('Heartbeat (UTC)')
+                            ->state(fn (): string => $this->mountedRunEvidence['heartbeat_at'] ?? 'Not started')
+                            ->icon(Heroicon::Clock),
+                        TextEntry::make('created_at')
+                            ->label('Created (UTC)')
+                            ->state(fn (): string => $this->mountedRunEvidence['created_at'] ?? '—')
+                            ->icon(Heroicon::Calendar),
+                        TextEntry::make('integrity')
+                            ->label('Result Integrity')
+                            ->badge()
+                            ->color(fn (): string => str_contains((string) ($this->mountedRunEvidence['integrity'] ?? ''), 'Intact') ? 'success' : 'danger')
+                            ->icon(fn (): string => str_contains((string) ($this->mountedRunEvidence['integrity'] ?? ''), 'Intact') ? 'heroicon-m-check-badge' : 'heroicon-m-exclamation-triangle')
+                            ->state(fn (): string => $this->mountedRunEvidence['integrity'] ?? 'No result recorded'),
+                    ]),
+
+                    TextEntry::make('last_error')
+                        ->label('Last Error / Halt Reason')
+                        ->state(fn (): ?string => $this->mountedRunEvidence['last_error'] ?? null)
+                        ->color('danger')
+                        ->icon(Heroicon::ExclamationCircle)
+                        ->visible(fn (): bool => filled($this->mountedRunEvidence['last_error'] ?? null))
+                        ->columnSpanFull(),
+
+                    Section::make('Cryptographic Evidence & Technical Digests')
+                        ->description('Auditor-verifiable SHA-256 hashes and trigger keys.')
+                        ->collapsible()
+                        ->collapsed()
+                        ->schema([
+                            TextEntry::make('trigger_key')->label('Trigger key')
+                                ->state(fn (): string => $this->mountedRunEvidence['trigger_key'] ?? '—')
+                                ->fontFamily('mono')->copyable()->columnSpanFull(),
+                            TextEntry::make('source_digest')->label('Source digest')
+                                ->state(fn (): string => $this->mountedRunEvidence['source_digest'] ?? '—')
+                                ->fontFamily('mono')->copyable()->columnSpanFull(),
+                            TextEntry::make('expected_digest')->label('Mounted result digest')
+                                ->state(fn (): string => $this->mountedResultDigest)
+                                ->fontFamily('mono')->copyable()->columnSpanFull(),
+                            $this->runEntry('budget_snapshot_id', 'Budget snapshot ID')->fontFamily('mono'),
+                            $this->runEntry('collection_batch_id', 'Collection batch ID')->fontFamily('mono'),
+                            $this->runEntry('organization_id', 'Institution ID')->fontFamily('mono'),
+                        ])->columns(3)->columnSpanFull(),
+                ])->columnSpanFull(),
+
+            Section::make('Exact Budget Proposal')
+                ->icon(Heroicon::Banknotes)
+                ->visible(fn (): bool => ($this->mountedRunEvidence['kind'] ?? null) === self::KINDS['budget_plan'] && $this->mountedPlan !== [])
+                ->description('AI-evaluated line allocations against institutional policy. Recommendations only — not payment instructions.')
+                ->schema([
+                    Grid::make(['default' => 1, 'sm' => 3])->schema([
+                        $this->planEntry('department.name', 'Department')->weight('bold')->icon(Heroicon::BuildingOffice),
+                        $this->planEntry('currency', 'Budget Currency')->badge()->color('info'),
+                        TextEntry::make('suggested_usdc_valuation')
+                            ->label('Suggested USDC Valuation')
+                            ->state(fn (): string => $this->formatUnits($this->mountedPlan['suggested_usdc_valuation_base_units'] ?? null, 'USDC'))
+                            ->weight('bold')
+                            ->color('primary')
+                            ->icon(Heroicon::CurrencyDollar),
+                    ]),
+
+                    Grid::make(['default' => 2, 'sm' => 4])->schema([
+                        $this->planMoneyEntry('headroom.budget_minor_units', 'Initial Budget Headroom'),
+                        $this->planMoneyEntry('headroom.cash_minor_units', 'Initial Realized Cash'),
+                        $this->planMoneyEntry('remaining_budget_minor_units', 'Remaining Budget'),
+                        $this->planMoneyEntry('remaining_cash_minor_units', 'Remaining Cash'),
+                    ]),
+
+                    RepeatableEntry::make('planned_bills')
+                        ->label('Closed Bill Set & Policy Rule Checks')
                         ->state(fn (): array => $this->planBills())
                         ->schema([
-                            TextEntry::make('invoice_version_id')->label('Invoice version ID'), TextEntry::make('invoice_id')->label('Invoice ID'),
-                            TextEntry::make('source_amount')->label('Original amount'), TextEntry::make('valuation_amount')->label('USDC valuation'),
-                            TextEntry::make('decision')->label('Planning decision')->badge()->color('gray')->columnSpanFull(),
-                            IconEntry::make('checks.evidence_intact')->label('Evidence intact')->boolean(),
-                            IconEntry::make('checks.evidence_approved')->label('Evidence approved')->boolean(),
-                            IconEntry::make('checks.allocation_available')->label('Allocation available')->boolean(),
-                            IconEntry::make('checks.realized_cash_available')->label('Realized cash available')->boolean(),
-                            TextEntry::make('remaining_budget')->label('Remaining budget after this bill'),
-                            TextEntry::make('remaining_cash')->label('Remaining cash after this bill'),
-                        ])->columns(['default' => 1, 'md' => 2])->columnSpanFull(),
-                ])->columns(['default' => 1, 'md' => 2])->columnSpanFull(),
-            Section::make('Bill payment progress')->visible(fn (): bool => $this->mountedPaymentProgress !== [])
+                            Grid::make(['default' => 2, 'sm' => 4])->schema([
+                                TextEntry::make('invoice_id')->label('Invoice #')->prefix('#')->fontFamily('mono')->weight('bold'),
+                                TextEntry::make('source_amount')->label('Billed Amount')->weight('bold'),
+                                TextEntry::make('valuation_amount')->label('USDC Valuation')->weight('bold')->color('primary'),
+                                TextEntry::make('decision')
+                                    ->label('Planning Decision')
+                                    ->badge()
+                                    ->color(fn (string $state): string => str_contains($state, 'Proposed') ? 'warning' : 'danger'),
+                            ]),
+                            Grid::make(['default' => 2, 'sm' => 4])->schema([
+                                IconEntry::make('checks.evidence_intact')->label('Evidence Intact')->boolean(),
+                                IconEntry::make('checks.evidence_approved')->label('Evidence Approved')->boolean(),
+                                IconEntry::make('checks.allocation_available')->label('Budget Available')->boolean(),
+                                IconEntry::make('checks.realized_cash_available')->label('Cash Realized')->boolean(),
+                            ]),
+                            Grid::make(['default' => 1, 'sm' => 2])->schema([
+                                TextEntry::make('remaining_budget')->label('Remaining Budget After Line'),
+                                TextEntry::make('remaining_cash')->label('Remaining Cash After Line'),
+                            ]),
+                        ])->columns(1)->columnSpanFull(),
+                ])->columnSpanFull(),
+
+            Section::make('Bill payment progress')
+                ->icon(Heroicon::QueueList)
+                ->visible(fn (): bool => $this->mountedPaymentProgress !== [])
                 ->description('Persisted vendor-payment work linked by exact invoice version. Reopen details for current progress; viewing never dispatches work.')
                 ->schema([
                     RepeatableEntry::make('payment_progress')->hiddenLabel()->state(fn (): array => $this->mountedPaymentProgress)
                         ->schema([
-                            TextEntry::make('invoice_id')->label('Invoice ID'),
-                            TextEntry::make('state')->label('Payment state')->badge()->color('gray'),
-                            TextEntry::make('stage')->label('Stage')->placeholder('Not started'),
-                            TextEntry::make('provider_handle')->label('Provider transaction ID')->placeholder('Not recorded')->wrap(),
-                            TextEntry::make('tx_hash')->label('Chain hash — not proof alone')->placeholder('Not published')->wrap(),
-                            IconEntry::make('settled')->label('Verified settlement recorded')->boolean(),
-                        ])->columns(['default' => 1, 'md' => 2])->columnSpanFull(),
+                            Grid::make(['default' => 2, 'sm' => 3])->schema([
+                                TextEntry::make('invoice_id')->label('Invoice #')->prefix('#')->fontFamily('mono')->weight('bold'),
+                                TextEntry::make('state')->label('Payment State')->badge()->color(fn (string $state): string => match ($state) {
+                                    'completed', 'settled' => 'success',
+                                    'awaiting_payment_review' => 'warning',
+                                    'failed' => 'danger',
+                                    default => 'info',
+                                }),
+                                TextEntry::make('stage')->label('Pipeline Stage')->badge()->color('gray'),
+                            ]),
+                            Grid::make(['default' => 1, 'sm' => 2])->schema([
+                                TextEntry::make('provider_handle')->label('Provider Transaction ID')->fontFamily('mono')->copyable()->placeholder('Not recorded'),
+                                TextEntry::make('tx_hash')->label('Chain Hash — Not Proof Alone')->fontFamily('mono')->copyable()->placeholder('Not published'),
+                            ]),
+                            IconEntry::make('settled')->label('Verified Settlement Recorded')->boolean(),
+                        ])->columns(1)->columnSpanFull(),
                 ])->columnSpanFull(),
-            Section::make('Authority boundary')->description('Collection and plan reviews do not verify bank balances or Arc funding. Preparing payment review holds capacity only.')
+
+            Section::make('Authority Boundary')
+                ->icon(Heroicon::InformationCircle)
+                ->collapsed()
+                ->description('Collection and plan reviews do not verify bank balances or Arc funding. Preparing payment review holds capacity only.')
                 ->schema([
                     TextEntry::make('authority')->hiddenLabel()->state('Accepting a plan grants no payment authority. Prepare payment review may hold capacity against independently reviewed funding. Exact MFA-backed payment approval and background execution remain separate.'),
                 ])->columnSpanFull(),

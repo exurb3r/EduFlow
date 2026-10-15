@@ -22,7 +22,8 @@ final readonly class InstitutionPolicyAdvice
 
     public function forPlan(FinanceWorkflowRun $run): void
     {
-        if (! config('eduflow.institution_policy.advice_enabled', false) || $run->kind !== 'budget_plan' || ! $run->hasValidResult()) {
+        if (! config('eduflow.institution_policy.advice_enabled', false) || $run->state === 'paused'
+            || $run->kind !== 'budget_plan' || ! $run->hasValidResult()) {
             return;
         }
         $publication = $this->workspace->active();
@@ -44,7 +45,7 @@ final readonly class InstitutionPolicyAdvice
             if (! $assessment->wasRecentlyCreated) {
                 continue;
             }
-            $connection = (string) config('eduflow.background_finance.queue_connection', 'database');
+            $connection = (string) config('queue.default', 'database');
             try {
                 if (! in_array(config('queue.connections.'.$connection.'.driver'), ['database', 'redis'], true)
                     || (int) config('queue.connections.'.$connection.'.retry_after', 0) <= 180) {

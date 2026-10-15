@@ -11,6 +11,7 @@ use App\Models\BudgetSnapshot;
 use App\Services\InstallationInstitution;
 use Filament\Widgets\ChartWidget;
 use Illuminate\Contracts\Support\Htmlable;
+use Illuminate\Database\Eloquent\Builder;
 
 /**
  * Approved allocation against realized cash headroom, per department.
@@ -93,6 +94,7 @@ class BudgetHeadroomChart extends ChartWidget
                 ->selectRaw('MAX(id)')
                 ->where('organization_id', $institution->id)
                 ->groupBy('budget_id'))
+            ->whereDoesntHave('workflowRuns', fn (Builder $query): Builder => $query->where('state', 'paused'))
             ->get();
 
         $rows = [];

@@ -51,7 +51,7 @@ use function Pest\Laravel\travelTo;
 function paymentAuthorizationContext(string $method = 'filament_app', bool $fake = false, bool $withFunding = true, ?Closure $beforeDrafts = null): array
 {
     travelTo(now()->utc()->startOfSecond());
-    config(['eduflow.institution_id' => null, 'eduflow.background_finance.enabled' => false,
+    config(['queue.default' => 'database', 'eduflow.institution_id' => null, 'eduflow.background_finance.enabled' => false,
         'lepton.default' => $fake ? 'fake' : 'circle', 'lepton.arc.chain' => 'ARC-TESTNET',
         'lepton.arc.chain_id' => 5042002, 'lepton.arc.treasury' => null]);
     app()->instance(WalletGateway::class, Mockery::mock(WalletGateway::class));

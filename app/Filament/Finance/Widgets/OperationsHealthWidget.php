@@ -59,8 +59,8 @@ class OperationsHealthWidget extends BaseWidget
         }
 
         $enabled = (bool) config('eduflow.background_finance.enabled');
-        $queue = (string) config('eduflow.background_finance.queue');
-        $connection = (string) config('eduflow.background_finance.queue_connection');
+        $connection = (string) config('queue.default', 'database');
+        $queue = (string) config('queue.connections.'.$connection.'.queue', 'default');
 
         $runtimeStat = Stat::make('Background runtime', $enabled ? 'Enabled' : 'Disabled')
             ->description(sprintf('%s planning queue "%s" on the %s connection. Payment submission uses a separate runtime and queue.', $enabled ? 'Durable' : 'Off —', $queue, $connection))

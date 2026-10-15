@@ -2,6 +2,7 @@
 
 use App\Models\User;
 use App\Notifications\FundsReceivedNotification;
+use App\Notifications\TuitionPaymentSubmittedNotification;
 use App\Notifications\TuitionPaymentSuccessNotification;
 
 test('guests are redirected away from the notifications page', function (): void {
@@ -165,5 +166,27 @@ test('tuition payment success notification stores sent amount, term and metadata
         'applied_amount' => '5.00',
         'overpayment_amount' => null,
         'type' => 'tuition_payment',
+    ]);
+});
+
+test('tuition payment submitted notification stores sent amount and metadata', function (): void {
+    $user = User::factory()->create();
+
+    $user->notify(new TuitionPaymentSubmittedNotification(
+        amount: '10.00',
+        description: 'Tuition payment of 10.00 USDC sent to Arc Testnet rail for Fall 2026.',
+        term: 'Fall 2026',
+        requestKey: '11111111-2222-3333-4444-555555555555',
+    ));
+
+    $notification = $user->notifications()->firstOrFail();
+
+    expect($notification->getAttribute('data'))->toBe([
+        'title' => 'Tuition payment of 10.00 USDC sent',
+        'message' => 'Tuition payment of 10.00 USDC sent to Arc Testnet rail for Fall 2026.',
+        'amount' => '10.00',
+        'term' => 'Fall 2026',
+        'request_key' => '11111111-2222-3333-4444-555555555555',
+        'type' => 'tuition_payment_submitted',
     ]);
 });

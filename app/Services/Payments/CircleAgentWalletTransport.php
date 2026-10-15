@@ -141,9 +141,15 @@ final readonly class CircleAgentWalletTransport implements FeeBoundedPaymentTran
         ]);
 
         if (is_array($quoted)) {
-            Cache::put($cacheKey, $quoted, 60);
+            Cache::put($cacheKey, $quoted, 3600);
+            Cache::forever($cacheKey.'_last_known', $quoted);
 
             return $quoted;
+        }
+
+        $fallback = Cache::get($cacheKey.'_last_known');
+        if (is_array($fallback)) {
+            return $fallback;
         }
 
         return null;

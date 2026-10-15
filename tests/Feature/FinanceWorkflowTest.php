@@ -49,7 +49,7 @@ use function Pest\Laravel\travel;
 /** @return array{actor: User, reviewer: User, snapshot: BudgetSnapshot, institution: Organization} */
 function workflowContext(): array
 {
-    config(['eduflow.institution_id' => null, 'eduflow.background_finance.enabled' => true,
+    config(['queue.default' => 'database', 'eduflow.institution_id' => null, 'eduflow.background_finance.enabled' => true,
         'eduflow.background_finance.queue_connection' => 'database']);
     app()->instance(ArcNetworkGateway::class, Mockery::mock(ArcNetworkGateway::class));
     app()->instance(WalletGateway::class, Mockery::mock(WalletGateway::class));
@@ -193,7 +193,7 @@ test('scheduler sweep recovers undispatched work once per lease and never uses a
 
     // A synchronous queue would run financial work inside the request that
     // merely recorded it, so it is refused outright rather than tolerated.
-    config(['eduflow.background_finance.queue_connection' => 'sync']);
+    config(['queue.default' => 'sync']);
     expect(fn () => $dispatcher->dispatch())->toThrow(ValidationException::class);
     expect($c['snapshot']->hasValidSnapshot())->toBeTrue();
 });
@@ -233,6 +233,25 @@ test('cashier and finance supervisor pages display exact evidence and record pla
         ['decision' => 'accept_plan', 'reason' => 'Supervisor checked exact plan.', 'attestation' => true]]);
     $page->__call('assertHasNoActionErrors', []);
     expect(FinancePlanReview::query()->count())->toBe(1)->and($run->fresh()->state)->toBe('completed')->and(Transaction::query()->count())->toBe(0);
+});
+
+test('finance supervisor page renders command center metrics, 4-stage pipeline and quick filters', function (): void {
+    $c = workflowContext();
+    Filament::setCurrentPanel(Filament::getPanel('finance'));
+    actingAs($c['reviewer']);
+
+    Livewire::test(FinanceSupervisor::class)
+        ->assertSuccessful()
+        ->assertSee('Finance Supervisor Command Center')
+        ->assertSee('Autonomous Allocation Architecture')
+        ->assertSee('Awaiting Decision')
+        ->assertSee('Background Worker')
+        ->assertSee('Accepted Proposals')
+        ->assertSee('Receipt Routing')
+        ->call('filterByState', 'waiting_for_review')
+        ->assertSet('activeStateFilter', 'waiting_for_review')
+        ->call('filterByState', null)
+        ->assertSet('activeStateFilter', null);
 });
 
 test('scheduler recovery discovers committed sources even when original enablement was off', function (): void {
