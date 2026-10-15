@@ -266,7 +266,7 @@ class FinanceSupervisor extends Page implements HasTable
             Action::make('captureBudgetSnapshot')->label('Capture budget planning evidence')->icon(Heroicon::Plus)
                 ->visible(fn (): bool => Gate::forUser(Auth::user())->allows('create', BudgetSnapshot::class))
                 ->modalHeading('Capture budget planning evidence')->modalWidth('5xl')
-                ->modalDescription('Immutable planning snapshot, not funding. Capture does not reserve funds, change accounts or authorize payment. New snapshots enter the background queue only when enabled.')
+                ->modalDescription('Immutable planning snapshot, not funding. Capture does not reserve funds, change accounts or authorize payment. New snapshots enter the default queue for background planning.')
                 ->modalSubmitActionLabel('Capture planning snapshot')
                 ->mountUsing(function (Schema $schema): void {
                     Gate::forUser(Auth::user())->authorize('create', BudgetSnapshot::class);
@@ -291,7 +291,7 @@ class FinanceSupervisor extends Page implements HasTable
                         throw ValidationException::withMessages($errors);
                     }
                     Notification::make()->title('Planning snapshot #'.$snapshot->id.' captured')
-                        ->body('Evidence only. No funding, payment authorization or accounts changed. Background processing depends on configuration and worker availability.')
+                        ->body('Evidence only. No funding, payment authorization or accounts changed. Planning uses the default queue and requires a running worker.')
                         ->success()->send();
                 }),
         ];
@@ -415,7 +415,7 @@ class FinanceSupervisor extends Page implements HasTable
                 } catch (ValidationException $exception) {
                     throw ValidationException::withMessages([$schema->getStatePath().'.attestation' => collect($exception->errors())->flatten()->all()]);
                 }
-                Notification::make()->title('Receipt routing reviewed')->body('Successor planning remains default off until operator enables it. No spending approved.')->success()->send();
+                Notification::make()->title('Receipt routing reviewed')->body('Reviewed receipts can now trigger bounded successor planning on the default queue. No spending approved.')->success()->send();
             });
     }
 
@@ -528,8 +528,8 @@ class FinanceSupervisor extends Page implements HasTable
                         TextEntry::make('background_enabled')->label('Background finance')
                             ->state(fn (): string => config('eduflow.background_finance.enabled', false) ? 'Enabled in configuration' : 'Disabled in configuration')
                             ->badge()->color(fn (): string => config('eduflow.background_finance.enabled', false) ? 'success' : 'gray')->columnSpanFull(),
-                        TextEntry::make('queue_connection')->label('Queue connection')->state(fn (): string => config('eduflow.background_finance.queue_connection', 'database')),
-                        TextEntry::make('queue_name')->label('Planning queue')->state(fn (): string => config('eduflow.background_finance.queue', 'finance-planning')),
+                        TextEntry::make('queue_connection')->label('Queue connection')->state(fn (): string => config('queue.default', 'database')),
+                        TextEntry::make('queue_name')->label('Planning queue')->state(fn (): string => config('queue.connections.'.config('queue.default', 'database').'.queue', 'default')),
                     ])->columns(['default' => 1, 'md' => 2])->columnSpan(1),
                 Section::make('Waiting review inbox')->icon(Heroicon::Inbox)
                     ->description('Institution-wide counts. Policy checks decide who can review each record.')

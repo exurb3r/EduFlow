@@ -1270,9 +1270,9 @@ export default function InstitutionPolicies({
                                                 <AlertDescription>
                                                     Use database or Redis queue
                                                     with retry_after above 180
-                                                    seconds; run worker for
-                                                    policy-assessments. Saving
-                                                    policy remains available.
+                                                    seconds; run worker for the
+                                                    default queue. Saving policy
+                                                    remains available.
                                                 </AlertDescription>
                                             </Alert>
                                         )}

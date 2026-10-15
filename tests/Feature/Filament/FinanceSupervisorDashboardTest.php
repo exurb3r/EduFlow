@@ -34,8 +34,10 @@ use App\Models\BudgetSnapshot;
 use App\Models\CollectionBatch;
 use App\Models\CollectionBatchReview;
 use App\Models\FinanceWorkflowRun;
+use App\Models\FundingWindow;
 use App\Models\Invoice;
 use App\Models\Organization;
+use App\Models\PaymentAuthorization;
 use App\Models\Transaction;
 use App\Models\User;
 use App\Models\Vendor;
@@ -68,6 +70,7 @@ use function Pest\Laravel\get;
 function financeDashboardContext(): array
 {
     config([
+        'queue.default' => 'database',
         'eduflow.institution_id' => null,
         'eduflow.background_finance.enabled' => true,
         'eduflow.background_finance.queue_connection' => 'database',
@@ -497,6 +500,77 @@ test('arc panel labels fake evidence and refuses to present a spendable balance'
     expect(Transaction::query()->count())->toBe(0);
 });
 
+test('paused planning examples are excluded from budget headroom displays without deleting evidence', function (): void {
+    $context = financeDashboardContext();
+    $run = FinanceWorkflowRun::query()->where('kind', 'budget_plan')->firstOrFail();
+    $run->update(['state' => 'paused', 'last_error' => 'Source amounts require independent correction.']);
+    Filament::setCurrentPanel(Filament::getPanel('finance'));
+    actingAs($context['reviewer']);
+
+    $table = Livewire::test(BudgetCapacityWidget::class);
+    $query = new ReflectionMethod(BudgetCapacityWidget::class, 'getTableQuery');
+    expect($query->invoke($table->instance())->count())->toBe(0);
+    $chart = Livewire::test(BudgetHeadroomChart::class);
+    $method = new ReflectionMethod(BudgetHeadroomChart::class, 'getData');
+    expect($method->invoke($chart->instance()))->toBe([])
+        ->and(BudgetSnapshot::query()->whereKey($run->budget_snapshot_id)->exists())->toBeTrue()
+        ->and(Transaction::query()->count())->toBe(0);
+});
+
+test('inbox does not count receipt review workflows as allocation proposals', function (): void {
+    $context = financeDashboardContext();
+    FinanceWorkflowRun::query()->where('kind', 'budget_plan')->update(['state' => 'paused']);
+    $run = FinanceWorkflowRun::query()->where('kind', 'collection_review')->firstOrFail();
+    $run->update(['state' => 'waiting_for_review']);
+    Filament::setCurrentPanel(Filament::getPanel('finance'));
+    actingAs($context['reviewer']);
+
+    $widget = Livewire::test(ApprovalInboxWidget::class);
+    $method = new ReflectionMethod(ApprovalInboxWidget::class, 'getViewData');
+    $data = $method->invoke($widget->instance());
+    expect($data['plans'])->toBe([])->and($run->refresh()->state)->toBe('waiting_for_review');
+});
+
+test('arc panel observes exact live wallet balance without creating a funding window', function (): void {
+    $context = paymentAuthorizationContext(withFunding: false);
+    config(['lepton.arc.treasury' => $context['wallet']->address]);
+    stubDashboardArcBalance('69900000000000000007');
+    Filament::setCurrentPanel(Filament::getPanel('finance'));
+    actingAs($context['reviewer']);
+
+    Livewire::test(ArcSettlementWidget::class)
+        ->assertSuccessful()
+        ->assertSee('69.900000 USDC')
+        ->assertSee('69.900000000000000007')
+        ->assertSee('None captured')
+        ->assertSee('sponsored gas');
+
+    expect(FundingWindow::query()->count())->toBe(0)
+        ->and(PaymentAuthorization::query()->count())->toBe(0)
+        ->and(Transaction::query()->count())->toBe(0);
+});
+
+test('arc panel never replaces missing live evidence with ledger cash', function (): void {
+    $context = paymentAuthorizationContext(withFunding: false);
+    config(['lepton.arc.treasury' => $context['wallet']->address]);
+    $arc = Mockery::mock(ArcNetworkGateway::class);
+    $arc->shouldReceive('chainCode')->andReturn('ARC-TESTNET');
+    $arc->shouldReceive('chainId')->andReturn(5042002);
+    mockExpectation($arc, 'rpc')->andThrow(new RuntimeException('Chain unavailable'));
+    $arc->shouldReceive('addressExplorerUrl')->andReturn('https://example.test/treasury');
+    app()->instance(ArcNetworkGateway::class, $arc);
+    Filament::setCurrentPanel(Filament::getPanel('finance'));
+    actingAs($context['reviewer']);
+
+    Livewire::test(ArcSettlementWidget::class)
+        ->assertSuccessful()
+        ->assertSee('Not observed')
+        ->assertSee('Live Arc balance unavailable')
+        ->assertDontSee('999,999.000000 USDC');
+
+    expect(FundingWindow::query()->count())->toBe(0);
+});
+
 test('arc panel reports a block-bound funding observation with its fake label', function (): void {
     $c = financeDashboardArcContext();
     stubDashboardArcBalance('100000000000000000007');
@@ -654,7 +728,7 @@ test('operations health tells a stopped worker apart from an idle one', function
         ->assertSee('Unresolved payment outcomes');
 
     DB::table('jobs')->insert([
-        'queue' => 'finance-planning', 'payload' => '{}', 'attempts' => 0,
+        'queue' => 'default', 'payload' => '{}', 'attempts' => 0,
         'reserved_at' => null, 'available_at' => time(), 'created_at' => time(),
     ]);
 

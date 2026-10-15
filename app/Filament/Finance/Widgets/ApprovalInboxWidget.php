@@ -17,8 +17,8 @@ use App\Models\PaymentReservation;
 use App\Models\User;
 use App\Models\VendorDestinationVersion;
 use App\Services\InstallationInstitution;
+use Carbon\CarbonInterface;
 use Filament\Widgets\Widget;
-use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Gate;
 
@@ -106,6 +106,7 @@ class ApprovalInboxWidget extends Widget
     {
         return FinanceWorkflowRun::query()
             ->where('organization_id', $institutionId)
+            ->where('kind', 'budget_plan')
             ->where('state', 'waiting_for_review')
             ->orderByDesc('id')
             ->limit(10)
@@ -207,7 +208,7 @@ class ApprovalInboxWidget extends Widget
 
     private function age(mixed $timestamp): string
     {
-        if (! $timestamp instanceof Carbon) {
+        if (! $timestamp instanceof CarbonInterface) {
             return 'Unknown';
         }
 

@@ -106,7 +106,7 @@ final readonly class FinanceWorkflowDispatcher
 
     private function requireDurableQueue(): void
     {
-        $connection = (string) config('eduflow.background_finance.queue_connection', 'database');
+        $connection = (string) config('queue.default', 'database');
         $driver = config('queue.connections.'.$connection.'.driver');
         if (! in_array($driver, ['database', 'redis'], true) || (int) config('queue.connections.'.$connection.'.retry_after', 0) <= 30) {
             throw ValidationException::withMessages(['queue' => 'Background finance requires a durable database/Redis queue with retry_after greater than 30 seconds.']);

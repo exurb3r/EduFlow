@@ -187,8 +187,9 @@ test('a refused intake leaves the settlement committed, unreconciled and recover
     $c = consentContext();
     $owner = intakeEnabled();
     Bus::fake();
+    config(['eduflow.student_tuition.auto_intake' => false]);
     $payment = postSettledPayment($c);
-    CollectionBatch::query()->where('student_tuition_payment_id', $payment->getKey())->delete();
+    config(['eduflow.student_tuition.auto_intake' => true]);
     $intake = app(TuitionReceiptIntake::class);
     $import = app(ImportTuitionPaymentAsCollection::class);
 

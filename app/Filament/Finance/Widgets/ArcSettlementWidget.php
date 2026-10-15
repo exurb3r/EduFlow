@@ -9,12 +9,14 @@ use App\Filament\Pages\PaymentReviews;
 use App\Models\FundingWindow;
 use App\Services\InstallationInstitution;
 use App\Services\LeptonTreasuryService;
+use App\Services\TreasuryBalanceObservation;
 use Brick\Math\BigDecimal;
 use Brick\Math\BigInteger;
 use Filament\Support\Icons\Heroicon;
 use Filament\Widgets\StatsOverviewWidget as BaseWidget;
 use Filament\Widgets\StatsOverviewWidget\Stat;
 use Illuminate\Support\Carbon;
+use Illuminate\Support\HtmlString;
 use Throwable;
 
 /**
@@ -28,6 +30,8 @@ use Throwable;
 class ArcSettlementWidget extends BaseWidget
 {
     protected static ?int $sort = 3;
+
+    protected static bool $isLazy = false;
 
     protected int|string|array $columnSpan = 'full';
 
@@ -45,7 +49,7 @@ class ArcSettlementWidget extends BaseWidget
     #[\Override]
     public function getDescription(): ?string
     {
-        return 'Block-bound observations read through Lepton. These are chain facts about the institution wallet, not local-currency receipts and not an approved payment balance. Native Arc USDC is an 18-decimal gas quantity; ERC-20 and native interfaces expose the same balance.';
+        return 'Live wallet observations read through Lepton, separate from funding approvals and settled payments. Native Arc USDC uses 18 decimals; ERC-20 and native interfaces expose the same funds, not two balances.';
     }
 
     #[\Override]
@@ -64,11 +68,16 @@ class ArcSettlementWidget extends BaseWidget
             ->orderByDesc('id')
             ->first();
 
-        $balance = is_array($window?->snapshot['balance'] ?? null) ? $window->snapshot['balance'] : [];
+        $wallet = $institution->primaryWallet();
+        $observation = app(TreasuryBalanceObservation::class)->read($wallet);
+        $fundingBalance = is_array($window?->snapshot['balance'] ?? null) ? $window->snapshot['balance'] : [];
+        $balance = $observation['available'] ? [
+            ...$observation, 'usdc_base_units' => $observation['balance_base_units'],
+        ] : (($observation['is_fake'] && ($fundingBalance['is_fake'] ?? false)) ? $fundingBalance : []);
         $isFake = $balance['is_fake'] ?? null;
         $observedAt = $balance['observed_at'] ?? null;
         $validUntil = $window?->snapshot['valid_until'] ?? null;
-        $age = $this->ageInSeconds($observedAt);
+        $age = $this->ageInSeconds($fundingBalance['observed_at'] ?? null);
 
         $usdcStat = Stat::make(
             'Observed USDC balance',
@@ -76,7 +85,7 @@ class ArcSettlementWidget extends BaseWidget
         )
             ->description($observedAt !== null
                 ? sprintf('Block %s · observed %s UTC', (string) ($balance['block_number'] ?? '—'), $observedAt)
-                : 'No reviewed funding window has observed this wallet yet')
+                : ($observation['error'] ?? 'Live balance has not been observed'))
             ->descriptionIcon(Heroicon::Banknotes)
             ->color($isFake === true ? 'warning' : ($balance !== [] ? 'success' : 'gray'));
 
@@ -86,9 +95,9 @@ class ArcSettlementWidget extends BaseWidget
 
         $nativeStat = Stat::make(
             'Native Arc balance (gas)',
-            isset($balance['native_units']) ? $this->formatNative($balance['native_units']) : 'Not observed',
+            isset($balance['native_units']) ? new HtmlString('<span class="block min-w-0 break-all">'.e($this->formatNative($balance['native_units'])).'</span>') : 'Not observed',
         )
-            ->description('On Arc, USDC pays the fee — an empty wallet cannot send anything, including a zero-value transfer')
+            ->description('Same USDC funds at native precision. Circle agent transfers use sponsored gas; sponsorship does not authorize payment.')
             ->descriptionIcon(Heroicon::Bolt)
             ->color($balance !== [] ? 'info' : 'gray');
 
@@ -96,11 +105,11 @@ class ArcSettlementWidget extends BaseWidget
         $chain = strtoupper($status['chain'] === '' ? 'ARC-TESTNET' : $status['chain']);
 
         $chainStat = Stat::make('Chain', $chain)
-            ->description($status['live_available']
-                ? sprintf('Chain id %s · block %s · %s', (string) $status['chain_id'], number_format((float) ($status['block'] ?? 0)), (string) ($status['rpc_host'] ?? 'rpc'))
+            ->description($observation['available']
+                ? sprintf('Chain id %s · block %s', (string) $observation['chain_id'], (string) $observation['block_number'])
                 : 'Live chain reads unavailable')
             ->descriptionIcon(Heroicon::GlobeAlt)
-            ->color($status['live_available'] ? ($chain === 'ARC' ? 'danger' : 'success') : 'gray');
+            ->color($observation['available'] ? ($chain === 'ARC' ? 'danger' : 'success') : 'gray');
 
         if ($status['address_url'] !== null) {
             $chainStat->url($status['address_url'], shouldOpenInNewTab: true)

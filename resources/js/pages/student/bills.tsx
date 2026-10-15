@@ -1,11 +1,16 @@
 import { Head, Link, router, usePoll } from '@inertiajs/react';
 import {
     BrainCircuit,
+    Check,
     CircleAlert,
+    Copy,
     ExternalLink,
     Loader2,
     ReceiptText,
     RefreshCw,
+    ShieldCheck,
+    TriangleAlert,
+    XCircle,
 } from 'lucide-react';
 import { useState } from 'react';
 import { toast } from 'sonner';
@@ -96,10 +101,18 @@ type Props = {
 
 const EXPLORER = 'https://testnet.arcscan.app';
 
-function usdc(baseUnits: string): string {
-    const units = BigInt(baseUnits);
+function usdc(baseUnits: string | null | undefined): string {
+    if (!baseUnits) return '—';
+    if (baseUnits.includes('.')) {
+        return parseFloat(baseUnits).toFixed(6);
+    }
+    try {
+        const units = BigInt(baseUnits);
 
-    return `${(units / 1_000_000n).toLocaleString('en-US')}.${(units % 1_000_000n).toString().padStart(6, '0')}`;
+        return `${(units / 1_000_000n).toLocaleString('en-US')}.${(units % 1_000_000n).toString().padStart(6, '0')}`;
+    } catch {
+        return baseUnits;
+    }
 }
 
 function statusTone(status: string): 'default' | 'secondary' | 'destructive' {
@@ -107,6 +120,273 @@ function statusTone(status: string): 'default' | 'secondary' | 'destructive' {
     if (status === 'void') return 'destructive';
 
     return 'secondary';
+}
+
+function BillPaymentCard({ payment }: { payment: Payment }) {
+    const [copied, setCopied] = useState<string | null>(null);
+
+    const copyText = (text: string, label: string) => {
+        navigator.clipboard.writeText(text);
+        setCopied(text);
+        toast.success(`${label} copied to clipboard`);
+        setTimeout(() => setCopied(null), 2000);
+    };
+
+    const isInFlight =
+        !payment.is_allocated &&
+        !payment.verified &&
+        [
+            'consented',
+            'prepared',
+            'submitting',
+            'accepted',
+            'awaiting_verification',
+        ].includes(payment.submission_state);
+
+    const isFailed = payment.submission_state === 'failed';
+    const isNeedsReview = payment.submission_state === 'needs_operator_review';
+    const isCompleted = payment.is_allocated || payment.verified;
+
+    const steps = [
+        {
+            title: '1. Consent & Fee Quoted',
+            desc: '120s quote locked with student consent',
+            status: 'completed' as const,
+        },
+        {
+            title: '2. Relayer Dispatch',
+            desc:
+                ['accepted', 'awaiting_verification', 'verified'].includes(
+                    payment.submission_state,
+                ) || isCompleted
+                    ? 'Relayer accepted and assigned transfer handle'
+                    : payment.submission_state === 'submitting'
+                      ? 'Transmitting payment to Arc relayer…'
+                      : isFailed
+                        ? 'Submission failed'
+                        : isNeedsReview
+                          ? 'Operator review required before send'
+                          : 'Queued for transmission',
+            status: (['accepted', 'awaiting_verification', 'verified'].includes(
+                payment.submission_state,
+            ) || isCompleted
+                ? 'completed'
+                : payment.submission_state === 'submitting' ||
+                    payment.submission_state === 'prepared'
+                  ? 'in_progress'
+                  : isFailed
+                    ? 'failed'
+                    : isNeedsReview
+                      ? 'warning'
+                      : 'pending') as
+                | 'completed'
+                | 'in_progress'
+                | 'failed'
+                | 'warning'
+                | 'pending',
+        },
+        {
+            title: '3. Arc Testnet Settlement',
+            desc: payment.tx_hash
+                ? 'Committed on-chain with deterministic finality'
+                : ['accepted', 'awaiting_verification'].includes(
+                        payment.submission_state,
+                    )
+                  ? 'Awaiting block confirmation and RPC receipt…'
+                  : 'Pending block inclusion',
+            status: (payment.verified || payment.tx_hash
+                ? 'completed'
+                : ['accepted', 'awaiting_verification'].includes(
+                        payment.submission_state,
+                    )
+                  ? 'in_progress'
+                  : isFailed
+                    ? 'failed'
+                    : 'pending') as
+                | 'completed'
+                | 'in_progress'
+                | 'failed'
+                | 'warning'
+                | 'pending',
+        },
+        {
+            title: '4. Bill Balance Credited',
+            desc: payment.is_allocated
+                ? 'Deducted from student outstanding bill'
+                : payment.tx_hash
+                  ? 'Movement verified, posting ledger allocation…'
+                  : 'Pending on-chain verification',
+            status: (payment.is_allocated
+                ? 'completed'
+                : payment.verified || payment.tx_hash
+                  ? 'in_progress'
+                  : 'pending') as
+                | 'completed'
+                | 'in_progress'
+                | 'failed'
+                | 'warning'
+                | 'pending',
+        },
+    ];
+
+    return (
+        <article className="clay-card flex flex-col gap-4 border-[var(--clay-border)] p-4 sm:p-5 text-sm shadow-xs">
+            <div className="flex flex-wrap items-start justify-between gap-3 border-b border-[var(--clay-border)] pb-3.5">
+                <div>
+                    <div className="flex items-center gap-2">
+                        <span className="text-base font-bold text-[var(--clay-text)]">
+                            Bill #{payment.student_bill_id}
+                        </span>
+                        <span className="text-xs text-[var(--clay-text-muted)]">
+                            ·
+                        </span>
+                        <span className="font-mono text-sm font-semibold text-[var(--clay-primary-bright)]">
+                            {usdc(payment.amount_base_units)} USDC
+                        </span>
+                    </div>
+                    <p className="clay-meta mt-0.5 text-xs">
+                        {payment.submission_label}
+                    </p>
+                </div>
+
+                <Badge
+                    variant="outline"
+                    className={`text-xs font-semibold ${
+                        isCompleted
+                            ? 'border-emerald-500/30 bg-emerald-500/10 text-emerald-400'
+                            : isInFlight
+                              ? 'border-amber-500/30 bg-amber-500/10 text-amber-300 animate-pulse'
+                              : isNeedsReview
+                                ? 'border-amber-500/40 bg-amber-500/15 text-amber-300'
+                                : 'border-rose-500/30 bg-rose-500/10 text-rose-300'
+                    }`}
+                >
+                    {isCompleted
+                        ? '✓ Verified & Credited'
+                        : isInFlight
+                          ? '⏳ In Flight · Arc Testnet'
+                          : isNeedsReview
+                            ? '⚠️ Needs Review'
+                            : '✕ Failed'}
+                </Badge>
+            </div>
+
+            {/* Stepper Progress */}
+            <ol className="relative grid gap-3 sm:grid-cols-4 sm:gap-2 pt-1">
+                {steps.map((step, idx) => (
+                    <li
+                        key={idx}
+                        className="flex items-start gap-3 sm:flex-col sm:gap-2 text-xs"
+                    >
+                        <div className="flex items-center gap-2">
+                            <span
+                                className={`flex size-6 shrink-0 items-center justify-center rounded-full text-xs font-bold ${
+                                    step.status === 'completed'
+                                        ? 'bg-[var(--status-resolved)] text-black'
+                                        : step.status === 'in_progress'
+                                          ? 'border-2 border-amber-400 bg-amber-400/20 text-amber-300'
+                                          : step.status === 'warning'
+                                            ? 'bg-amber-500 text-black'
+                                            : step.status === 'failed'
+                                              ? 'bg-rose-500 text-white'
+                                              : 'border border-[var(--clay-border)] bg-[var(--clay-surface)] text-[var(--clay-text-muted)]'
+                                }`}
+                            >
+                                {step.status === 'completed' ? (
+                                    <Check className="size-3.5 stroke-[2.5]" />
+                                ) : step.status === 'in_progress' ? (
+                                    <Loader2 className="size-3 animate-spin text-amber-400" />
+                                ) : step.status === 'warning' ? (
+                                    <TriangleAlert className="size-3 stroke-[2.5]" />
+                                ) : step.status === 'failed' ? (
+                                    <XCircle className="size-3 stroke-[2.5]" />
+                                ) : (
+                                    idx + 1
+                                )}
+                            </span>
+                            <span
+                                className={`font-semibold sm:hidden ${
+                                    step.status === 'completed'
+                                        ? 'text-[var(--clay-text)]'
+                                        : step.status === 'in_progress'
+                                          ? 'text-amber-400'
+                                          : 'text-[var(--clay-text-muted)]'
+                                }`}
+                            >
+                                {step.title}
+                            </span>
+                        </div>
+                        <div className="min-w-0 flex-1 sm:pt-1">
+                            <p
+                                className={`hidden font-semibold sm:block ${
+                                    step.status === 'completed'
+                                        ? 'text-[var(--clay-text)]'
+                                        : step.status === 'in_progress'
+                                          ? 'text-amber-400'
+                                          : 'text-[var(--clay-text-muted)]'
+                                }`}
+                            >
+                                {step.title}
+                            </p>
+                            <p className="mt-0.5 text-[11px] leading-tight text-[var(--clay-text-muted)]">
+                                {step.desc}
+                            </p>
+                        </div>
+                    </li>
+                ))}
+            </ol>
+
+            {/* Evidence & Transaction Links */}
+            <div className="flex flex-wrap items-center justify-between gap-3 rounded-lg border border-[var(--clay-border)]/60 bg-[var(--clay-surface-soft)] p-3 text-xs">
+                <div className="flex flex-wrap items-center gap-3">
+                    <span className="font-mono text-[11px] text-[var(--clay-text-muted)]">
+                        Req: {payment.request_key.slice(0, 8)}…
+                        {payment.request_key.slice(-4)}
+                    </span>
+                    <button
+                        type="button"
+                        onClick={() =>
+                            copyText(payment.request_key, 'Request key')
+                        }
+                        className="clay-focus inline-flex items-center gap-1 text-[11px] text-[var(--clay-text-muted)] hover:text-[var(--clay-text)]"
+                    >
+                        <Copy className="size-3" />
+                        {copied === payment.request_key ? 'Copied' : 'Copy'}
+                    </button>
+                    {payment.tx_hash && (
+                        <a
+                            href={`${EXPLORER}/tx/${payment.tx_hash}`}
+                            target="_blank"
+                            rel="noreferrer"
+                            className="inline-flex items-center gap-1 font-mono text-[11px] text-[var(--clay-primary-bright)] hover:underline"
+                        >
+                            Tx: {payment.tx_hash.slice(0, 10)}…
+                            {payment.tx_hash.slice(-6)}
+                            <ExternalLink className="size-3" />
+                        </a>
+                    )}
+                </div>
+
+                <div className="text-[11px] text-[var(--clay-text-muted)]">
+                    {payment.fee_paid_by === 'relayer_sponsored' ? (
+                        <span className="inline-flex items-center gap-1 text-emerald-400 font-medium">
+                            <ShieldCheck className="size-3.5" />
+                            Relayer sponsored gas
+                        </span>
+                    ) : (
+                        payment.quoted_network_fee &&
+                        `Fee: ${usdc(payment.quoted_network_fee)} USDC`
+                    )}
+                </div>
+            </div>
+
+            {payment.last_error && (
+                <div className="rounded-lg border border-amber-500/20 bg-amber-500/10 p-2.5 text-xs text-amber-300">
+                    {payment.last_error}
+                </div>
+            )}
+        </article>
+    );
 }
 
 export default function StudentBills({
@@ -126,7 +406,20 @@ export default function StudentBills({
     const [busy, setBusy] = useState(false);
     const [consented, setConsented] = useState(false);
 
-    usePoll(8_000, { only: ['payments'] });
+    const hasInFlight = payments.some(
+        (p) =>
+            !p.is_allocated &&
+            !p.verified &&
+            [
+                'consented',
+                'prepared',
+                'submitting',
+                'accepted',
+                'awaiting_verification',
+            ].includes(p.submission_state),
+    );
+
+    usePoll(hasInFlight ? 2_500 : 8_000, { only: ['payments', 'bills'] });
 
     function open(bill: Bill) {
         setActive(bill);
@@ -383,66 +676,7 @@ export default function StudentBills({
                     )}
 
                     {payments.map((payment) => (
-                        <article
-                            key={payment.id}
-                            className="clay-card grid gap-2 border-[var(--clay-border)] p-4 text-sm"
-                        >
-                            <p className="font-semibold">
-                                Bill #{payment.student_bill_id} —{' '}
-                                {usdc(payment.amount_base_units)} USDC
-                            </p>
-                            <p>{payment.submission_label}</p>
-
-                            <p className="clay-meta">
-                                Policy: {payment.policy_code}.{' '}
-                                {payment.requires_human_approval
-                                    ? 'A staff member must approve this before anything is sent.'
-                                    : 'Cleared for unattended handling by policy.'}
-                            </p>
-
-                            {payment.fee_paid_by && (
-                                <p className="clay-meta">
-                                    Network fee{' '}
-                                    {usdc(payment.quoted_network_fee ?? '0')} is
-                                    paid by{' '}
-                                    {payment.fee_paid_by === 'relayer_sponsored'
-                                        ? 'the payment provider, not by you'
-                                        : 'you'}
-                                    .
-                                </p>
-                            )}
-
-                            <p className="break-all text-xs">
-                                Request {payment.request_key}
-                                {payment.tx_hash && (
-                                    <>
-                                        {' · '}
-                                        <a
-                                            className="underline"
-                                            href={`${EXPLORER}/tx/${payment.tx_hash}`}
-                                            rel="noreferrer"
-                                            target="_blank"
-                                        >
-                                            Transaction{' '}
-                                            {payment.tx_hash.slice(0, 10)}…
-                                            <ExternalLink className="ml-1 inline size-3" />
-                                        </a>
-                                    </>
-                                )}
-                                {!payment.tx_hash &&
-                                    payment.provider_handle && (
-                                        <>
-                                            {' '}
-                                            · Accepted by the provider, no chain
-                                            hash yet
-                                        </>
-                                    )}
-                            </p>
-
-                            {payment.last_error && (
-                                <p className="text-xs">{payment.last_error}</p>
-                            )}
-                        </article>
+                        <BillPaymentCard key={payment.id} payment={payment} />
                     ))}
                 </section>
 

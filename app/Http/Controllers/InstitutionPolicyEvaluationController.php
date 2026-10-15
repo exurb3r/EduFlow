@@ -41,7 +41,11 @@ class InstitutionPolicyEvaluationController extends Controller
             'evaluations' => fn (): array => InstitutionPolicyEvaluation::query()->where('organization_id', $institution->id)
                 ->latest('id')->limit(50)->get()->map(fn (InstitutionPolicyEvaluation $evaluation): array => $this->data($evaluation))->all(),
             'queueReady' => $evaluations->queueReady(), 'aiEnabled' => $settings->mayCallProvider(),
-            'adminUrl' => url($request->user()->hasRole('super_admin') ? '/admin' : '/finance'), 'policyUrl' => route('finance.policies.index'),
+            'adminUrl' => url($request->user()->hasRole('super_admin') ? '/admin' : '/finance'),
+            'financeUrl' => url('/finance'),
+            'collectionsUrl' => url('/finance/collections'),
+            'supervisorUrl' => url('/finance/finance-supervisor'),
+            'policyUrl' => route('finance.policies.index'),
         ]);
     }
 

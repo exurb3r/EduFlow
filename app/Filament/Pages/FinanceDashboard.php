@@ -125,6 +125,10 @@ class FinanceDashboard extends BaseDashboard
                 ->color('gray')
                 ->url(fn (): string => FinanceSupervisor::getUrl(panel: 'finance')),
 
+            Action::make('policyDecisions')->label('Policy evaluations')->icon(Heroicon::Sparkles)->color('gray')
+                ->visible(fn (): bool => Auth::user() instanceof User && Auth::user()->hasAnyRole(['admin', 'super_admin']))
+                ->url(fn (): string => route('finance.policy-evaluations.index')),
+
             Action::make('reviewPayments')
                 ->label('Review payments')
                 ->icon(Heroicon::ClipboardDocumentCheck)

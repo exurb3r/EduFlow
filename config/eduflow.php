@@ -10,10 +10,9 @@ return [
     ],
 
     'background_finance' => [
-        'enabled' => env('EDUFLOW_BACKGROUND_FINANCE', false),
-        'receipt_routing_enabled' => env('EDUFLOW_RECEIPT_BUDGET_ROUTING', false),
-        'queue_connection' => env('EDUFLOW_FINANCE_QUEUE_CONNECTION', 'database'),
-        'queue' => 'finance-planning',
+        // Read-only planning runs by default. Payment execution keeps separate gates.
+        'enabled' => true,
+        'receipt_routing_enabled' => true,
     ],
 
     /*

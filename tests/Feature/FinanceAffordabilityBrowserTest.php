@@ -95,5 +95,6 @@ test('finance overview dashboard renders affordability widget', function (): voi
         ->assertSee('69.900000 USDC')
         ->assertSee('Bills & funding')
         ->assertNoJavaScriptErrors();
+    $page->assertSee('Observed Arc settlement rail')->assertSee('None captured')->assertSee('sponsored gas');
     $page->screenshot(fullPage: false, filename: 'finance-overview-dashboard');
 })->group('browser');

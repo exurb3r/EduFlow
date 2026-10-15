@@ -25,8 +25,6 @@ class ProcessFinanceWorkflow implements ShouldQueue
 
     public function __construct(public int $runId)
     {
-        $this->onConnection((string) config('eduflow.background_finance.queue_connection', 'database'));
-        $this->onQueue((string) config('eduflow.background_finance.queue', 'finance-planning'));
         $this->afterCommit();
     }
 
