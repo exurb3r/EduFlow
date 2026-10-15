@@ -279,7 +279,7 @@ export default function Dashboard({
             <Head title="Dashboard" />
 
             <div className="bulletin clay-ambient min-h-full w-full">
-{/* 8pt grid: 4 / 8 / 12 / 16 / 24 / 32 / 48 / 64 */}
+                {/* 8pt grid: 4 / 8 / 12 / 16 / 24 / 32 / 48 / 64 */}
                 <div className="mx-auto flex w-full max-w-6xl flex-col gap-8 px-4 py-6 sm:gap-10 sm:px-6 sm:py-10 lg:px-8 lg:py-12">
                     {/* -- Header: greeting -- */}
                     <header className="flex flex-col gap-6">
@@ -295,14 +295,15 @@ export default function Dashboard({
                             </h1>
                             <p className="clay-body mt-1.5 max-w-md">
                                 {stats?.totalRequests ?? 0} assistance{' '}
-                                {stats?.totalRequests === 1 ? 'case' : 'cases'} on
-                                file
+                                {stats?.totalRequests === 1 ? 'case' : 'cases'}{' '}
+                                on file
                                 {stats?.activeRequests
                                     ? ` · ${stats.activeRequests} still need attention`
                                     : ' · nothing waiting'}
                                 .
                             </p>
                         </div>
+                    </header>
 
                     {/* -- Stat band: the one place numbers lead --------------- */}
                     <section
@@ -848,8 +849,8 @@ export default function Dashboard({
             </div>
         </>
     );
-}
 
-Dashboard.layout = {
-    breadcrumbs: [{ title: 'Dashboard', href: dashboard() }],
-};
+    Dashboard.layout = {
+        breadcrumbs: [{ title: 'Dashboard', href: dashboard() }],
+    };
+}
