@@ -14,7 +14,14 @@ use App\Models\User;
 use Spatie\Permission\Models\Role;
 
 beforeEach(function (): void {
-    $this->org = Organization::create([
+    // Organization has a factory. AssistanceFund and AssistancePolicyVersion
+    // declare HasFactory but ship no factory class, so they use the
+    // query()->create() form the finance dashboard test already uses for
+    // Budget rather than a static call Eloquent only exposes via __callStatic.
+    // The @var is the same one FinanceSupervisorDashboardTest uses: Larastan
+    // types factory()->create() as Model|Collection and will not narrow it.
+    /** @var Organization $organization */
+    $organization = Organization::factory()->create([
         'name' => 'Northstar Learning Center',
         'currency' => 'USDC',
         'minimum_reserve' => 10000.00,
@@ -23,7 +30,9 @@ beforeEach(function (): void {
         'human_approval_threshold' => 1000.00,
     ]);
 
-    AssistanceFund::create([
+    $this->org = $organization;
+
+    AssistanceFund::query()->create([
         'organization_id' => $this->org->id,
         'name' => 'Emergency Assistance Fund',
         'balance_base_units' => 10000_000000,
@@ -32,7 +41,7 @@ beforeEach(function (): void {
         'status' => 'active',
     ]);
 
-    AssistancePolicyVersion::create([
+    AssistancePolicyVersion::query()->create([
         'version' => 'v1',
         'organization_id' => null,
         'auto_limit_base_units' => 100_000000,

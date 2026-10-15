@@ -117,7 +117,9 @@ it('uses success, warning, danger and gray only', function (): void {
         $matches,
     );
 
-    $colours = array_unique($matches[1] ?? []);
+    // preg_match_all with an explicit $matches argument always populates both
+    // offsets, so the ?? was dead weight.
+    $colours = array_unique($matches[1]);
 
     // Guard against the extraction silently matching nothing.
     expect($colours)->not->toBeEmpty();
@@ -140,10 +142,14 @@ it('never puts an untruncated address in a stat value or description', function 
     foreach ([InstallationReadinessWidget::class, LeptonNetworkWidget::class, TreasuryOverviewWidget::class] as $widget) {
         $instance = new $widget;
         $method = new ReflectionMethod($widget, 'getStats');
-        $method->setAccessible(true);
 
-        foreach ($method->invoke($instance) as $stat) {
-            /** @var Stat $stat */
+        // Reflection::invoke() returns mixed and PHPStan cannot infer through
+        // it, so the element type is declared once here rather than on the
+        // loop variable - where a @var would attach to $field instead.
+        /** @var list<Stat> $stats */
+        $stats = $method->invoke($instance);
+
+        foreach ($stats as $stat) {
             foreach ([(string) $stat->getValue(), (string) $stat->getDescription()] as $field) {
                 expect($field)->not->toMatch(
                     '/0x[0-9a-fA-F]{40}/',
@@ -163,7 +169,6 @@ it('keeps every stat description to a single short line', function (): void {
     foreach ([InstallationReadinessWidget::class, LeptonNetworkWidget::class, TreasuryOverviewWidget::class] as $widget) {
         $instance = new $widget;
         $method = new ReflectionMethod($widget, 'getStats');
-        $method->setAccessible(true);
 
         foreach ($method->invoke($instance) as $stat) {
             /** @var Stat $stat */

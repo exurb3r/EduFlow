@@ -132,7 +132,10 @@ class OperationsHealthWidget extends BaseWidget
                 default => 'danger',
             });
 
-        if (! $status['live_available'] && is_string($status['error'] ?? null) && $status['error'] !== '') {
+        // $status['error'] is declared string|null by the gateway contract, so the
+        // null-safe read was redundant; the '' check below is the one that
+        // matters, because an empty string is not a useful tooltip.
+        if (! $status['live_available'] && is_string($status['error']) && $status['error'] !== '') {
             $providerStat->extraAttributes(['title' => $status['error']]);
         }
 
