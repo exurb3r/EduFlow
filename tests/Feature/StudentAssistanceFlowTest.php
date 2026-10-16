@@ -5,7 +5,9 @@ declare(strict_types=1);
 use App\Models\Budget;
 use App\Models\Organization;
 use App\Models\Student;
+use App\Models\StudentTuitionPayment;
 use App\Models\Transaction;
+use App\Models\TuitionAccount;
 use App\Models\User;
 use App\Models\Wallet;
 use Illuminate\Support\Facades\DB;
@@ -243,5 +245,41 @@ test('payments page matches the wallet address regardless of letter case', funct
         ->assertInertia(fn ($page) => $page
             ->has('transactions.data', 1)
             ->where('totals.confirmed', 120)
+        );
+});
+
+test('payments page lists official e-receipts for the students verified tuition payments', function (): void {
+    $user = User::factory()->create();
+    $student = Student::factory()->create([
+        'user_id' => $user->id,
+        'payout_address' => '0xa1b2c3d4e5f60718293a4b5c6d7e8f9012345678',
+    ]);
+    $account = TuitionAccount::factory()->for($student)->create([
+        'total_amount' => 250_000000,
+        'paid_amount' => 10_000000,
+    ]);
+
+    $payment = StudentTuitionPayment::factory()->create([
+        'student_id' => $student->id,
+        'tuition_account_id' => $account->id,
+        'amount_base_units' => 10_000000,
+        'applied_base_units' => 10_000000,
+        'overpayment_base_units' => 0,
+    ]);
+
+    StudentTuitionPayment::factory()->create(['amount_base_units' => 7_000000]);
+
+    $this->actingAs($user)
+        ->get(route('payments.index'))
+        ->assertOk()
+        ->assertInertia(fn ($page) => $page
+            ->component('payments')
+            ->has('receipts', 1)
+            ->where('receipts.0.payment_type', 'tuition')
+            ->where('receipts.0.amount_base_units', '10000000')
+            ->where('receipts.0.remaining_balance_base_units', '240000000')
+            ->where('receipts.0.tx_hash', $payment->tx_hash)
+            ->where('receipts.0.student_number', $student->student_number)
+            ->where('totals.tuition_paid', 10)
         );
 });

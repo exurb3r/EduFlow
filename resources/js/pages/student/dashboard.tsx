@@ -4,7 +4,6 @@ import {
     router,
     usePage,
     usePoll,
-    useRemember,
 } from '@inertiajs/react';
 import {
     ArrowDownLeft,
@@ -31,7 +30,6 @@ import { toast } from 'sonner';
 
 import { StudentPaymentTracker } from '@/components/student-payment-tracker';
 import { Button } from '@/components/ui/button';
-import { Checkbox } from '@/components/ui/checkbox';
 import {
     Dialog,
     DialogContent,
@@ -46,17 +44,10 @@ import {
     SheetHeader,
     SheetTitle,
 } from '@/components/ui/sheet';
-import { Input } from '@/components/ui/input';
-import InputError from '@/components/input-error';
-import { Label } from '@/components/ui/label';
 import { formatUsdc } from '@/lib/financial-aid';
 import { index as financialAssistanceIndex } from '@/routes/financial-assistance';
 import { index as paymentsIndex } from '@/routes/payments';
-import { dashboard } from '@/routes/student';
-import {
-    quote as tuitionPayQuote,
-    pay as tuitionPayStore,
-} from '@/routes/student/tuition';
+import { dashboard, pay as studentPay } from '@/routes/student';
 import { show as walletShow } from '@/routes/student/wallet';
 import type {
     PaymentTransaction,
@@ -94,24 +85,6 @@ function formatBaseUnits(baseUnits: string | number): string {
     const units = BigInt(baseUnits);
     return `${(units / 1_000_000n).toLocaleString('en-US')}.${(units % 1_000_000n).toString().padStart(6, '0')}`;
 }
-
-function formatQuoteExpiry(iso: string): string {
-    try {
-        const d = new Date(iso);
-        if (Number.isNaN(d.getTime())) {
-            return iso;
-        }
-
-        return d.toLocaleTimeString([], {
-            hour: 'numeric',
-            minute: '2-digit',
-            second: '2-digit',
-        });
-    } catch {
-        return iso;
-    }
-}
-
 /**
  * An on-chain balance arrives as an exact decimal string at Arc's 18
  * decimals, so it is grouped with BigInt and never passes through a float.
@@ -182,32 +155,8 @@ export default function StudentDashboard({
 
     // Pay Now needs a wallet with a balance and tuition that is still owed.
     const remainingBase = Number(tuitionAccount?.remaining_amount ?? 0);
-    const remainingUsdc = remainingBase / 1_000_000;
     const canPay = hasWallet && remainingBase > 0;
-    const [payOpen, setPayOpen] = useState(false);
-    const [payAmount, setPayAmount] = useState('');
-    const [payQuote, setPayQuote] = useState<TuitionQuote | null>(null);
-    const [payError, setPayError] = useState<string | null>(null);
-    const [quoting, setQuoting] = useState(false);
-    const [paying, setPaying] = useState(false);
-    /**
-     * The identity this attempt keeps for its whole life, minted when the quote
-     * is requested and echoed back by both endpoints. Holding it in state is
-     * what stops a retry from becoming a second transfer.
-     */
-    const [requestKey, setRequestKey] = useRemember<string | null>(
-        null,
-        `tuition-request:${tuitionAccount?.id}`,
-    );
-    const [consent, setConsent] = useState(false);
     const [receipt, setReceipt] = useState<TuitionAttempt | null>(null);
-
-    const isInitialOpenRef = useRef(false);
-    const quoteRequestIdRef = useRef(0);
-    const abortControllerRef = useRef<AbortController | null>(null);
-    const inFlightQuotePromiseRef = useRef<Promise<TuitionQuote | null> | null>(
-        null,
-    );
 
     const activeReceipt = receipt
         ? (tuitionAttempts.find(
@@ -724,49 +673,8 @@ export default function StudentDashboard({
                         )?.content ?? '',
                     Accept: 'application/json',
                 },
-                body: JSON.stringify({
-                    tuition_account_id: tuitionAccount?.id,
-                    amount_base_units: baseUnits,
-                    request_key: currentKey,
-                    request_digest: currentQuote.request_digest,
-                    consent: true,
-                }),
-            });
-
-            const payload = await response.json();
-
-            if (!response.ok) {
-                setPayError(
-                    payload?.message ?? 'The transfer could not be sent.',
-                );
-
-                return;
-            }
-
-            setPayOpen(true);
-            setReceipt(payload);
-            setMonitorDrawerOpen(false);
-            toast.success('Tuition payment submitted', {
-                description: 'Tracking live progress on Arc Testnet rail…',
-            });
-
-            // The wallet balance and paid figures both changed on-chain.
-            router.reload({
-                only: [
-                    'tuitionAttempts',
-                    'tuitionAccount',
-                    'wallet',
-                    'notificationSummary',
-                ],
-            });
-        } catch {
-            setPayError(
-                'Response lost. Check existing attempt history before doing anything else; do not create a new payment.',
-            );
-            router.reload({ only: ['tuitionAttempts'] });
-        } finally {
-            setPaying(false);
-        }
+            }),
+        );
     };
 
     const copyAddress = () => {

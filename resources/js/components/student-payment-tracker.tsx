@@ -5,6 +5,7 @@ import {
     ExternalLink,
     Loader2,
     Radio,
+    ReceiptText,
     RefreshCw,
     ShieldCheck,
     TriangleAlert,
@@ -13,11 +14,15 @@ import {
 import React, { useState } from 'react';
 import { toast } from 'sonner';
 
+import { OfficialPaymentReceiptModal } from '@/components/official-payment-receipt-modal';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { formatUsdc } from '@/lib/financial-aid';
 import { cn } from '@/lib/utils';
-import type { TuitionAttempt } from '@/types/financial-aid';
+import type {
+    OfficialPaymentReceipt,
+    TuitionAttempt,
+} from '@/types/financial-aid';
 
 type StepStatus =
     | 'completed'
@@ -67,6 +72,8 @@ export function StudentPaymentTracker({
     className,
 }: StudentPaymentTrackerProps) {
     const [copied, setCopied] = useState<string | null>(null);
+    const [activeReceipt, setActiveReceipt] =
+        useState<OfficialPaymentReceipt | null>(null);
     const [selectedAttemptId, setSelectedAttemptId] = useState<number | null>(
         null,
     );
@@ -622,9 +629,25 @@ export function StudentPaymentTracker({
                         </p>
                     </div>
 
-                    {/* Settled Action: Done & Pay More */}
+                    {/* Settled Action: Official e-Receipt, Done & Pay More */}
                     {isSettled && (
                         <div className="mt-2 flex flex-col gap-2 rounded-xl border border-emerald-500/20 bg-emerald-500/10 p-3.5">
+                            {activeAttempt.receipt && (
+                                <Button
+                                    type="button"
+                                    variant="outline"
+                                    onClick={() =>
+                                        setActiveReceipt(
+                                            activeAttempt.receipt ?? null,
+                                        )
+                                    }
+                                    className="h-9 w-full rounded-full border border-emerald-500/40 bg-emerald-500/15 text-xs font-semibold text-emerald-200 hover:bg-emerald-500/25"
+                                >
+                                    <ReceiptText className="mr-1.5 size-3.5 text-emerald-300" />
+                                    View Official e-Receipt (
+                                    {activeAttempt.receipt.receipt_number})
+                                </Button>
+                            )}
                             <div className="flex items-center gap-2">
                                 <Button
                                     type="button"
@@ -691,32 +714,62 @@ export function StudentPaymentTracker({
 
                     {attempts.length > 0 && (
                         <div className="border-t border-[var(--clay-border)] pt-3 text-xs">
-                            <div className="flex items-center justify-between text-[11px] text-[var(--clay-text-muted)]">
+                            <div className="flex items-center justify-between gap-2 text-[11px] text-[var(--clay-text-muted)]">
                                 <span>Recent attempt</span>
-                                <button
-                                    type="button"
-                                    onClick={() => {
-                                        try {
-                                            sessionStorage.removeItem(
-                                                'opensinop_dismissed_tuition_attempt',
+                                <div className="flex items-center gap-2">
+                                    {attempts[0].receipt && (
+                                        <button
+                                            type="button"
+                                            onClick={() =>
+                                                setActiveReceipt(
+                                                    attempts[0].receipt ?? null,
+                                                )
+                                            }
+                                            className="clay-focus inline-flex items-center gap-1 rounded-full border border-emerald-500/30 bg-emerald-500/10 px-2 py-0.5 text-[10px] font-semibold text-emerald-300 hover:bg-emerald-500/20"
+                                        >
+                                            <ReceiptText className="size-2.5" />
+                                            e-Receipt
+                                        </button>
+                                    )}
+                                    <button
+                                        type="button"
+                                        onClick={() => {
+                                            try {
+                                                sessionStorage.removeItem(
+                                                    'opensinop_dismissed_tuition_attempt',
+                                                );
+                                            } catch {
+                                                // Ignore storage errors
+                                            }
+                                            setDismissedAttemptId(null);
+                                            setSelectedAttemptId(
+                                                attempts[0].id,
                                             );
-                                        } catch {
-                                            // Ignore storage errors
-                                        }
-                                        setDismissedAttemptId(null);
-                                        setSelectedAttemptId(attempts[0].id);
-                                    }}
-                                    className="clay-focus inline-flex items-center gap-1 font-semibold text-[var(--clay-primary-bright)] hover:underline"
-                                >
-                                    #{attempts[0].id} ·{' '}
-                                    {formatUsdc(attempts[0].amount_base_units)}{' '}
-                                    ({attempts[0].state_label})
-                                </button>
+                                        }}
+                                        className="clay-focus inline-flex items-center gap-1 font-semibold text-[var(--clay-primary-bright)] hover:underline"
+                                    >
+                                        #{attempts[0].id} ·{' '}
+                                        {formatUsdc(
+                                            attempts[0].amount_base_units,
+                                        )}{' '}
+                                        ({attempts[0].state_label})
+                                    </button>
+                                </div>
                             </div>
                         </div>
                     )}
                 </div>
             )}
+
+            <OfficialPaymentReceiptModal
+                receipt={activeReceipt}
+                open={Boolean(activeReceipt)}
+                onOpenChange={(open) => {
+                    if (!open) {
+                        setActiveReceipt(null);
+                    }
+                }}
+            />
         </div>
     );
 }
