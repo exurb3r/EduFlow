@@ -9,9 +9,28 @@ department's approved budget, and link authorized bills to USDC payments on Arc 
 
 </div>
 
+> **Project status:** OpenSinop is under active development. Self-hosting does not
+> certify financial readiness. Use simulated data or an explicitly authorized
+> Arc testnet pilot; review the safety boundaries below before enabling payments.
+
+## Contents
+
+- [Overview](#overview)
+- [Production readiness](#production-readiness)
+- [Getting started](#getting-started)
+- [Requirements](#requirements--prerequisites)
+- [Installation and updates](#setup)
+- [Wallets and configuration](#lepton-agent-package-circle--arc)
+- [Commands](#commands)
+- [Testing](#testing)
+- [Troubleshooting](#troubleshooting)
+- [Technical reference](#technical-reference)
+- [Contributing](#contributing)
+- [License](#license)
+
 ---
 
-## What this is
+## Overview
 
 OpenSinop is institution-owned finance orchestration using
 [Circle Agent Stack](https://developers.circle.com/agent-stack) and the
@@ -61,7 +80,90 @@ policy activation or developer demo is not a certified school treasury system.
 5. **Demo funding must match the chain.** Use explicit consent for testnet runs and label
    fake results as simulated. Testnet settlement is not proof of mainnet readiness.
 
+## Production readiness
+
+**Status: blockers identified; hardening is not yet implemented.** OpenSinop and
+its Lepton dependency require separate release gates. Neither a green test suite
+nor a new package tag certifies the application for real institutional funds.
+
+### Current integration blockers
+
+- The checked-in lock file installs Lepton `v2.7.0`; selecting `developer` or
+  `circle-rest` in an installer does not provide `CircleRestGateway`. The package
+  prerelease [`v2.12.0-rc.2`](https://github.com/yukazakiri/lepton-agent/releases/tag/v2.12.0-rc.2)
+  still has unresolved API, accounting, and runtime-compatibility issues. Upgrading
+  to that prerelease alone is not the fix.
+- The current `POST /api/webhooks/circle` handler logs and continues after failed
+  verification and uses an Entity Secret encryption key instead of the notification
+  key. Do not expose this endpoint publicly for production use until it rejects
+  unauthenticated requests. Notification logging is not settlement verification.
+- Composer metadata, Docker settings, queue/scheduler processes, credentials,
+  application authorization, and reconciliation must all be tested together.
+  Package unit tests do not cover those deployment boundaries.
+
+### Hardening sequence and acceptance gates
+
+The following is required work, not a list of shipped protections:
+
+1. **Contain webhook ingestion.** Disable public access to the current handler.
+   Require signature headers and verify raw payload bytes with the notification
+   key from `GET /v2/notifications/publicKey/{keyId}` using the documented
+   `ECDSA_SHA_256` algorithm. Missing signatures, invalid signatures, and key-fetch
+   failures must not reach financial processing.
+2. **Validate the REST driver.** Correct Circle endpoint paths and request fields
+   against official OpenAPI schemas, paginate reads, scope wallets to chain and
+   wallet set, verify API access, and document unsupported operations. Resolve
+   PHP/OpenSSL compatibility before updating the application lock file.
+3. **Prove exact balances and bounded sends.** Identify USDC by trusted token and
+   chain identity, normalize to six-decimal base units with exact arithmetic,
+   and never add Arc's native and ERC-20 views of the same balance. Enforce
+   approved amount, recipient, network, and fee controls at the signing boundary;
+   an estimate is not an enforceable fee ceiling.
+4. **Recover without duplicate payments.** Persist submission identity and the
+   provider-compatible idempotency key before sending. Record webhook events in
+   a durable inbox with unique `notificationId`, validate subscription/network,
+   and queue bounded reconciliation. Duplicate and out-of-order notifications
+   must not regress state or cause another transfer. Keep recovery polling for
+   missed notifications; timeouts and null lookups remain unresolved.
+5. **Verify settlement independently.** Notification delivery, a provider ID,
+   `CONFIRMED`, or a stored hash alone must not mark a bill paid. Require a
+   successful receipt and matching token, chain, sender, recipient, exact amount,
+   and finality. Testnet mirrors never clear real local-currency liabilities.
+6. **Pass release validation.** Lock the hardened package version and run
+   application regressions plus separately authorized testnet integration.
+   Exercise provider failures, worker crashes, replay, missed events, restart,
+   update, and backup restoration. Review secrets/recovery custody, MFA,
+   monitoring, alerts, and rollback procedures before a controlled mainnet
+   rollout decision. No mainnet payment or custody migration is implicit.
+
+The [Lepton production-readiness checklist](https://github.com/yukazakiri/lepton-agent/blob/v2.12.0-rc.2/README.md#production-readiness)
+tracks package-specific blockers. See Circle's
+[transfer schema](https://developers.circle.com/api-reference/wallets/developer-controlled-wallets/create-developer-transaction-transfer)
+and [webhook verification guide](https://developers.circle.com/wallets/webhook-notifications)
+for provider contracts. [PLAN.md](PLAN.md) retains the application's broader
+financial, pilot, and release-safety requirements.
+
 ---
+
+## Getting started
+
+Choose a setup path based on your goal:
+
+| Goal | Start here |
+|---|---|
+| Evaluate the application locally | [Development setup](#development-setup-local), with `LEPTON_DRIVER=fake` |
+| Deploy on your own infrastructure | [Docker deployment](#option-a--docker-deployment-recommended) or [bare-metal setup](#option-b--bare-metal-production-setup) |
+| Upgrade an existing deployment | [Docker updates](#3-updating-an-existing-docker-deployment), from the original installation directory |
+| Connect a wallet | [Wallet configuration](#lepton-agent-package-circle--arc) |
+| Understand evidence and payment boundaries | [Technical reference](#technical-reference) and [project roadmap](PLAN.md) |
+
+The application includes institutional collections, departmental planning, staff
+reviews, student finance screens, and payment evidence workflows. Individual
+features have separate authorization and runtime gates; a dashboard or installed
+wallet driver does not grant permission to send funds.
+
+<details>
+<summary><strong>Pilot scope, boundaries, and development history</strong></summary>
 
 ## College shadow pilot (current hackathon focus)
 
@@ -126,8 +228,9 @@ baseline including correction effort, and automatic versus escalated outcomes. C
 agreement with automatic decisions separately from per-item approvals. Report sample sizes,
 feedback and limitations; no invented savings, adoption or guaranteed organizer promotion.
 
-Keep **Circle Agent Wallets** for this hackathon; no mid-build switch to Developer-Controlled
-Wallets. Validate with the college, expand departments first, then deeper collections and
+The original hackathon pilot targets **Circle Agent Wallets**. Developer-Controlled
+Wallets are a separate integration option, not an automatic migration of existing
+wallets or payment authority. Validate with the college, expand departments first, then deeper collections and
 later optional assistance. Grades, attendance, hardship, discounts/installments, student
 employment, payroll execution, bank/FX adapters and Gateway/x402/Earn/Borrow are deferred.
 Preserve existing modules; deferred does not mean deleted.
@@ -146,35 +249,6 @@ Preserve existing modules; deferred does not mean deleted.
 
 This documentation update enables no transfers. Sections below describe existing developer
 commands; they are not a ready-made college pilot or permission to use legacy execution.
-
----
-
-## Table of contents
-
-- [College shadow pilot](#college-shadow-pilot-current-hackathon-focus)
-- [What you'll see](#what-youll-see)
-- [Requirements & Prerequisites](#requirements--prerequisites)
-- [Setup](#setup)
-  - [Development setup (local)](#development-setup-local)
-  - [Self-hosted (production) setup](#self-hosted-production-setup)
-    - [Option A — Docker deployment (recommended)](#option-a--docker-deployment-recommended)
-    - [Option B — Bare-metal production setup](#option-b--bare-metal-production-setup)
-- [Lepton agent package (Circle + Arc)](#lepton-agent-package-circle--arc)
-- [Authenticate your agent wallet](#authenticate-your-agent-wallet)
-- [Fund the wallet](#fund-the-wallet)
-- [Run the demo](#run-the-demo)
-- [The seeded scenarios](#the-seeded-scenarios)
-- [Using the app: fee collections and budget decisions](#using-the-app)
-- [Student fee-payment role](#student-side--fee-payment-and-confirmation)
-- [Agent collections-to-budget workflow](#agent-side--review-collected-fees-and-propose-their-use)
-- [Verify it really settled](#verify-it-really-settled)
-- [Institution finance preview](#institution-finance-preview-no-students-required)
-- [Commands](#commands)
-- [Configuration](#configuration)
-- [How the money moves](#how-the-money-moves)
-- [Testing](#testing)
-- [Troubleshooting](#troubleshooting)
-- [Project layout](#project-layout)
 
 ---
 
@@ -218,7 +292,7 @@ The other items stop for specific policy reasons. This is developer-demo output,
 of college usage or successful matching settlement. The current college target needs
 real permitted source records, staff review and connected verified testnet evidence.
 
----
+</details>
 
 ## Requirements & Prerequisites
 
@@ -356,7 +430,17 @@ Use the idempotent installer instead.
 
 #### Option A — Docker deployment (recommended)
 
-Production Docker containers bundle FrankenPHP, Octane, PostgreSQL 16, Redis 7, and Supervisor (scheduler & queue workers). Images are published to GitHub Container Registry.
+The Compose stack pairs the FrankenPHP/Octane application image with PostgreSQL 16
+and Redis 7. Images are published to GitHub Container Registry through the release
+workflows. Confirm the chosen tag is available before deploying; preview releases
+do not update `latest`. Configure supervised queue workers and the scheduler for
+the background workflows you enable.
+
+**Current deployment limitation:** The checked-in Compose file fixes the database
+driver to PostgreSQL and does not forward every value collected by the installer.
+Selecting MySQL, SQLite, or a wallet driver in the wizard alone does not configure
+those services inside the container. Review the resolved Compose configuration
+before relying on non-default settings.
 
 ##### 1. One-line quick start (Docker Compose)
 
@@ -370,7 +454,12 @@ docker compose -f https://raw.githubusercontent.com/koamishin/OpenSinop/main/doc
 
 ##### 2. Interactive TUI installer
 
-For a guided terminal wizard that prompts for application URL, database credentials, Redis, mail, school identity, Circle/Arc wallet settings, and AI configuration before starting containers:
+Run the wizard from a dedicated installation directory. It collects the application
+URL, port, database choice, school identity, wallet driver, and optional AI settings.
+Common environment settings use production defaults instead of extra prompts.
+
+The scripts below download and execute repository code. Review them before running
+them on a server with credentials or financial records.
 
 - **macOS / Linux:**
   ```bash
@@ -383,7 +472,13 @@ For a guided terminal wizard that prompts for application URL, database credenti
 
 ##### 3. Updating an existing Docker deployment
 
-To pull the newest container images, create an automated PostgreSQL database backup in `./backups/`, run new migrations, and restart services:
+Run updates from the original installation directory so the scripts find the same
+`.env`, Compose project, and volumes. The update path attempts a PostgreSQL dump to
+`./backups/`, pulls images, and starts services again.
+
+**Create and verify an independent backup first.** The current updater can continue
+after a failed dump; it is not a complete backup or rollback system. Do not assume
+it backs up SQLite, MySQL, uploaded files, or encryption keys.
 
 - **macOS / Linux:**
   ```bash
@@ -406,7 +501,10 @@ On initial boot, the container automatically runs database migrations, enables r
 docker exec -it opensinop php artisan app:bootstrap-admin --name="School Operator" --email="operator@example.org"
 ```
 
-> **Data Persistence:** Database data, uploaded files, and application cache are safely persisted in Docker volumes (`app_db`, `app_storage`, `app_cache`, `app_redis`).
+> **Data persistence:** Compose declares `opensinop_db`, `opensinop_storage`,
+> `opensinop_cache`, and `opensinop_redis` volumes, normally prefixed by the Compose
+> project name. Keep the original project identity when upgrading. Never run
+> `docker compose down -v` on an instance whose records you need to retain.
 
 ---
 
@@ -491,7 +589,7 @@ This application depends on [`yukazakiri/lepton-agent`](https://github.com/yukaz
 Circle Agent Wallets and the Arc network behind injected contracts; application code never
 shells out to `circle`/`arc-canteen` directly.
 
-**What it needs on the host:**
+**Circle CLI driver requirements:**
 - `circle` CLI (`npm i -g @circle-fin/cli`) — Circle owns the agent session; the package stores no
   credentials.
 - `arc-canteen` (`uv tool install arc-canteen && arc-canteen login`) — RPC + optional funded testnet wallet.
@@ -526,6 +624,18 @@ LEPTON_WALLET_SET_ID=
 LEPTON_CIRCLE_API_URL=https://api.circle.com/v1/w3s
 ```
 
+**Version boundary:** The application lock file currently installs Lepton `v2.7.0`.
+The `developer` / `circle-rest` options require the newer package that supplies
+`CircleRestGateway`; setting environment variables does not upgrade dependencies.
+Treat these options as integration work until the application locks and tests the
+required version. Existing Agent Stack wallets are not automatically accessible
+through a Developer-Controlled Wallets API key.
+
+The current webhook route is not production-safe: it continues on failed
+verification and does not retrieve the notification signing key. Keep it blocked
+from public production traffic until the [hardening gates](#production-readiness)
+pass. It grants no settlement or payment authority.
+
 **Verify:**
 ```bash
 php artisan lepton:doctor       # binaries, session, treasury, chain reads, ledger parity
@@ -535,14 +645,13 @@ php artisan lepton:status --address=0x...
 **Key rules** (from the package; do not violate):
 - Amounts are integer base units; USDC = 6 decimals, Arc native = 18 decimals. Use
   `Yukazakiri\Lepton\Support\Amounts`, never floats or `hexdec()`.
-- A transaction hash is a claim, not proof — verify with `eth_getTransactionByHash`.
+- A transaction hash is a claim, not proof. `eth_getTransactionByHash` shows
+  visibility only; settlement needs a successful matching receipt and finality.
 - Prefer Circle agent wallet addresses; local wallets make transfers fail.
 - Mainnet and testnet sessions are independent.
 
 For full API (transfers, balances, x402, Gateway, bridges, testing with the fake
 driver), see `vendor/yukazakiri/lepton-agent/README.md` or the package docs.
-"""
-
 ### Demo accounts
 
 | Role | Email | Password |
@@ -643,6 +752,16 @@ repository history. Removing source text does not invalidate a credential. These
 do not certify the current Docker image or live payment rails for production.
 
 ---
+
+## Technical reference
+
+The sections below retain detailed operational and implementation notes. Legacy
+demo commands are not deployment steps, and roadmap targets are not promises that
+every payment path is production-ready. See [PLAN.md](PLAN.md) for the delivery
+contract and remaining release gates.
+
+<details>
+<summary><strong>Wallet authentication, funding, and developer demo</strong></summary>
 
 ## Authenticate your agent wallet
 
@@ -748,6 +867,11 @@ these ever stop fitting the faucet ceiling or stop covering all four reachable
 decisions.
 
 ---
+
+</details>
+
+<details>
+<summary><strong>Finance workflows, evidence, and payment review</strong></summary>
 
 ## Using the app
 
@@ -1168,6 +1292,8 @@ rather than inventing evidence, restores SQLite monetary guards and refuses popu
 rollback. Destination revocation/suspension workflow, cooling-off, source corrections,
 reservation release/rollover, approval renewal/withdrawal, durable recovery and verified settlement remain open.
 
+</details>
+
 ## Commands
 
 | Command | What it does |
@@ -1207,6 +1333,9 @@ LEPTON_TREASURY_ADDRESS=0xYourAgentWallet
 `LEPTON_DRIVER` defaults to `fake` under `APP_ENV=testing`.
 
 ---
+
+<details>
+<summary><strong>Optional AI, approval boundaries, and payment architecture</strong></summary>
 
 ## The AI layer (optional)
 
@@ -1464,10 +1593,12 @@ receipt/finality evidence before **testnet mirror** settlement, without clearing
 
 ---
 
+</details>
+
 ## Testing
 
 ```bash
-php artisan test                              # 374 tests
+php artisan test
 php artisan test --compact --filter=Reconcile
 ```
 
@@ -1509,20 +1640,20 @@ authenticated for.
 
 ```
 app/
-  Agents/OpenSinopAgent.php            the autonomous cycle
+  Agents/EduFlowAgent.php             legacy developer autonomous cycle
   Policies/                          invoice + assistance policy (deterministic)
   Actions/                           policy evaluation, escalation approval
   Services/
     FinancialPolicyEngine.php        every vendor-payment decision
     CircleWalletService.php          the only path to a real transfer
-    LeptonReconciliationService.php  proves settlement on-chain
+  LeptonReconciliationService.php  legacy reconciliation; see evidence limitations
     LeptonTreasuryService.php        live chain reads vs the ledger
   Console/Commands/
-    OpenSinopDemo.php                  the end-to-end demo
+    EduFlowDemo.php                   legacy developer demo command
     LeptonDoctor.php                 the "is it working" check
 database/seeders/
-  OpenSinopFinancialSeeder.php         org, wallets, budgets, the six invoices
-  OpenSinopPlanSeeder.php              thresholds, assistance fund, aid policy
+  EduFlowFinancialSeeder.php          org, wallets, budgets, the six invoices
+  EduFlowPlanSeeder.php               thresholds, assistance fund, aid policy
   EducationDemoSeeder.php           students, tuition, one pending aid request
 ```
 
@@ -1530,9 +1661,30 @@ database/seeders/
 
 ## Built on
 
-- [Laravel 13](https://laravel.com) · [Inertia v3](https://inertiajs.com) · [Vue 3](https://vuejs.org) · [Tailwind 4](https://tailwindcss.com) · shadcn/ui
+- [Laravel 13](https://laravel.com) · [Inertia v3](https://inertiajs.com) · [React 19](https://react.dev) · [Tailwind 4](https://tailwindcss.com) · shadcn/ui
 - [Filament 5](https://filamentphp.com) for staff panels
 - [yukazakiri/lepton-agent](https://github.com/yukazakiri/lepton-agent) for Circle + Arc
 - [Circle Agent Stack](https://developers.circle.com/agent-stack) · [Arc](https://docs.arc.io) · [x402](https://developers.circle.com/agent-stack/agent-wallets/wallet-operations/pay-for-service)
 
 Built for the [Lepton Agents Hackathon](https://arc-node.thecanteenapp.com/).
+
+## Contributing
+
+Open an [issue](https://github.com/koamishin/OpenSinop/issues) to discuss bugs or
+proposed changes, then submit a focused pull request with reproduction steps and
+tests. Use fake gateways for automated tests; do not commit credentials, wallet
+secrets, student records, or private institutional documents.
+
+Before submitting, run the relevant tests and project checks:
+
+```bash
+composer test:lint
+composer phpstan
+composer rector
+npm run check
+php artisan test --compact
+```
+
+## License
+
+OpenSinop is open-source software licensed under the [MIT License](LICENSE).

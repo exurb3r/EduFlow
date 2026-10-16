@@ -117,3 +117,16 @@ it('never claims a fake-driver run settles real money', function (): void {
     expect($readme)->toContain('LEPTON_DRIVER=fake')
         ->and($readme)->toMatch('/not a simulation|never mistake a fake run/i');
 });
+
+it('documents production integration blockers separately from completed features', function (): void {
+    $readme = (string) file_get_contents(base_path('README.md'));
+
+    expect($readme)->toContain('[Production readiness](#production-readiness)')
+        ->and($readme)->toContain('hardening is not yet implemented')
+        ->and($readme)->toContain('GET /v2/notifications/publicKey/{keyId}')
+        ->and($readme)->toContain('ECDSA_SHA_256')
+        ->and($readme)->toContain('unique `notificationId`')
+        ->and($readme)->toContain('Persist submission identity')
+        ->and($readme)->toContain('backup restoration')
+        ->and($readme)->toContain('No mainnet payment or custody migration is implicit.');
+});
