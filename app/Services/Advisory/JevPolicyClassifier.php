@@ -72,6 +72,13 @@ final readonly class JevPolicyClassifier
         if ($review) {
             if ($conflict) {
                 $explanation = 'JEV detected conflicting policy categories with similar high scores. Held for human review to prevent ambiguous allocation.';
+            } elseif ($answer->choice === 'needs_review' && $topCategory !== null && $topProbPercent > 0) {
+                // Naming the runner-up matters: "no match" hides that a real
+                // category was close, which is exactly what a reviewer needs to
+                // judge whether the hold was right.
+                $explanation = sprintf(
+                    'JEV declined to commit and held this record for human review (%d%% for "needs review"). Its closest real category was "%s" at %d%%, short of the 80%% safety threshold. Finance review required.',
+                    $confidencePercent, $topCategory['name'], $topProbPercent);
             } elseif ($answer->choice === 'needs_review' || ! $topCategory) {
                 $explanation = sprintf('JEV flagged this record for human review (%d%% match). The evidence did not clearly match any saved policy category. Finance review required.', $confidencePercent);
             } else {
@@ -87,10 +94,12 @@ final readonly class JevPolicyClassifier
             $review
                 ? ($conflict
                     ? 'Conflict check triggered: multiple categories scored above safety limit. Fail-closed.'
-                    : sprintf('Confidence check: %d%% vs 80%% minimum threshold. Fail-closed: human review required.', $topProbPercent))
+                    : ($topCategory === null
+                        ? sprintf('Confidence check: %d%% vs 80%% minimum threshold. Fail-closed: human review required.', $topProbPercent)
+                        : sprintf('Confidence check: best category "%s" scored %d%%, under the 80%% minimum. Fail-closed: human review required.', $topCategory['name'], $topProbPercent)))
                 : sprintf('Confidence check passed: %d%% >= 80%%. Verified verbatim citations against policy clauses.', $confidencePercent),
             $review
-                ? 'Outcome: Human review required before any planning or spending.'
+                ? 'Outcome: Human review required before any planning or spending. AI never approves or moves money.'
                 : sprintf('Outcome: Classified as "%s". Advisory only.', $category['name']),
         ];
 

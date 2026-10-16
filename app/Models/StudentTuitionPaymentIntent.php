@@ -56,7 +56,7 @@ class StudentTuitionPaymentIntent extends Model
                     return false;
                 }
             }
-            foreach (['amount_base_units', 'fee_ceiling_base_units', 'available_base_units', 'total_base_units'] as $field) {
+            foreach (['amount_base_units', 'fee_ceiling_base_units', 'available_base_units', 'total_base_units', 'payer_debit_base_units'] as $field) {
                 if (! is_int($s[$field] ?? null) || $s[$field] < 0) {
                     return false;
                 }
@@ -75,7 +75,13 @@ class StudentTuitionPaymentIntent extends Model
                 && $s['amount_base_units'] > 0 && is_string($s['quoted_network_fee'] ?? null)
                 && preg_match('/^(?:0|[1-9][0-9]*)(?:\.[0-9]{1,18})?$/D', $s['quoted_network_fee']) === 1
                 && BigInteger::of($s['amount_base_units'])->plus($s['fee_ceiling_base_units'])->isEqualTo($s['total_base_units'])
-                && $s['available_base_units'] >= $s['total_base_units']
+                // The payer must cover what this rail debits them, which on a
+                // relayer-sponsored rail is the principal alone. Comparing against
+                // principal + ceiling instead rejected a quote the service had
+                // already accepted, and surfaced as a 500 on the pay screen rather
+                // than as a validation message.
+                && ($s['payer_debit_base_units'] === $s['amount_base_units'] || $s['payer_debit_base_units'] === $s['total_base_units'])
+                && $s['available_base_units'] >= $s['payer_debit_base_units']
                 && Carbon::parse($s['expires_at'])->gt(Carbon::parse($s['quoted_at']))
                 && hash_equals($this->snapshot_digest, PaymentIntent::digest($s));
         } catch (Throwable) {
