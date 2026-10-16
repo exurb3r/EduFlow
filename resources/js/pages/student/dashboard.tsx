@@ -102,6 +102,37 @@ function formatBalance(balance: string): string {
     return `${grouped}.${cents} USDC`;
 }
 
+function parseBaseUnits(amount: string): number | null {
+    if (!/^(?:0|[1-9][0-9]*)(?:\.[0-9]{1,6})?$/.test(amount)) {
+        return null;
+    }
+    const [whole, fraction = ''] = amount.split('.');
+    const exact = BigInt(whole) * 1_000_000n + BigInt(fraction.padEnd(6, '0'));
+    const baseUnits = Number(exact);
+
+    if (!Number.isSafeInteger(baseUnits) || baseUnits <= 0) {
+        return null;
+    }
+
+    return baseUnits;
+}
+
+type TuitionQuote = {
+    network_fee: string;
+    total: string;
+    payer_debit?: string;
+    fee_paid_by_payer?: boolean;
+    max_amount_base_units: number;
+    amount_base_units?: number;
+    balance: string | null;
+    chain: string;
+    request_digest: string;
+    consent_text: string;
+    expires_at: string;
+    fee_ceiling_base_units: number;
+    request_key?: string;
+};
+
 export default function StudentDashboard({
     student,
     tuitionAccount,
@@ -367,14 +398,280 @@ export default function StudentDashboard({
         }
         return true;
     });
-    const openPay = (amount?: string | React.MouseEvent) => {
-        const amt = typeof amount === 'string' ? amount : undefined;
-        router.visit(
-            studentPay.url({
-                query: {
-                    mode: 'tuition',
-                    account: tuitionAccount?.id,
-                    amount: amt,
+
+    const defaultPayBaseUnits = Math.min(
+        remainingBase,
+        Number(
+            snapshot?.balance
+                ? Math.floor(Number(snapshot.balance) * 1_000_000)
+                : 0,
+        ),
+    );
+
+    const buildInstantQuote = useCallback(
+        (baseUnits: number): TuitionQuote => ({
+            network_fee: '0.000000',
+            total: (baseUnits / 1_000_000).toFixed(2),
+            // Placeholder until the server quote lands; a zero fee means the
+            // signed-in rail's fee is not the payer's, so show principal only.
+            payer_debit: (baseUnits / 1_000_000).toFixed(2),
+            fee_paid_by_payer: false,
+            max_amount_base_units: remainingBase,
+            amount_base_units: baseUnits,
+            balance: snapshot?.balance ?? null,
+            chain: 'ARC-TESTNET',
+            request_digest: '',
+            consent_text:
+                'I consent to the transfer of USDC on Arc Testnet for tuition.',
+            expires_at: '',
+            fee_ceiling_base_units: 0,
+        }),
+        [remainingBase, snapshot?.balance],
+    );
+
+    const openPay = () => {
+        const defaultAmount = (defaultPayBaseUnits / 1_000_000).toFixed(2);
+        setPayAmount(defaultAmount);
+
+        const currentQuoteValid =
+            payQuote &&
+            payQuote.amount_base_units === defaultPayBaseUnits &&
+            Boolean(payQuote.request_key) &&
+            payQuote.expires_at &&
+            new Date(payQuote.expires_at).getTime() > Date.now();
+
+        if (!currentQuoteValid) {
+            isInitialOpenRef.current = true;
+            setPayQuote(buildInstantQuote(defaultPayBaseUnits));
+            setRequestKey(null);
+        }
+        setConsent(false);
+        setPayError(null);
+        setReceipt(null);
+        setPayOpen(true);
+    };
+
+    useEffect(() => {
+        if (!payOpen || !tuitionAccount?.id) {
+            if (abortControllerRef.current) {
+                abortControllerRef.current.abort();
+            }
+            setQuoting(false);
+
+            return;
+        }
+
+        const baseUnits = parseBaseUnits(payAmount);
+        if (baseUnits === null) {
+            if (abortControllerRef.current) {
+                abortControllerRef.current.abort();
+            }
+            setQuoting(false);
+
+            return;
+        }
+
+        setQuoting(true);
+
+        const isInitial = isInitialOpenRef.current;
+        isInitialOpenRef.current = false;
+        const delay = isInitial ? 0 : 200;
+
+        const timer = setTimeout(() => {
+            void requestQuote(baseUnits);
+        }, delay);
+
+        return () => {
+            clearTimeout(timer);
+        };
+    }, [payAmount, payOpen, tuitionAccount?.id]);
+
+    useEffect(() => {
+        return () => {
+            if (abortControllerRef.current) {
+                abortControllerRef.current.abort();
+            }
+        };
+    }, []);
+
+    const requestQuote = async (
+        baseUnits: number,
+    ): Promise<TuitionQuote | null> => {
+        if (abortControllerRef.current) {
+            abortControllerRef.current.abort();
+        }
+        const controller = new AbortController();
+        abortControllerRef.current = controller;
+
+        const requestId = ++quoteRequestIdRef.current;
+        setQuoting(true);
+        setPayError(null);
+
+        const promise = (async () => {
+            try {
+                const response = await fetch(tuitionPayQuote.url(), {
+                    method: 'POST',
+                    credentials: 'same-origin',
+                    signal: controller.signal,
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'X-CSRF-TOKEN':
+                            document.querySelector<HTMLMetaElement>(
+                                'meta[name="csrf-token"]',
+                            )?.content ?? '',
+                        Accept: 'application/json',
+                    },
+                    body: JSON.stringify({
+                        tuition_account_id: tuitionAccount?.id,
+                        amount_base_units: baseUnits,
+                    }),
+                });
+
+                const payload = (await response.json()) as
+                    | (TuitionQuote & {
+                          message?: string;
+                          errors?: Record<string, string[]>;
+                      })
+                    | undefined;
+
+                if (requestId !== quoteRequestIdRef.current) {
+                    return null;
+                }
+
+                if (!response.ok) {
+                    const message =
+                        payload?.message ??
+                        (payload?.errors
+                            ? Object.values(payload.errors).flat().join(' ')
+                            : null) ??
+                        'Could not quote this payment on the chain.';
+                    setPayError(message);
+                    setPayQuote(null);
+                    setRequestKey(null);
+
+                    return null;
+                }
+
+                const quote = payload as TuitionQuote;
+                setPayQuote(quote);
+                setRequestKey(quote.request_key ?? null);
+
+                return quote;
+            } catch (err: unknown) {
+                if (err instanceof DOMException && err.name === 'AbortError') {
+                    return null;
+                }
+                if (requestId === quoteRequestIdRef.current) {
+                    setPayError('Could not reach the payment network.');
+                    setPayQuote(null);
+                    setRequestKey(null);
+                }
+
+                return null;
+            } finally {
+                if (requestId === quoteRequestIdRef.current) {
+                    setQuoting(false);
+                    inFlightQuotePromiseRef.current = null;
+                }
+            }
+        })();
+
+        inFlightQuotePromiseRef.current = promise;
+
+        return promise;
+    };
+
+    // Background prefetch the default quote so opening the modal has zero delay
+    useEffect(() => {
+        if (
+            !tuitionAccount?.id ||
+            defaultPayBaseUnits <= 0 ||
+            !canPay ||
+            hasInFlight
+        ) {
+            return;
+        }
+
+        if (!payQuote && !payOpen) {
+            void requestQuote(defaultPayBaseUnits);
+        }
+    }, [defaultPayBaseUnits, canPay, hasInFlight]);
+
+    const submitPay = async () => {
+        const baseUnits = parseBaseUnits(payAmount);
+        if (baseUnits === null) {
+            if (!/^(?:0|[1-9][0-9]*)(?:\.[0-9]{1,6})?$/.test(payAmount)) {
+                setPayError(
+                    'Enter exact USDC with at most six decimal places.',
+                );
+            } else {
+                setPayError('Enter an amount greater than zero.');
+            }
+
+            return;
+        }
+
+        let currentQuote = payQuote;
+        let currentKey = requestKey;
+
+        const isCurrentQuoteMatching =
+            currentQuote &&
+            currentQuote.amount_base_units === baseUnits &&
+            currentKey;
+
+        if (!isCurrentQuoteMatching) {
+            setPaying(true);
+            setPayError(null);
+
+            let quotePromise = inFlightQuotePromiseRef.current;
+            if (!quotePromise) {
+                quotePromise = requestQuote(baseUnits);
+            }
+
+            try {
+                const quoteResult = await quotePromise;
+                if (!quoteResult) {
+                    setPaying(false);
+
+                    return;
+                }
+                currentQuote = quoteResult;
+                currentKey = quoteResult.request_key ?? null;
+            } catch {
+                setPaying(false);
+
+                return;
+            }
+        }
+
+        if (!currentQuote || !currentKey) {
+            setPaying(false);
+            setPayError('Get a fresh fee quote before sending this payment.');
+
+            return;
+        }
+
+        if (!consent) {
+            setPaying(false);
+            setPayError('Accept this exact pilot quote before confirming.');
+
+            return;
+        }
+
+        setPaying(true);
+        setPayError(null);
+
+        try {
+            const response = await fetch(tuitionPayStore.url(), {
+                method: 'POST',
+                credentials: 'same-origin',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'X-CSRF-TOKEN':
+                        document.querySelector<HTMLMetaElement>(
+                            'meta[name="csrf-token"]',
+                        )?.content ?? '',
+                    Accept: 'application/json',
                 },
             }),
         );
@@ -452,6 +749,452 @@ export default function StudentDashboard({
                                 </button>
                             </div>
                         </header>
+
+                        {/* -- Pay tuition -- */}
+                        <Dialog
+                            open={payOpen}
+                            onOpenChange={(open) => {
+                                if (paying) {
+                                    return;
+                                }
+
+                                setPayOpen(open);
+                                if (!open) {
+                                    setReceipt(null);
+                                }
+                            }}
+                        >
+                            <DialogContent className="bulletin clay-card border-[var(--clay-border)] sm:max-w-md">
+                                <DialogHeader>
+                                    <DialogTitle className="clay-h2 flex items-center gap-3">
+                                        <span className="clay-icon-chip size-9 shrink-0">
+                                            <ArrowUpRight className="size-4" />
+                                        </span>
+                                        Pay tuition
+                                    </DialogTitle>
+                                    <DialogDescription className="clay-body">
+                                        Operator-controlled Arc testnet pilot
+                                        only. This does not pay official college
+                                        tuition. Confirmation binds this one
+                                        amount and fee ceiling.
+                                    </DialogDescription>
+                                </DialogHeader>
+
+                                {activeReceipt ? (
+                                    <div className="pt-1">
+                                        <StudentPaymentTracker
+                                            attempts={[
+                                                activeReceipt,
+                                                ...trackerAttempts,
+                                            ]}
+                                            tuitionAccount={tuitionAccount}
+                                            walletBalance={snapshot?.balance}
+                                            onOpenPay={() => {
+                                                setReceipt(null);
+                                                setConsent(true);
+                                                setPayAmount('5.00');
+                                                const units = 5_000_000;
+                                                setPayQuote(
+                                                    buildInstantQuote(units),
+                                                );
+                                                void requestQuote(units);
+                                            }}
+                                            onDone={() => {
+                                                setPayOpen(false);
+                                                setReceipt(null);
+                                                setMonitorDrawerOpen(false);
+                                            }}
+                                            className="border-0 bg-transparent p-0 shadow-none"
+                                        />
+                                    </div>
+                                ) : (
+                                    <form
+                                        className="grid gap-4"
+                                        onSubmit={(event) => {
+                                            event.preventDefault();
+                                            void submitPay();
+                                        }}
+                                    >
+                                        {inFlightAttempt && (
+                                            <div className="flex items-center justify-between gap-3 rounded-xl border border-amber-500/30 bg-amber-500/10 p-3 text-xs text-amber-300">
+                                                <div className="flex items-center gap-2 min-w-0">
+                                                    <Loader2 className="size-4 shrink-0 animate-spin text-amber-400" />
+                                                    <span className="truncate">
+                                                        Transfer of{' '}
+                                                        {formatBaseUnits(
+                                                            inFlightAttempt.amount_base_units,
+                                                        )}{' '}
+                                                        USDC is processing
+                                                        on-chain.
+                                                    </span>
+                                                </div>
+                                                <button
+                                                    type="button"
+                                                    onClick={() =>
+                                                        setReceipt(
+                                                            inFlightAttempt,
+                                                        )
+                                                    }
+                                                    className="clay-focus shrink-0 font-semibold text-amber-200 underline hover:text-amber-100"
+                                                >
+                                                    View receipt
+                                                </button>
+                                            </div>
+                                        )}
+                                        <dl className="grid gap-3 text-sm">
+                                            <div className="flex items-baseline justify-between gap-4">
+                                                <dt className="clay-meta">
+                                                    Outstanding
+                                                </dt>
+                                                <dd className="clay-title tabular-nums">
+                                                    {remainingUsdc.toFixed(2)}{' '}
+                                                    USDC
+                                                </dd>
+                                            </div>
+                                            <div className="flex items-baseline justify-between gap-4">
+                                                <dt className="clay-meta">
+                                                    Wallet balance
+                                                </dt>
+                                                <dd className="clay-title tabular-nums">
+                                                    {snapshot?.balance
+                                                        ? `${snapshot.balance} USDC`
+                                                        : '—'}
+                                                </dd>
+                                            </div>
+                                        </dl>
+
+                                        {/* Quick Amount Chips */}
+                                        <div className="space-y-1.5">
+                                            <span className="bulletin-eyebrow text-xs text-[var(--clay-text-muted)]">
+                                                Quick amounts
+                                            </span>
+                                            <div className="flex flex-wrap items-center gap-1.5">
+                                                {[5, 10, 25, 50]
+                                                    .filter(
+                                                        (amt) =>
+                                                            amt <=
+                                                            remainingUsdc,
+                                                    )
+                                                    .map((amt) => (
+                                                        <button
+                                                            key={amt}
+                                                            type="button"
+                                                            onClick={() => {
+                                                                const val =
+                                                                    amt.toFixed(
+                                                                        2,
+                                                                    );
+                                                                setPayAmount(
+                                                                    val,
+                                                                );
+                                                                setConsent(
+                                                                    true,
+                                                                );
+                                                                setPayError(
+                                                                    null,
+                                                                );
+                                                                const units =
+                                                                    amt *
+                                                                    1_000_000;
+                                                                setPayQuote(
+                                                                    buildInstantQuote(
+                                                                        units,
+                                                                    ),
+                                                                );
+                                                                void requestQuote(
+                                                                    units,
+                                                                );
+                                                            }}
+                                                            className={`rounded-full px-3 py-1 text-xs font-semibold border transition ${
+                                                                payAmount ===
+                                                                amt.toFixed(2)
+                                                                    ? 'border-[var(--clay-primary-bright)] bg-[var(--clay-primary)]/20 text-[var(--clay-primary-bright)] shadow-xs'
+                                                                    : 'border-[var(--clay-border)] bg-[var(--clay-surface-soft)] text-[var(--clay-text)] hover:border-[var(--clay-primary-bright)]/40'
+                                                            }`}
+                                                        >
+                                                            {amt} USDC
+                                                        </button>
+                                                    ))}
+                                                <button
+                                                    type="button"
+                                                    onClick={() => {
+                                                        const val =
+                                                            remainingUsdc.toFixed(
+                                                                2,
+                                                            );
+                                                        setPayAmount(val);
+                                                        setConsent(true);
+                                                        setPayError(null);
+                                                        setPayQuote(
+                                                            buildInstantQuote(
+                                                                remainingBase,
+                                                            ),
+                                                        );
+                                                        void requestQuote(
+                                                            remainingBase,
+                                                        );
+                                                    }}
+                                                    className={`rounded-full px-3 py-1 text-xs font-semibold border transition ${
+                                                        payAmount ===
+                                                        remainingUsdc.toFixed(2)
+                                                            ? 'border-[var(--clay-primary-bright)] bg-[var(--clay-primary)]/20 text-[var(--clay-primary-bright)] shadow-xs'
+                                                            : 'border-[var(--clay-border)] bg-[var(--clay-surface-soft)] text-[var(--clay-text)] hover:border-[var(--clay-primary-bright)]/40'
+                                                    }`}
+                                                >
+                                                    Full (
+                                                    {remainingUsdc.toFixed(2)})
+                                                </button>
+                                            </div>
+                                        </div>
+
+                                        <div className="space-y-1.5">
+                                            <Label
+                                                htmlFor="pay_amount"
+                                                className="bulletin-eyebrow"
+                                            >
+                                                Custom Amount (USDC)
+                                            </Label>
+                                            <Input
+                                                id="pay_amount"
+                                                type="text"
+                                                inputMode="decimal"
+                                                max={remainingUsdc}
+                                                value={payAmount}
+                                                onChange={(event) => {
+                                                    const val =
+                                                        event.target.value;
+                                                    setPayAmount(val);
+                                                    setConsent(false);
+                                                    setPayError(null);
+                                                    const units =
+                                                        parseBaseUnits(val);
+                                                    if (
+                                                        units !== null &&
+                                                        units > 0
+                                                    ) {
+                                                        setPayQuote((prev) => ({
+                                                            network_fee:
+                                                                '0.000000',
+                                                            total: (
+                                                                units /
+                                                                1_000_000
+                                                            ).toFixed(2),
+                                                            max_amount_base_units:
+                                                                remainingBase,
+                                                            amount_base_units:
+                                                                units,
+                                                            balance:
+                                                                snapshot?.balance ??
+                                                                null,
+                                                            chain: 'ARC-TESTNET',
+                                                            request_digest:
+                                                                prev?.amount_base_units ===
+                                                                units
+                                                                    ? prev.request_digest
+                                                                    : '',
+                                                            consent_text:
+                                                                prev?.amount_base_units ===
+                                                                units
+                                                                    ? prev.consent_text
+                                                                    : 'I consent to the transfer of USDC on Arc Testnet for tuition.',
+                                                            expires_at:
+                                                                prev?.amount_base_units ===
+                                                                units
+                                                                    ? prev.expires_at
+                                                                    : '',
+                                                            fee_ceiling_base_units: 0,
+                                                            request_key:
+                                                                prev?.amount_base_units ===
+                                                                units
+                                                                    ? prev.request_key
+                                                                    : undefined,
+                                                        }));
+                                                    } else if (
+                                                        val.trim() === ''
+                                                    ) {
+                                                        setPayQuote(null);
+                                                    }
+                                                }}
+                                                className="clay-field clay-focus tabular-nums shadow-none"
+                                                required
+                                            />
+                                            <InputError
+                                                message={payError ?? undefined}
+                                            />
+                                            <p className="clay-meta">
+                                                Arc Testnet tuition payments are
+                                                relayer-sponsored: 0.00 USDC gas
+                                                fee charged to your wallet.
+                                            </p>
+                                        </div>
+
+                                        {!payQuote && quoting && (
+                                            <div className="clay-inset flex items-center justify-between gap-3 p-3.5 text-xs text-[var(--clay-text-muted)] rounded-xl border border-[var(--clay-border)]/50 animate-pulse">
+                                                <div className="flex items-center gap-2">
+                                                    <Loader2 className="size-3.5 animate-spin text-[var(--clay-primary)] shrink-0" />
+                                                    <span>
+                                                        Calculating network fee
+                                                        and ceiling…
+                                                    </span>
+                                                </div>
+                                                <span className="text-[11px] font-mono text-[var(--clay-text-muted)]/70 shrink-0">
+                                                    Arc Testnet
+                                                </span>
+                                            </div>
+                                        )}
+
+                                        {payQuote && (
+                                            <dl className="clay-inset grid gap-2 p-3 text-sm">
+                                                <div className="flex items-baseline justify-between gap-4">
+                                                    <dt className="clay-meta flex items-center gap-1.5">
+                                                        <span>Network fee</span>
+                                                        {quoting && (
+                                                            <span className="inline-flex items-center gap-1 text-[11px] font-normal text-[var(--clay-primary)]">
+                                                                <Loader2 className="size-2.5 animate-spin" />
+                                                                securing lock…
+                                                            </span>
+                                                        )}
+                                                    </dt>
+                                                    <dd className="clay-title tabular-nums">
+                                                        {payQuote.network_fee}{' '}
+                                                        USDC
+                                                        {payQuote.fee_paid_by_payer ===
+                                                        false && (
+                                                            <span className="ml-1.5 text-xs font-normal text-[var(--clay-text-muted)]">
+                                                                paid by Circle,
+                                                                not you
+                                                            </span>
+                                                        )}
+                                                    </dd>
+                                                </div>
+                                                <div className="flex items-baseline justify-between gap-4">
+                                                    <dt className="clay-meta">
+                                                        Total leaving your
+                                                        wallet
+                                                    </dt>
+                                                    <dd className="clay-title tabular-nums">
+                                                        {payQuote.payer_debit ??
+                                                            payQuote.total}{' '}
+                                                        USDC
+                                                    </dd>
+                                                </div>
+                                            </dl>
+                                        )}
+
+                                        {payQuote && (
+                                            <label
+                                                htmlFor="pilot_consent"
+                                                className={`group relative flex cursor-pointer items-start gap-3 rounded-xl border p-3.5 transition-all duration-150 select-none hover:-translate-y-0.5 active:translate-y-0 active:scale-[0.995] ${
+                                                    consent
+                                                        ? 'border-[var(--clay-primary-bright)]/60 bg-[var(--clay-surface-soft)] shadow-xs hover:border-[var(--clay-primary-bright)]'
+                                                        : 'border-[var(--clay-border)] bg-[var(--clay-surface-soft)]/50 hover:border-[var(--clay-primary-bright)]/40 hover:bg-[var(--clay-surface-soft)]'
+                                                }`}
+                                            >
+                                                <Checkbox
+                                                    id="pilot_consent"
+                                                    checked={consent}
+                                                    onCheckedChange={(
+                                                        checked,
+                                                    ) =>
+                                                        setConsent(
+                                                            checked === true,
+                                                        )
+                                                    }
+                                                    className="mt-0.5 shrink-0 border-[var(--clay-border)] transition-colors group-hover:border-[var(--clay-primary-bright)]/70 data-[state=checked]:bg-[var(--clay-primary)] data-[state=checked]:border-[var(--clay-primary)] data-[state=checked]:text-[var(--clay-primary-foreground)]"
+                                                />
+                                                <div className="flex-1 space-y-2.5 min-w-0">
+                                                    <p className="text-xs sm:text-[13px] leading-relaxed text-[var(--clay-text)] transition-colors group-hover:text-[var(--clay-text)]">
+                                                        {payQuote.consent_text}
+                                                    </p>
+                                                    <div className="flex flex-wrap items-center gap-1.5 pt-1 text-[11px] text-[var(--clay-text-muted)] border-t border-[var(--clay-border)]/60">
+                                                        <span className="inline-flex items-center gap-1 rounded-md border border-[var(--clay-border)] bg-[var(--clay-surface)] px-2 py-0.5 font-mono transition-colors group-hover:border-[var(--clay-border)]/80">
+                                                            <span className="text-[var(--clay-text-muted)]">
+                                                                Fee ceiling:
+                                                            </span>
+                                                            <strong className="text-[var(--clay-text)]">
+                                                                {formatBaseUnits(
+                                                                    payQuote.fee_ceiling_base_units,
+                                                                )}{' '}
+                                                                USDC
+                                                            </strong>
+                                                            {quoting && (
+                                                                <Loader2 className="size-2.5 animate-spin text-[var(--clay-primary)] ml-0.5" />
+                                                            )}
+                                                        </span>
+                                                        <span
+                                                            title={`Quote expires: ${payQuote.expires_at}`}
+                                                            className="inline-flex items-center gap-1 rounded-md border border-[var(--clay-border)] bg-[var(--clay-surface)] px-2 py-0.5 font-mono transition-colors group-hover:border-[var(--clay-border)]/80"
+                                                        >
+                                                            <Clock className="size-3 text-amber-400 shrink-0" />
+                                                            <span className="text-[var(--clay-text-muted)]">
+                                                                Expires:
+                                                            </span>
+                                                            <span className="text-[var(--clay-text)]">
+                                                                {formatQuoteExpiry(
+                                                                    payQuote.expires_at,
+                                                                )}
+                                                            </span>
+                                                        </span>
+                                                    </div>
+                                                </div>
+                                            </label>
+                                        )}
+
+                                        <div className="flex flex-wrap items-center gap-3">
+                                            <Button
+                                                type="submit"
+                                                disabled={
+                                                    paying ||
+                                                    Boolean(inFlightAttempt) ||
+                                                    !consent ||
+                                                    !payAmount ||
+                                                    parseBaseUnits(
+                                                        payAmount,
+                                                    ) === null ||
+                                                    parseBaseUnits(
+                                                        payAmount,
+                                                    )! <= 0
+                                                }
+                                                data-loading={paying}
+                                                className="clay-focus rounded-full bg-[var(--clay-primary)] font-semibold text-[var(--clay-primary-foreground)]"
+                                            >
+                                                {paying ? (
+                                                    <Loader2 className="size-4 animate-spin" />
+                                                ) : (
+                                                    <ArrowUpRight className="size-4" />
+                                                )}
+                                                {inFlightAttempt
+                                                    ? 'Transfer in progress…'
+                                                    : paying
+                                                      ? 'Processing…'
+                                                      : payQuote
+                                                        ? consent
+                                                            ? 'Pay Now'
+                                                            : 'Confirm pilot consent'
+                                                        : 'Pay Now'}
+                                            </Button>
+                                            <Button
+                                                type="button"
+                                                variant="ghost"
+                                                className="clay-focus rounded-full text-xs font-semibold"
+                                                onClick={() =>
+                                                    setPayOpen(false)
+                                                }
+                                                disabled={paying}
+                                            >
+                                                Cancel
+                                            </Button>
+                                        </div>
+
+                                        <p className="clay-meta flex items-start gap-2 text-[var(--status-pending)]">
+                                            <TriangleAlert className="mt-0.5 size-3.5 shrink-0" />
+                                            USDC transfers are final. Confirm
+                                            the amount before you send.
+                                        </p>
+                                    </form>
+                                )}
+                            </DialogContent>
+                        </Dialog>
 
                         {/* -- Active Tuition Payment Rail Tracker -- */}
                         {showInlineTracker && (
