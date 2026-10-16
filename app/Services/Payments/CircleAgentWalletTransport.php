@@ -8,25 +8,22 @@ use Illuminate\Support\Facades\Cache;
 use RuntimeException;
 use Symfony\Component\Process\Process;
 use Throwable;
+use Yukazakiri\Lepton\Contracts\WalletGateway;
+use Yukazakiri\Lepton\Gateways\CircleRestGateway;
 use Yukazakiri\Lepton\Support\Amounts;
 
 /**
- * Circle agent wallets, over the Circle CLI.
+ * Circle agent wallets, over the Circle W3S HTTP API (with CLI fallback).
  *
- * Two behaviours of the CLI shape this class, and both were confirmed against
- * the live tool rather than assumed:
+ * Supports both Circle Agent Wallets (via `CircleAgentHttpClient` reading the
+ * operator's W3S session directly over HTTPS) and Circle Developer-Controlled
+ * Wallets (`CircleRestGateway` from `yukazakiri/lepton-agent`), eliminating the
+ * need to spawn the Node `circle` CLI binary on every quote, transfer, and
+ * resolution poll.
  *
- *  - `circle wallet transfer` **without** `--quiet` does not broadcast. It
- *    prints a fee preview — `gasLimit`, `networkFee`, `baseFee`, `priorityFee`,
- *    `maxFee` — identical in shape to an explicit `--estimate`. Verified on
- *    ARC-TESTNET: a transfer run that way left no new entry in
- *    `circle transaction list` and moved no money.
- *  - with `--quiet`, an **agent** wallet yields a transaction *id* rather than a
- *    hash ("transaction hash for local wallets, transaction ID for agent
- *    wallets"). The hash only exists after the transaction completes.
- *
- * So `submit()` must pass `--quiet` and must never invent a hash, and
- * `resolve()` is the only place a hash may enter the system.
+ * `submit()` returns a Circle transaction UUID (`TransportAcceptance`), never
+ * an unverified hash, and `resolve()` is the only place an on-chain transaction
+ * hash may enter the system before `ArcSettlementVerifier` checks the receipt.
  */
 final readonly class CircleAgentWalletTransport implements FeeBoundedPaymentTransport
 {
@@ -34,6 +31,8 @@ final readonly class CircleAgentWalletTransport implements FeeBoundedPaymentTran
         private string $binary,
         private int $timeout = 120,
         private int $usdcDecimals = 6,
+        private ?CircleAgentHttpClient $http = null,
+        private ?WalletGateway $walletGateway = null,
     ) {}
 
     public static function fromConfig(): self
@@ -42,6 +41,10 @@ final readonly class CircleAgentWalletTransport implements FeeBoundedPaymentTran
             binary: (string) config('lepton.circle.bin', 'circle'),
             timeout: (int) config('lepton.circle.timeout', 120),
             usdcDecimals: (int) config('lepton.usdc_decimals', 6),
+            http: app()->bound(CircleAgentHttpClient::class)
+                ? app(CircleAgentHttpClient::class)
+                : new CircleAgentHttpClient((int) config('lepton.circle.timeout', 30)),
+            walletGateway: app()->bound(WalletGateway::class) ? app(WalletGateway::class) : null,
         );
     }
 
@@ -54,27 +57,57 @@ final readonly class CircleAgentWalletTransport implements FeeBoundedPaymentTran
         if (array_key_exists('max_fee_base_units', $request)) {
             throw new RuntimeException('Circle CLI sets no transaction fee ceiling; a requested cap cannot be honoured and is refused rather than ignored.');
         }
-        $handle = $this->run([
-            'wallet', 'transfer', $request['to'],
-            '--amount', Amounts::toCliAmount((int) $request['amount_base_units'], $this->usdcDecimals),
-            '--address', $request['from'],
-            '--chain', $request['chain'],
-            '--idempotency-key', $request['idempotency_key'],
-            '--quiet',
-        ]);
+
+        if ($this->walletGateway instanceof CircleRestGateway) {
+            $result = $this->walletGateway->transfer(
+                (string) $request['from'],
+                (string) $request['to'],
+                (int) $request['amount_base_units'],
+                [
+                    'chain' => (string) $request['chain'],
+                    'idempotencyKey' => (string) $request['idempotency_key'],
+                ],
+            );
+
+            $candidate = trim((string) ($result->handle ?? $result->raw['id'] ?? $result->raw['data']['id'] ?? ''));
+            if (preg_match('/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i', $candidate) !== 1) {
+                throw new RuntimeException(
+                    'Circle REST API returned no transaction identifier for transfer; submission state is unknown, not settled.'
+                );
+            }
+
+            return new TransportAcceptance(handle: strtolower($candidate), raw: ['raw' => $result->raw]);
+        }
+
+        if ($this->http instanceof CircleAgentHttpClient) {
+            $handle = $this->http->submitTransfer(
+                fromAddress: (string) $request['from'],
+                toAddress: (string) $request['to'],
+                amountDecimal: Amounts::toCliAmount((int) $request['amount_base_units'], $this->usdcDecimals),
+                chain: (string) $request['chain'],
+                idempotencyKey: (string) $request['idempotency_key'],
+            );
+        } else {
+            $handle = $this->run([
+                'wallet', 'transfer', $request['to'],
+                '--amount', Amounts::toCliAmount((int) $request['amount_base_units'], $this->usdcDecimals),
+                '--address', $request['from'],
+                '--chain', $request['chain'],
+                '--idempotency-key', $request['idempotency_key'],
+                '--quiet',
+            ]);
+        }
 
         // A handle is an opaque provider identifier. Accept only something that
-        // is shaped like one, because whatever else the CLI printed is not
+        // is shaped like one, because whatever else the rail returned is not
         // evidence that a transfer exists.
-        $candidate = trim((string) ($handle['id'] ?? $handle['transactionId'] ?? $handle['transaction_id'] ?? ''));
-
-        if ($candidate === '' && is_string($handle)) {
-            $candidate = trim($handle);
-        }
+        $candidate = is_array($handle)
+            ? trim((string) ($handle['id'] ?? $handle['transactionId'] ?? $handle['transaction_id'] ?? ''))
+            : trim((string) $handle);
 
         if (preg_match('/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i', $candidate) !== 1) {
             throw new RuntimeException(
-                'Circle CLI returned no transaction identifier for an agent-wallet transfer; the submission state is unknown, not settled.'
+                'Circle rail returned no transaction identifier for an agent-wallet transfer; the submission state is unknown, not settled.'
             );
         }
 
@@ -82,14 +115,7 @@ final readonly class CircleAgentWalletTransport implements FeeBoundedPaymentTran
     }
 
     /**
-     * The installed CLI sets no fee ceiling.
-     *
-     * `circle wallet transfer` exposes `--amount`, `--token`, `--address`,
-     * `--chain`, `--rpc-url`, `--idempotency-key`, `--estimate`, `--output` and
-     * `--quiet` — there is no fee or gas-limit flag, so the transaction's
-     * `maxFeePerGas` is chosen entirely by the CLI. But that flag is irrelevant
-     * here, because the CLI does not transact from the payer's account at all:
-     * a Circle agent wallet transfer is relayed, and Circle sponsors the gas.
+     * The Circle agent wallet rail is relayer-sponsored.
      *
      * Verified on three real ARC-TESTNET receipts rather than inferred from the
      * EVM rule. The payer's balance moved by exactly the principal and not one
@@ -111,9 +137,9 @@ final readonly class CircleAgentWalletTransport implements FeeBoundedPaymentTran
     }
 
     /**
-     * Fee preflight through the rail itself.
+     * Fee preflight through the rail itself over HTTPS.
      *
-     * `--estimate` never broadcasts, which is exactly what a preflight must be.
+     * `estimateFee` never broadcasts, which is exactly what a preflight must be.
      * The response is returned raw rather than parsed into an amount the code
      * trusts: the only fee this system will later enforce is the one the
      * settlement receipt proves, so a preflight number is informational and is
@@ -131,14 +157,37 @@ final readonly class CircleAgentWalletTransport implements FeeBoundedPaymentTran
             return $cached;
         }
 
-        $quoted = $this->run([
-            'wallet', 'transfer', $request['to'],
-            '--amount', Amounts::toCliAmount((int) $request['amount_base_units'], $this->usdcDecimals),
-            '--address', $request['from'],
-            '--chain', $request['chain'],
-            '--estimate',
-            '--output', 'json',
-        ]);
+        $quoted = null;
+
+        if ($this->http instanceof CircleAgentHttpClient) {
+            try {
+                $quoted = $this->http->estimateTransferFee(
+                    fromAddress: (string) $request['from'],
+                    toAddress: (string) $request['to'],
+                    amountDecimal: Amounts::toCliAmount((int) $request['amount_base_units'], $this->usdcDecimals),
+                    chain: (string) $request['chain'],
+                );
+            } catch (Throwable $e) {
+                $fallback = Cache::get($cacheKey.'_last_known');
+                if (is_array($fallback)) {
+                    return $fallback;
+                }
+
+                throw new RuntimeException('Circle HTTP fee estimate failed: '.$e->getMessage(), $e->getCode(), previous: $e);
+            }
+        } else {
+            $result = $this->run([
+                'wallet', 'transfer', $request['to'],
+                '--amount', Amounts::toCliAmount((int) $request['amount_base_units'], $this->usdcDecimals),
+                '--address', $request['from'],
+                '--chain', $request['chain'],
+                '--estimate',
+                '--output', 'json',
+            ]);
+            if (is_array($result)) {
+                $quoted = $result;
+            }
+        }
 
         if (is_array($quoted)) {
             Cache::put($cacheKey, $quoted, 3600);
@@ -157,16 +206,44 @@ final readonly class CircleAgentWalletTransport implements FeeBoundedPaymentTran
 
     public function resolve(string $handle, array $request): TransportResolution
     {
-        $listed = $this->run([
-            'transaction', 'list',
-            '--address', $request['from'],
-            '--chain', $request['chain'],
-            '--output', 'json',
-        ]);
+        if ($this->walletGateway instanceof CircleRestGateway) {
+            $res = $this->walletGateway->resolve($handle, ['chain' => (string) ($request['chain'] ?? 'ARC-TESTNET')]);
 
-        $transactions = is_array($listed['data']['transactions'] ?? null)
-            ? $listed['data']['transactions']
-            : [];
+            return match ($res->state) {
+                'completed' => is_string($res->txHash) && preg_match('/^0x[0-9a-fA-F]{64}$/D', $res->txHash) === 1
+                    ? TransportResolution::completed($res->txHash, $res->raw)
+                    : TransportResolution::pending($res->raw),
+                'failed' => TransportResolution::failed($res->reason ?? 'Circle reported transfer failed.', $res->raw),
+                'pending' => TransportResolution::pending($res->raw),
+                default => TransportResolution::unknown($res->reason ?? 'Transaction state unresolved on rail.', $res->raw),
+            };
+        }
+
+        if ($this->http instanceof CircleAgentHttpClient) {
+            $chain = (string) ($request['chain'] ?? 'ARC-TESTNET');
+
+            try {
+                $direct = $this->http->getTransaction($handle, $chain);
+                if (is_array($direct) && strtolower((string) ($direct['id'] ?? '')) === strtolower($handle)) {
+                    return $this->resolutionFromTransaction($direct);
+                }
+            } catch (Throwable) {
+                // Fall back to transaction list lookup below
+            }
+
+            $transactions = $this->http->listTransactions($chain, isset($request['from']) ? (string) $request['from'] : null);
+        } else {
+            $listed = $this->run([
+                'transaction', 'list',
+                '--address', $request['from'],
+                '--chain', $request['chain'],
+                '--output', 'json',
+            ]);
+
+            $transactions = is_array($listed) && is_array($listed['data']['transactions'] ?? null)
+                ? $listed['data']['transactions']
+                : [];
+        }
 
         foreach ($transactions as $transaction) {
             if (! is_array($transaction)) {
@@ -175,21 +252,30 @@ final readonly class CircleAgentWalletTransport implements FeeBoundedPaymentTran
             if (strtolower((string) ($transaction['id'] ?? '')) !== strtolower($handle)) {
                 continue;
             }
-            $state = strtoupper((string) ($transaction['state'] ?? ''));
 
-            return match ($state) {
-                'COMPLETE' => $this->hashOrPending($transaction),
-                'FAILED', 'CANCELED', 'REJECTED' => TransportResolution::failed(
-                    'Circle reported the transfer as '.$state.'. No USDC moved; the nonce may be spent, so a retry needs a fresh submission.',
-                    ['state' => $state],
-                ),
-                default => TransportResolution::pending(['state' => $state]),
-            };
+            return $this->resolutionFromTransaction($transaction);
         }
 
         // The handle is simply absent from the history. That is not evidence the
         // transfer was never made, so it stays unresolved rather than failed.
         return TransportResolution::unknown('The rail did not return this transaction. Its fate is unresolved; reconcile before any retry.');
+    }
+
+    /**
+     * @param  array<string, mixed>  $transaction
+     */
+    private function resolutionFromTransaction(array $transaction): TransportResolution
+    {
+        $state = strtoupper((string) ($transaction['state'] ?? ''));
+
+        return match ($state) {
+            'COMPLETE', 'CONFIRMED' => $this->hashOrPending($transaction),
+            'FAILED', 'CANCELED', 'CANCELLED', 'REJECTED', 'DENIED' => TransportResolution::failed(
+                'Circle reported the transfer as '.$state.'. No USDC moved; the nonce may be spent, so a retry needs a fresh submission.',
+                ['state' => $state],
+            ),
+            default => TransportResolution::pending(['state' => $state]),
+        };
     }
 
     /**
@@ -212,7 +298,7 @@ final readonly class CircleAgentWalletTransport implements FeeBoundedPaymentTran
     }
 
     /**
-     * Run the CLI with argv, never a shell string.
+     * Run the CLI with argv, never a shell string (fallback when HTTP client is not injected).
      *
      * @param  array<int, string>  $args
      * @return array<string, mixed>|string

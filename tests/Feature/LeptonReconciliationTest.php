@@ -15,6 +15,7 @@ use Yukazakiri\Lepton\Contracts\ArcNetworkGateway;
 use Yukazakiri\Lepton\Contracts\WalletGateway;
 use Yukazakiri\Lepton\DTOs\BalanceResult;
 use Yukazakiri\Lepton\DTOs\TransactionRecord;
+use Yukazakiri\Lepton\DTOs\TransferResolution;
 use Yukazakiri\Lepton\DTOs\TransferResult;
 
 /**
@@ -112,6 +113,29 @@ function agentWalletKnowing(array $knownHashes = []): WalletGateway
         public function limits(string $address, array $options = []): array
         {
             return [];
+        }
+
+        public function resolve(string $handle, array $options = []): TransferResolution
+        {
+            throw new RuntimeException('not used in reconciliation tests');
+        }
+
+        /** @return array<int,array<string,mixed>> */
+        public function wallets(array $options = []): array
+        {
+            throw new RuntimeException('not used in reconciliation tests');
+        }
+
+        /** @return array<string,mixed> */
+        public function createWallet(array $options = []): array
+        {
+            throw new RuntimeException('not used in reconciliation tests');
+        }
+
+        /** @return array<string,mixed> */
+        public function fundWallet(string $address, array $options = []): array
+        {
+            throw new RuntimeException('not used in reconciliation tests');
         }
     };
 }

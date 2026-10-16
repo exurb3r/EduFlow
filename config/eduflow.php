@@ -163,6 +163,24 @@ return [
 
     /*
     |--------------------------------------------------------------------------
+    | Autonomous Pipeline Bridge
+    |--------------------------------------------------------------------------
+    |
+    | Seamlessly connects verified student tuition receipts directly to JEV
+    | policy classification, department budget planning, and automated
+    | vendor bill disbursement on Arc Testnet without manual human gauntlets.
+    |
+    */
+    'autonomous_pipeline' => [
+        'enabled' => env('EDUFLOW_AUTONOMOUS_PIPELINE_ENABLED', false),
+        'auto_disburse' => env('EDUFLOW_AUTONOMOUS_PIPELINE_AUTO_DISBURSE', true),
+        'max_auto_disburse_usdc' => (float) env('EDUFLOW_AUTONOMOUS_PIPELINE_MAX_USDC', 50.00),
+        'maker_id' => env('EDUFLOW_AUTONOMOUS_PIPELINE_MAKER_ID', 4),
+        'reviewer_id' => env('EDUFLOW_AUTONOMOUS_PIPELINE_REVIEWER_ID', 1),
+    ],
+
+    /*
+    |--------------------------------------------------------------------------
     | Campus Quick Resources
     |--------------------------------------------------------------------------
     |
