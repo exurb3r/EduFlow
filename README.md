@@ -16,6 +16,7 @@ department's approved budget, and link authorized bills to USDC payments on Arc 
 ## Contents
 
 - [Overview](#overview)
+- [Production readiness](#production-readiness)
 - [Getting started](#getting-started)
 - [Requirements](#requirements--prerequisites)
 - [Installation and updates](#setup)
@@ -78,6 +79,69 @@ policy activation or developer demo is not a certified school treasury system.
    [`yukazakiri/lepton-agent`](https://github.com/yukazakiri/lepton-agent) gateways.
 5. **Demo funding must match the chain.** Use explicit consent for testnet runs and label
    fake results as simulated. Testnet settlement is not proof of mainnet readiness.
+
+## Production readiness
+
+**Status: blockers identified; hardening is not yet implemented.** OpenSinop and
+its Lepton dependency require separate release gates. Neither a green test suite
+nor a new package tag certifies the application for real institutional funds.
+
+### Current integration blockers
+
+- The checked-in lock file installs Lepton `v2.7.0`; selecting `developer` or
+  `circle-rest` in an installer does not provide `CircleRestGateway`. The package
+  prerelease [`v2.12.0-rc.2`](https://github.com/yukazakiri/lepton-agent/releases/tag/v2.12.0-rc.2)
+  still has unresolved API, accounting, and runtime-compatibility issues. Upgrading
+  to that prerelease alone is not the fix.
+- The current `POST /api/webhooks/circle` handler logs and continues after failed
+  verification and uses an Entity Secret encryption key instead of the notification
+  key. Do not expose this endpoint publicly for production use until it rejects
+  unauthenticated requests. Notification logging is not settlement verification.
+- Composer metadata, Docker settings, queue/scheduler processes, credentials,
+  application authorization, and reconciliation must all be tested together.
+  Package unit tests do not cover those deployment boundaries.
+
+### Hardening sequence and acceptance gates
+
+The following is required work, not a list of shipped protections:
+
+1. **Contain webhook ingestion.** Disable public access to the current handler.
+   Require signature headers and verify raw payload bytes with the notification
+   key from `GET /v2/notifications/publicKey/{keyId}` using the documented
+   `ECDSA_SHA_256` algorithm. Missing signatures, invalid signatures, and key-fetch
+   failures must not reach financial processing.
+2. **Validate the REST driver.** Correct Circle endpoint paths and request fields
+   against official OpenAPI schemas, paginate reads, scope wallets to chain and
+   wallet set, verify API access, and document unsupported operations. Resolve
+   PHP/OpenSSL compatibility before updating the application lock file.
+3. **Prove exact balances and bounded sends.** Identify USDC by trusted token and
+   chain identity, normalize to six-decimal base units with exact arithmetic,
+   and never add Arc's native and ERC-20 views of the same balance. Enforce
+   approved amount, recipient, network, and fee controls at the signing boundary;
+   an estimate is not an enforceable fee ceiling.
+4. **Recover without duplicate payments.** Persist submission identity and the
+   provider-compatible idempotency key before sending. Record webhook events in
+   a durable inbox with unique `notificationId`, validate subscription/network,
+   and queue bounded reconciliation. Duplicate and out-of-order notifications
+   must not regress state or cause another transfer. Keep recovery polling for
+   missed notifications; timeouts and null lookups remain unresolved.
+5. **Verify settlement independently.** Notification delivery, a provider ID,
+   `CONFIRMED`, or a stored hash alone must not mark a bill paid. Require a
+   successful receipt and matching token, chain, sender, recipient, exact amount,
+   and finality. Testnet mirrors never clear real local-currency liabilities.
+6. **Pass release validation.** Lock the hardened package version and run
+   application regressions plus separately authorized testnet integration.
+   Exercise provider failures, worker crashes, replay, missed events, restart,
+   update, and backup restoration. Review secrets/recovery custody, MFA,
+   monitoring, alerts, and rollback procedures before a controlled mainnet
+   rollout decision. No mainnet payment or custody migration is implicit.
+
+The [Lepton production-readiness checklist](https://github.com/yukazakiri/lepton-agent/blob/v2.12.0-rc.2/README.md#production-readiness)
+tracks package-specific blockers. See Circle's
+[transfer schema](https://developers.circle.com/api-reference/wallets/developer-controlled-wallets/create-developer-transaction-transfer)
+and [webhook verification guide](https://developers.circle.com/wallets/webhook-notifications)
+for provider contracts. [PLAN.md](PLAN.md) retains the application's broader
+financial, pilot, and release-safety requirements.
 
 ---
 
@@ -567,9 +631,10 @@ Treat these options as integration work until the application locks and tests th
 required version. Existing Agent Stack wallets are not automatically accessible
 through a Developer-Controlled Wallets API key.
 
-The current webhook route is a notification/logging integration, not settlement
-authority. Do not use it to mark payments paid: verified signatures, replay handling,
-and matching successful on-chain evidence are required before production use.
+The current webhook route is not production-safe: it continues on failed
+verification and does not retrieve the notification signing key. Keep it blocked
+from public production traffic until the [hardening gates](#production-readiness)
+pass. It grants no settlement or payment authority.
 
 **Verify:**
 ```bash
@@ -580,7 +645,8 @@ php artisan lepton:status --address=0x...
 **Key rules** (from the package; do not violate):
 - Amounts are integer base units; USDC = 6 decimals, Arc native = 18 decimals. Use
   `Yukazakiri\Lepton\Support\Amounts`, never floats or `hexdec()`.
-- A transaction hash is a claim, not proof — verify with `eth_getTransactionByHash`.
+- A transaction hash is a claim, not proof. `eth_getTransactionByHash` shows
+  visibility only; settlement needs a successful matching receipt and finality.
 - Prefer Circle agent wallet addresses; local wallets make transfers fail.
 - Mainnet and testnet sessions are independent.
 
