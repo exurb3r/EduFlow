@@ -6,6 +6,7 @@ import {
     ChevronRight,
     ExternalLink,
     Inbox,
+    ReceiptText,
 } from 'lucide-react';
 import { toast } from 'sonner';
 
@@ -16,6 +17,7 @@ import {
     markAllRead,
     markAsRead,
 } from '@/routes/notifications';
+import { index as paymentsIndex } from '@/routes/payments';
 import type { NotificationRecord, Paginated } from '@/types';
 
 interface NotificationsProps {
@@ -182,7 +184,17 @@ export default function Notifications({
                                             {typeof notification.data
                                                 .tx_hash === 'string' &&
                                                 notification.data.tx_hash && (
-                                                    <div className="mt-2 flex items-center gap-2">
+                                                    <div className="mt-2 flex flex-wrap items-center gap-3">
+                                                        <Link
+                                                            href={paymentsIndex.url()}
+                                                            className="clay-focus inline-flex items-center gap-1 rounded-full bg-emerald-500/15 px-2.5 py-0.5 text-xs font-semibold text-emerald-300 hover:bg-emerald-500/25"
+                                                        >
+                                                            <ReceiptText className="size-3" />
+                                                            <span>
+                                                                View Official
+                                                                e-Receipt
+                                                            </span>
+                                                        </Link>
                                                         <a
                                                             href={`https://testnet.arcscan.app/tx/${notification.data.tx_hash}`}
                                                             target="_blank"

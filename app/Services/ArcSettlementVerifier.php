@@ -147,7 +147,7 @@ final readonly class ArcSettlementVerifier
             return $this->verdict('mismatched', $economic['mismatch'], $receipt);
         }
 
-        $feeBaseUnits = $this->actualFeeBaseUnits($receipt);
+        $feeBaseUnits = $this->actualFeeBaseUnits($receipt, $expected['sender'] ?? null);
         if ($feeBaseUnits !== null && $feeBaseUnits > $expected['max_fee_base_units']) {
             return $this->verdict('fee_exceeded', sprintf(
                 'Actual fee %s USDC exceeded the approved ceiling of %s USDC.',
@@ -348,8 +348,32 @@ final readonly class ArcSettlementVerifier
      *
      * @param  array<string, mixed>  $receipt
      */
-    private function actualFeeBaseUnits(array $receipt): ?int
+    private function actualFeeBaseUnits(array $receipt, ?string $sender = null): ?int
     {
+        $from = is_string($receipt['from'] ?? null) ? strtolower($receipt['from']) : null;
+        if ($sender !== null && $from !== null && $from !== strtolower($sender)) {
+            // Relayed/bundled transaction where gas is sponsored by the bundler/relayer.
+            // Check if any fee transfer was made from the sender to a paymaster/EntryPoint.
+            $senderFeeDeducted = 0;
+            foreach ($receipt['logs'] ?? [] as $log) {
+                if (! is_array($log) || ! isset($log['topics'][1])) {
+                    continue;
+                }
+                $logFrom = '0x'.substr(strtolower((string) $log['topics'][1]), 26);
+                if ($logFrom === strtolower($sender)) {
+                    $logTo = isset($log['topics'][2]) ? '0x'.substr(strtolower((string) $log['topics'][2]), 26) : null;
+                    if ($logTo !== null && $logTo === '0x0000000071727de22e5e9d8baf0edac6f37da032') {
+                        $moved = $this->hexQuantity((string) ($log['data'] ?? '0x0'), 18);
+                        if ($moved instanceof BigDecimal) {
+                            $senderFeeDeducted += $moved->multipliedBy(BigInteger::of('1000000'))->toInt();
+                        }
+                    }
+                }
+            }
+
+            return $senderFeeDeducted;
+        }
+
         $gasUsed = $receipt['gasUsed'] ?? null;
         $price = $receipt['effectiveGasPrice'] ?? null;
 

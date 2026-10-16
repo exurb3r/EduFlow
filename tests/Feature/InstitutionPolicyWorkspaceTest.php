@@ -34,51 +34,6 @@ use Illuminate\Validation\ValidationException;
 use Inertia\Testing\AssertableInertia;
 use Spatie\Permission\Models\Role;
 
-/** @return array<string, mixed> */
-function institutionPolicyInput(): array
-{
-    return ['request_key' => (string) Str::uuid(), 'title' => 'Campus finance policy', 'predecessor_id' => null, 'expected_current_digest' => null,
-        'clauses' => [['id' => 'materials', 'title' => 'Teaching purchases', 'text' => 'Laboratory consumables belong to Teaching Materials. Equipment with multi-year use belongs to Capital Equipment.']],
-        'categories' => [
-            ['id' => 'teaching-materials', 'name' => 'Teaching Materials', 'description' => 'Consumables used in teaching.', 'inclusions' => 'Chemicals, disposable pipettes', 'exclusions' => 'Long-lived equipment', 'clause_ids' => ['materials']],
-            ['id' => 'capital-equipment', 'name' => 'Capital Equipment', 'description' => 'Equipment used over multiple years.', 'inclusions' => 'Microscopes', 'exclusions' => 'Consumables', 'clause_ids' => ['materials']],
-        ], 'examples' => [['description' => 'Disposable chemistry pipettes for classes', 'category_id' => 'teaching-materials']],
-        'controls' => ['minimum_reserve' => '10.000001', 'max_auto_payment' => '0', 'max_daily_disbursement' => '500', 'max_fee' => '0.1'],
-        'priorities' => 'Prioritize essential teaching purchases due this week.', 'clarifications' => []];
-}
-
-/** @return array<string, mixed> */
-function institutionPolicyAnswer(?string $category = 'teaching-materials'): array
-{
-    return ['category_id' => $category, 'citations' => [['clause_id' => 'materials', 'quote' => 'Laboratory consumables belong to Teaching Materials.']],
-        'explanation' => 'Consumable teaching supplies match the institution definition.', 'questions' => [], 'missing_evidence' => [], 'priority' => 'high', 'needs_review' => false];
-}
-
-/** @return array<string, mixed> */
-function institutionPolicyContext(): array
-{
-    config(['queue.default' => 'database', 'eduflow.institution_id' => null, 'queue.connections.database.retry_after' => 360]);
-    Organization::factory()->create();
-    $maker = User::factory()->create()->assignRole(Role::findOrCreate('finance_officer', 'web'));
-    $reviewer = User::factory()->create()->assignRole(Role::findOrCreate('admin', 'web'));
-    $policy = app(InstitutionPolicyWorkspace::class)->save($maker, institutionPolicyInput());
-
-    return ['maker' => $maker, 'reviewer' => $reviewer, 'policy' => $policy];
-}
-
-/** @param array<string, mixed> $c */
-function assessInstitutionPolicy(array $c, string $kind = 'authoring'): InstitutionPolicyAssessment
-{
-    Bus::fake();
-    $response = test()->actingAs($c['maker'])->postJson(route('finance.policies.assess', $c['policy']), [
-        'kind' => $kind, 'request_key' => (string) Str::uuid(), 'expected_digest' => $c['policy']->content_digest, 'description' => 'Chemistry supplies',
-    ])->assertSuccessful();
-    $id = $response->json('data.id');
-    (new AssessInstitutionPolicy($id))->handle(app(InstitutionPolicyInterpreter::class), app(InstallationInstitution::class), app(AiProviderResolver::class));
-
-    return InstitutionPolicyAssessment::query()->findOrFail($id);
-}
-
 test('institution authors custom policy without fixed category vocabulary and exact controls remain inactive until reviewed', function (): void {
     $c = institutionPolicyContext();
     expect($c['policy']->hasValidContent())->toBeTrue()->and($c['policy']->financePolicy->minimum_reserve_base_units)->toBe(10_000001)

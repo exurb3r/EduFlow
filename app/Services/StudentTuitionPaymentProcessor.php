@@ -370,8 +370,14 @@ final readonly class StudentTuitionPaymentProcessor
     {
         try {
             $payment = StudentTuitionPayment::query()->find($paymentId);
-            if ($payment !== null && ! $payment->collections()->exists()) {
-                $this->intake->reconcile($payment);
+            if ($payment !== null) {
+                if (! $payment->collections()->exists()) {
+                    $this->intake->reconcile($payment);
+                }
+
+                if (config('eduflow.autonomous_pipeline.enabled', false)) {
+                    app(AutonomousPipelineBridge::class)->bridgePayment($payment);
+                }
             }
         } catch (Throwable $exception) {
             report($exception);

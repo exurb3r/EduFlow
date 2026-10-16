@@ -120,6 +120,35 @@ export type StudentDashboardProps = {
     };
 };
 
+export type OfficialPaymentReceipt = {
+    receipt_number: string;
+    payment_type?: 'tuition' | 'bill';
+    student_name: string;
+    student_number: string;
+    program: string;
+    term: string;
+    description?: string;
+    amount_base_units: string;
+    applied_base_units: string;
+    overpayment_base_units: string;
+    remaining_balance_base_units: string;
+    total_tuition_base_units?: string;
+    paid_tuition_base_units?: string;
+    network_fee: string;
+    fee_guarantee: string;
+    payer_address: string;
+    recipient_address: string;
+    chain: string;
+    chain_id: number;
+    block_number?: string | null;
+    verified_status?: string | null;
+    tx_hash: string | null;
+    explorer_url: string | null;
+    settlement_digest: string | null;
+    consent_digest?: string | null;
+    issued_at: string;
+};
+
 export type TuitionAttempt = {
     id: number;
     request_key: string;
@@ -142,6 +171,7 @@ export type TuitionAttempt = {
     overpayment_base_units: string;
     requires_investigation?: boolean;
     created_at?: string;
+    receipt?: OfficialPaymentReceipt | null;
 };
 
 export type PaymentTransaction = {

@@ -76,6 +76,11 @@ final readonly class InstitutionPolicyInterpreter
             'questions.*' => ['required', 'string', 'max:1000'], 'missing_evidence' => ['present', 'array', 'max:20'],
             'missing_evidence.*' => ['required', 'string', 'max:1000'], 'priority' => ['required', Rule::in(['high', 'normal', 'low'])],
             'needs_review' => ['required', 'boolean'],
+            'confidence' => ['sometimes', 'nullable', 'numeric'],
+            'probabilities' => ['sometimes', 'nullable', 'array'],
+            'top_category_id' => ['sometimes', 'nullable', 'string'],
+            'top_category_name' => ['sometimes', 'nullable', 'string'],
+            'decision_process' => ['sometimes', 'nullable', 'array'],
         ])->validate();
         foreach ($data['citations'] as $citation) {
             $clause = collect($policy->content['clauses'])->firstWhere('id', $citation['clause_id']);
@@ -95,7 +100,7 @@ final readonly class InstitutionPolicyInterpreter
         $data['needs_review'] = (bool) $data['needs_review'] || ($kind !== 'authoring' && $data['category_id'] === null)
             || $data['questions'] !== [] || $data['missing_evidence'] !== [];
 
-        return $data + ['advisory_only' => true, 'can_execute' => false, 'confidence' => null, 'policy_version_id' => $policy->id,
+        return $data + ['advisory_only' => true, 'can_execute' => false, 'confidence' => $data['confidence'] ?? null, 'policy_version_id' => $policy->id,
             'policy_digest' => $policy->content_digest, 'jev_called' => false];
     }
 }

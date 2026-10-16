@@ -76,7 +76,12 @@ final readonly class StudentTuitionPaymentService
             'quoted_for' => $student->user_id, 'student_id' => $student->id, 'tuition_account_id' => $account->id,
             'student_wallet_id' => $wallet->id, 'payer_address' => strtolower($wallet->address), 'recipient_address' => $recipient,
             'amount_base_units' => $amountBaseUnits, 'quoted_network_fee' => $fee, 'fee_ceiling_base_units' => $feeUnits,
-            'available_base_units' => $available, 'total_base_units' => $total, 'chain' => 'ARC-TESTNET', 'chain_id' => 5042002,
+            'available_base_units' => $available, 'total_base_units' => $total,
+            // Recorded rather than recomputed later, so the stored evidence states
+            // what the payer was actually required to have, and the guard below
+            // re-checks the same figure instead of a second, stricter one.
+            'payer_debit_base_units' => $required,
+            'chain' => 'ARC-TESTNET', 'chain_id' => 5042002,
             'simulated' => $simulated, 'quoted_at' => now()->utc()->toIso8601String(),
             'expires_at' => now()->utc()->addSeconds(max(30, min(300, (int) config('eduflow.student_tuition.quote_seconds', 120))))->toIso8601String(),
             'consent_text' => StudentTuitionPaymentIntent::CONSENT_TEXT];
@@ -216,6 +221,12 @@ final readonly class StudentTuitionPaymentService
 
         return [...$s, 'recipient' => $s['recipient_address'], 'network_fee' => $s['quoted_network_fee'],
             'request_digest' => $intent->snapshot_digest, 'total' => BigDecimal::of($s['amount_base_units'])->withPointMovedLeft(6)->plus($s['quoted_network_fee'])->__toString(),
+            // What the wallet is actually debited. Equal to `total` only on a rail
+            // where the payer bears the fee; on the sponsored testnet rail the fee
+            // is Circle's cost, so labelling the principal-plus-fee figure as the
+            // amount "leaving your wallet" overstated it.
+            'payer_debit' => BigDecimal::of($s['payer_debit_base_units'])->withPointMovedLeft(6)->__toString(),
+            'fee_paid_by_payer' => $s['payer_debit_base_units'] === $s['total_base_units'],
             'remaining_base_units' => TuitionAccount::query()->findOrFail($intent->tuition_account_id)->remainingAmount()];
     }
 

@@ -5,9 +5,11 @@ declare(strict_types=1);
 use App\Models\Student;
 use App\Models\StudentTuitionPayment;
 use App\Models\StudentTuitionPaymentAttempt;
+use App\Models\StudentTuitionPaymentIntent;
 use App\Models\Transaction;
 use App\Models\TuitionAccount;
 use App\Services\Payments\AsyncPaymentTransport;
+use App\Services\Payments\FeeGuarantee;
 use App\Services\Payments\TransportAcceptance;
 use App\Services\Payments\TransportResolution;
 use App\Services\StudentTuitionPaymentProcessor;
@@ -31,6 +33,30 @@ test('the quote refuses an amount larger than the wallet can cover', function ()
     $c = consentContext();
     expect(fn () => app(StudentTuitionPaymentService::class)->quote($c['student'], $c['account'], 20_000000))
         ->toThrow(ValidationException::class, 'plus the network fee ceiling');
+});
+
+test('a sponsored rail quotes spending the whole balance instead of failing the pay screen', function (): void {
+    $c = consentContext();
+    // The fixture funds exactly 20 USDC. Where Circle sponsors the gas the payer's
+    // debit is that 20 USDC principal alone, so the quote is affordable and must be
+    // issued. The stored snapshot used to demand principal + fee ceiling
+    // (20.029452 USDC) from the same wallet, so the quote the service had already
+    // accepted was rejected on insert and surfaced as an HTTP 500 on the pay
+    // dialog rather than as a validation message the student could act on.
+    app()->instance(AsyncPaymentTransport::class, tuitionTransport(FeeGuarantee::RelayerSponsored));
+
+    $q = app(StudentTuitionPaymentService::class)->quote($c['student'], $c['account'], 20_000000);
+
+    expect($q['amount_base_units'])->toBe(20_000000)
+        ->and($q['available_base_units'])->toBe(20_000000)
+        // The notional total still exceeds the balance; that is now recorded as
+        // evidence rather than used as the affordability test.
+        ->and($q['total_base_units'])->toBe(20_029452)
+        ->and($q['payer_debit_base_units'])->toBe(20_000000)
+        ->and($q['fee_paid_by_payer'])->toBeFalse()
+        ->and($q['payer_debit'])->toBe('20.000000');
+
+    expect(StudentTuitionPaymentIntent::query()->where('request_key', $q['request_key'])->firstOrFail()->hasValidSnapshot())->toBeTrue();
 });
 
 test('a fee the rail cannot read is never reported as free', function (): void {

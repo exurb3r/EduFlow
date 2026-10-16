@@ -16,6 +16,7 @@ use Illuminate\Support\Facades\Cache;
 use Spatie\Permission\Models\Role;
 use Yukazakiri\Lepton\Contracts\WalletGateway;
 use Yukazakiri\Lepton\DTOs\BalanceResult;
+use Yukazakiri\Lepton\DTOs\TransferResolution;
 use Yukazakiri\Lepton\DTOs\TransferResult;
 use Yukazakiri\Lepton\Gateways\FakeLeptonGateway;
 use Yukazakiri\Lepton\Support\CliRunner;
@@ -211,6 +212,29 @@ test('a chain failure is reported, not recorded', function (): void {
         {
             return [];
         }
+
+        public function resolve(string $handle, array $options = []): TransferResolution
+        {
+            throw new LeptonCliException(command: ['wallet', 'transfer'], exitCode: 1, stderr: 'unused');
+        }
+
+        /** @return array<int,array<string,mixed>> */
+        public function wallets(array $options = []): array
+        {
+            throw new LeptonCliException(command: ['wallet', 'list'], exitCode: 1, stderr: 'unused');
+        }
+
+        /** @return array<string,mixed> */
+        public function createWallet(array $options = []): array
+        {
+            throw new LeptonCliException(command: ['wallet', 'create'], exitCode: 1, stderr: 'unused');
+        }
+
+        /** @return array<string,mixed> */
+        public function fundWallet(string $address, array $options = []): array
+        {
+            throw new LeptonCliException(command: ['wallet', 'fund'], exitCode: 1, stderr: 'unused');
+        }
     });
 
     $this->actingAs($student->user->assignRole('student'));
@@ -236,4 +260,71 @@ test('a payment request without a durable identity is refused', function (): voi
     ])->assertUnprocessable()->assertJsonValidationErrors('request_key');
 
     expect(StudentTuitionPayment::query()->count())->toBe(0);
+});
+
+test('a student can open the dedicated crypto wallet transfer page', function (): void {
+    [$student, $account, $wallet] = payEndpointStudent();
+
+    $this->actingAs($student->user->assignRole('student'));
+
+    $response = $this->get(route('student.pay', ['mode' => 'tuition']));
+
+    $response->assertOk()
+        ->assertInertia(fn ($page) => $page
+            ->component('student/pay')
+            ->where('initialMode', 'tuition')
+            ->where('wallet.address', $wallet->address)
+            ->where('tuitionAccount.id', $account->id)
+            ->where('treasury.chain', 'ARC-TESTNET')
+        );
+});
+
+test('circle webhook records candidate txHash on matching tuition attempt without forging settlement', function (): void {
+    [$student, $account] = payEndpointStudent();
+    $this->actingAs($student->user->assignRole('student'));
+
+    $quote = $this->postJson(route('student.tuition.quote'), [
+        'tuition_account_id' => $account->id,
+        'amount_base_units' => 5_000000,
+    ])->assertOk();
+
+    $requestKey = (string) $quote->json('request_key');
+
+    $this->postJson(route('student.tuition.pay'), [
+        'tuition_account_id' => $account->id,
+        'amount_base_units' => 5_000000,
+        'request_key' => $requestKey,
+        'request_digest' => $quote->json('request_digest'),
+        'consent' => true,
+    ])->assertAccepted();
+
+    $attempt = StudentTuitionPaymentAttempt::query()->where('request_key', $requestKey)->firstOrFail();
+    $providerHandle = '11111111-2222-4333-8444-555555555555';
+    $candidateHash = '0x'.str_repeat('ab', 32);
+
+    $attempt->update([
+        'state' => 'accepted',
+        'provider_handle' => $providerHandle,
+        'provider_reference' => null,
+    ]);
+
+    $webhook = $this->postJson(route('api.webhooks.circle'), [
+        'notificationType' => 'transactions.outbound',
+        'data' => [
+            'transaction' => [
+                'id' => $providerHandle,
+                'idempotencyKey' => $requestKey,
+                'state' => 'COMPLETE',
+                'txHash' => $candidateHash,
+            ],
+        ],
+    ]);
+
+    $webhook->assertOk()
+        ->assertJsonPath('received', true)
+        ->assertJsonPath('reconciled.tuition_attempt', $attempt->id);
+
+    expect($attempt->fresh()->provider_reference)->toBe($candidateHash)
+        // Without a real on-chain receipt verified by ArcSettlementVerifier, the webhook alone never posts credit
+        ->and($attempt->fresh()->posted_at)->toBeNull();
 });
